@@ -1,9 +1,18 @@
-mod commands;
+//! ## Features
+//!
+//! - `std`:
+//!   - Provides `impl Connection` for several common types (e.g: TcpStream)
+//!   - Outputs protocol responses via `trace!`
+
+#![cfg_attr(not(feature = "std"), no_std)]
+
+extern crate alloc;
+
 mod connection_impls;
 mod error;
+mod protocol;
 mod stub;
 
-pub use commands::{Command, Error as CommandParseError};
 pub use error::Error;
 pub use stub::GdbStub;
 
@@ -20,11 +29,12 @@ pub trait Target {
     // /// Write a byte to a memory address
     // fn write(&mut self, addr: Self::Usize, val: u8);
 
-    /// Perform a single "step" of the target CPU, recording any memory accesses
-    /// in the `mem_accesses` vector. The return value indicates
+    /// Perform a single "step" of the target CPU.
+    /// The provided `log_mem_access` function should be called each time a
+    /// memory location is accessed.
     fn step(
         &mut self,
-        mem_accesses: &mut Vec<(AccessKind, Self::Usize, u8)>,
+        log_mem_access: impl FnMut(Access<Self::Usize>),
     ) -> Result<TargetState, Self::Error>;
 }
 
@@ -34,17 +44,27 @@ pub enum AccessKind {
     Write,
 }
 
+#[derive(Debug)]
+pub struct Access<U> {
+    pub kind: AccessKind,
+    pub addr: U,
+    pub val: u8,
+}
+
 #[derive(PartialEq, Eq)]
 pub enum TargetState {
     Running,
     Halted,
 }
 
-/// A trait similar to `impl Read + Write`, albeit without any dependency on
-/// std::io, and with some additional helper methods.
+/// A trait similar to `impl Read + Write`, albeit without any dependencies on
+/// std::io.
 ///
 /// The default implementation of `read_nonblocking` falls-back to `read`. If
 /// non-blocking reads are possible, you should provide your own implementation.
+///
+/// Enabling the `std` feature will automatically implement `Connection` on
+/// several common types (such as TcpStream).
 pub trait Connection {
     type Error;
 

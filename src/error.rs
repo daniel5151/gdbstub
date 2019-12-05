@@ -1,27 +1,29 @@
+use alloc::string::String;
 use core::fmt::{Debug, Display};
 
 #[derive(Debug)]
 pub enum Error<T, C> {
+    ChecksumParse,
     Connection(C),
+    MismatchedChecksum,
+    PacketParse(String),
     TargetError(T),
     Unexpected,
-    ChecksumParse,
-    MismatchedChecksum,
-    CommandParse(String),
 }
 
 impl<T: Debug, C: Debug> Display for Error<T, C> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         use self::Error::*;
         match self {
+            ChecksumParse => write!(f, "Couldn't parse checksum"),
             Connection(e) => write!(f, "Connection Error: {:?}", e),
+            MismatchedChecksum => write!(f, "Checksum mismatch"),
+            PacketParse(e) => write!(f, "Couldn't parse command: {}", e),
             TargetError(e) => write!(f, "Target Fatal Error: {:?}", e),
             Unexpected => write!(f, "Client sent an unexpected packet"),
-            ChecksumParse => write!(f, "Couldn't parse checksum"),
-            MismatchedChecksum => write!(f, "Checksum mismatch"),
-            CommandParse(e) => write!(f, "Couldn't parse command: {}", e),
         }
     }
 }
 
+#[cfg(feature = "std")]
 impl<T: Debug, C: Debug> std::error::Error for Error<T, C> {}

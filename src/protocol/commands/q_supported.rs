@@ -1,11 +1,16 @@
+use alloc::vec::Vec;
+
+/// https://sourceware.org/gdb/onlinedocs/gdb/General-Query-Packets.html#qSupported
 #[derive(PartialEq, Eq, Debug)]
 pub struct QSupported<'a>(Vec<Feature<'a>>);
 
 impl<'a> QSupported<'a> {
-    pub fn from_cmd_body(s: Option<&'a str>) -> Result<QSupported<'a>, ()> {
-        let s = s.ok_or(())?; // can't have empty body
+    pub fn parse(body: &'a str) -> Result<QSupported<'a>, ()> {
+        if body.is_empty() {
+            return Err(());
+        }
 
-        let features = s
+        let features = body
             .split(';')
             .map(|s| match s.as_bytes().last() {
                 None => {

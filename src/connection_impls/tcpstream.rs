@@ -1,4 +1,4 @@
-use super::super::Connection;
+use crate::Connection;
 
 impl Connection for std::net::TcpStream {
     type Error = std::io::Error;
