@@ -2,10 +2,10 @@ use alloc::vec::Vec;
 
 /// https://sourceware.org/gdb/onlinedocs/gdb/General-Query-Packets.html#qSupported
 #[derive(PartialEq, Eq, Debug)]
-pub struct QSupported<'a>(Vec<Feature<'a>>);
+pub struct qSupported<'a>(pub Vec<Feature<'a>>);
 
-impl<'a> QSupported<'a> {
-    pub fn parse(body: &'a str) -> Result<QSupported<'a>, ()> {
+impl<'a> qSupported<'a> {
+    pub fn parse(body: &'a str) -> Result<Self, ()> {
         if body.is_empty() {
             return Err(());
         }
@@ -37,7 +37,7 @@ impl<'a> QSupported<'a> {
                 }
             })
             .collect::<Result<Vec<_>, _>>()?;
-        Ok(QSupported(features))
+        Ok(qSupported(features))
     }
 }
 

@@ -21,10 +21,14 @@ macro_rules! prefix_match {
 
 macro_rules! commands {
     ($($name:literal => $mod:ident::$command:ident$(<$lifetime:lifetime>)?,)*) => {
-        $(pub mod $mod;)*
+        $(
+            #[allow(non_snake_case, non_camel_case_types)]
+            pub mod $mod;
+        )*
         $(pub use $mod::$command;)*
 
         /// GDB commands
+        #[allow(non_camel_case_types)]
         #[derive(PartialEq, Eq, Debug)]
         pub enum Command<'a> {
             $($command($command<$($lifetime)?>),)*
@@ -65,6 +69,15 @@ pub enum CommandParseError<'a> {
 }
 
 commands! {
-    "qSupported" => q_supported::QSupported<'a>,
-    "H" => h::H,
+    "?" => question_mark::QuestionMark,
+    "D" => _D::D,
+    "g" => _g::g,
+    "H" => _H::H,
+    "m" => _m::m,
+    "qAttached" => _qAttached::qAttached,
+    "qC" => _qC::qC,
+    "qfThreadInfo" => _qfThreadInfo::qfThreadInfo,
+    "qsThreadInfo" => _qsThreadInfo::qsThreadInfo,
+    "qSupported" => _qSupported::qSupported<'a>,
+    "qXfer:features:read" => _qXfer_features_read::qXferFeaturesRead<'a>,
 }

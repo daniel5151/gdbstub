@@ -2,8 +2,9 @@ use log::*;
 
 mod commands;
 mod response_writer;
+
 pub use commands::*;
-pub use response_writer::ResponseWriter;
+pub use response_writer::{Error as ResponseWriterError, ResponseWriter};
 
 /// Packet parse error.
 #[derive(Debug)]
@@ -16,7 +17,7 @@ pub enum PacketParseError<'a> {
     UnexpectedHeader(u8),
 }
 
-/// Top-Level GDB Stub packet
+/// Top-Level GDB packet
 #[derive(PartialEq, Eq, Debug)]
 pub enum Packet<'a> {
     Ack,

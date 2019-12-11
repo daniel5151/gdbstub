@@ -15,12 +15,12 @@
 /// for an error
 #[derive(PartialEq, Eq, Debug)]
 pub struct H {
-    kind: char, // TODO: make this an enum
-    id: isize,
+    pub kind: char, // TODO: make this an enum
+    pub id: isize,
 }
 
 impl H {
-    pub fn parse(body: &str) -> Result<H, ()> {
+    pub fn parse(body: &str) -> Result<Self, ()> {
         if body.is_empty() {
             return Err(());
         }
