@@ -1,11 +1,11 @@
 #[derive(PartialEq, Eq, Debug)]
-pub struct g;
+pub struct vContQuestionMark;
 
-impl g {
+impl vContQuestionMark {
     pub fn parse(body: &str) -> Result<Self, ()> {
         if !body.is_empty() {
             return Err(());
         }
-        Ok(g)
+        Ok(vContQuestionMark)
     }
 }

@@ -22,6 +22,7 @@ pub enum PacketParseError<'a> {
 pub enum Packet<'a> {
     Ack,
     Nack,
+    Interrupt,
     Command(Command<'a>),
 }
 
@@ -44,7 +45,8 @@ impl<'a> Packet<'a> {
                     core::str::from_utf8(checksum).map_err(|_| PacketParseError::NotASCII)?;
                 let checksum = u8::from_str_radix(checksum, 16)
                     .map_err(|_| PacketParseError::MalformedChecksum)?;
-                if body.iter().sum::<u8>() != checksum {
+
+                if body.iter().fold(0u8, |a, x| a.wrapping_add(*x)) != checksum {
                     return Err(PacketParseError::MismatchedChecksum);
                 }
 
@@ -62,6 +64,7 @@ impl<'a> Packet<'a> {
             }
             b'+' => Ok(Packet::Ack),
             b'-' => Ok(Packet::Nack),
+            0x03 => Ok(Packet::Interrupt),
             _ => Err(PacketParseError::UnexpectedHeader(buf[0])),
         }
     }

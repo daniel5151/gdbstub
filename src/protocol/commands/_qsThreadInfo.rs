@@ -1,6 +1,3 @@
-/// 'qfThreadInfo'
-///
-/// See 'qfThreadInfo'
 #[derive(PartialEq, Eq, Debug)]
 pub struct qsThreadInfo;
 

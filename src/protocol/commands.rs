@@ -1,4 +1,5 @@
 // TODO: figure out how to make it accept exprs _and_ blocks
+// TODO: use a trie structure for more efficient longest-prefix matching
 macro_rules! prefix_match {
     (
         match $val:expr => [$name:ident|$rest:ident] {
@@ -32,7 +33,7 @@ macro_rules! commands {
         #[derive(PartialEq, Eq, Debug)]
         pub enum Command<'a> {
             $($command($command<$($lifetime)?>),)*
-            Unknown,
+            Unknown(&'a str),
         }
 
         impl<'a> Command<'a> {
@@ -49,7 +50,7 @@ macro_rules! commands {
                                 .map_err(|_| CommandParseError::MalformedCommand(name))?;
                             Command::$command(cmd)
                         })*
-                        _ => { Command::Unknown }
+                        _ => { Command::Unknown(body) }
                     }
                 };
 
@@ -61,6 +62,7 @@ macro_rules! commands {
 }
 
 /// Command parse error
+// TODO: add more granular errors
 #[derive(Debug)]
 pub enum CommandParseError<'a> {
     Empty,
@@ -70,14 +72,23 @@ pub enum CommandParseError<'a> {
 
 commands! {
     "?" => question_mark::QuestionMark,
+    "c" => _c::c,
     "D" => _D::D,
     "g" => _g::g,
     "H" => _H::H,
     "m" => _m::m,
+    "M" => _M::M,
     "qAttached" => _qAttached::qAttached,
     "qC" => _qC::qC,
     "qfThreadInfo" => _qfThreadInfo::qfThreadInfo,
     "qsThreadInfo" => _qsThreadInfo::qsThreadInfo,
     "qSupported" => _qSupported::qSupported<'a>,
     "qXfer:features:read" => _qXfer_features_read::qXferFeaturesRead<'a>,
+    "s" => _s::s,
+    "z" => _z::z,
+    "Z" => _Z::Z,
+
+    // Order Matters (because of prefix matching)
+    "vCont?" => vCont_question_mark::vContQuestionMark,
+    "vCont" => _vCont::vCont,
 }

@@ -1,6 +1,5 @@
 use alloc::vec::Vec;
 
-/// https://sourceware.org/gdb/onlinedocs/gdb/General-Query-Packets.html#qSupported
 #[derive(PartialEq, Eq, Debug)]
 pub struct qSupported<'a>(pub Vec<Feature<'a>>);
 

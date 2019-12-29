@@ -12,14 +12,26 @@ mod connection_impls;
 mod error;
 mod protocol;
 mod stub;
+mod support;
 
 pub use error::Error;
 pub use stub::GdbStub;
 
 /// The set of operations that a GDB target needs to implement.
 pub trait Target {
-    /// The target architecture's pointer size
-    type Usize: FromLEBytes;
+    /// The target architecture's pointer size. Should be one of the built-in
+    /// unsigned integer types (u8, u16, u32, u64, or u128)
+    type Usize: support::ToFromLEBytes
+        + Clone
+        + Copy
+        + core::hash::Hash
+        + core::fmt::Debug
+        + Eq
+        + Ord
+        + PartialEq
+        + PartialOrd
+        + Sized;
+
     /// A target-specific unrecoverable error, which will be propagated
     /// through the GdbStub
     type Error;
@@ -57,8 +69,14 @@ pub trait Target {
     /// register's value.
     fn read_registers(&mut self, push_reg: impl FnMut(&[u8]));
 
+    /// Read the target's current PC
+    fn read_pc(&mut self) -> Self::Usize;
+
     /// Read bytes from the specified address range
     fn read_addrs(&mut self, addr: core::ops::Range<Self::Usize>, val: impl FnMut(u8));
+
+    /// Write bytes to the specified address range
+    fn write_addrs(&mut self, get_addr_val: impl FnMut() -> Option<(Self::Usize, u8)>);
 }
 
 #[derive(Debug)]
@@ -74,7 +92,7 @@ pub struct Access<U> {
     pub val: u8,
 }
 
-// TODO: explore if TargetState is really necissary...
+// TODO: explore if TargetState is really necessary...
 #[derive(Debug, PartialEq, Eq)]
 pub enum TargetState {
     Running,
@@ -112,36 +130,3 @@ pub trait Connection {
         })
     }
 }
-
-/// A simple trait that enables a type to be constructed from a slice of little
-/// endian bytes. It is automatically implemented for u8 through u128.
-pub trait FromLEBytes: Sized {
-    /// Create [Self] from an array of little-endian order bytes.
-    /// Returns None if byte array is too short.
-    /// The array can be longer than required (truncating the result).
-    fn from_le_bytes(bytes: &[u8]) -> Option<Self>;
-}
-
-impl FromLEBytes for u8 {
-    fn from_le_bytes(buf: &[u8]) -> Option<Self> {
-        buf.get(0).copied()
-    }
-}
-
-macro_rules! impl_FromLEBytes {
-    ($($type:ty),*) => {$(
-        impl FromLEBytes for $type {
-            fn from_le_bytes(buf: &[u8]) -> Option<Self> {
-                if buf.len() < core::mem::size_of::<Self>() {
-                    return None;
-                }
-
-                let mut b = [0; core::mem::size_of::<Self>()];
-                b.copy_from_slice(&buf[..core::mem::size_of::<Self>()]);
-                Some(Self::from_le_bytes(b))
-            }
-        })*
-    };
-}
-
-impl_FromLEBytes! { u16, u32, u64, u128 }
