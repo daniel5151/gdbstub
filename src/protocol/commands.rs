@@ -73,11 +73,11 @@ pub enum CommandParseError<'a> {
 commands! {
     "?" => question_mark::QuestionMark,
     "c" => _c::c,
-    "D" => _D::D,
+    "D" => _d_upcase::D,
     "g" => _g::g,
-    "H" => _H::H,
+    "H" => _h_upcase::H,
     "m" => _m::m,
-    "M" => _M::M,
+    "M" => _m_upcase::M,
     "qAttached" => _qAttached::qAttached,
     "qC" => _qC::qC,
     "qfThreadInfo" => _qfThreadInfo::qfThreadInfo,
@@ -86,7 +86,7 @@ commands! {
     "qXfer:features:read" => _qXfer_features_read::qXferFeaturesRead<'a>,
     "s" => _s::s,
     "z" => _z::z,
-    "Z" => _Z::Z,
+    "Z" => _z_upcase::Z,
 
     // Order Matters (because of prefix matching)
     "vCont?" => vCont_question_mark::vContQuestionMark,
