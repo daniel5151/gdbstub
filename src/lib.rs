@@ -71,9 +71,9 @@ pub trait Target {
 
     /// Write the target's registers.
     ///
-    /// The registers are provided in the order specified in the target's
-    /// `target.xml`.
-    fn write_registers(&mut self, regs: impl FnMut() -> Option<Self::Usize>);
+    /// The bytes are provided in the order specified in the target's registers
+    /// are provided in the order specified in the target's `target.xml`.
+    fn write_registers(&mut self, regs: &[u8]);
 
     /// Read the target's current PC
     fn read_pc(&mut self) -> Self::Usize;
