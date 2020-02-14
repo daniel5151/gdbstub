@@ -104,6 +104,21 @@ impl<T: Target, C: Connection> GdbStub<T, C> {
                 });
                 err?;
             }
+            Command::G(cmd) => {
+                let wordlen = std::mem::size_of::<T::Usize>();
+                if cmd.vals.len() % wordlen != 0 {
+                    return Err(Error::PacketParse(format!(
+                        "Invalid number of bytes for register write: {}",
+                        cmd.vals.len()
+                    )));
+                }
+                let mut vals = cmd
+                    .vals
+                    .chunks_exact(wordlen)
+                    .map(|b| T::Usize::from_le_bytes(b).unwrap());
+
+                target.write_registers(|| vals.next());
+            }
             Command::m(cmd) => {
                 let mut err = Ok(());
                 // XXX: get rid of this unwrap ahhh

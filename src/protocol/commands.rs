@@ -75,6 +75,7 @@ commands! {
     "c" => _c::c,
     "D" => _d_upcase::D,
     "g" => _g::g,
+    "G" => _g_upcase::G,
     "H" => _h_upcase::H,
     "m" => _m::m,
     "M" => _m_upcase::M,
