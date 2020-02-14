@@ -104,6 +104,10 @@ impl<T: Target, C: Connection> GdbStub<T, C> {
                 });
                 err?;
             }
+            Command::G(cmd) => {
+                target.write_registers(cmd.vals.as_slice());
+                res.write_str("OK")?;
+            }
             Command::m(cmd) => {
                 let mut err = Ok(());
                 // XXX: get rid of this unwrap ahhh
