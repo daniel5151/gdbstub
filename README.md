@@ -10,6 +10,7 @@ An implementation of the [GDB Remote Server Protocol](https://sourceware.org/gdb
     - [x] Step / Continue
     - [x] Add / Remove Breakpoints
     - [x] Read/Write memory
+    - [x] Read/Write registers
     - [ ] Read/Write/Access Watchpoints (i.e: value breakpoints)
       - implemented, but currently broken
 - Extended Protocol
@@ -23,14 +24,10 @@ There are also a few features which rely on `std`, which can be enabled by enabl
 ## Future Plans
 
 - Improve packet-parsing infrastructure
-- Reconsider / Rework `Target::Usize`
-  - i.e: find a "nicer" way to make `gdbstub` generic across various target pointer sizes
-  - Will most-likely switch to using `&[u8]` instead of a generic type
-    - If only const-generics were stable, then I could use generic-sized arrays. One day...
 - Improve multiprocess / multithread / multicore support?
 - Re-architect internals to remove `alloc` dependency?
-  - Current approach has a clear separation between packet parsing and command execution, and requires intermediate allocations for parsed data.
-  - Require user to provide their own packet buffers
+  - Current approach has a clear separation between packet parsing and command execution, and requires intermediate allocations for parsed data. Interleaving packet parsing and command execution would remove the need for intermediate allocations, at the expense of potentially less-clear code...
+  - Require users to allocate packet buffers themselves
 
 ## Example
 

@@ -1,3 +1,5 @@
+use alloc::vec::Vec;
+
 #[derive(PartialEq, Eq, Debug)]
 pub struct G {
     pub vals: Vec<u8>,

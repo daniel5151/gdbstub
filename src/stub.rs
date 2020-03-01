@@ -6,7 +6,6 @@ use log::*;
 
 use crate::{
     protocol::{Command, Packet, ResponseWriter},
-    support::ToFromLEBytes,
     Access, AccessKind, Connection, Error, Target, TargetState,
 };
 
@@ -110,10 +109,9 @@ impl<T: Target, C: Connection> GdbStub<T, C> {
             }
             Command::m(cmd) => {
                 let mut err = Ok(());
-                // XXX: get rid of this unwrap ahhh
-                let start = T::Usize::from_le_bytes(&cmd.addr.to_le_bytes()).unwrap();
-                let end =
-                    T::Usize::from_le_bytes(&(cmd.addr + cmd.len as u64).to_le_bytes()).unwrap();
+                // XXX: get rid of these unwraps ahhh
+                let start = num_traits::NumCast::from(cmd.addr).unwrap();
+                let end = num_traits::NumCast::from(cmd.addr + cmd.len as u64).unwrap();
 
                 target.read_addrs(start..end, |val| {
                     // TODO: assert the length is correct
@@ -131,7 +129,7 @@ impl<T: Target, C: Connection> GdbStub<T, C> {
                     .enumerate()
                     .map(|(i, v)| (addr + i as u64, v))
                     // XXX: get rid of this unwrap ahhh
-                    .map(|(i, v)| (T::Usize::from_le_bytes(&i.to_le_bytes()).unwrap(), v));
+                    .map(|(i, v)| (num_traits::NumCast::from(i).unwrap(), v));
 
                 target.write_addrs(|| val.next());
             }
@@ -141,7 +139,7 @@ impl<T: Target, C: Connection> GdbStub<T, C> {
             }
             Command::Z(cmd) => {
                 // XXX: get rid of this unwrap ahhh
-                let addr = T::Usize::from_le_bytes(&cmd.addr.to_le_bytes()).unwrap();
+                let addr = num_traits::NumCast::from(cmd.addr).unwrap();
                 let supported = match cmd.type_ {
                     // TODO: defer implementation of hardware and software breakpoints to target
                     0 => Some(self.swbreak.insert(addr)),
@@ -158,7 +156,7 @@ impl<T: Target, C: Connection> GdbStub<T, C> {
             }
             Command::z(cmd) => {
                 // XXX: get rid of this unwrap ahhh
-                let addr = T::Usize::from_le_bytes(&cmd.addr.to_le_bytes()).unwrap();
+                let addr = num_traits::NumCast::from(cmd.addr).unwrap();
                 let supported = match cmd.type_ {
                     // TODO: defer implementation of hardware and software breakpoints to target
                     0 => Some(self.swbreak.remove(&addr)),
@@ -198,7 +196,7 @@ impl<T: Target, C: Connection> GdbStub<T, C> {
 
             // ------------------- Stubbed Functionality -------------------- //
             // TODO: add proper support for >1 "thread"
-            // hard-code to return a single thread with id 1
+            // for now, just hard-code a single thread with id 1
             Command::H(_) => res.write_str("OK")?,
             Command::qfThreadInfo(_) => res.write_str("m1")?,
             Command::qsThreadInfo(_) => res.write_str("l")?,
@@ -263,11 +261,9 @@ impl<T: Target, C: Connection> GdbStub<T, C> {
 
         macro_rules! write_addr {
             ($addr:expr) => {
-                let mut buf = [0; 128];
-                let len = $addr
-                    .to_le_bytes(&mut buf)
-                    .expect("target uses addr > 128 bytes");
-                res.write_hex_buf(&buf[..len])?;
+                // XXX: get rid of this unwrap ahhh
+                let addr: u64 = num_traits::NumCast::from($addr).unwrap();
+                res.write_hex_buf(&addr.to_ne_bytes())?;
             };
         }
 

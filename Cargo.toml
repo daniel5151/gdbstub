@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 log = "0.4"
+num-traits = { version = "0.2", default-features = false }
 
 [features]
 default = []

@@ -8,29 +8,22 @@
 
 extern crate alloc;
 
+use core::fmt::Debug;
+
+use num_traits::{PrimInt, Unsigned};
+
 mod connection_impls;
 mod error;
 mod protocol;
 mod stub;
-mod support;
 
 pub use error::Error;
 pub use stub::GdbStub;
 
 /// The set of operations that a GDB target needs to implement.
 pub trait Target {
-    /// The target architecture's pointer size. Should be one of the built-in
-    /// unsigned integer types (u8, u16, u32, u64, or u128)
-    type Usize: support::ToFromLEBytes
-        + Clone
-        + Copy
-        + core::hash::Hash
-        + core::fmt::Debug
-        + Eq
-        + Ord
-        + PartialEq
-        + PartialOrd
-        + Sized;
+    /// The target architecture's pointer size.
+    type Usize: PrimInt + Unsigned + Debug;
 
     /// A target-specific unrecoverable error, which will be propagated
     /// through the GdbStub
@@ -127,8 +120,8 @@ pub trait Connection {
         self.read().map(Some)
     }
 
-    /// Read the exact number of bytes required to fill buf,
-    /// blocking if necessary.
+    /// Read the exact number of bytes required to fill buf, blocking if
+    /// necessary.
     fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
         buf.iter_mut().try_for_each(|b| {
             *b = self.read()?;
