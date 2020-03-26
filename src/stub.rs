@@ -15,8 +15,9 @@ enum ExecState {
     Exit,
 }
 
-/// [`GdbStub`] maintains the state of a GDB remote debugging session, including
-/// the underlying transport.
+/// Uses the GDB Remote Serial Protocol across a
+/// [`Connection`](trait.Connection.html) to facilitate remote debugging of
+/// a given [`Target`](trait.Target.html).
 pub struct GdbStub<T: Target, C: Connection> {
     conn: C,
     exec_state: ExecState,
@@ -29,6 +30,7 @@ pub struct GdbStub<T: Target, C: Connection> {
 }
 
 impl<T: Target, C: Connection> GdbStub<T, C> {
+    /// Create a new `GdbStub` using the provided connection.
     pub fn new(conn: C) -> GdbStub<T, C> {
         GdbStub {
             conn,
@@ -104,6 +106,8 @@ impl<T: Target, C: Connection> GdbStub<T, C> {
                 err?;
             }
             Command::G(cmd) => {
+                // TODO: use the length of the slice returned by `target.read_registers` to
+                // validate that the server sent the correct amount of data
                 target.write_registers(cmd.vals.as_slice());
                 res.write_str("OK")?;
             }
@@ -289,8 +293,10 @@ impl<T: Target, C: Connection> GdbStub<T, C> {
         Ok(res.flush()?)
     }
 
-    /// Runs the target in a loop, with debug checks between each call to
-    /// `target.step()`
+    /// Starts a GDB remote debugging session.
+    ///
+    /// Returns once the GDB client cleanly closes the debugging session (via
+    /// the GDB `quit` command).
     pub fn run(&mut self, target: &mut T) -> Result<TargetState, Error<T::Error, C::Error>> {
         let mut packet_buffer = Vec::new();
 

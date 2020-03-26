@@ -3,15 +3,23 @@ use core::fmt::{Debug, Display};
 
 use crate::protocol::ResponseWriterError;
 
+/// Errors which may occur during a GDB debugging session.
 #[derive(Debug)]
 pub enum Error<T, C> {
+    /// Could not parse a packet's checksum.
     ChecksumParse,
-    Connection(C),
-    ResponseConnection(ResponseWriterError<C>),
+    /// Computed checksum doesn't match packet's checksum.
     MismatchedChecksum,
+    /// Connection Error.
+    // TODO: rename this variant to RequestConnection
+    Connection(C),
+    /// Could not parse the packet into a valid command.
+    // TODO: remove the `String` payload!
     PacketParse(String),
+    /// Error while writing a response.
+    ResponseConnection(ResponseWriterError<C>),
+    /// Target threw a fatal error.
     TargetError(T),
-    Unexpected,
 }
 
 impl<T, C> From<ResponseWriterError<C>> for Error<T, C> {
@@ -30,7 +38,6 @@ impl<T: Debug, C: Debug> Display for Error<T, C> {
             MismatchedChecksum => write!(f, "Checksum mismatch"),
             PacketParse(e) => write!(f, "Couldn't parse command: {}", e),
             TargetError(e) => write!(f, "Target Fatal Error: {:?}", e),
-            Unexpected => write!(f, "Client sent an unexpected packet"),
         }
     }
 }

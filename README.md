@@ -1,6 +1,6 @@
 # gdbstub
 
-An implementation of the [GDB Remote Server Protocol](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Protocol.html#Remote-Protocol) in Rust, primarily for use in _emulators_.
+An implementation of the [GDB Remote Serial Protocol](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Protocol.html#Remote-Protocol) in Rust, primarily for use in _emulators_.
 
 `gdbstub` tries to make as few assumptions as possible about your emulator's architecture, and aims to provide a "drop-in" way to add GDB support into an emulator, _without_ any large refactoring / ownership juggling (hopefully).
 
@@ -18,8 +18,9 @@ An implementation of the [GDB Remote Server Protocol](https://sourceware.org/gdb
 
 There are also a few features which rely on `std`, which can be enabled by enabling the `std` feature:
 
-- An `impl Connection` for some common std types (notably: TcpStream)
-- Additional logging (outputs protocol responses via `trace!`)
+- An `impl Connection` for some common std types (notably: `std::net::TcpStream`)
+- An `impl std::error::Error` for `gdbstub::Error`
+- Additional logging (outputs protocol responses via `log::trace!`)
 
 ## Future Plans
 
