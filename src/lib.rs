@@ -78,13 +78,13 @@ pub trait Target {
     fn write_addrs(&mut self, get_addr_val: impl FnMut() -> Option<(Self::Usize, u8)>);
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AccessKind {
     Read,
     Write,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Access<U> {
     pub kind: AccessKind,
     pub addr: U,
@@ -92,7 +92,7 @@ pub struct Access<U> {
 }
 
 // TODO: explore if TargetState is really necessary...
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TargetState {
     Running,
     Halted,
