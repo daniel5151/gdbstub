@@ -1,6 +1,6 @@
 use alloc::collections::BTreeSet;
-use alloc::format;
 use alloc::vec::Vec;
+use core::marker::PhantomData;
 
 use log::*;
 
@@ -26,7 +26,7 @@ pub struct GdbStub<T: Target, C: Connection> {
     wwatch: BTreeSet<T::Usize>,
     rwatch: BTreeSet<T::Usize>,
     awatch: BTreeSet<T::Usize>,
-    _target: core::marker::PhantomData<T>,
+    _target: PhantomData<T>,
 }
 
 impl<T: Target, C: Connection> GdbStub<T, C> {
@@ -40,17 +40,13 @@ impl<T: Target, C: Connection> GdbStub<T, C> {
             rwatch: BTreeSet::new(),
             awatch: BTreeSet::new(),
             exec_state: ExecState::Paused,
-            _target: core::marker::PhantomData,
+            _target: PhantomData,
         }
     }
 
-    fn handle_command(
-        &mut self,
-        target: &mut T,
-        command: Command,
-    ) -> Result<(), Error<T::Error, C::Error>> {
+    fn handle_command(&mut self, target: &mut T, command: Command) -> Result<(), Error<T, C>> {
         // Acknowledge the command
-        self.conn.write(b'+').map_err(Error::Connection)?;
+        self.conn.write(b'+').map_err(Error::ConnectionRead)?;
 
         let mut res = ResponseWriter::new(&mut self.conn);
 
@@ -212,13 +208,13 @@ impl<T: Target, C: Connection> GdbStub<T, C> {
             c => warn!("Unimplemented command: {:?}", c),
         }
 
-        res.flush().map_err(Error::ResponseConnection)
+        res.flush().map_err(Error::ConnectionWrite)
     }
 
     fn recv_packet<'a, 'b>(
         &'a mut self,
         packet_buffer: &'b mut Vec<u8>,
-    ) -> Result<Option<Packet<'b>>, Error<T::Error, C::Error>> {
+    ) -> Result<Option<Packet<'b>>, Error<T, C>> {
         let header_byte = match self.exec_state {
             // block waiting for a gdb command
             ExecState::Paused => self.conn.read().map(Some),
@@ -234,7 +230,7 @@ impl<T: Target, C: Connection> GdbStub<T, C> {
                 if header_byte == b'$' {
                     // read the packet body
                     loop {
-                        match self.conn.read().map_err(Error::Connection)? {
+                        match self.conn.read().map_err(Error::ConnectionRead)? {
                             b'#' => break,
                             x => packet_buffer.push(x),
                         }
@@ -242,22 +238,26 @@ impl<T: Target, C: Connection> GdbStub<T, C> {
                     // append the # char
                     packet_buffer.push(b'#');
                     // and finally, read the checksum as well
-                    packet_buffer.push(self.conn.read().map_err(Error::Connection)?);
-                    packet_buffer.push(self.conn.read().map_err(Error::Connection)?);
+                    packet_buffer.push(self.conn.read().map_err(Error::ConnectionRead)?);
+                    packet_buffer.push(self.conn.read().map_err(Error::ConnectionRead)?);
                 }
 
-                Some(Packet::from_buf(packet_buffer))
-                    .transpose()
-                    .map_err(|e| Error::PacketParse(format!("{:?}", e)))
+                match Packet::from_buf(packet_buffer) {
+                    Ok(packet) => Ok(Some(packet)),
+                    Err(e) => {
+                        error!("Could not parse packet: {:?}", e);
+                        Err(Error::PacketParse)
+                    }
+                }
             }
-            Err(e) => Err(Error::Connection(e)),
+            Err(e) => Err(Error::ConnectionRead(e)),
         }
     }
 
     fn send_breakpoint_stop_response(
         &mut self,
         stop_reason: StopReason<T::Usize>,
-    ) -> Result<(), Error<T::Error, C::Error>> {
+    ) -> Result<(), Error<T, C>> {
         let mut res = ResponseWriter::new(&mut self.conn);
 
         res.write_str("T")?;
@@ -297,7 +297,7 @@ impl<T: Target, C: Connection> GdbStub<T, C> {
     ///
     /// Returns once the GDB client cleanly closes the debugging session (via
     /// the GDB `quit` command).
-    pub fn run(&mut self, target: &mut T) -> Result<TargetState, Error<T::Error, C::Error>> {
+    pub fn run(&mut self, target: &mut T) -> Result<TargetState, Error<T, C>> {
         let mut packet_buffer = Vec::new();
 
         loop {

@@ -9,10 +9,10 @@ pub use response_writer::{Error as ResponseWriterError, ResponseWriter};
 /// Packet parse error.
 #[derive(Debug)]
 pub enum PacketParseError<'a> {
+    ChecksumMismatched,
     EmptyBuf,
     MalformedChecksum,
     MalformedCommand(CommandParseError<'a>),
-    MismatchedChecksum,
     NotASCII,
     UnexpectedHeader(u8),
 }
@@ -47,7 +47,7 @@ impl<'a> Packet<'a> {
                     .map_err(|_| PacketParseError::MalformedChecksum)?;
 
                 if body.iter().fold(0u8, |a, x| a.wrapping_add(*x)) != checksum {
-                    return Err(PacketParseError::MismatchedChecksum);
+                    return Err(PacketParseError::ChecksumMismatched);
                 }
 
                 // validate the body is ASCII

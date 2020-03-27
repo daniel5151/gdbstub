@@ -1,46 +1,56 @@
-use alloc::string::String;
-use core::fmt::{Debug, Display};
+use core::fmt::{self, Debug, Display};
 
 use crate::protocol::ResponseWriterError;
+use crate::{Connection, Target};
 
 /// Errors which may occur during a GDB debugging session.
-#[derive(Debug)]
-pub enum Error<T, C> {
-    /// Could not parse a packet's checksum.
-    ChecksumParse,
-    /// Computed checksum doesn't match packet's checksum.
-    MismatchedChecksum,
-    /// Connection Error.
-    // TODO: rename this variant to RequestConnection
-    Connection(C),
+pub enum Error<T: Target, C: Connection> {
+    /// Connection Error while reading request.
+    ConnectionRead(C::Error),
+    /// Connection Error while writing response.
+    ConnectionWrite(ResponseWriterError<C>),
     /// Could not parse the packet into a valid command.
-    // TODO: remove the `String` payload!
-    PacketParse(String),
-    /// Error while writing a response.
-    ResponseConnection(ResponseWriterError<C>),
+    PacketParse,
     /// Target threw a fatal error.
-    TargetError(T),
+    TargetError(T::Error),
 }
 
-impl<T, C> From<ResponseWriterError<C>> for Error<T, C> {
+impl<T: Target, C: Connection> From<ResponseWriterError<C>> for Error<T, C> {
     fn from(e: ResponseWriterError<C>) -> Self {
-        Error::ResponseConnection(e)
+        Error::ConnectionWrite(e)
     }
 }
 
-impl<T: Debug, C: Debug> Display for Error<T, C> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl<T: Target, C: Connection> Debug for Error<T, C>
+where
+    T::Error: Debug,
+    C::Error: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl<T: Target, C: Connection> Display for Error<T, C>
+where
+    T::Error: Debug,
+    C::Error: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use self::Error::*;
         match self {
-            ChecksumParse => write!(f, "Couldn't parse checksum"),
-            Connection(e) => write!(f, "Connection Error: {:?}", e),
-            ResponseConnection(e) => write!(f, "Connection Error while writing response: {:?}", e),
-            MismatchedChecksum => write!(f, "Checksum mismatch"),
-            PacketParse(e) => write!(f, "Couldn't parse command: {}", e),
-            TargetError(e) => write!(f, "Target Fatal Error: {:?}", e),
+            ConnectionRead(e) => write!(f, "Connection Error while reading request: {:?}", e),
+            ConnectionWrite(e) => write!(f, "Connection Error while writing response: {:?}", e),
+            PacketParse => write!(f, "Could not parse the packet into a valid command."),
+            TargetError(e) => write!(f, "Target threw a fatal error: {:?}", e),
         }
     }
 }
 
 #[cfg(feature = "std")]
-impl<T: Debug, C: Debug> std::error::Error for Error<T, C> {}
+impl<T: Target, C: Connection> std::error::Error for Error<T, C>
+where
+    T::Error: Debug,
+    C::Error: Debug,
+{
+}

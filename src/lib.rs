@@ -2,9 +2,9 @@
 //! [GDB Remote Serial Protocol](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Protocol.html#Remote-Protocol)
 //! in Rust, primarily for use in emulators.
 //!
-//! `gdbstub` tries to make as few assumptions as possible about your target's
-//! architecture, and aims to provide a "drop-in" way to add GDB support into a
-//! project, _without_ requiring any large refactoring / ownership juggling.
+//! `gdbstub` tries to make as few assumptions as possible about your project's
+//! architecture, and aims to provide a "drop-in" way to add GDB support,
+//! _without_ requiring any large refactoring / ownership juggling.
 //!
 //! `gdbstub` is `no_std` by default, though it does have a dependency on
 //! `alloc`.
@@ -36,12 +36,12 @@ pub use stub::GdbStub;
 /// Describes a target system which can be debugged using
 /// [`GdbStub`](struct.GdbStub.html).
 ///
-/// This trait describes the architecture and capabilities of a target
-/// system, and provides an interface for `GdbStub` to modify and control the
-/// system's state.
+/// This trait describes the architecture and capabilities of a target system,
+/// and provides an interface for `GdbStub` to modify and control the system's
+/// state.
 ///
-/// Several of the trait's "Provided methods" can be overwritten to
-/// enable certain advanced GDB debugging features. For example, the
+/// Several of the trait's "Provided methods" can be overwritten to enable
+/// certain advanced GDB debugging features. For example, the
 /// [`target_description_xml`](#method.target_description_xml) method can be
 /// overwritten to enable automatic architecture detection.
 ///
