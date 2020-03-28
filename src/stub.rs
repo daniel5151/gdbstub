@@ -245,6 +245,7 @@ impl<T: Target, C: Connection> GdbStub<T, C> {
                 match Packet::from_buf(packet_buffer) {
                     Ok(packet) => Ok(Some(packet)),
                     Err(e) => {
+                        // TODO: preserve this context within Error::PacketParse
                         error!("Could not parse packet: {:?}", e);
                         Err(Error::PacketParse)
                     }

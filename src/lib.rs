@@ -1,10 +1,12 @@
 //! An implementation of the
 //! [GDB Remote Serial Protocol](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Protocol.html#Remote-Protocol)
-//! in Rust, primarily for use in emulators.
+//! in Rust.
 //!
-//! `gdbstub` tries to make as few assumptions as possible about your project's
+//! `gdbstub` tries to make as few assumptions as possible about a project's
 //! architecture, and aims to provide a "drop-in" way to add GDB support,
-//! _without_ requiring any large refactoring / ownership juggling.
+//! _without_ requiring any large refactoring / ownership juggling. It is
+//! particularly useful in _emulators_, where it provides a powerful,
+//! non-intrusive way to debug code running within an emulated system.
 //!
 //! **Disclaimer:** `gdbstub` is still in it's early stages of development!
 //! Expect breaking API changes between minor releases.
@@ -12,7 +14,7 @@
 //! ## Debugging Features
 //!
 //! At the moment, `gdbstub` implements enough of the GDB Remote Serial Protocol
-//! to support a step-through + breakpoint debugging flow:
+//! to support step-through + breakpoint debugging of single-threaded code.
 //!
 //! - Core GDB Protocol
 //!     - Step + Continue
@@ -38,17 +40,17 @@
 //! Additional functionality can be enabled by activating certain features.
 //!
 //! - `std` - (disabled by default)
-//!   - Implements [`Connection`](trait.Connection.html) for [`std::net::TcpStream`](https://doc.rust-lang.org/std/net/struct.TcpStream.html)
+//!   - Implements [`Connection`](trait.Connection.html) for
+//!     `std::net::TcpStream`.
 //!   - Implements [`std::error::Error`](https://doc.rust-lang.org/std/error/trait.Error.html)
-//!     for `gdbstub::Error`
+//!     for [`gdbstub::Error`](enum.Error.html).
 //!   - Outputs protocol responses via `log::trace!`
 //!
 //! ## Example
 //!
 //! **Note:** Please refer to the [Real-World Examples](#real-world-examples)
-//! section to see examples that can actually be compiled and run. The example
-//! below is merely a high-level overview of what a `gdbstub` integration
-//! might look like.
+//! for examples that can be compiled and run. The example below merely provides
+//! a high-level overview of what a `gdbstub` integration might look like.
 //!
 //! Consider a project with the following structure:
 //!
@@ -76,10 +78,10 @@
 //!
 //! ### The `Target` trait
 //!
-//! The [`Target`](trait.Target.html) trait is used to query a system's
-//! architecture and capabilities, and to modify and control the system's
-//! execution state while debugging. Since each project is different, it's up
-//! to the user to provide methods to read/write memory, step execution, etc...
+//! The [`Target`](trait.Target.html) trait is used to modify and control a
+//! system's execution state during a GDB debugging session. Since each project
+//! is different, it's up to the user to provide methods to read/write memory,
+//! step execution, etc...
 //!
 //! ```compile_fail
 //! use gdbstub::{GdbStub, Access, AccessKind, Target, TargetState};
@@ -87,7 +89,7 @@
 //! impl Target for Emu {
 //!     // The target's pointer size.
 //!     type Usize = u32;
-//!     // Target-specific error type.
+//!     // Project-specific error type.
 //!     type Error = EmuError;
 //!
 //!     // Run the system for a single "step", using the provided callback to log
@@ -167,16 +169,15 @@
 //!
 //! ### The `Connection` trait
 //!
-//! The GDB Remote Serial Protocol is transport agnostic, and can be used across
-//! any transport which provides in-order, bytewise I/O (such as TCP, UDS, UART,
+//! The GDB Remote Serial Protocol is transport agnostic, only requiring that
+//! the transport provides in-order, bytewise I/O (such as TCP, UDS, UART,
 //! etc...). This transport requirement is encoded in the
-//! [`Connection`](trait.Connection.html) trait, which the `GdbStub` uses to
-//! communicate with the GDB client.
+//! [`Connection`](trait.Connection.html) trait.
 //!
 //! `gdbstub` includes a pre-defined implementation of `Connection` for
-//! `std::net::TcpStream` when the `std` feature is enabled.
+//! `std::net::TcpStream` (assuming the `std` feature flag is enabled).
 //!
-//! For example, to establish a TCP connection:
+//! A common way to begin a remote debugging is connecting to a target via TCP:
 //!
 //! ```
 //! use std::net::{TcpListener, TcpStream};
@@ -186,8 +187,10 @@
 //!     eprintln!("Waiting for a GDB connection on {:?}...", sockaddr);
 //!     let sock = TcpListener::bind(sockaddr)?;
 //!     let (stream, addr) = sock.accept()?;
-//!     // At this point, GDB can connect to the target by running
-//!     // `target remote localhost:9001` from within GDB
+//!
+//!     // Blocks until a GDB client connects via TCP.
+//!     // i.e: Running `target remote localhost:<port>` from the GDB prompt.
+//!
 //!     eprintln!("Debugger connected from {}", addr);
 //!     Ok(stream)
 //! }
@@ -236,7 +239,7 @@
 //! - [microcorruption-emu](https://github.com/sapir/microcorruption-emu) -
 //!   msp430 emulator for the microcorruption.com ctf
 //! - [ts7200](https://github.com/daniel5151/ts7200/) - An emulator for the
-//!   TS-7200, a relatively bespoke embedded ARMv4t platform
+//!   TS-7200, a somewhat bespoke embedded ARMv4t platform
 //!
 //! If you happen to use `gdbstub` in one of your own projects, feel free to
 //! open a PR to add it to this list!
@@ -288,7 +291,8 @@ pub trait Target {
     /// A target-specific fatal error.
     type Error;
 
-    /// Perform a single "step" of the target CPU.
+    /// Perform a single "step" of the emulated system. A step should be a
+    /// single CPU instruction or less.
     ///
     /// The provided `log_mem_access` function should be called each time a
     /// memory location is accessed.
@@ -332,11 +336,9 @@ pub trait Target {
     /// These descriptions can be quite succinct. For example, the target
     /// description for an `armv4t` platform can be as simple as:
     ///
-    /// ```compile_fail
-    /// Some(r#"
-    /// <target version="1.0">
-    ///     <architecture>armv4t</architecture>
-    /// </target>"#)
+    /// ```
+    /// r#"<target version="1.0"><architecture>armv4t</architecture></target>"#
+    /// # ;
     /// ```
     ///
     /// See the [GDB docs](https://sourceware.org/gdb/current/onlinedocs/gdb/Target-Description-Format.html)
@@ -377,14 +379,6 @@ pub enum TargetState {
 }
 
 /// A trait for reading / writing bytes across some transport layer.
-///
-/// Enabling the optional `std` feature provides implementations of `Connection`
-/// on several common std types (such as `std::net::TcpStream`).
-///
-/// _Note_: the default implementation of `read_nonblocking` will fall-back to
-/// the blocking `read` implementation. If non-blocking reads are possible, you
-/// should provide your own implementation.
-// TODO: remove this silly default read_nonblocking implementation!
 pub trait Connection {
     /// Transport-specific error type.
     type Error;
@@ -396,9 +390,7 @@ pub trait Connection {
     fn write(&mut self, byte: u8) -> Result<(), Self::Error>;
 
     /// Try to read a single byte, returning None if no data is available.
-    fn read_nonblocking(&mut self) -> Result<Option<u8>, Self::Error> {
-        self.read().map(Some)
-    }
+    fn read_nonblocking(&mut self) -> Result<Option<u8>, Self::Error>;
 
     /// Read the exact number of bytes required to fill buf, blocking if
     /// necessary.

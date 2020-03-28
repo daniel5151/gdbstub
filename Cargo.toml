@@ -1,8 +1,15 @@
 [package]
 name = "gdbstub"
-version = "0.1.0"
+description = "An implementation of the GDB Remote Serial Protocol in Rust"
 authors = ["Daniel Prilik <danielprilik@gmail.com>"]
+version = "0.1.0"
+license = "MIT"
 edition = "2018"
+documentation = "https://docs.rs/gdbstub"
+homepage = "https://github.com/daniel5151/gdbstub"
+repository  = "https://github.com/daniel5151/gdbstub"
+keywords = ["gdb", "emulation", "no_std", "debugging"]
+categories = ["development-tools::debugging", "embedded", "emulators", "network-programming", "no-std"]
 
 [dependencies]
 log = "0.4"
