@@ -374,7 +374,7 @@ pub enum TargetState {
     Running,
     /// Halted
     Halted,
-    /// Running but hit a breakpoint
+    /// Running, but hit a breakpoint
     Breakpoint,
 }
 
