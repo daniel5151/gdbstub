@@ -15,9 +15,9 @@ enum ExecState {
     Exit,
 }
 
-/// Uses the GDB Remote Serial Protocol across a
-/// [`Connection`](trait.Connection.html) to facilitate remote debugging of
-/// a given [`Target`](trait.Target.html).
+/// Facilitates the remote debugging of a [`Target`](trait.Target.html) using
+/// the GDB Remote Serial Protocol over a given
+/// [`Connection`](trait.Connection.html).
 pub struct GdbStub<T: Target, C: Connection> {
     conn: C,
     exec_state: ExecState,
