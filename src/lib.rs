@@ -374,6 +374,8 @@ pub enum TargetState {
     Running,
     /// Halted
     Halted,
+    /// Running but hit a breakpoint
+    Breakpoint,
 }
 
 /// A trait for reading / writing bytes across some transport layer.
