@@ -359,7 +359,8 @@ impl<T: Target, C: Connection> GdbStub<T, C> {
 
                     // TODO: defer implementation of hardware and software breakpoints to target
                     let target_pc = target.read_pc();
-                    if target_state == TargetState::Breakpoint || self.swbreak.contains(&target_pc)
+                    if target_state == TargetState::SoftwareBreakpoint
+                        || self.swbreak.contains(&target_pc)
                     {
                         stop_reason = Some(StopReason::SwBreak)
                     } else if self.hwbreak.contains(&target_pc) {

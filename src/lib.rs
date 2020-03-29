@@ -374,8 +374,9 @@ pub enum TargetState {
     Running,
     /// Halted
     Halted,
-    /// Running, but hit a breakpoint
-    Breakpoint,
+    /// Running, but system triggered a software breakpoint, e.g. due to a trap instruction.
+    /// This is not necessarily a breakpoint configured by the client/user.
+    SoftwareBreakpoint,
 }
 
 /// A trait for reading / writing bytes across some transport layer.
