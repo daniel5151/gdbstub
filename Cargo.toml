@@ -2,7 +2,7 @@
 name = "gdbstub"
 description = "An implementation of the GDB Remote Serial Protocol in Rust"
 authors = ["Daniel Prilik <danielprilik@gmail.com>"]
-version = "0.1.1"
+version = "0.1.2"
 license = "MIT"
 edition = "2018"
 readme = "README.md"
