@@ -3,6 +3,7 @@ use alloc::vec::Vec;
 use core::marker::PhantomData;
 
 use log::*;
+use num_traits::ops::saturating::Saturating;
 
 use crate::{
     protocol::{Command, Packet, ResponseWriter},
@@ -110,8 +111,9 @@ impl<T: Target, C: Connection> GdbStub<T, C> {
             Command::m(cmd) => {
                 let mut err = Ok(());
                 // XXX: get rid of these unwraps ahhh
-                let start = num_traits::NumCast::from(cmd.addr).unwrap();
-                let end = num_traits::NumCast::from(cmd.addr + cmd.len as u64).unwrap();
+                let start: T::Usize = num_traits::NumCast::from(cmd.addr).unwrap();
+                // XXX: on overflow, this _should_ wrap around to low addresses (maybe?)
+                let end = start.saturating_add(num_traits::NumCast::from(cmd.len).unwrap());
 
                 target.read_addrs(start..end, |val| {
                     // TODO: assert the length is correct
