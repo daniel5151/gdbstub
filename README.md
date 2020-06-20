@@ -20,7 +20,7 @@ At the moment, `gdbstub` implements enough of the GDB Remote Serial Protocol to 
     - Add + Remove Breakpoints
     - Read/Write memory
     - Read/Write registers
-    - Read/Write/Access Watchpoints (i.e: value breakpoints) (_currently broken_)
+    - (optional) Read/Write/Access Watchpoints (i.e: value breakpoints)
 - Extended GDB Protocol
     - (optional) Automatic architecture detection
 
@@ -36,6 +36,10 @@ Additional functionality can be enabled by activating certain features.
   - Implements `Connection` for [`std::net::TcpStream`](https://doc.rust-lang.org/std/net/struct.TcpStream.html)
   - Implements [`std::error::Error`](https://doc.rust-lang.org/std/error/trait.Error.html) for `gdbstub::Error`
   - Outputs protocol responses via `log::trace!`
+
+## Examples
+
+The included `armv4t` example shows how `gdbstub` can be used to add `gdb` debugging support to a (incredibly simple) ARMv4T-based emulator. See it's `README.md` for details.
 
 ## Future Plans
 

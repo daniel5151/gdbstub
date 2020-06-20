@@ -7,7 +7,7 @@ use num_traits::ops::saturating::Saturating;
 
 use crate::{
     protocol::{Command, Packet, ResponseWriter},
-    Access, AccessKind, Connection, Error, Target, TargetState,
+    Connection, Error, HwBreakOp, Target, TargetState, WatchKind,
 };
 
 enum ExecState {
@@ -23,10 +23,6 @@ pub struct GdbStub<T: Target, C: Connection> {
     conn: C,
     exec_state: ExecState,
     swbreak: BTreeSet<T::Usize>,
-    hwbreak: BTreeSet<T::Usize>,
-    wwatch: BTreeSet<T::Usize>,
-    rwatch: BTreeSet<T::Usize>,
-    awatch: BTreeSet<T::Usize>,
     _target: PhantomData<T>,
 }
 
@@ -36,10 +32,6 @@ impl<T: Target, C: Connection> GdbStub<T, C> {
         GdbStub {
             conn,
             swbreak: BTreeSet::new(),
-            hwbreak: BTreeSet::new(),
-            wwatch: BTreeSet::new(),
-            rwatch: BTreeSet::new(),
-            awatch: BTreeSet::new(),
             exec_state: ExecState::Paused,
             _target: PhantomData,
         }
@@ -54,18 +46,30 @@ impl<T: Target, C: Connection> GdbStub<T, C> {
         match command {
             // ------------------ Handshaking and Queries ------------------- //
             Command::qSupported(_features) => {
-                // TODO: enumerate qSupported features better
                 res.write_str("swbreak+;")?;
-                res.write_str("hwbreak+;")?;
                 res.write_str("vContSupported+;")?;
 
+                // probe support for hw breakpoints
+                let test_addr = num_traits::NumCast::from(0).unwrap();
+                let can_set_hw_break = target.update_hw_breakpoint(test_addr, HwBreakOp::AddBreak);
+                if can_set_hw_break.is_some() {
+                    target.update_hw_breakpoint(test_addr, HwBreakOp::RemoveBreak);
+
+                    res.write_str("hwbreak+;")?;
+                    res.write_str("BreakpointCommands+;")?;
+                }
+
+                // TODO: implement conditional breakpoint support (since that's kool).
+                // res.write_str("ConditionalBreakpoints+;")?;
+
+                // probe support for target description xml
                 if T::target_description_xml().is_some() {
                     res.write_str("qXfer:features:read+;")?;
                 }
             }
-            Command::vContQuestionMark(_) => res.write_str("vCont;c;C;s;S;t")?,
+            Command::vContQuestionMark(_) => res.write_str("vCont;c;s;t")?,
             Command::qXferFeaturesRead(cmd) => {
-                let _annex = cmd.annex; // This _should_ always be target.xml...
+                assert_eq!(cmd.annex, "target.xml");
                 match T::target_description_xml() {
                     Some(xml) => {
                         let xml = xml.trim();
@@ -95,17 +99,21 @@ impl<T: Target, C: Connection> GdbStub<T, C> {
             Command::qAttached(_) => res.write_str("1")?,
             Command::g(_) => {
                 let mut err = Ok(());
-                target.read_registers(|reg| {
-                    if let Err(e) = res.write_hex_buf(reg) {
-                        err = Err(e)
-                    }
-                });
+                target
+                    .read_registers(|reg| {
+                        if let Err(e) = res.write_hex_buf(reg) {
+                            err = Err(e)
+                        }
+                    })
+                    .map_err(Error::TargetError)?;
                 err?;
             }
             Command::G(cmd) => {
                 // TODO: use the length of the slice returned by `target.read_registers` to
                 // validate that the server sent the correct amount of data
-                target.write_registers(cmd.vals.as_slice());
+                target
+                    .write_registers(cmd.vals.as_slice())
+                    .map_err(Error::TargetError)?;
                 res.write_str("OK")?;
             }
             Command::m(cmd) => {
@@ -115,12 +123,14 @@ impl<T: Target, C: Connection> GdbStub<T, C> {
                 // XXX: on overflow, this _should_ wrap around to low addresses (maybe?)
                 let end = start.saturating_add(num_traits::NumCast::from(cmd.len).unwrap());
 
-                target.read_addrs(start..end, |val| {
-                    // TODO: assert the length is correct
-                    if let Err(e) = res.write_hex(val) {
-                        err = Err(e)
-                    }
-                });
+                target
+                    .read_addrs(start..end, |val| {
+                        // TODO: assert the length is correct
+                        if let Err(e) = res.write_hex(val) {
+                            err = Err(e)
+                        }
+                    })
+                    .map_err(Error::TargetError)?;
                 err?;
             }
             Command::M(cmd) => {
@@ -133,7 +143,9 @@ impl<T: Target, C: Connection> GdbStub<T, C> {
                     // XXX: get rid of this unwrap ahhh
                     .map(|(i, v)| (num_traits::NumCast::from(i).unwrap(), v));
 
-                target.write_addrs(|| val.next());
+                target
+                    .write_addrs(|| val.next())
+                    .map_err(Error::TargetError)?;
             }
             Command::D(_) => {
                 res.write_str("OK")?;
@@ -141,36 +153,49 @@ impl<T: Target, C: Connection> GdbStub<T, C> {
             }
             Command::Z(cmd) => {
                 // XXX: get rid of this unwrap ahhh
-                let addr = num_traits::NumCast::from(cmd.addr).unwrap();
+                let addr: T::Usize = num_traits::NumCast::from(cmd.addr).unwrap();
+
+                use HwBreakOp::*;
                 let supported = match cmd.type_ {
-                    // TODO: defer implementation of hardware and software breakpoints to target
-                    0 => Some(self.swbreak.insert(addr)),
-                    1 => Some(self.hwbreak.insert(addr)),
-                    2 => Some(self.wwatch.insert(addr)),
-                    3 => Some(self.rwatch.insert(addr)),
-                    4 => Some(self.awatch.insert(addr)),
-                    _ => None,
+                    0 => {
+                        self.swbreak.insert(addr);
+                        Some(Ok(true))
+                    }
+                    1 => target.update_hw_breakpoint(addr, AddBreak),
+                    2 => target.update_hw_breakpoint(addr, AddWatch(WatchKind::Write)),
+                    3 => target.update_hw_breakpoint(addr, AddWatch(WatchKind::Read)),
+                    4 => target.update_hw_breakpoint(addr, AddWatch(WatchKind::ReadWrite)),
+                    _ => None, // only 5 documented types in the protocol
                 };
 
-                if supported.is_some() {
-                    res.write_str("OK")?;
+                match supported {
+                    None => {}
+                    Some(Ok(true)) => res.write_str("OK")?,
+                    Some(Ok(false)) => res.write_str("E22")?, // value of 22 grafted from QEMU
+                    Some(Err(e)) => return Err(Error::TargetError(e)),
                 }
             }
             Command::z(cmd) => {
                 // XXX: get rid of this unwrap ahhh
-                let addr = num_traits::NumCast::from(cmd.addr).unwrap();
+                let addr: T::Usize = num_traits::NumCast::from(cmd.addr).unwrap();
+
+                use HwBreakOp::*;
                 let supported = match cmd.type_ {
-                    // TODO: defer implementation of hardware and software breakpoints to target
-                    0 => Some(self.swbreak.remove(&addr)),
-                    1 => Some(self.hwbreak.remove(&addr)),
-                    2 => Some(self.wwatch.remove(&addr)),
-                    3 => Some(self.rwatch.remove(&addr)),
-                    4 => Some(self.awatch.remove(&addr)),
-                    _ => None,
+                    0 => {
+                        self.swbreak.remove(&addr);
+                        Some(Ok(true))
+                    }
+                    1 => target.update_hw_breakpoint(addr, RemoveBreak),
+                    2 => target.update_hw_breakpoint(addr, RemoveWatch(WatchKind::Write)),
+                    3 => target.update_hw_breakpoint(addr, RemoveWatch(WatchKind::Read)),
+                    4 => target.update_hw_breakpoint(addr, RemoveWatch(WatchKind::ReadWrite)),
+                    _ => None, // only 5 documented types in the protocol
                 };
 
-                if supported.is_some() {
-                    res.write_str("OK")?;
+                match supported {
+                    None => {}
+                    Some(Ok(_)) => res.write_str("OK")?,
+                    Some(Err(_)) => res.write_str("E22")?, // value of 22 grafted from QEMU
                 }
             }
             Command::vCont(cmd) => {
@@ -257,50 +282,11 @@ impl<T: Target, C: Connection> GdbStub<T, C> {
         }
     }
 
-    fn send_breakpoint_stop_response(
-        &mut self,
-        stop_reason: StopReason<T::Usize>,
-    ) -> Result<(), Error<T, C>> {
-        let mut res = ResponseWriter::new(&mut self.conn);
-
-        res.write_str("T")?;
-        res.write_hex(5)?;
-
-        macro_rules! write_addr {
-            ($addr:expr) => {
-                // XXX: get rid of this unwrap ahhh
-                let addr: u64 = num_traits::NumCast::from($addr).unwrap();
-                res.write_hex_buf(&addr.to_ne_bytes())?;
-            };
-        }
-
-        match stop_reason {
-            StopReason::WWatch(addr) => {
-                res.write_str("watch:")?;
-                write_addr!(addr);
-            }
-            StopReason::RWatch(addr) => {
-                res.write_str("rwatch:")?;
-                write_addr!(addr);
-            }
-            StopReason::AWatch(addr) => {
-                res.write_str("awatch:")?;
-                write_addr!(addr);
-            }
-            StopReason::SwBreak => res.write_str("swbreak:")?,
-            StopReason::HwBreak => res.write_str("hwbreak:")?,
-        };
-
-        res.write_str(";")?;
-
-        Ok(res.flush()?)
-    }
-
     /// Starts a GDB remote debugging session.
     ///
     /// Returns once the GDB client cleanly closes the debugging session (via
     /// the GDB `quit` command).
-    pub fn run(&mut self, target: &mut T) -> Result<TargetState, Error<T, C>> {
+    pub fn run(&mut self, target: &mut T) -> Result<TargetState<T::Usize>, Error<T, C>> {
         let mut packet_buffer = Vec::new();
 
         loop {
@@ -324,58 +310,59 @@ impl<T: Target, C: Connection> GdbStub<T, C> {
 
             match self.exec_state {
                 ExecState::Paused => {}
-                ExecState::Exit => {
-                    return Ok(TargetState::Running);
-                }
+                ExecState::Exit => return Ok(TargetState::Running),
                 ExecState::Running { single_step } => {
-                    let mut stop_reason = None;
+                    let mut target_state = target.step().map_err(Error::TargetError)?;
 
-                    // check for memory breakpoints on each access
-                    let on_access = |access: Access<T::Usize>| {
-                        if self.awatch.contains(&access.addr) {
-                            stop_reason = Some(StopReason::AWatch(access.addr));
-                            return;
-                        }
-
-                        match access.kind {
-                            AccessKind::Read => {
-                                if self.rwatch.contains(&access.addr) {
-                                    stop_reason = Some(StopReason::RWatch(access.addr))
-                                }
-                            }
-                            AccessKind::Write => {
-                                if self.wwatch.contains(&access.addr) {
-                                    stop_reason = Some(StopReason::WWatch(access.addr))
-                                }
-                            }
-                        }
-                    };
-
-                    let target_state = target.step(on_access).map_err(Error::TargetError)?;
-                    if target_state == TargetState::Halted {
-                        // "The process exited with status code 00"
-                        let mut res = ResponseWriter::new(&mut self.conn);
-                        res.write_str("W00")?;
-                        res.flush()?;
-                        return Ok(TargetState::Halted);
-                    };
-
-                    // TODO: defer implementation of hardware and software breakpoints to target
-                    let target_pc = target.read_pc();
-                    if target_state == TargetState::SoftwareBreakpoint
-                        || self.swbreak.contains(&target_pc)
-                    {
-                        stop_reason = Some(StopReason::SwBreak)
-                    } else if self.hwbreak.contains(&target_pc) {
-                        stop_reason = Some(StopReason::HwBreak)
+                    // check if a software breakpoint was hit
+                    let target_pc = target.read_pc().map_err(Error::TargetError)?;
+                    if self.swbreak.contains(&target_pc) {
+                        target_state = TargetState::SwBreak;
                     }
 
-                    // if something interesting happened, send the stop response
-                    if let Some(stop_reason) = stop_reason {
-                        warn!("{:x?}", stop_reason);
-                        self.send_breakpoint_stop_response(stop_reason)?;
+                    // if the target isn't running, send a stop-response packet
+                    if target_state != TargetState::Running {
+                        debug!("[0x{:x}] {:x?}", target_pc, target_state);
+
+                        let mut res = ResponseWriter::new(&mut self.conn);
+
+                        // if the target Halted, send a "process exited with status code 0" packet,
+                        // and break the loop.
+                        if target_state == TargetState::Halted {
+                            res.write_str("W00")?;
+                            res.flush()?;
+                            return Ok(TargetState::Halted);
+                        }
+
+                        // otherwise, a breakpoint was hit
+                        res.write_str("T")?;
+                        res.write_hex(5)?;
+
+                        match target_state {
+                            // don't include addr on sw/hw break
+                            TargetState::SwBreak => res.write_str("swbreak:")?,
+                            TargetState::HwBreak => res.write_str("hwbreak:")?,
+                            TargetState::Watch { kind, addr } => {
+                                match kind {
+                                    WatchKind::Write => res.write_str("watch:")?,
+                                    WatchKind::Read => res.write_str("rwatch:")?,
+                                    WatchKind::ReadWrite => res.write_str("awatch:")?,
+                                }
+                                // XXX: get rid of this unwrap ahhh
+                                let addr: u64 = num_traits::NumCast::from(addr).unwrap();
+                                res.write_hex_buf(&addr.to_be_bytes())?;
+                            }
+                            _ => unreachable!(),
+                        };
+
+                        res.write_str(";")?;
+                        res.flush()?;
+
                         self.exec_state = ExecState::Paused;
-                    } else if single_step {
+                        continue;
+                    }
+
+                    if single_step {
                         self.exec_state = ExecState::Paused;
                         let mut res = ResponseWriter::new(&mut self.conn);
                         res.write_str("S05")?;
@@ -385,16 +372,6 @@ impl<T: Target, C: Connection> GdbStub<T, C> {
             }
         }
     }
-}
-
-#[derive(Debug)]
-enum StopReason<U> {
-    WWatch(U),
-    RWatch(U),
-    AWatch(U),
-    SwBreak,
-    HwBreak,
-    // TODO: add more stop reasons
 }
 
 // enum SignalMetadata {

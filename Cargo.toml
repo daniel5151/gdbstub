@@ -2,7 +2,7 @@
 name = "gdbstub"
 description = "An implementation of the GDB Remote Serial Protocol in Rust"
 authors = ["Daniel Prilik <danielprilik@gmail.com>"]
-version = "0.1.2"
+version = "0.2.0"
 license = "MIT"
 edition = "2018"
 readme = "README.md"
@@ -16,6 +16,15 @@ categories = ["development-tools::debugging", "embedded", "emulators", "network-
 log = "0.4"
 num-traits = { version = "0.2", default-features = false }
 
+[dev-dependencies]
+armv4t_emu = "0.1"
+pretty_env_logger = "0.4"
+goblin = "0.2"
+
 [features]
 default = []
 std = []
+
+[[example]]
+name = "armv4t"
+required-features = ["std"]

@@ -21,8 +21,7 @@
 //!     - Add + Remove Breakpoints
 //!     - Read/Write memory
 //!     - Read/Write registers
-//!     - Read/Write/Access Watchpoints (i.e: value breakpoints) (_currently
-//!       broken_)
+//!     - Read/Write/Access Watchpoints (i.e: value breakpoints)
 //! - Extended GDB Protocol
 //!     - (optional) Automatic architecture detection
 //!
@@ -46,15 +45,17 @@
 //!     for [`gdbstub::Error`](enum.Error.html).
 //!   - Outputs protocol responses via `log::trace!`
 //!
-//! ## Example
+//! ## Integrating `gdbstub` Into an Existing Project
 //!
-//! **Note:** Please refer to the [Real-World Examples](#real-world-examples)
-//! for examples that can be compiled and run. The example below merely provides
-//! a high-level overview of what a `gdbstub` integration might look like.
+//! **Note:** This section provides a rough overview of what a `gdbstub`
+//! integration might look like. It is _not_ a fully-fledged working example.
+//! Please refer to examples included in the crate's `examples` folder + those
+//! listed under [Real-World Examples](#real-world-examples) for examples that
+//! can be compiled and run.
 //!
 //! Consider a project with the following structure:
 //!
-//! ```compile_fail
+//! ```ignore
 //! struct EmuError { /* ... */ }
 //!
 //! struct Emu { /* ... */ }
@@ -83,8 +84,8 @@
 //! is different, it's up to the user to provide methods to read/write memory,
 //! step execution, etc...
 //!
-//! ```compile_fail
-//! use gdbstub::{GdbStub, Access, AccessKind, Target, TargetState};
+//! ```ignore
+//! use gdbstub::{GdbStub, Target, TargetState};
 //!
 //! impl Target for Emu {
 //!     // The target's pointer size.
@@ -92,35 +93,17 @@
 //!     // Project-specific error type.
 //!     type Error = EmuError;
 //!
-//!     // Run the system for a single "step", using the provided callback to log
-//!     // any memory accesses which may have occurred
-//!     fn step(
-//!         &mut self,
-//!         mut log_mem_access: impl FnMut(Access<u32>),
-//!     ) -> Result<TargetState, Self::Error> {
+//!     // Run the system for a single "step" (i.e: one instruction or less)
+//!     fn step(&mut self) -> Result<TargetState, Self::Error> {
 //!         // run the system
 //!         self.step()?; // <-- can use `?` to propagate project-specific errors!
-//!
-//!         // log any memory accesses which might have occurred
-//!         for (read_or_write, addr, val) in self.mem.recent_accesses.drain(..) {
-//!             log_mem_access(Access {
-//!                 kind: if read_or_write {
-//!                     AccessKind::Read
-//!                 } else {
-//!                     AccessKind::Write
-//!                 },
-//!                 addr,
-//!                 val
-//!             })
-//!         }
-//!
 //!         Ok(TargetState::Running)
 //!     }
 //!
 //!     // Read-out the CPU's register values in the order specified in the arch's
 //!     // `target.xml` file.
 //!     // e.g: for ARM: binutils-gdb/blob/master/gdb/features/arm/arm-core.xml
-//!     fn read_registers(&mut self, mut push_reg: impl FnMut(&[u8])) {
+//!     fn read_registers(&mut self, mut push_reg: impl FnMut(&[u8])) -> Result<(), Self::Error> {
 //!         // general purpose registers
 //!         for i in 0..13 {
 //!             push_reg(&self.cpu.reg_get(i).to_le_bytes());
@@ -133,11 +116,13 @@
 //!             push_reg(&[0, 0, 0, 0]);
 //!         }
 //!         push_reg(&self.cpu.reg_get(reg::CPSR).to_le_bytes());
+//!
+//!         Ok(())
 //!     }
 //!
 //!     // Write to the CPU's register values in the order specified in the arch's
 //!     // `target.xml` file.
-//!     fn write_registers(&mut self, regs: &[u8]) {
+//!     fn write_registers(&mut self, regs: &[u8]) -> Result<(), Self::Error> {
 //!         /* ... similar to read_registers ... */
 //!     }
 //!
@@ -146,17 +131,26 @@
 //!     }
 //!
 //!     // read the specified memory addresses from the target
-//!     fn read_addrs(&mut self, addr: std::ops::Range<u32>, mut push_byte: impl FnMut(u8)) {
+//!     fn read_addrs(
+//!         &mut self,
+//!         addr: std::ops::Range<u32>,
+//!         mut push_byte: impl FnMut(u8)
+//!     ) -> Result<(), Self::Error> {
 //!         for addr in addr {
 //!             push_byte(self.mem.r8(addr))
 //!         }
+//!         Ok(())
 //!     }
 //!
 //!     // write data to the specified memory addresses
-//!     fn write_addrs(&mut self, mut get_addr_val: impl FnMut() -> Option<(u32, u8)>) {
+//!     fn write_addrs(
+//!         &mut self,
+//!         mut get_addr_val: impl FnMut() -> Option<(u32, u8)>
+//!     ) -> Result<(), Self::Error> {
 //!         while let Some((addr, val)) = get_addr_val() {
 //!             self.mem.w8(addr, val);
 //!         }
+//!         Ok(())
 //!     }
 //!
 //!     // there are several other methods whose default implementations can be
@@ -201,7 +195,7 @@
 //! All that's left is to create a new [`GdbStub`](struct.GdbStub.html), pass it
 //! your `Connection` and `Target`, and call `run`!
 //!
-//! ```compile_fail
+//! ```ignore
 //! fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     // Pre-existing setup code
 //!     let mut system = Emu::new()?;
@@ -238,6 +232,8 @@
 //!   Nintendo GameBoy Advance emulator and debugger
 //! - [microcorruption-emu](https://github.com/sapir/microcorruption-emu) -
 //!   msp430 emulator for the microcorruption.com ctf
+//! - [clicky](https://github.com/daniel5151/clicky/) - A WIP emulator for
+//!   classic clickwheel iPods
 //! - [ts7200](https://github.com/daniel5151/ts7200/) - An emulator for the
 //!   TS-7200, a somewhat bespoke embedded ARMv4t platform
 //!
@@ -248,7 +244,8 @@
 
 extern crate alloc;
 
-use core::fmt::Debug;
+use core::fmt::{self, Debug};
+use core::ops::Range;
 
 use num_traits::{PrimInt, Unsigned};
 
@@ -279,14 +276,13 @@ pub use stub::GdbStub;
 /// ARM target uses the register layout described in the
 ///  [`arm-core.xml`](https://github.com/bminor/binutils-gdb/blob/master/gdb/features/arm/arm-core.xml)
 /// file.
-// TODO: modify all signatures to return Result<(), Self::Error>
 // TODO: Introduce a `Registers` trait to abstract register read/write
 //  - i.e: provide "built-in" `Registers` implementations for common
 //    architectures which match GDB's XML files.
 //  - always easier to work with structured data instead of unstructured data...
 pub trait Target {
     /// The target architecture's pointer size (e.g: `u32` on a 32-bit system).
-    type Usize: PrimInt + Unsigned + Debug;
+    type Usize: PrimInt + Unsigned + Debug + fmt::LowerHex;
 
     /// A target-specific fatal error.
     type Error;
@@ -296,10 +292,7 @@ pub trait Target {
     ///
     /// The provided `log_mem_access` function should be called each time a
     /// memory location is accessed.
-    fn step(
-        &mut self,
-        log_mem_access: impl FnMut(Access<Self::Usize>),
-    ) -> Result<TargetState, Self::Error>;
+    fn step(&mut self) -> Result<TargetState<Self::Usize>, Self::Error>;
 
     /// Read the target's registers.
     ///
@@ -307,7 +300,7 @@ pub trait Target {
     /// [`<target>.xml`](#whats-targetxml). The provided `push_reg` function
     /// should be called with the register's value.
     // e.g: for ARM: binutils-gdb/blob/master/gdb/features/arm/arm-core.xml
-    fn read_registers(&mut self, push_reg: impl FnMut(&[u8]));
+    fn read_registers(&mut self, push_reg: impl FnMut(&[u8])) -> Result<(), Self::Error>;
 
     /// Write the target's registers.
     ///
@@ -316,18 +309,25 @@ pub trait Target {
     /// [`<target>.xml`](#whats-targetxml).
     ///
     /// e.g: for ARM: binutils-gdb/blob/master/gdb/features/arm/arm-core.xml
-    fn write_registers(&mut self, regs: &[u8]);
+    fn write_registers(&mut self, regs: &[u8]) -> Result<(), Self::Error>;
 
     /// Read the target's current PC.
-    fn read_pc(&mut self) -> Self::Usize;
+    fn read_pc(&mut self) -> Result<Self::Usize, Self::Error>;
 
     /// Read bytes from the specified address range.
-    fn read_addrs(&mut self, addr: core::ops::Range<Self::Usize>, val: impl FnMut(u8));
+    fn read_addrs(
+        &mut self,
+        addrs: Range<Self::Usize>,
+        val: impl FnMut(u8),
+    ) -> Result<(), Self::Error>;
 
     /// Write bytes to the specified address range.
-    fn write_addrs(&mut self, get_addr_val: impl FnMut() -> Option<(Self::Usize, u8)>);
+    fn write_addrs(
+        &mut self,
+        get_addr_val: impl FnMut() -> Option<(Self::Usize, u8)>,
+    ) -> Result<(), Self::Error>;
 
-    /// Return the platform's `features.xml` file.
+    /// (optional) Return the platform's `features.xml` file.
     ///
     /// Implementing this method enables `gdb` to automatically detect the
     /// target's architecture, saving the hassle of having to run `set
@@ -346,39 +346,70 @@ pub trait Target {
     fn target_description_xml() -> Option<&'static str> {
         None
     }
+
+    /// (optional) Update the target's hardware break/watchpoints. Returns a
+    /// boolean indicating if the operation succeeded.
+    ///
+    /// While `gdbstub` has built-in support for _Software_ breakpoints,
+    /// implementing support for _Hardware_ breakpoints can substantially
+    /// improve performance (especially when working with **memory
+    /// watchpoints**).
+    fn update_hw_breakpoint(
+        &mut self,
+        addr: Self::Usize,
+        op: HwBreakOp,
+    ) -> Option<Result<bool, Self::Error>> {
+        let _ = (addr, op);
+
+        None
+    }
 }
 
-/// The kind of memory access being performed
+/// What kind of watchpoint.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum AccessKind {
-    /// Read
-    Read,
-    /// Write
+pub enum WatchKind {
+    /// Fire when the memory location is written to.
     Write,
+    /// Fire when the memory location is read from.
+    Read,
+    /// Fire when the memory location is written to and/or read from.
+    ReadWrite,
 }
 
-/// Describes a memory access.
-#[derive(Clone, Copy, Debug)]
-pub struct Access<U> {
-    /// The kind of memory access (Read or Write).
-    pub kind: AccessKind,
-    /// The associated address.
-    pub addr: U,
-    /// The byte that was read / written.
-    pub val: u8,
+/// Add/Remove hardware breakpoints / watchpoints
+#[derive(Debug)]
+pub enum HwBreakOp {
+    /// Add a new hardware breakpoint at specified address.
+    AddBreak,
+    /// Add a new watchpoint for the specified address.
+    AddWatch(WatchKind),
+    /// Remove the hardware breakpoint
+    RemoveBreak,
+    /// Remove the hardware watchpoint
+    RemoveWatch(WatchKind),
 }
 
-/// The underlying system's execution state.
-// TODO: explore if TargetState is really necessary...
+/// The system's current execution state.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum TargetState {
+pub enum TargetState<U> {
     /// Running
     Running,
     /// Halted
     Halted,
-    /// Running, but system triggered a software breakpoint, e.g. due to a trap instruction.
-    /// This is not necessarily a breakpoint configured by the client/user.
-    SoftwareBreakpoint,
+    /// Hit a software breakpoint (e.g. due to a trap instruction).
+    ///
+    /// NOTE: This does not necessarily have to be a breakpoint configured by
+    /// the client/user of the current GDB session.
+    SwBreak,
+    /// Hit a hardware breakpoint.
+    HwBreak,
+    /// Hit a watchpoint.
+    Watch {
+        /// What kind of Watchpoint was hit
+        kind: WatchKind,
+        /// Associated data address
+        addr: U,
+    },
 }
 
 /// A trait for reading / writing bytes across some transport layer.
