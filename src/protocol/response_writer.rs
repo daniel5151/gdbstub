@@ -1,4 +1,3 @@
-use alloc::format;
 use core::fmt::{self, Debug};
 
 use crate::Connection;
@@ -81,9 +80,14 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
 
     /// Write a single byte as a hex string (two ascii chars)
     pub fn write_hex(&mut self, byte: u8) -> Result<(), Error<C>> {
-        let hex_str = format!("{:02x}", byte);
-        self.write(hex_str.as_bytes()[0])?;
-        self.write(hex_str.as_bytes()[1])?;
+        for digit in [(byte & 0xf0) >> 4, byte & 0x0f].iter() {
+            let c = match digit {
+                0..=9 => b'0' + digit,
+                10..=15 => b'A' + digit - 10,
+                _ => unreachable!(),
+            };
+            self.write(c)?;
+        }
         Ok(())
     }
 

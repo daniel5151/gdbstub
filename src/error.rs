@@ -1,6 +1,7 @@
 use core::fmt::{self, Debug, Display};
 
 use crate::protocol::ResponseWriterError;
+use crate::util::slicevec::CapacityError;
 use crate::{Connection, Target};
 
 /// Errors which may occur during a GDB debugging session.
@@ -9,6 +10,8 @@ pub enum Error<T: Target, C: Connection> {
     ConnectionRead(C::Error),
     /// Connection Error while writing response.
     ConnectionWrite(ResponseWriterError<C>),
+    /// Packet cannot fit in the provided packet buffer
+    PacketBufferOverlow,
     /// Could not parse the packet into a valid command.
     PacketParse,
     /// Target threw a fatal error.
@@ -18,6 +21,12 @@ pub enum Error<T: Target, C: Connection> {
 impl<T: Target, C: Connection> From<ResponseWriterError<C>> for Error<T, C> {
     fn from(e: ResponseWriterError<C>) -> Self {
         Error::ConnectionWrite(e)
+    }
+}
+
+impl<A, T: Target, C: Connection> From<CapacityError<A>> for Error<T, C> {
+    fn from(_: CapacityError<A>) -> Self {
+        Error::PacketBufferOverlow
     }
 }
 
@@ -41,6 +50,7 @@ where
         match self {
             ConnectionRead(e) => write!(f, "Connection Error while reading request: {:?}", e),
             ConnectionWrite(e) => write!(f, "Connection Error while writing response: {:?}", e),
+            PacketBufferOverlow => write!(f, "Packet too big for provided buffer!"),
             PacketParse => write!(f, "Could not parse the packet into a valid command."),
             TargetError(e) => write!(f, "Target threw a fatal error: {:?}", e),
         }

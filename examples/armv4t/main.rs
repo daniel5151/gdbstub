@@ -8,7 +8,10 @@ mod emu;
 mod gdb;
 mod mem_sniffer;
 
-fn new_tcp_gdbstub<T>(port: u16) -> DynResult<gdbstub::GdbStub<T, TcpStream>>
+fn new_tcp_gdbstub<'a, T>(
+    port: u16,
+    buf: &'a mut [u8],
+) -> DynResult<gdbstub::GdbStub<'a, T, TcpStream>>
 where
     T: gdbstub::Target,
 {
@@ -19,7 +22,7 @@ where
     let (stream, addr) = sock.accept()?;
     eprintln!("Debugger connected from {}", addr);
 
-    Ok(gdbstub::GdbStub::new(stream))
+    Ok(gdbstub::GdbStub::new(stream, buf))
 }
 
 fn main() -> DynResult<()> {
@@ -28,7 +31,8 @@ fn main() -> DynResult<()> {
     let mut emu = emu::Emu::new(TEST_PROGRAM_ELF)?;
 
     // hook-up debugger
-    let mut debugger = new_tcp_gdbstub(9001)?;
+    let mut pktbuf = [0; 4096];
+    let mut debugger = new_tcp_gdbstub(9001, &mut pktbuf)?;
 
     let state_after_disconnect = debugger.run(&mut emu)?;
     if state_after_disconnect == gdbstub::TargetState::Running {

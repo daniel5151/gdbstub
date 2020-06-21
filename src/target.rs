@@ -1,7 +1,7 @@
 use core::fmt::{self, Debug};
 use core::ops::Range;
 
-use num_traits::{PrimInt, Unsigned};
+use num_traits::{Num, PrimInt, Unsigned};
 
 /// Describes a target system which can be debugged using
 /// [`GdbStub`](struct.GdbStub.html).
@@ -28,7 +28,7 @@ use num_traits::{PrimInt, Unsigned};
 //  - always easier to work with structured data instead of unstructured data...
 pub trait Target {
     /// The target architecture's pointer size (e.g: `u32` on a 32-bit system).
-    type Usize: PrimInt + Unsigned + Debug + fmt::LowerHex;
+    type Usize: Num + PrimInt + Unsigned + Debug + fmt::LowerHex;
 
     /// A target-specific fatal error.
     type Error;
@@ -55,7 +55,7 @@ pub trait Target {
     /// [`<target>.xml`](#whats-targetxml).
     ///
     /// e.g: for ARM: binutils-gdb/blob/master/gdb/features/arm/arm-core.xml
-    fn write_registers(&mut self, regs: &[u8]) -> Result<(), Self::Error>;
+    fn write_registers(&mut self, pop_reg: impl FnMut() -> Option<u8>) -> Result<(), Self::Error>;
 
     /// Read the target's current PC.
     fn read_pc(&mut self) -> Result<Self::Usize, Self::Error>;

@@ -1,3 +1,5 @@
+use core::convert::TryFrom;
+
 #[derive(PartialEq, Eq, Debug)]
 pub struct z {
     pub type_: u8,
@@ -6,8 +8,10 @@ pub struct z {
     pub kind: u8,
 }
 
-impl z {
-    pub fn parse(body: &str) -> Result<Self, ()> {
+impl TryFrom<&str> for z {
+    type Error = ();
+
+    fn try_from(body: &str) -> Result<Self, ()> {
         let mut body = body.split(',');
         let type_ = u8::from_str_radix(body.next().ok_or(())?, 16).map_err(drop)?;
         let addr = u64::from_str_radix(body.next().ok_or(())?, 16).map_err(drop)?;

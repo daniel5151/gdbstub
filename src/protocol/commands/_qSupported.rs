@@ -1,42 +1,55 @@
-use alloc::vec::Vec;
+use core::convert::TryFrom;
 
-#[derive(PartialEq, Eq, Debug)]
-pub struct qSupported<'a>(pub Vec<Feature<'a>>);
+#[derive(Debug)]
+pub struct qSupported<'a> {
+    features: core::str::Split<'a, char>,
+}
 
-impl<'a> qSupported<'a> {
-    pub fn parse(body: &'a str) -> Result<Self, ()> {
+impl<'a> TryFrom<&'a str> for qSupported<'a> {
+    type Error = ();
+
+    fn try_from(body: &'a str) -> Result<Self, ()> {
         if body.is_empty() {
             return Err(());
         }
 
-        let features = body
-            .split(';')
-            .map(|s| match s.as_bytes().last() {
-                None => {
-                    // packet shouldn't have two ";;" in a row
-                    Err(())
-                }
-                Some(&c) if c == b'+' || c == b'-' || c == b'?' => Ok(Feature {
-                    name: &s[..s.len() - 1],
-                    val: None,
-                    status: match c {
-                        b'+' => FeatureSupported::Yes,
-                        b'-' => FeatureSupported::No,
-                        b'?' => FeatureSupported::Maybe,
-                        _ => unreachable!(),
-                    },
-                }),
-                Some(_) => {
-                    let mut parts = s.split('=');
-                    Ok(Feature {
-                        name: parts.next().unwrap(),
-                        val: Some(parts.next().ok_or(())?),
-                        status: FeatureSupported::Yes,
-                    })
-                }
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(qSupported(features))
+        let features = body.split(';');
+        Ok(qSupported { features })
+    }
+}
+
+impl<'a> Iterator for qSupported<'a> {
+    type Item = Feature<'a>;
+
+    fn next(&mut self) -> Option<Feature<'a>> {
+        let s = self.features.next()?;
+
+        match s.as_bytes().last() {
+            None => {
+                // packet shouldn't have two ";;" in a row
+                // FIXME: this should return an Error, not none!
+                None
+            }
+            Some(&c) if c == b'+' || c == b'-' || c == b'?' => Some(Feature {
+                name: &s[..s.len() - 1],
+                val: None,
+                status: match c {
+                    b'+' => FeatureSupported::Yes,
+                    b'-' => FeatureSupported::No,
+                    b'?' => FeatureSupported::Maybe,
+                    _ => unreachable!(),
+                },
+            }),
+            Some(_) => {
+                let mut parts = s.split('=');
+                Some(Feature {
+                    name: parts.next().unwrap(),
+                    // FIXME: this should return an Error, not none!
+                    val: Some(parts.next()?),
+                    status: FeatureSupported::Yes,
+                })
+            }
+        }
     }
 }
 

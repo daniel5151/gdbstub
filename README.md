@@ -3,9 +3,9 @@
 [![](http://meritbadge.herokuapp.com/gdbstub)](https://crates.io/crates/gdbstub)
 [![](https://docs.rs/gdbstub/badge.svg)](https://docs.rs/gdbstub)
 
-An implementation of the [GDB Remote Serial Protocol](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Protocol.html#Remote-Protocol) in Rust, primarily for use in emulators.
+An implementation of the [GDB Remote Serial Protocol](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Protocol.html#Remote-Protocol) in Rust.
 
-`gdbstub` tries to make as few assumptions as possible about a project's architecture, and aims to provide a "drop-in" way to add GDB support, _without_ requiring any large refactoring / ownership juggling. It is particularly useful in _emulators_, where it provides a powerful, non-intrusive way to debug code running within an emulated system.
+`gdbstub` tries to make as few assumptions as possible about a project's architecture, and aims to provide a "drop-in" way to add GDB support, _without_ requiring any large refactoring / ownership juggling. It is particularly useful in _emulators_, where it provides a powerful, non-intrusive way to debug code running within an emulated system. `gdbstub` is also _entirely `no_std`_, and can be run on bare-metal systems as well.
 
 - [Documentation and Examples](https://docs.rs/gdbstub)
 
@@ -28,7 +28,7 @@ The GDB Remote Serial Protocol is surprisingly complex, supporting advanced feat
 
 ## Feature flags
 
-`gdbstub` is `no_std` by default, though it does have a dependency on `alloc`.
+`gdbstub` is `no_std` by default.
 
 Additional functionality can be enabled by activating certain features.
 
@@ -46,12 +46,9 @@ The included `armv4t` example shows how `gdbstub` can be used to add `gdb` debug
 - Improve packet-parsing infrastructure
     - Macros can be clever, but sometimes, they can be _too_ clever...
 - Improve multiprocess / multi-thread / multi-core support?
-- Re-architect internals to remove `alloc` dependency (for lower-end embedded targets)
-  - The current `gdbstub` implementation clearly separates packet parsing and command execution, and uses intermediate allocations to store structured command data. Interleaving packet parsing and command execution would remove the need for these intermediate allocations, at the expense of potentially less clear code...
-  - Would require users to allocate packet buffers themselves
 
 ## Using `gdbstub` on bare-metal hardware
 
-While the target use-case for `gdbstub` is emulation, the crate is `no_std` compatible (albeit with a dependency on `alloc`), which means it _should_ be possible to use in embedded contexts as well.
+While the target use-case for `gdbstub` is emulation, the crate is `no_std` compatible, which means it _should_ be possible to use `gdbstub` implement a `Target` which uses low-level trap instructions + context switching to debug bare-metal code.
 
-At the moment, this is not a "first-class" use-case, and has not been tested. Please let me know if you've had any success using `gdbstub` on actual hardware!
+If you happen to stumble across this crate and use it on bare-metal hardware, please let me know!

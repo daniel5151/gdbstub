@@ -51,28 +51,35 @@ impl Target for Emu {
         Ok(())
     }
 
-    fn write_registers(&mut self, regs: &[u8]) -> Result<(), &'static str> {
+    fn write_registers(
+        &mut self,
+        mut pop_reg: impl FnMut() -> Option<u8>,
+    ) -> Result<(), &'static str> {
+        const ERR: &str = "malformed write register packet";
+
         let mut next = {
-            let mut idx: usize = 0;
-            move || {
-                use std::convert::TryInto;
-                idx += 4;
-                u32::from_le_bytes(regs[idx - 4..idx].try_into().unwrap())
+            move || -> Option<u32> {
+                Some(
+                    (pop_reg()? as u32)
+                        | (pop_reg()? as u32) << 8
+                        | (pop_reg()? as u32) << 16
+                        | (pop_reg()? as u32) << 24,
+                )
             }
         };
         let mode = self.cpu.mode();
         for i in 0..13 {
-            self.cpu.reg_set(mode, i, next());
+            self.cpu.reg_set(mode, i, next().ok_or(ERR)?);
         }
-        self.cpu.reg_set(mode, reg::SP, next());
-        self.cpu.reg_set(mode, reg::LR, next());
-        self.cpu.reg_set(mode, reg::PC, next());
+        self.cpu.reg_set(mode, reg::SP, next().ok_or(ERR)?);
+        self.cpu.reg_set(mode, reg::LR, next().ok_or(ERR)?);
+        self.cpu.reg_set(mode, reg::PC, next().ok_or(ERR)?);
         // Floating point registers, unused
         for _ in 0..25 {
-            next();
+            next().ok_or(ERR)?;
         }
 
-        self.cpu.reg_set(mode, reg::CPSR, next());
+        self.cpu.reg_set(mode, reg::CPSR, next().ok_or(ERR)?);
 
         Ok(())
     }

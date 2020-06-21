@@ -1,10 +1,8 @@
-use alloc::collections::BTreeSet;
-use alloc::vec::Vec;
-use core::marker::PhantomData;
-
+use arrayvec::ArrayVec;
 use log::*;
 use num_traits::ops::saturating::Saturating;
 
+use crate::util::slicevec::SliceVec;
 use crate::{
     protocol::{Command, Packet, ResponseWriter},
     Connection, Error, HwBreakOp, Target, TargetState, WatchKind,
@@ -16,28 +14,32 @@ enum ExecState {
     Exit,
 }
 
+// TODO?: make number of swbreak configurable
+const MAX_SWBREAK: usize = 32;
+
 /// Facilitates the remote debugging of a [`Target`](trait.Target.html) using
 /// the GDB Remote Serial Protocol over a given
 /// [`Connection`](trait.Connection.html).
-pub struct GdbStub<T: Target, C: Connection> {
+pub struct GdbStub<'a, T: Target, C: Connection> {
     conn: C,
     exec_state: ExecState,
-    swbreak: BTreeSet<T::Usize>,
-    _target: PhantomData<T>,
+    // TODO?: use BTreeSet if std is enabled for infinite swbreaks?
+    swbreak: ArrayVec<[T::Usize; MAX_SWBREAK]>,
+    packet_buffer: Option<&'a mut [u8]>,
 }
 
-impl<T: Target, C: Connection> GdbStub<T, C> {
-    /// Create a new `GdbStub` using the provided connection.
-    pub fn new(conn: C) -> GdbStub<T, C> {
+impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
+    /// Create a new `GdbStub` using the provided connection + packet buffer.
+    pub fn new(conn: C, packet_buffer: &'a mut [u8]) -> GdbStub<T, C> {
         GdbStub {
             conn,
-            swbreak: BTreeSet::new(),
+            swbreak: ArrayVec::new(),
             exec_state: ExecState::Paused,
-            _target: PhantomData,
+            packet_buffer: Some(packet_buffer),
         }
     }
 
-    fn handle_command(&mut self, target: &mut T, command: Command) -> Result<(), Error<T, C>> {
+    fn handle_command(&mut self, target: &mut T, command: Command<'_>) -> Result<(), Error<T, C>> {
         // Acknowledge the command
         self.conn.write(b'+').map_err(Error::ConnectionRead)?;
 
@@ -108,11 +110,11 @@ impl<T: Target, C: Connection> GdbStub<T, C> {
                     .map_err(Error::TargetError)?;
                 err?;
             }
-            Command::G(cmd) => {
+            Command::G(mut vals) => {
                 // TODO: use the length of the slice returned by `target.read_registers` to
                 // validate that the server sent the correct amount of data
                 target
-                    .write_registers(cmd.vals.as_slice())
+                    .write_registers(|| vals.next())
                     .map_err(Error::TargetError)?;
                 res.write_str("OK")?;
             }
@@ -137,7 +139,6 @@ impl<T: Target, C: Connection> GdbStub<T, C> {
                 let addr = cmd.addr;
                 let mut val = cmd
                     .val
-                    .into_iter()
                     .enumerate()
                     .map(|(i, v)| (addr + i as u64, v))
                     // XXX: get rid of this unwrap ahhh
@@ -157,10 +158,7 @@ impl<T: Target, C: Connection> GdbStub<T, C> {
 
                 use HwBreakOp::*;
                 let supported = match cmd.type_ {
-                    0 => {
-                        self.swbreak.insert(addr);
-                        Some(Ok(true))
-                    }
+                    0 => Some(Ok(self.swbreak.try_push(addr).is_ok())),
                     1 => target.update_hw_breakpoint(addr, AddBreak),
                     2 => target.update_hw_breakpoint(addr, AddWatch(WatchKind::Write)),
                     3 => target.update_hw_breakpoint(addr, AddWatch(WatchKind::Read)),
@@ -181,10 +179,13 @@ impl<T: Target, C: Connection> GdbStub<T, C> {
 
                 use HwBreakOp::*;
                 let supported = match cmd.type_ {
-                    0 => {
-                        self.swbreak.remove(&addr);
-                        Some(Ok(true))
-                    }
+                    0 => match self.swbreak.iter().position(|x| x == &addr) {
+                        Some(i) => {
+                            self.swbreak.swap_remove(i);
+                            Some(Ok(true))
+                        }
+                        None => Some(Ok(false)),
+                    },
                     1 => target.update_hw_breakpoint(addr, RemoveBreak),
                     2 => target.update_hw_breakpoint(addr, RemoveWatch(WatchKind::Write)),
                     3 => target.update_hw_breakpoint(addr, RemoveWatch(WatchKind::Read)),
@@ -194,13 +195,15 @@ impl<T: Target, C: Connection> GdbStub<T, C> {
 
                 match supported {
                     None => {}
-                    Some(Ok(_)) => res.write_str("OK")?,
-                    Some(Err(_)) => res.write_str("E22")?, // value of 22 grafted from QEMU
+                    Some(Ok(true)) => res.write_str("OK")?,
+                    Some(Ok(false)) => res.write_str("E22")?, // value of 22 grafted from QEMU
+                    Some(Err(e)) => return Err(Error::TargetError(e)),
                 }
             }
             Command::vCont(cmd) => {
                 use crate::protocol::_vCont::VContKind;
-                let action = &cmd.actions[0];
+                // XXX: handle multiple actions properly
+                let action = cmd.into_iter().next().unwrap().unwrap();
                 self.exec_state = match action.kind {
                     VContKind::Step => ExecState::Running { single_step: true },
                     VContKind::Continue => ExecState::Running { single_step: false },
@@ -238,10 +241,7 @@ impl<T: Target, C: Connection> GdbStub<T, C> {
         res.flush().map_err(Error::ConnectionWrite)
     }
 
-    fn recv_packet<'a, 'b>(
-        &'a mut self,
-        packet_buffer: &'b mut Vec<u8>,
-    ) -> Result<Option<Packet<'b>>, Error<T, C>> {
+    fn recv_packet<'b>(&mut self, buf: &'b mut [u8]) -> Result<Option<Packet<'b>>, Error<T, C>> {
         let header_byte = match self.exec_state {
             // block waiting for a gdb command
             ExecState::Paused => self.conn.read().map(Some),
@@ -252,24 +252,29 @@ impl<T: Target, C: Connection> GdbStub<T, C> {
         match header_byte {
             Ok(None) => Ok(None), // no incoming message
             Ok(Some(header_byte)) => {
+                // use SliceVec as a convenient view into the packet buffer
+                let mut packet_buffer = SliceVec::new(buf);
+
                 packet_buffer.clear();
-                packet_buffer.push(header_byte);
+                packet_buffer.push(header_byte)?;
                 if header_byte == b'$' {
                     // read the packet body
                     loop {
-                        match self.conn.read().map_err(Error::ConnectionRead)? {
-                            b'#' => break,
-                            x => packet_buffer.push(x),
+                        let c = self.conn.read().map_err(Error::ConnectionRead)?;
+                        packet_buffer.push(c)?;
+                        if c == b'#' {
+                            break;
                         }
                     }
-                    // append the # char
-                    packet_buffer.push(b'#');
-                    // and finally, read the checksum as well
-                    packet_buffer.push(self.conn.read().map_err(Error::ConnectionRead)?);
-                    packet_buffer.push(self.conn.read().map_err(Error::ConnectionRead)?);
+                    // read the checksum as well
+                    packet_buffer.push(self.conn.read().map_err(Error::ConnectionRead)?)?;
+                    packet_buffer.push(self.conn.read().map_err(Error::ConnectionRead)?)?;
                 }
 
-                match Packet::from_buf(packet_buffer) {
+                let len = packet_buffer.len();
+                drop(packet_buffer);
+
+                match Packet::from_buf(&buf[..len]) {
                     Ok(packet) => Ok(Some(packet)),
                     Err(e) => {
                         // TODO: preserve this context within Error::PacketParse
@@ -287,24 +292,24 @@ impl<T: Target, C: Connection> GdbStub<T, C> {
     /// Returns once the GDB client cleanly closes the debugging session (via
     /// the GDB `quit` command).
     pub fn run(&mut self, target: &mut T) -> Result<TargetState<T::Usize>, Error<T, C>> {
-        let mut packet_buffer = Vec::new();
+        let packet_buffer = self.packet_buffer.take().unwrap();
 
         loop {
             // Handle any incoming GDB packets
-            match self.recv_packet(&mut packet_buffer)? {
+            match self.recv_packet(packet_buffer)? {
                 None => {}
                 Some(packet) => match packet {
                     Packet::Ack => {}
-                    Packet::Nack => unimplemented!(),
+                    Packet::Nack => {
+                        unimplemented!("GDB nack'd the packet, but retry isn't implemented yet")
+                    }
                     Packet::Interrupt => {
                         self.exec_state = ExecState::Paused;
                         let mut res = ResponseWriter::new(&mut self.conn);
                         res.write_str("S05")?;
                         res.flush()?;
                     }
-                    Packet::Command(command) => {
-                        self.handle_command(target, command)?;
-                    }
+                    Packet::Command(command) => self.handle_command(target, command)?,
                 },
             };
 

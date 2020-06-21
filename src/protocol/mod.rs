@@ -18,7 +18,7 @@ pub enum PacketParseError<'a> {
 }
 
 /// Top-Level GDB packet
-#[derive(PartialEq, Eq, Debug)]
+#[derive(Debug)]
 pub enum Packet<'a> {
     Ack,
     Nack,

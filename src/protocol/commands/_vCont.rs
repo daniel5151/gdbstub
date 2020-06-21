@@ -1,30 +1,32 @@
-use alloc::vec::Vec;
+use core::convert::TryFrom;
 
 #[derive(PartialEq, Eq, Debug)]
-pub struct vCont {
-    pub actions: Vec<VContAction>,
+pub struct vCont<'a> {
+    i: usize,
+    buf: &'a str,
 }
 
-impl vCont {
-    pub fn parse(body: &str) -> Result<Self, ()> {
-        let mut acts = body.split(';');
-        acts.next();
+impl<'a> TryFrom<&'a str> for vCont<'a> {
+    type Error = ();
 
-        let mut actions = Vec::new();
+    fn try_from(body: &'a str) -> Result<Self, ()> {
+        Ok(vCont { i: 0, buf: body })
+    }
+}
 
-        for s in acts {
-            let mut s = s.split(':');
-            let kind = s.next().ok_or(())?;
+impl<'a> vCont<'a> {
+    pub fn into_iter(self) -> impl Iterator<Item = Result<VContAction, &'static str>> + 'a {
+        self.buf.split(';').map(|act| {
+            let mut s = act.split(':');
+            let kind = s.next().ok_or("missing kind")?;
             // TODO: properly handle thread-id
             let _tid = s.next();
 
-            actions.push(VContAction {
-                kind: kind.parse()?,
+            Ok(VContAction {
+                kind: kind.parse().map_err(|_| "invalid kind")?,
                 tid: None,
             })
-        }
-
-        Ok(vCont { actions })
+        })
     }
 }
 
@@ -38,7 +40,7 @@ pub struct VContAction {
 pub enum VContKind {
     Continue,
     ContinueWithSig(u8),
-    RangeStep(u64, u64), // FIXME: vCont 'r' should use Target::Usize
+    RangeStep(u64, u64),
     Step,
     StepWithSig(u8),
     Stop,

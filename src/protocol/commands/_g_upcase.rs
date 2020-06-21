@@ -1,24 +1,26 @@
-use alloc::vec::Vec;
+use core::convert::TryFrom;
+
+use crate::util::hexiter::HexIter;
 
 #[derive(PartialEq, Eq, Debug)]
-pub struct G {
-    pub vals: Vec<u8>,
+pub struct G<'a> {
+    vals: HexIter<'a>,
 }
 
-impl G {
-    pub fn parse(body: &str) -> Result<Self, ()> {
-        if body.len() % 2 != 0 || !body.is_ascii() {
-            return Err(());
-        }
+impl<'a> TryFrom<&'a str> for G<'a> {
+    type Error = ();
 
-        let vals = body
-            .as_bytes()
-            .chunks_exact(2)
-            .map(|c| unsafe { core::str::from_utf8_unchecked(c) })
-            .map(|c| u8::from_str_radix(c, 16))
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(drop)?;
+    fn try_from(body: &'a str) -> Result<Self, ()> {
+        Ok(G {
+            vals: HexIter::new(body).ok_or(())?,
+        })
+    }
+}
 
-        Ok(G { vals })
+impl<'a> Iterator for G<'a> {
+    type Item = u8;
+
+    fn next(&mut self) -> Option<u8> {
+        self.vals.next()
     }
 }

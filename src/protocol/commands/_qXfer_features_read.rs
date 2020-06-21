@@ -1,3 +1,5 @@
+use core::convert::TryFrom;
+
 #[derive(PartialEq, Eq, Debug)]
 pub struct qXferFeaturesRead<'a> {
     pub annex: &'a str,
@@ -5,8 +7,10 @@ pub struct qXferFeaturesRead<'a> {
     pub len: usize,
 }
 
-impl<'a> qXferFeaturesRead<'a> {
-    pub fn parse(body: &'a str) -> Result<Self, ()> {
+impl<'a> TryFrom<&'a str> for qXferFeaturesRead<'a> {
+    type Error = ();
+
+    fn try_from(body: &'a str) -> Result<Self, ()> {
         // body should be ":<target>:<offset>,<len>b"
         log::debug!("{}", body);
         if body.is_empty() {

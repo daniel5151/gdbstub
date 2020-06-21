@@ -1,3 +1,5 @@
+use core::convert::TryFrom;
+
 // TODO: figure out how to make it accept exprs _and_ blocks
 // TODO: use a trie structure for more efficient longest-prefix matching
 macro_rules! prefix_match {
@@ -30,7 +32,7 @@ macro_rules! commands {
 
         /// GDB commands
         #[allow(non_camel_case_types)]
-        #[derive(PartialEq, Eq, Debug)]
+        #[derive(Debug)]
         pub enum Command<'a> {
             $($command($command<$($lifetime)?>),)*
             Unknown(&'a str),
@@ -46,7 +48,7 @@ macro_rules! commands {
                 let command = prefix_match! {
                     match body => [name | rest] {
                         $($name => {
-                            let cmd = $command::parse(rest)
+                            let cmd = $command::try_from(rest)
                                 .map_err(|_| CommandParseError::MalformedCommand(name))?;
                             Command::$command(cmd)
                         })*
@@ -75,10 +77,10 @@ commands! {
     "c" => _c::c,
     "D" => _d_upcase::D,
     "g" => _g::g,
-    "G" => _g_upcase::G,
+    "G" => _g_upcase::G<'a>,
     "H" => _h_upcase::H,
     "m" => _m::m,
-    "M" => _m_upcase::M,
+    "M" => _m_upcase::M<'a>,
     "qAttached" => _qAttached::qAttached,
     "qC" => _qC::qC,
     "qfThreadInfo" => _qfThreadInfo::qfThreadInfo,
@@ -91,5 +93,5 @@ commands! {
 
     // Order Matters (because of prefix matching)
     "vCont?" => vCont_question_mark::vContQuestionMark,
-    "vCont" => _vCont::vCont,
+    "vCont" => _vCont::vCont<'a>,
 }

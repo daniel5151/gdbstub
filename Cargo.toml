@@ -15,6 +15,7 @@ categories = ["development-tools::debugging", "embedded", "emulators", "network-
 [dependencies]
 log = "0.4"
 num-traits = { version = "0.2", default-features = false }
+arrayvec = { version = "0.5", default-features = false }
 
 [dev-dependencies]
 armv4t_emu = "0.1"

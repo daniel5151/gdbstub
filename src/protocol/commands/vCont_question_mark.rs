@@ -1,8 +1,12 @@
+use core::convert::TryFrom;
+
 #[derive(PartialEq, Eq, Debug)]
 pub struct vContQuestionMark;
 
-impl vContQuestionMark {
-    pub fn parse(body: &str) -> Result<Self, ()> {
+impl TryFrom<&str> for vContQuestionMark {
+    type Error = ();
+
+    fn try_from(body: &str) -> Result<Self, ()> {
         if !body.is_empty() {
             return Err(());
         }

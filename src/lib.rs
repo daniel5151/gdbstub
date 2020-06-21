@@ -2,6 +2,8 @@
 //! [GDB Remote Serial Protocol](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Protocol.html#Remote-Protocol)
 //! in Rust.
 //!
+//! ***TODO BEFORE PUBLISHING: *** re-write these docs with the new interface!
+//!
 //! `gdbstub` tries to make as few assumptions as possible about a project's
 //! architecture, and aims to provide a "drop-in" way to add GDB support,
 //! _without_ requiring any large refactoring / ownership juggling. It is
@@ -33,8 +35,7 @@
 //!
 //! ## Feature flags
 //!
-//! `gdbstub` is `no_std` by default, though it does have a dependency on
-//! `alloc`.
+//! `gdbstub` is completely `no_std` by default.
 //!
 //! Additional functionality can be enabled by activating certain features.
 //!
@@ -242,13 +243,12 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-extern crate alloc;
-
 mod connection;
 mod error;
 mod protocol;
 mod stub;
 mod target;
+mod util;
 
 pub use connection::Connection;
 pub use error::Error;
