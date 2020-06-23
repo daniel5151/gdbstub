@@ -1,10 +1,10 @@
 use core::convert::TryFrom;
 
-use crate::util::hexiter::HexIter;
+use crate::util::HexDecoder;
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct G<'a> {
-    vals: HexIter<'a>,
+    pub vals: HexDecoder<'a>,
 }
 
 impl<'a> TryFrom<&'a str> for G<'a> {
@@ -12,15 +12,7 @@ impl<'a> TryFrom<&'a str> for G<'a> {
 
     fn try_from(body: &'a str) -> Result<Self, ()> {
         Ok(G {
-            vals: HexIter::new(body).ok_or(())?,
+            vals: HexDecoder::new(body).map_err(drop)?,
         })
-    }
-}
-
-impl<'a> Iterator for G<'a> {
-    type Item = u8;
-
-    fn next(&mut self) -> Option<u8> {
-        self.vals.next()
     }
 }

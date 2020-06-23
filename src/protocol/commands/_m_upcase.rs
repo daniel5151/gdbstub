@@ -1,12 +1,12 @@
 use core::convert::TryFrom;
 
-use crate::util::hexiter::HexIter;
+use crate::util::HexDecoder;
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct M<'a> {
     pub addr: u64,
     pub len: usize,
-    pub val: HexIter<'a>,
+    pub val: HexDecoder<'a>,
 }
 
 impl<'a> TryFrom<&'a str> for M<'a> {
@@ -21,7 +21,7 @@ impl<'a> TryFrom<&'a str> for M<'a> {
         Ok(M {
             addr,
             len,
-            val: HexIter::new(val).ok_or(())?,
+            val: HexDecoder::new(val).map_err(drop)?,
         })
     }
 }

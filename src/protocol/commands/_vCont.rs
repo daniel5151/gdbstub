@@ -1,22 +1,26 @@
 use core::convert::TryFrom;
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(Debug)]
 pub struct vCont<'a> {
-    i: usize,
-    buf: &'a str,
+    pub actions: Actions<'a>,
 }
 
 impl<'a> TryFrom<&'a str> for vCont<'a> {
     type Error = ();
 
     fn try_from(body: &'a str) -> Result<Self, ()> {
-        Ok(vCont { i: 0, buf: body })
+        Ok(vCont {
+            actions: Actions(body),
+        })
     }
 }
 
-impl<'a> vCont<'a> {
+#[derive(Debug)]
+pub struct Actions<'a>(&'a str);
+
+impl<'a> Actions<'a> {
     pub fn into_iter(self) -> impl Iterator<Item = Result<VContAction, &'static str>> + 'a {
-        self.buf.split(';').map(|act| {
+        self.0.split(';').map(|act| {
             let mut s = act.split(':');
             let kind = s.next().ok_or("missing kind")?;
             // TODO: properly handle thread-id

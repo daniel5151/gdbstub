@@ -47,7 +47,9 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
 
         match command {
             // ------------------ Handshaking and Queries ------------------- //
-            Command::qSupported(_features) => {
+            Command::qSupported(cmd) => {
+                let _features = cmd.features.into_iter();
+
                 res.write_str("swbreak+;")?;
                 res.write_str("vContSupported+;")?;
 
@@ -110,11 +112,11 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
                     .map_err(Error::TargetError)?;
                 err?;
             }
-            Command::G(mut vals) => {
+            Command::G(mut cmd) => {
                 // TODO: use the length of the slice returned by `target.read_registers` to
                 // validate that the server sent the correct amount of data
                 target
-                    .write_registers(|| vals.next())
+                    .write_registers(|| cmd.vals.next())
                     .map_err(Error::TargetError)?;
                 res.write_str("OK")?;
             }
@@ -203,7 +205,7 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
             Command::vCont(cmd) => {
                 use crate::protocol::_vCont::VContKind;
                 // XXX: handle multiple actions properly
-                let action = cmd.into_iter().next().unwrap().unwrap();
+                let action = cmd.actions.into_iter().next().unwrap().unwrap();
                 self.exec_state = match action.kind {
                     VContKind::Step => ExecState::Running { single_step: true },
                     VContKind::Continue => ExecState::Running { single_step: false },
