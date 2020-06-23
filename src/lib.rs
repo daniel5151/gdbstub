@@ -242,7 +242,11 @@
 //! open a PR to add it to this list!
 
 #![cfg_attr(not(feature = "std"), no_std)]
+// #![deny(missing_docs)]
 
+pub mod arch;
+
+mod arch_traits;
 mod connection;
 mod error;
 mod protocol;
@@ -250,6 +254,7 @@ mod stub;
 mod target;
 mod util;
 
+pub use arch_traits::{Arch, Registers};
 pub use connection::Connection;
 pub use error::Error;
 pub use stub::GdbStub;

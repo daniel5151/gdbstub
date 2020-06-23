@@ -5,7 +5,7 @@ use num_traits::ops::saturating::Saturating;
 use crate::util::slicevec::SliceVec;
 use crate::{
     protocol::{Command, Packet, ResponseWriter},
-    Connection, Error, HwBreakOp, Target, TargetState, WatchKind,
+    Arch, Connection, Error, HwBreakOp, Registers, Target, TargetState, WatchKind,
 };
 
 enum ExecState {
@@ -24,7 +24,7 @@ pub struct GdbStub<'a, T: Target, C: Connection> {
     conn: C,
     exec_state: ExecState,
     // TODO?: use BTreeSet if std is enabled for infinite swbreaks?
-    swbreak: ArrayVec<[T::Usize; MAX_SWBREAK]>,
+    swbreak: ArrayVec<[<T::Arch as Arch>::Usize; MAX_SWBREAK]>,
     packet_buffer: Option<&'a mut [u8]>,
 }
 
@@ -67,14 +67,14 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
                 // res.write_str("ConditionalBreakpoints+;")?;
 
                 // probe support for target description xml
-                if T::target_description_xml().is_some() {
+                if T::Arch::target_description_xml().is_some() {
                     res.write_str("qXfer:features:read+;")?;
                 }
             }
             Command::vContQuestionMark(_) => res.write_str("vCont;c;s;t")?,
             Command::qXferFeaturesRead(cmd) => {
                 assert_eq!(cmd.annex, "target.xml");
-                match T::target_description_xml() {
+                match T::Arch::target_description_xml() {
                     Some(xml) => {
                         let xml = xml.trim();
                         if cmd.offset >= xml.len() {
@@ -102,28 +102,33 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
             Command::QuestionMark(_) => res.write_str("S05")?,
             Command::qAttached(_) => res.write_str("1")?,
             Command::g(_) => {
-                let mut err = Ok(());
+                let mut regs: <T::Arch as Arch>::Registers = Default::default();
                 target
-                    .read_registers(|reg| {
-                        if let Err(e) = res.write_hex_buf(reg) {
-                            err = Err(e)
-                        }
-                    })
+                    .read_registers(&mut regs)
                     .map_err(Error::TargetError)?;
+                let mut err = Ok(());
+                regs.gdb_serialize(|val| {
+                    let res = match val {
+                        Some(b) => res.write_hex(b),
+                        None => res.write_str("xx"),
+                    };
+                    if let Err(e) = res {
+                        err = Err(e);
+                    }
+                });
                 err?;
             }
-            Command::G(mut cmd) => {
-                // TODO: use the length of the slice returned by `target.read_registers` to
-                // validate that the server sent the correct amount of data
-                target
-                    .write_registers(|| cmd.vals.next())
-                    .map_err(Error::TargetError)?;
+            Command::G(cmd) => {
+                let mut regs: <T::Arch as Arch>::Registers = Default::default();
+                regs.gdb_deserialize(cmd.vals)
+                    .map_err(|_| Error::PacketParse)?; // FIXME: more granular error?
+                target.write_registers(&regs).map_err(Error::TargetError)?;
                 res.write_str("OK")?;
             }
             Command::m(cmd) => {
                 let mut err = Ok(());
                 // XXX: get rid of these unwraps ahhh
-                let start: T::Usize = num_traits::NumCast::from(cmd.addr).unwrap();
+                let start: <T::Arch as Arch>::Usize = num_traits::NumCast::from(cmd.addr).unwrap();
                 // XXX: on overflow, this _should_ wrap around to low addresses (maybe?)
                 let end = start.saturating_add(num_traits::NumCast::from(cmd.len).unwrap());
 
@@ -156,7 +161,7 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
             }
             Command::Z(cmd) => {
                 // XXX: get rid of this unwrap ahhh
-                let addr: T::Usize = num_traits::NumCast::from(cmd.addr).unwrap();
+                let addr: <T::Arch as Arch>::Usize = num_traits::NumCast::from(cmd.addr).unwrap();
 
                 use HwBreakOp::*;
                 let supported = match cmd.type_ {
@@ -177,7 +182,7 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
             }
             Command::z(cmd) => {
                 // XXX: get rid of this unwrap ahhh
-                let addr: T::Usize = num_traits::NumCast::from(cmd.addr).unwrap();
+                let addr: <T::Arch as Arch>::Usize = num_traits::NumCast::from(cmd.addr).unwrap();
 
                 use HwBreakOp::*;
                 let supported = match cmd.type_ {
@@ -293,7 +298,7 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
     ///
     /// Returns once the GDB client cleanly closes the debugging session (via
     /// the GDB `quit` command).
-    pub fn run(&mut self, target: &mut T) -> Result<TargetState<T::Usize>, Error<T, C>> {
+    pub fn run(&mut self, target: &mut T) -> Result<TargetState<T::Arch>, Error<T, C>> {
         let packet_buffer = self.packet_buffer.take().unwrap();
 
         loop {

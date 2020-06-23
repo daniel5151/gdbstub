@@ -1,15 +1,11 @@
 use armv4t_emu::{reg, Memory};
-use gdbstub::{HwBreakOp, Target, TargetState, WatchKind};
+use gdbstub::{arch, HwBreakOp, Target, TargetState, WatchKind};
 
 use crate::emu::{Emu, Event};
 
 impl Target for Emu {
-    type Usize = u32;
+    type Arch = arch::arm::Armv4t;
     type Error = &'static str;
-
-    fn target_description_xml() -> Option<&'static str> {
-        Some(r#"<target version="1.0"><architecture>armv4t</architecture></target>"#)
-    }
 
     fn step(&mut self) -> Result<TargetState<u32>, Self::Error> {
         let event = match self.step() {
@@ -32,54 +28,33 @@ impl Target for Emu {
     }
 
     // order specified in binutils-gdb/blob/master/gdb/features/arm/arm-core.xml
-    fn read_registers(&mut self, mut push_reg: impl FnMut(&[u8])) -> Result<(), &'static str> {
+    fn read_registers(
+        &mut self,
+        regs: &mut arch::arm::reg::ArmCoreRegs,
+    ) -> Result<(), &'static str> {
         let mode = self.cpu.mode();
+
         for i in 0..13 {
-            push_reg(&self.cpu.reg_get(mode, i).to_le_bytes());
+            regs.r[i] = self.cpu.reg_get(mode, i as u8);
         }
-        push_reg(&self.cpu.reg_get(mode, reg::SP).to_le_bytes()); // 13
-        push_reg(&self.cpu.reg_get(mode, reg::LR).to_le_bytes()); // 14
-        push_reg(&self.cpu.reg_get(mode, reg::PC).to_le_bytes()); // 15
-
-        // Floating point registers, unused
-        for _ in 0..25 {
-            push_reg(&[0, 0, 0, 0]);
-        }
-
-        push_reg(&self.cpu.reg_get(mode, reg::CPSR).to_le_bytes());
+        regs.sp = self.cpu.reg_get(mode, reg::SP);
+        regs.lr = self.cpu.reg_get(mode, reg::LR);
+        regs.pc = self.cpu.reg_get(mode, reg::PC);
+        regs.cpsr = self.cpu.reg_get(mode, reg::CPSR);
 
         Ok(())
     }
 
-    fn write_registers(
-        &mut self,
-        mut pop_reg: impl FnMut() -> Option<u8>,
-    ) -> Result<(), &'static str> {
-        const ERR: &str = "malformed write register packet";
-
-        let mut next = {
-            move || -> Option<u32> {
-                Some(
-                    (pop_reg()? as u32)
-                        | (pop_reg()? as u32) << 8
-                        | (pop_reg()? as u32) << 16
-                        | (pop_reg()? as u32) << 24,
-                )
-            }
-        };
+    fn write_registers(&mut self, regs: &arch::arm::reg::ArmCoreRegs) -> Result<(), &'static str> {
         let mode = self.cpu.mode();
-        for i in 0..13 {
-            self.cpu.reg_set(mode, i, next().ok_or(ERR)?);
-        }
-        self.cpu.reg_set(mode, reg::SP, next().ok_or(ERR)?);
-        self.cpu.reg_set(mode, reg::LR, next().ok_or(ERR)?);
-        self.cpu.reg_set(mode, reg::PC, next().ok_or(ERR)?);
-        // Floating point registers, unused
-        for _ in 0..25 {
-            next().ok_or(ERR)?;
-        }
 
-        self.cpu.reg_set(mode, reg::CPSR, next().ok_or(ERR)?);
+        for i in 0..13 {
+            self.cpu.reg_set(mode, i, regs.r[i as usize]);
+        }
+        self.cpu.reg_set(mode, reg::SP, regs.sp);
+        self.cpu.reg_set(mode, reg::LR, regs.lr);
+        self.cpu.reg_set(mode, reg::PC, regs.pc);
+        self.cpu.reg_set(mode, reg::CPSR, regs.cpsr);
 
         Ok(())
     }
