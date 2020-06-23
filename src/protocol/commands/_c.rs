@@ -2,7 +2,6 @@ use core::convert::TryFrom;
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct c {
-    // FIXME: 'c' packet's addr should correspond to Target::USize
     pub addr: Option<u64>,
 }
 

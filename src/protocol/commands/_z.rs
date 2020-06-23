@@ -3,7 +3,6 @@ use core::convert::TryFrom;
 #[derive(PartialEq, Eq, Debug)]
 pub struct z {
     pub type_: u8,
-    // FIXME: 'z' packets should use Target::USize for addr
     pub addr: u64,
     pub kind: u8,
 }

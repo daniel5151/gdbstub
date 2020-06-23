@@ -46,6 +46,8 @@ The included `armv4t` example shows how `gdbstub` can be used to add `gdb` debug
 - Improve packet-parsing infrastructure
     - Macros can be clever, but sometimes, they can be _too_ clever...
 - Improve multiprocess / multi-thread / multi-core support?
+- Support addresses larger than 64-bits?
+  - This would require plumbling-through the achitecture's pointer size as a generic parameter into all the packet parsing code. It's probably not _too_ difficult, just time consuming.
 
 ## Using `gdbstub` on bare-metal hardware
 
