@@ -84,11 +84,11 @@ impl Target for Emu {
         Ok(())
     }
 
-    fn update_hw_breakpoint(
-        &mut self,
-        addr: u32,
-        op: HwBreakOp,
-    ) -> Option<Result<bool, &'static str>> {
+    fn impl_update_hw_breakpoint(&self) -> bool {
+        true
+    }
+
+    fn update_hw_breakpoint(&mut self, addr: u32, op: HwBreakOp) -> Result<bool, &'static str> {
         match op {
             HwBreakOp::AddBreak => self.breakpoints.push(addr),
             HwBreakOp::AddWatch(kind) => {
@@ -100,14 +100,14 @@ impl Target for Emu {
             }
             HwBreakOp::RemoveBreak => {
                 let pos = match self.breakpoints.iter().position(|x| *x == addr) {
-                    None => return Some(Ok(false)),
+                    None => return Ok(false),
                     Some(pos) => pos,
                 };
                 self.breakpoints.remove(pos);
             }
             HwBreakOp::RemoveWatch(kind) => {
                 let pos = match self.watchpoints.iter().position(|x| *x == addr) {
-                    None => return Some(Ok(false)),
+                    None => return Ok(false),
                     Some(pos) => pos,
                 };
 
@@ -119,6 +119,6 @@ impl Target for Emu {
             }
         }
 
-        Some(Ok(true))
+        Ok(true)
     }
 }

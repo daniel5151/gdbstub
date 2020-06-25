@@ -1,10 +1,9 @@
 use arrayvec::ArrayVec;
-use log::*;
 use num_traits::ops::saturating::Saturating;
 
 use crate::util::slicevec::SliceVec;
 use crate::{
-    protocol::{Command, Packet, ResponseWriter},
+    protocol::{Command, Packet, ResponseWriter, Tid},
     Arch, Connection, Error, HwBreakOp, Registers, Target, TargetState, WatchKind,
 };
 
@@ -22,10 +21,12 @@ const MAX_SWBREAK: usize = 32;
 /// [`Connection`](trait.Connection.html).
 pub struct GdbStub<'a, T: Target, C: Connection> {
     conn: C,
+    packet_buffer: Option<&'a mut [u8]>,
+
     exec_state: ExecState,
     // TODO?: use BTreeSet if std is enabled for infinite swbreaks?
     swbreak: ArrayVec<[<T::Arch as Arch>::Usize; MAX_SWBREAK]>,
-    packet_buffer: Option<&'a mut [u8]>,
+    current_tid: Option<Tid>,
 }
 
 impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
@@ -33,9 +34,11 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
     pub fn new(conn: C, packet_buffer: &'a mut [u8]) -> GdbStub<T, C> {
         GdbStub {
             conn,
+            packet_buffer: Some(packet_buffer),
+
             swbreak: ArrayVec::new(),
             exec_state: ExecState::Paused,
-            packet_buffer: Some(packet_buffer),
+            current_tid: None,
         }
     }
 
@@ -52,13 +55,10 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
 
                 res.write_str("swbreak+;")?;
                 res.write_str("vContSupported+;")?;
+                res.write_str("multiprocess+;")?;
 
                 // probe support for hw breakpoints
-                let test_addr = num_traits::NumCast::from(0).unwrap();
-                let can_set_hw_break = target.update_hw_breakpoint(test_addr, HwBreakOp::AddBreak);
-                if can_set_hw_break.is_some() {
-                    target.update_hw_breakpoint(test_addr, HwBreakOp::RemoveBreak);
-
+                if target.impl_update_hw_breakpoint() {
                     res.write_str("hwbreak+;")?;
                     res.write_str("BreakpointCommands+;")?;
                 }
@@ -93,14 +93,14 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
                     // If the target hasn't provided their own XML, then the initial response to
                     // "qSupported" wouldn't have included  "qXfer:features:read", and gdb wouldn't
                     // send this packet unless it was explicitly marked as supported.
-                    None => unreachable!(),
+                    None => return Err(Error::PacketUnexpected),
                 }
             }
 
             // -------------------- "Core" Functionality -------------------- //
             // TODO: Improve the '?' response...
             Command::QuestionMark(_) => res.write_str("S05")?,
-            Command::qAttached(_) => res.write_str("1")?,
+            Command::qAttached(_) => res.write_str("1")?, // attached to existing process
             Command::g(_) => {
                 let mut regs: <T::Arch as Arch>::Registers = Default::default();
                 target
@@ -165,19 +165,22 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
 
                 use HwBreakOp::*;
                 let supported = match cmd.type_ {
-                    0 => Some(Ok(self.swbreak.try_push(addr).is_ok())),
+                    0 => Ok(self.swbreak.try_push(addr).is_ok()),
                     1 => target.update_hw_breakpoint(addr, AddBreak),
                     2 => target.update_hw_breakpoint(addr, AddWatch(WatchKind::Write)),
                     3 => target.update_hw_breakpoint(addr, AddWatch(WatchKind::Read)),
                     4 => target.update_hw_breakpoint(addr, AddWatch(WatchKind::ReadWrite)),
-                    _ => None, // only 5 documented types in the protocol
+                    // only 5 documented types in the protocol
+                    _ => {
+                        res.flush()?;
+                        return Ok(());
+                    }
                 };
 
                 match supported {
-                    None => {}
-                    Some(Ok(true)) => res.write_str("OK")?,
-                    Some(Ok(false)) => res.write_str("E22")?, // value of 22 grafted from QEMU
-                    Some(Err(e)) => return Err(Error::TargetError(e)),
+                    Ok(true) => res.write_str("OK")?,
+                    Ok(false) => res.write_str("E22")?, // value of 22 grafted from QEMU
+                    Err(e) => return Err(Error::TargetError(e)),
                 }
             }
             Command::z(cmd) => {
@@ -189,22 +192,25 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
                     0 => match self.swbreak.iter().position(|x| x == &addr) {
                         Some(i) => {
                             self.swbreak.swap_remove(i);
-                            Some(Ok(true))
+                            Ok(true)
                         }
-                        None => Some(Ok(false)),
+                        None => Ok(false),
                     },
                     1 => target.update_hw_breakpoint(addr, RemoveBreak),
                     2 => target.update_hw_breakpoint(addr, RemoveWatch(WatchKind::Write)),
                     3 => target.update_hw_breakpoint(addr, RemoveWatch(WatchKind::Read)),
                     4 => target.update_hw_breakpoint(addr, RemoveWatch(WatchKind::ReadWrite)),
-                    _ => None, // only 5 documented types in the protocol
+                    // only 5 documented types in the protocol
+                    _ => {
+                        res.flush()?;
+                        return Ok(());
+                    }
                 };
 
                 match supported {
-                    None => {}
-                    Some(Ok(true)) => res.write_str("OK")?,
-                    Some(Ok(false)) => res.write_str("E22")?, // value of 22 grafted from QEMU
-                    Some(Err(e)) => return Err(Error::TargetError(e)),
+                    Ok(true) => res.write_str("OK")?,
+                    Ok(false) => res.write_str("E22")?, // value of 22 grafted from QEMU
+                    Err(e) => return Err(Error::TargetError(e)),
                 }
             }
             Command::vCont(cmd) => {
@@ -234,7 +240,10 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
             // ------------------- Stubbed Functionality -------------------- //
             // TODO: add proper support for >1 "thread"
             // for now, just hard-code a single thread with id 1
-            Command::H(_) => res.write_str("OK")?,
+            Command::H(cmd) => {
+                self.current_tid = Some(cmd.tid);
+                res.write_str("OK")?
+            }
             Command::qfThreadInfo(_) => res.write_str("m1")?,
             Command::qsThreadInfo(_) => res.write_str("l")?,
             Command::qC(_) => res.write_str("QC1")?,

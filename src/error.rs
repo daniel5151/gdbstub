@@ -14,6 +14,8 @@ pub enum Error<T: Target, C: Connection> {
     PacketBufferOverlow,
     /// Could not parse the packet into a valid command.
     PacketParse,
+    /// GDB client sent an unexpected packet.
+    PacketUnexpected,
     /// Target threw a fatal error.
     TargetError(T::Error),
 }
@@ -52,6 +54,7 @@ where
             ConnectionWrite(e) => write!(f, "Connection Error while writing response: {:?}", e),
             PacketBufferOverlow => write!(f, "Packet too big for provided buffer!"),
             PacketParse => write!(f, "Could not parse the packet into a valid command."),
+            PacketUnexpected => write!(f, "Client sent an unexpected packet."),
             TargetError(e) => write!(f, "Target threw a fatal error: {:?}", e),
         }
     }

@@ -1,9 +1,11 @@
 use core::convert::TryFrom;
 
+use crate::protocol::common::Tid;
+
 #[derive(PartialEq, Eq, Debug)]
 pub struct H {
     pub kind: char, // TODO: make this an enum
-    pub id: isize,  // FIXME: 'H' has invlaid thread-id syntax
+    pub tid: Tid,
 }
 
 impl TryFrom<&str> for H {
@@ -15,8 +17,8 @@ impl TryFrom<&str> for H {
         }
 
         let kind = body.chars().next().ok_or(())?;
-        let id = body[1..].parse::<isize>().map_err(drop)?;
+        let tid = body[1..].parse::<Tid>().map_err(drop)?;
 
-        Ok(H { kind, id })
+        Ok(H { kind, tid })
     }
 }

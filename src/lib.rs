@@ -244,6 +244,9 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 // #![deny(missing_docs)]
 
+#[macro_use]
+extern crate log;
+
 pub mod arch;
 
 mod arch_traits;

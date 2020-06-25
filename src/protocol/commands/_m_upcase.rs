@@ -1,6 +1,6 @@
 use core::convert::TryFrom;
 
-use crate::util::HexDecoder;
+use crate::protocol::common::HexDecoder;
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct M<'a> {

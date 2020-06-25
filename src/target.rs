@@ -10,9 +10,11 @@ use crate::Arch;
 /// and provides an interface for `GdbStub` to modify and control the system's
 /// state.
 ///
-/// Additionally, there are several [provided methods](#provided-methods) that
-/// can optionally be overwritten to support more advanced GDB debugging
-/// features.
+/// There are several [provided methods](#provided-methods) that can optionally
+/// be implemented to enable additional advanced GDB debugging functionality.
+/// Aside from overriding the method itself, each optional method has an
+/// associated `fn impl_XXX(&self) -> bool` method which must also be overridden
+/// to return `true`.
 ///
 /// ### What's with the `<Self::Arch as Arch>::` syntax?
 ///
@@ -64,6 +66,11 @@ pub trait Target {
         get_addr_val: impl FnMut() -> Option<(<Self::Arch as Arch>::Usize, u8)>,
     ) -> Result<(), Self::Error>;
 
+    /// (optional) Target provides an `update_hw_breakpoint()` implementation.
+    fn impl_update_hw_breakpoint(&self) -> bool {
+        false
+    }
+
     /// (optional) Update the target's hardware break/watchpoints. Returns a
     /// boolean indicating if the operation succeeded.
     ///
@@ -75,10 +82,9 @@ pub trait Target {
         &mut self,
         addr: <Self::Arch as Arch>::Usize,
         op: HwBreakOp,
-    ) -> Option<Result<bool, Self::Error>> {
+    ) -> Result<bool, Self::Error> {
         let _ = (addr, op);
-
-        None
+        unimplemented!();
     }
 }
 

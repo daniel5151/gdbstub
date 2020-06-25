@@ -19,7 +19,7 @@ where
 
 /// A wrapper around [`Connection`] that computes the single-byte checksum of
 /// incoming / outgoing data.
-pub struct ResponseWriter<'a, C: 'a> {
+pub struct ResponseWriter<'a, C: Connection + 'a> {
     inner: &'a mut C,
     started: bool,
     checksum: u8,

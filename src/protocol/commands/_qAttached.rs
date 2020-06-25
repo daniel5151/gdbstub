@@ -13,7 +13,7 @@ impl TryFrom<&str> for qAttached {
             pid: if body.is_empty() {
                 None
             } else {
-                Some(body.parse::<isize>().map_err(drop)?)
+                Some(isize::from_str_radix(body.trim_start_matches(':'), 16).map_err(drop)?)
             },
         })
     }
