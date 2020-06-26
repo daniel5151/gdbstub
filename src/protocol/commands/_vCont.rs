@@ -1,5 +1,7 @@
 use core::convert::TryFrom;
 
+use crate::protocol::common::Tid;
+
 #[derive(Debug)]
 pub struct vCont<'a> {
     pub actions: Actions<'a>,
@@ -23,12 +25,14 @@ impl<'a> Actions<'a> {
         self.0.split(';').map(|act| {
             let mut s = act.split(':');
             let kind = s.next().ok_or("missing kind")?;
-            // TODO: properly handle thread-id
-            let _tid = s.next();
+            let tid = match s.next() {
+                Some(s) => Some(s.parse::<Tid>().map_err(|_| "invalid tid")?),
+                None => None,
+            };
 
             Ok(VContAction {
                 kind: kind.parse().map_err(|_| "invalid kind")?,
-                tid: None,
+                tid,
             })
         })
     }
@@ -37,7 +41,7 @@ impl<'a> Actions<'a> {
 #[derive(PartialEq, Eq, Debug)]
 pub struct VContAction {
     pub kind: VContKind,
-    pub tid: Option<isize>, // FIXME: vCont has invalid thread-id syntax
+    pub tid: Option<Tid>,
 }
 
 #[derive(PartialEq, Eq, Debug)]

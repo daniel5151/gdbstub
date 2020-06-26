@@ -1,66 +1,133 @@
-use arrayvec::ArrayVec;
 use num_traits::ops::saturating::Saturating;
 
-use crate::util::slicevec::SliceVec;
 use crate::{
-    protocol::{Command, Packet, ResponseWriter, Tid},
-    Arch, Connection, Error, HwBreakOp, Registers, Target, TargetState, WatchKind,
+    arch_traits::{Arch, Registers},
+    connection::Connection,
+    error::Error,
+    protocol::{Command, Packet, ResponseWriter, Tid, TidKind},
+    target::{BreakOp, ResumeAction, StopReason, Target, WatchKind},
+    util::slicevec::SliceVec,
 };
 
-enum ExecState {
-    Paused,
-    Running { single_step: bool },
-    Exit,
+/// Reason the GDB session has ended
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DisconnectReason {
+    /// Target Halted
+    TargetHalted,
+    /// GDB issued a disconnect command
+    Disconnect,
+    /// GDB issued a kill command
+    Kill,
 }
-
-// TODO?: make number of swbreak configurable
-const MAX_SWBREAK: usize = 32;
 
 /// Facilitates the remote debugging of a [`Target`](trait.Target.html) using
 /// the GDB Remote Serial Protocol over a given
 /// [`Connection`](trait.Connection.html).
 pub struct GdbStub<'a, T: Target, C: Connection> {
-    conn: C,
+    conn: Option<C>,
     packet_buffer: Option<&'a mut [u8]>,
 
-    exec_state: ExecState,
-    // TODO?: use BTreeSet if std is enabled for infinite swbreaks?
-    swbreak: ArrayVec<[<T::Arch as Arch>::Usize; MAX_SWBREAK]>,
-    current_tid: Option<Tid>,
+    current_tid: Tid,
+    _target: core::marker::PhantomData<T>,
 }
 
 impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
     /// Create a new `GdbStub` using the provided connection + packet buffer.
     pub fn new(conn: C, packet_buffer: &'a mut [u8]) -> GdbStub<T, C> {
         GdbStub {
-            conn,
+            conn: Some(conn),
             packet_buffer: Some(packet_buffer),
 
-            swbreak: ArrayVec::new(),
-            exec_state: ExecState::Paused,
-            current_tid: None,
+            current_tid: Tid {
+                pid: None,
+                tid: TidKind::Any,
+            },
+            _target: core::marker::PhantomData,
         }
     }
 
-    fn handle_command(&mut self, target: &mut T, command: Command<'_>) -> Result<(), Error<T, C>> {
-        // Acknowledge the command
-        self.conn.write(b'+').map_err(Error::ConnectionRead)?;
+    fn do_vcont(
+        &mut self,
+        res: &mut ResponseWriter<C>,
+        target: &mut T,
+        actions: impl Iterator<Item = (TidKind, ResumeAction)>,
+    ) -> Result<Option<DisconnectReason>, Error<T, C>> {
+        let stop_reason = target.resume(actions).map_err(Error::TargetError)?;
 
-        let mut res = ResponseWriter::new(&mut self.conn);
+        // if the target isn't running, send a stop-response packet
+        if stop_reason != StopReason::Running {
+            // if the target Halted, send a "process exited with status code 0" packet,
+            // and break the loop.
+            if stop_reason == StopReason::Halted {
+                res.write_str("W00")?;
+                return Ok(Some(DisconnectReason::TargetHalted));
+            }
 
+            // if the target's still running, just say it was a signal 05
+            if stop_reason == StopReason::Running {
+                res.write_str("S05")?;
+                return Ok(None);
+            }
+
+            // otherwise, a breakpoint was hit
+            res.write_str("T")?;
+            res.write_hex(5)?;
+
+            match stop_reason {
+                // don't include addr on sw/hw break
+                StopReason::SwBreak => res.write_str("swbreak:")?,
+                StopReason::HwBreak => res.write_str("hwbreak:")?,
+                StopReason::Watch { kind, addr } => {
+                    match kind {
+                        WatchKind::Write => res.write_str("watch:")?,
+                        WatchKind::Read => res.write_str("rwatch:")?,
+                        WatchKind::ReadWrite => res.write_str("awatch:")?,
+                    }
+                    // XXX: get rid of this unwrap ahhh
+                    let addr: u64 = num_traits::NumCast::from(addr).unwrap();
+                    res.write_hex_buf(&addr.to_be_bytes())?;
+                }
+                _ => unreachable!(),
+            };
+
+            res.write_str(";")?;
+        }
+
+        Ok(None)
+    }
+
+    fn handle_command(
+        &mut self,
+        res: &mut ResponseWriter<C>,
+        target: &mut T,
+        command: Command<'_>,
+    ) -> Result<Option<DisconnectReason>, Error<T, C>> {
         match command {
             // ------------------ Handshaking and Queries ------------------- //
             Command::qSupported(cmd) => {
                 let _features = cmd.features.into_iter();
 
-                res.write_str("swbreak+;")?;
                 res.write_str("vContSupported+;")?;
                 res.write_str("multiprocess+;")?;
+                res.write_str("swbreak+;")?;
 
-                // probe support for hw breakpoints
-                if target.impl_update_hw_breakpoint() {
+                // probe support for various watchpoints/breakpoints
+                let mut supports_hwbreak = false;
+
+                let test_addr = num_traits::NumCast::from(0).unwrap();
+                if (target.update_hw_breakpoint(test_addr, BreakOp::Add)).is_some() {
+                    target.update_hw_breakpoint(test_addr, BreakOp::Remove);
+                    supports_hwbreak = true;
+                }
+                if (target.update_hw_watchpoint(test_addr, BreakOp::Add, WatchKind::Write))
+                    .is_some()
+                {
+                    target.update_hw_watchpoint(test_addr, BreakOp::Remove, WatchKind::Write);
+                    supports_hwbreak = true;
+                }
+
+                if supports_hwbreak {
                     res.write_str("hwbreak+;")?;
-                    res.write_str("BreakpointCommands+;")?;
                 }
 
                 // TODO: implement conditional breakpoint support (since that's kool).
@@ -71,7 +138,7 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
                     res.write_str("qXfer:features:read+;")?;
                 }
             }
-            Command::vContQuestionMark(_) => res.write_str("vCont;c;s;t")?,
+            Command::vContQuestionMark(_) => res.write_str("vCont;c;s")?,
             Command::qXferFeaturesRead(cmd) => {
                 assert_eq!(cmd.annex, "target.xml");
                 match T::Arch::target_description_xml() {
@@ -155,93 +222,112 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
                     .write_addrs(|| val.next())
                     .map_err(Error::TargetError)?;
             }
+            Command::k(_) | Command::vKill(_) => {
+                // no response
+                return Ok(Some(DisconnectReason::Kill));
+            }
             Command::D(_) => {
                 res.write_str("OK")?;
-                self.exec_state = ExecState::Exit
+                return Ok(Some(DisconnectReason::Disconnect));
             }
             Command::Z(cmd) => {
                 // XXX: get rid of this unwrap ahhh
                 let addr: <T::Arch as Arch>::Usize = num_traits::NumCast::from(cmd.addr).unwrap();
 
-                use HwBreakOp::*;
+                use BreakOp::*;
                 let supported = match cmd.type_ {
-                    0 => Ok(self.swbreak.try_push(addr).is_ok()),
-                    1 => target.update_hw_breakpoint(addr, AddBreak),
-                    2 => target.update_hw_breakpoint(addr, AddWatch(WatchKind::Write)),
-                    3 => target.update_hw_breakpoint(addr, AddWatch(WatchKind::Read)),
-                    4 => target.update_hw_breakpoint(addr, AddWatch(WatchKind::ReadWrite)),
+                    0 => Some(target.update_sw_breakpoint(addr, Add).map(|_| true)),
+                    1 => target.update_hw_breakpoint(addr, Add),
+                    2 => target.update_hw_watchpoint(addr, Add, WatchKind::Write),
+                    3 => target.update_hw_watchpoint(addr, Add, WatchKind::Read),
+                    4 => target.update_hw_watchpoint(addr, Add, WatchKind::ReadWrite),
                     // only 5 documented types in the protocol
-                    _ => {
-                        res.flush()?;
-                        return Ok(());
-                    }
+                    _ => None,
                 };
 
                 match supported {
-                    Ok(true) => res.write_str("OK")?,
-                    Ok(false) => res.write_str("E22")?, // value of 22 grafted from QEMU
-                    Err(e) => return Err(Error::TargetError(e)),
+                    None => {}
+                    Some(Ok(true)) => res.write_str("OK")?,
+                    Some(Ok(false)) => res.write_str("E22")?, // value of 22 grafted from QEMU
+                    Some(Err(e)) => return Err(Error::TargetError(e)),
                 }
             }
             Command::z(cmd) => {
                 // XXX: get rid of this unwrap ahhh
                 let addr: <T::Arch as Arch>::Usize = num_traits::NumCast::from(cmd.addr).unwrap();
 
-                use HwBreakOp::*;
+                use BreakOp::*;
                 let supported = match cmd.type_ {
-                    0 => match self.swbreak.iter().position(|x| x == &addr) {
-                        Some(i) => {
-                            self.swbreak.swap_remove(i);
-                            Ok(true)
-                        }
-                        None => Ok(false),
-                    },
-                    1 => target.update_hw_breakpoint(addr, RemoveBreak),
-                    2 => target.update_hw_breakpoint(addr, RemoveWatch(WatchKind::Write)),
-                    3 => target.update_hw_breakpoint(addr, RemoveWatch(WatchKind::Read)),
-                    4 => target.update_hw_breakpoint(addr, RemoveWatch(WatchKind::ReadWrite)),
+                    0 => Some(target.update_sw_breakpoint(addr, Remove).map(|_| true)),
+                    1 => target.update_hw_breakpoint(addr, Remove),
+                    2 => target.update_hw_watchpoint(addr, Remove, WatchKind::Write),
+                    3 => target.update_hw_watchpoint(addr, Remove, WatchKind::Read),
+                    4 => target.update_hw_watchpoint(addr, Remove, WatchKind::ReadWrite),
                     // only 5 documented types in the protocol
-                    _ => {
-                        res.flush()?;
-                        return Ok(());
-                    }
+                    _ => None,
                 };
 
                 match supported {
-                    Ok(true) => res.write_str("OK")?,
-                    Ok(false) => res.write_str("E22")?, // value of 22 grafted from QEMU
-                    Err(e) => return Err(Error::TargetError(e)),
+                    None => {}
+                    Some(Ok(true)) => res.write_str("OK")?,
+                    Some(Ok(false)) => res.write_str("E22")?, // value of 22 grafted from QEMU
+                    Some(Err(e)) => return Err(Error::TargetError(e)),
                 }
             }
             Command::vCont(cmd) => {
                 use crate::protocol::_vCont::VContKind;
-                // XXX: handle multiple actions properly
-                let action = cmd.actions.into_iter().next().unwrap().unwrap();
-                self.exec_state = match action.kind {
-                    VContKind::Step => ExecState::Running { single_step: true },
-                    VContKind::Continue => ExecState::Running { single_step: false },
-                    _ => unimplemented!("unsupported vCont action"),
-                };
-                // no immediate response
-                return Ok(());
+
+                // map raw vCont action iterator to a format the `Target` expects
+                let mut err = Ok(());
+                let actions = cmd.actions.into_iter().filter_map(|action| {
+                    let action = match action {
+                        Ok(action) => action,
+                        Err(e) => {
+                            err = Err(e);
+                            return None;
+                        }
+                    };
+
+                    let resume_action = match action.kind {
+                        VContKind::Step => ResumeAction::Step,
+                        VContKind::Continue => ResumeAction::Continue,
+                        _ => unimplemented!("unimplemented vCont action {:?}", action.kind),
+                    };
+
+                    let tid = match action.tid {
+                        Some(tid) => tid.tid,
+                        // An action with no thread-id matches all threads
+                        None => TidKind::Any,
+                    };
+
+                    Some((tid, resume_action))
+                });
+
+                let ret = self.do_vcont(res, target, actions);
+                err.map_err(|_| Error::PacketParse)?;
+                return ret;
             }
             // TODO?: support custom resume addr in 'c' and 's'
             Command::c(_) => {
-                self.exec_state = ExecState::Running { single_step: false };
-                // no immediate response
-                return Ok(());
+                self.do_vcont(
+                    res,
+                    target,
+                    core::iter::once((self.current_tid.tid, ResumeAction::Continue)),
+                )?;
             }
             Command::s(_) => {
-                self.exec_state = ExecState::Running { single_step: true };
-                // no immediate response
-                return Ok(());
+                self.do_vcont(
+                    res,
+                    target,
+                    core::iter::once((self.current_tid.tid, ResumeAction::Step)),
+                )?;
             }
 
             // ------------------- Stubbed Functionality -------------------- //
             // TODO: add proper support for >1 "thread"
             // for now, just hard-code a single thread with id 1
             Command::H(cmd) => {
-                self.current_tid = Some(cmd.tid);
+                self.current_tid = cmd.tid;
                 res.write_str("OK")?
             }
             Command::qfThreadInfo(_) => res.write_str("m1")?,
@@ -254,15 +340,19 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
             c => warn!("Unimplemented command: {:?}", c),
         }
 
-        res.flush().map_err(Error::ConnectionWrite)
+        Ok(None)
     }
 
-    fn recv_packet<'b>(&mut self, buf: &'b mut [u8]) -> Result<Option<Packet<'b>>, Error<T, C>> {
-        let header_byte = match self.exec_state {
-            // block waiting for a gdb command
-            ExecState::Paused => self.conn.read().map(Some),
-            ExecState::Running { .. } => self.conn.read_nonblocking(),
-            ExecState::Exit => unreachable!(),
+    fn recv_packet<'b>(
+        &mut self,
+        conn: &mut C,
+        buf: &'b mut [u8],
+        blocking: bool,
+    ) -> Result<Option<Packet<'b>>, Error<T, C>> {
+        let header_byte = if blocking {
+            conn.read().map(Some)
+        } else {
+            conn.read_nonblocking()
         };
 
         match header_byte {
@@ -276,15 +366,15 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
                 if header_byte == b'$' {
                     // read the packet body
                     loop {
-                        let c = self.conn.read().map_err(Error::ConnectionRead)?;
+                        let c = conn.read().map_err(Error::ConnectionRead)?;
                         packet_buffer.push(c)?;
                         if c == b'#' {
                             break;
                         }
                     }
                     // read the checksum as well
-                    packet_buffer.push(self.conn.read().map_err(Error::ConnectionRead)?)?;
-                    packet_buffer.push(self.conn.read().map_err(Error::ConnectionRead)?)?;
+                    packet_buffer.push(conn.read().map_err(Error::ConnectionRead)?)?;
+                    packet_buffer.push(conn.read().map_err(Error::ConnectionRead)?)?;
                 }
 
                 let len = packet_buffer.len();
@@ -305,92 +395,40 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
 
     /// Starts a GDB remote debugging session.
     ///
-    /// Returns once the GDB client cleanly closes the debugging session (via
-    /// the GDB `quit` command).
-    pub fn run(&mut self, target: &mut T) -> Result<TargetState<T::Arch>, Error<T, C>> {
+    /// Returns once the GDB client closes the debugging session, or if the
+    /// target halts.
+    pub fn run(&mut self, target: &mut T) -> Result<DisconnectReason, Error<T, C>> {
         let packet_buffer = self.packet_buffer.take().unwrap();
+        let mut conn = self.conn.take().unwrap();
 
         loop {
             // Handle any incoming GDB packets
-            match self.recv_packet(packet_buffer)? {
+            match self.recv_packet(&mut conn, packet_buffer, true)? {
                 None => {}
                 Some(packet) => match packet {
                     Packet::Ack => {}
                     Packet::Nack => {
                         unimplemented!("GDB nack'd the packet, but retry isn't implemented yet")
                     }
-                    Packet::Interrupt => {
-                        self.exec_state = ExecState::Paused;
-                        let mut res = ResponseWriter::new(&mut self.conn);
-                        res.write_str("S05")?;
-                        res.flush()?;
-                    }
-                    Packet::Command(command) => self.handle_command(target, command)?,
-                },
-            };
+                    Packet::Interrupt => unimplemented!(),
+                    Packet::Command(command) => {
+                        // Acknowledge the command
+                        conn.write(b'+').map_err(Error::ConnectionRead)?;
 
-            match self.exec_state {
-                ExecState::Paused => {}
-                ExecState::Exit => return Ok(TargetState::Running),
-                ExecState::Running { single_step } => {
-                    let mut target_state = target.step().map_err(Error::TargetError)?;
+                        let mut res = ResponseWriter::new(&mut conn);
+                        let status = self.handle_command(&mut res, target, command)?;
 
-                    // check if a software breakpoint was hit
-                    let target_pc = target.read_pc().map_err(Error::TargetError)?;
-                    if self.swbreak.contains(&target_pc) {
-                        target_state = TargetState::SwBreak;
-                    }
-
-                    // if the target isn't running, send a stop-response packet
-                    if target_state != TargetState::Running {
-                        debug!("[0x{:x}] {:x?}", target_pc, target_state);
-
-                        let mut res = ResponseWriter::new(&mut self.conn);
-
-                        // if the target Halted, send a "process exited with status code 0" packet,
-                        // and break the loop.
-                        if target_state == TargetState::Halted {
-                            res.write_str("W00")?;
+                        // HACK: this could be more elegant...
+                        if status != Some(DisconnectReason::Kill) {
                             res.flush()?;
-                            return Ok(TargetState::Halted);
                         }
 
-                        // otherwise, a breakpoint was hit
-                        res.write_str("T")?;
-                        res.write_hex(5)?;
-
-                        match target_state {
-                            // don't include addr on sw/hw break
-                            TargetState::SwBreak => res.write_str("swbreak:")?,
-                            TargetState::HwBreak => res.write_str("hwbreak:")?,
-                            TargetState::Watch { kind, addr } => {
-                                match kind {
-                                    WatchKind::Write => res.write_str("watch:")?,
-                                    WatchKind::Read => res.write_str("rwatch:")?,
-                                    WatchKind::ReadWrite => res.write_str("awatch:")?,
-                                }
-                                // XXX: get rid of this unwrap ahhh
-                                let addr: u64 = num_traits::NumCast::from(addr).unwrap();
-                                res.write_hex_buf(&addr.to_be_bytes())?;
-                            }
-                            _ => unreachable!(),
-                        };
-
-                        res.write_str(";")?;
-                        res.flush()?;
-
-                        self.exec_state = ExecState::Paused;
-                        continue;
+                        if let Some(disconnect_reason) = status {
+                            return Ok(disconnect_reason);
+                        }
                     }
-
-                    if single_step {
-                        self.exec_state = ExecState::Paused;
-                        let mut res = ResponseWriter::new(&mut self.conn);
-                        res.write_str("S05")?;
-                        res.flush()?;
-                    }
-                }
-            }
+                },
+            };
         }
     }
 }

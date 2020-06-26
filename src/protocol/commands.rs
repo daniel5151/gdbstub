@@ -79,6 +79,7 @@ commands! {
     "g" => _g::g,
     "G" => _g_upcase::G<'a>,
     "H" => _h_upcase::H,
+    "k" => _k::k,
     "m" => _m::m,
     "M" => _m_upcase::M<'a>,
     "qAttached" => _qAttached::qAttached,
@@ -94,4 +95,5 @@ commands! {
     // Order Matters (because of prefix matching)
     "vCont?" => vCont_question_mark::vContQuestionMark,
     "vCont" => _vCont::vCont<'a>,
+    "vKill" => _vKill::vKill,
 }

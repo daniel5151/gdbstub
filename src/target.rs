@@ -1,10 +1,10 @@
 use core::fmt::Debug;
 use core::ops::Range;
 
-use crate::Arch;
+use crate::{Arch, Tid};
 
-/// A collection of methods and metadata used by
-/// [`GdbStub`](struct.GdbStub.html) to debug a system.
+/// A collection of methods and metadata GDB can use to control + query a
+/// running system.
 ///
 /// This trait describes the architecture and capabilities of a target system,
 /// and provides an interface for `GdbStub` to modify and control the system's
@@ -12,9 +12,6 @@ use crate::Arch;
 ///
 /// There are several [provided methods](#provided-methods) that can optionally
 /// be implemented to enable additional advanced GDB debugging functionality.
-/// Aside from overriding the method itself, each optional method has an
-/// associated `fn impl_XXX(&self) -> bool` method which must also be overridden
-/// to return `true`.
 ///
 /// ### What's with the `<Self::Arch as Arch>::` syntax?
 ///
@@ -34,9 +31,15 @@ pub trait Target {
     /// A target-specific fatal error.
     type Error;
 
-    /// Perform a single "step" of the emulated system. A step should be a
-    /// single CPU instruction or less.
-    fn step(&mut self) -> Result<TargetState<<Self::Arch as Arch>::Usize>, Self::Error>;
+    /// Resume execution, specifying different resume actions for each thread.
+    ///
+    /// _Author's recommendation:_ If you're implementing `Target` to debug
+    /// bare-metal code (emulated or not), treat the `tid` field as a _core_ ID
+    /// (as threads are an OS-level construct).
+    fn resume(
+        &mut self,
+        actions: impl Iterator<Item = (Tid, ResumeAction)>,
+    ) -> Result<StopReason<<Self::Arch as Arch>::Usize>, Self::Error>;
 
     /// Read the target's registers.
     fn read_registers(
@@ -49,9 +52,6 @@ pub trait Target {
         &mut self,
         regs: &<Self::Arch as Arch>::Registers,
     ) -> Result<(), Self::Error>;
-
-    /// Read the target's current PC.
-    fn read_pc(&mut self) -> Result<<Self::Arch as Arch>::Usize, Self::Error>;
 
     /// Read bytes from the specified address range.
     fn read_addrs(
@@ -66,25 +66,61 @@ pub trait Target {
         get_addr_val: impl FnMut() -> Option<(<Self::Arch as Arch>::Usize, u8)>,
     ) -> Result<(), Self::Error>;
 
-    /// (optional) Target provides an `update_hw_breakpoint()` implementation.
-    fn impl_update_hw_breakpoint(&self) -> bool {
-        false
-    }
-
-    /// (optional) Update the target's hardware break/watchpoints. Returns a
-    /// boolean indicating if the operation succeeded.
+    /// Set/remove a software breakpoint.
+    /// Return `Ok(false)` if the operation could not be completed.
     ///
-    /// As a convenience, `gdbstub` has built-in support for _Software_
-    /// breakpoints, though implementing support for _Hardware_ breakpoints
-    /// can substantially improve performance (especially when working with
-    /// **memory watchpoints**).
+    /// See [this stackoverflow](https://stackoverflow.com/questions/8878716/what-is-the-difference-between-hardware-and-software-breakpoints)
+    /// discussion about the differences between hardware and software
+    /// breakpoints.
+    ///
+    /// _Author's recommendation:_ If you're implementing `Target` for an
+    /// emulator using an _interpreted_ CPU (as opposed to a JIT), the
+    /// simplest way to implement "software" breakpoints is to check the
+    /// `PC` value after each CPU cycle.
+    fn update_sw_breakpoint(
+        &mut self,
+        addr: <Self::Arch as Arch>::Usize,
+        op: BreakOp,
+    ) -> Result<bool, Self::Error>;
+
+    /// (optional) Set/remove a hardware breakpoint.
+    /// Return `Ok(false)` if the operation could not be completed.
+    ///
+    /// See [this stackoverflow](https://stackoverflow.com/questions/8878716/what-is-the-difference-between-hardware-and-software-breakpoints)
+    /// discussion about the differences between hardware and software
+    /// breakpoints.
+    ///
+    /// _Author's recommendation:_ If you're implementing `Target` for an
+    /// emulator using an _interpreted_ CPU (as opposed to a JIT), there
+    /// shouldn't be any reason to implement this method (as software
+    /// breakpoints are likely to be just-as-fast).
     fn update_hw_breakpoint(
         &mut self,
         addr: <Self::Arch as Arch>::Usize,
-        op: HwBreakOp,
-    ) -> Result<bool, Self::Error> {
+        op: BreakOp,
+    ) -> Option<Result<bool, Self::Error>> {
         let _ = (addr, op);
-        unimplemented!();
+        None
+    }
+
+    /// (optional) Set/remove a hardware watchpoint.
+    /// Return `Ok(false)` if the operation could not be completed.
+    ///
+    /// See the [GDB documentation](https://sourceware.org/gdb/current/onlinedocs/gdb/Set-Watchpoints.html)
+    /// regarding watchpoints.
+    ///
+    /// _NOTE:_ If this method isn't implemented, GDB will default to using
+    /// _software watchpoints_, which tend to be excruciatingly slow (as
+    /// they are implemented by single-stepping the system, and reading the
+    /// memory location after each step).
+    fn update_hw_watchpoint(
+        &mut self,
+        addr: <Self::Arch as Arch>::Usize,
+        op: BreakOp,
+        kind: WatchKind,
+    ) -> Option<Result<bool, Self::Error>> {
+        let _ = (addr, op, kind);
+        None
     }
 }
 
@@ -99,22 +135,18 @@ pub enum WatchKind {
     ReadWrite,
 }
 
-/// Add/Remove hardware breakpoints / watchpoints
+/// Add / Remove a breakpoint / watchpoint
 #[derive(Debug)]
-pub enum HwBreakOp {
-    /// Add a new hardware breakpoint at specified address.
-    AddBreak,
-    /// Add a new watchpoint for the specified address.
-    AddWatch(WatchKind),
-    /// Remove the hardware breakpoint
-    RemoveBreak,
-    /// Remove the hardware watchpoint
-    RemoveWatch(WatchKind),
+pub enum BreakOp {
+    /// Add a new breakpoint / watchpoint.
+    Add,
+    /// Remove an existing breakpoint / watchpoint.
+    Remove,
 }
 
 /// The system's current execution state.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum TargetState<U> {
+pub enum StopReason<U> {
     /// Running
     Running,
     /// Halted
@@ -128,9 +160,21 @@ pub enum TargetState<U> {
     HwBreak,
     /// Hit a watchpoint.
     Watch {
-        /// What kind of Watchpoint was hit
+        /// Kind of watchpoint that was hit
         kind: WatchKind,
-        /// Associated data address
+        /// Address of watched memory
         addr: U,
     },
+}
+
+/// Describes how the target should resume the specified thread.
+pub enum ResumeAction {
+    /// Continue execution (until the next event occurs).
+    Continue,
+    /// Step forward a single instruction.
+    Step,
+    /* ContinueWithSignal(u8),
+     * StepWithSignal(u8),
+     * Stop,
+     * StepInRange(core::ops::Range<U>), */
 }

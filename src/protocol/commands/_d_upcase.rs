@@ -1,20 +1,17 @@
 use core::convert::TryFrom;
 
+use crate::protocol::common::TidKind;
+
 #[derive(PartialEq, Eq, Debug)]
 pub struct D {
-    pub pid: Option<isize>,
+    pub pid: Option<TidKind>,
 }
 
 impl TryFrom<&str> for D {
     type Error = ();
 
     fn try_from(body: &str) -> Result<Self, ()> {
-        Ok(D {
-            pid: if body.is_empty() {
-                None
-            } else {
-                Some(body.parse::<isize>().map_err(drop)?)
-            },
-        })
+        let pid = body.trim_start_matches(';').parse::<TidKind>().ok();
+        Ok(D { pid })
     }
 }

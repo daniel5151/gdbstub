@@ -1,5 +1,5 @@
 use armv4t_emu::{reg, Memory};
-use gdbstub::{arch, HwBreakOp, Target, TargetState, WatchKind};
+use gdbstub::{arch, BreakOp, ResumeAction, StopReason, Target, Tid, WatchKind};
 
 use crate::emu::{Emu, Event};
 
@@ -7,20 +7,35 @@ impl Target for Emu {
     type Arch = arch::arm::Armv4t;
     type Error = &'static str;
 
-    fn step(&mut self) -> Result<TargetState<u32>, Self::Error> {
-        let event = match self.step() {
-            Some(event) => event,
-            None => return Ok(TargetState::Running),
+    fn resume(
+        &mut self,
+        mut actions: impl Iterator<Item = (Tid, ResumeAction)>,
+    ) -> Result<StopReason<u32>, Self::Error> {
+        // only one thread, only one action
+        let (_, action) = actions.next().unwrap();
+
+        let event = match action {
+            ResumeAction::Step => self.step(),
+            ResumeAction::Continue => loop {
+                if let Some(event) = self.step() {
+                    break Some(event);
+                };
+            },
+        };
+
+        let event = match event {
+            Some(e) => e,
+            None => return Ok(StopReason::Running),
         };
 
         Ok(match event {
-            Event::Halted => TargetState::Halted,
-            Event::Break => TargetState::HwBreak,
-            Event::WatchWrite(addr) => TargetState::Watch {
+            Event::Halted => StopReason::Halted,
+            Event::Break => StopReason::HwBreak,
+            Event::WatchWrite(addr) => StopReason::Watch {
                 kind: WatchKind::Write,
                 addr,
             },
-            Event::WatchRead(addr) => TargetState::Watch {
+            Event::WatchRead(addr) => StopReason::Watch {
                 kind: WatchKind::Read,
                 addr,
             },
@@ -59,10 +74,6 @@ impl Target for Emu {
         Ok(())
     }
 
-    fn read_pc(&mut self) -> Result<u32, &'static str> {
-        Ok(self.cpu.reg_get(self.cpu.mode(), reg::PC))
-    }
-
     fn read_addrs(
         &mut self,
         addr: std::ops::Range<u32>,
@@ -84,30 +95,38 @@ impl Target for Emu {
         Ok(())
     }
 
-    fn impl_update_hw_breakpoint(&self) -> bool {
-        true
-    }
-
-    fn update_hw_breakpoint(&mut self, addr: u32, op: HwBreakOp) -> Result<bool, &'static str> {
+    fn update_sw_breakpoint(&mut self, addr: u32, op: BreakOp) -> Result<bool, &'static str> {
         match op {
-            HwBreakOp::AddBreak => self.breakpoints.push(addr),
-            HwBreakOp::AddWatch(kind) => {
-                match kind {
-                    WatchKind::Write => self.watchpoints.push(addr),
-                    WatchKind::Read => self.watchpoints.push(addr),
-                    WatchKind::ReadWrite => self.watchpoints.push(addr),
-                };
-            }
-            HwBreakOp::RemoveBreak => {
+            BreakOp::Add => self.breakpoints.push(addr),
+            BreakOp::Remove => {
                 let pos = match self.breakpoints.iter().position(|x| *x == addr) {
                     None => return Ok(false),
                     Some(pos) => pos,
                 };
                 self.breakpoints.remove(pos);
             }
-            HwBreakOp::RemoveWatch(kind) => {
+        }
+
+        Ok(true)
+    }
+
+    fn update_hw_watchpoint(
+        &mut self,
+        addr: u32,
+        op: BreakOp,
+        kind: WatchKind,
+    ) -> Option<Result<bool, &'static str>> {
+        match op {
+            BreakOp::Add => {
+                match kind {
+                    WatchKind::Write => self.watchpoints.push(addr),
+                    WatchKind::Read => self.watchpoints.push(addr),
+                    WatchKind::ReadWrite => self.watchpoints.push(addr),
+                };
+            }
+            BreakOp::Remove => {
                 let pos = match self.watchpoints.iter().position(|x| *x == addr) {
-                    None => return Ok(false),
+                    None => return Some(Ok(false)),
                     Some(pos) => pos,
                 };
 
@@ -119,6 +138,6 @@ impl Target for Emu {
             }
         }
 
-        Ok(true)
+        Some(Ok(true))
     }
 }

@@ -1,17 +1,22 @@
 use core::convert::TryFrom;
 use core::str::FromStr;
 
-#[derive(PartialEq, Eq, Debug)]
+/// Thread ID kind
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum TidKind {
+    /// All threads
     All,
+    /// Any thread
     Any,
+    /// Thread with specific ID
     WithID(usize),
 }
 
-#[derive(PartialEq, Eq, Debug)]
+/// Thread ID
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub struct Tid {
-    pid: Option<TidKind>,
-    tid: TidKind,
+    pub pid: Option<TidKind>,
+    pub tid: TidKind,
 }
 
 impl TryFrom<&str> for Tid {
@@ -22,7 +27,10 @@ impl TryFrom<&str> for Tid {
             // p<pid>.<tid>
             let mut s = s.trim_start_matches('p').split('.');
             let pid = s.next().ok_or(())?.parse::<TidKind>().map_err(drop)?;
-            let tid = s.next().ok_or(())?.parse::<TidKind>().map_err(drop)?;
+            let tid = match s.next() {
+                Some(s) => s.parse::<TidKind>().map_err(drop)?,
+                None => TidKind::All, // valid to pass only p<pid>
+            };
 
             Ok(Tid {
                 pid: Some(pid),

@@ -34,10 +34,16 @@ fn main() -> DynResult<()> {
     let mut pktbuf = [0; 4096];
     let mut debugger = new_tcp_gdbstub(9001, &mut pktbuf)?;
 
-    let state_after_disconnect = debugger.run(&mut emu)?;
-    if state_after_disconnect == gdbstub::TargetState::Running {
-        // run to completion
-        while emu.step() != Some(emu::Event::Halted) {}
+    match debugger.run(&mut emu)? {
+        gdbstub::DisconnectReason::Disconnect => {
+            // run to completion
+            while emu.step() != Some(emu::Event::Halted) {}
+        }
+        gdbstub::DisconnectReason::TargetHalted => println!("Target halted!"),
+        gdbstub::DisconnectReason::Kill => {
+            println!("GDB sent a kill command!");
+            return Ok(());
+        }
     }
 
     let ret = emu.cpu.reg_get(armv4t_emu::Mode::User, 0);

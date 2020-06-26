@@ -242,7 +242,7 @@
 //! open a PR to add it to this list!
 
 #![cfg_attr(not(feature = "std"), no_std)]
-// #![deny(missing_docs)]
+#![deny(missing_docs)]
 
 #[macro_use]
 extern crate log;
@@ -260,5 +260,7 @@ mod util;
 pub use arch_traits::{Arch, Registers};
 pub use connection::Connection;
 pub use error::Error;
-pub use stub::GdbStub;
+// TODO: (breaking change) expose PID to client
+pub use protocol::TidKind as Tid;
+pub use stub::{DisconnectReason, GdbStub};
 pub use target::*;

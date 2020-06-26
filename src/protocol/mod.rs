@@ -3,7 +3,7 @@ mod common;
 mod response_writer;
 
 pub use commands::*;
-pub use common::Tid;
+pub use common::{Tid, TidKind};
 pub use response_writer::{Error as ResponseWriterError, ResponseWriter};
 
 /// Packet parse error.
