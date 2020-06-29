@@ -46,12 +46,17 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
         let checksum = self.checksum;
 
         #[cfg(feature = "std")]
-        log::trace!("--> ${}#{:02x?}", self.msg, checksum);
+        trace!("--> ${}#{:02x?}", self.msg, checksum);
 
         self.write(b'#')?;
         self.write_hex(checksum)?;
 
         Ok(())
+    }
+
+    /// Get a mutable reference to the underlying connection.
+    pub fn as_conn(&mut self) -> &mut C {
+        self.inner
     }
 
     /// Write a single byte.
@@ -83,7 +88,7 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
         for digit in [(byte & 0xf0) >> 4, byte & 0x0f].iter() {
             let c = match digit {
                 0..=9 => b'0' + digit,
-                10..=15 => b'A' + digit - 10,
+                10..=15 => b'a' + digit - 10,
                 _ => unreachable!(),
             };
             self.write(c)?;

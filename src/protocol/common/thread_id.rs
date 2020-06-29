@@ -1,7 +1,7 @@
 use core::convert::TryFrom;
 use core::str::FromStr;
 
-/// Thread ID kind
+/// Thread Identifier.
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum TidKind {
     /// All threads

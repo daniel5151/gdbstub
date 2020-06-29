@@ -10,22 +10,30 @@ impl Target for Emu {
     fn resume(
         &mut self,
         mut actions: impl Iterator<Item = (Tid, ResumeAction)>,
+        mut check_gdb_interrupt: impl FnMut() -> bool,
     ) -> Result<StopReason<u32>, Self::Error> {
         // only one thread, only one action
-        let (_, action) = actions.next().unwrap();
+        let (_, action) = actions.next().ok_or("unexpected number of actions")?;
 
         let event = match action {
-            ResumeAction::Step => self.step(),
-            ResumeAction::Continue => loop {
-                if let Some(event) = self.step() {
-                    break Some(event);
-                };
+            ResumeAction::Step => match self.step() {
+                Some(e) => e,
+                None => return Ok(StopReason::DoneStep),
             },
-        };
+            ResumeAction::Continue => {
+                let mut cycles = 0;
+                loop {
+                    if let Some(event) = self.step() {
+                        break event;
+                    };
 
-        let event = match event {
-            Some(e) => e,
-            None => return Ok(StopReason::Running),
+                    // check for GDB interrupt every 1024 instructions
+                    cycles += 1;
+                    if cycles % 1024 == 0 && check_gdb_interrupt() {
+                        return Ok(StopReason::GdbInterrupt);
+                    }
+                }
+            }
         };
 
         Ok(match event {

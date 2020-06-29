@@ -5,11 +5,13 @@
 
 An easy-to-use and easy-to-integrate implementation of the [GDB Remote Serial Protocol](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Protocol.html#Remote-Protocol) in Rust.
 
-`gdbstub` aims to provide a "drop-in" way to add GDB support to a project, _without_ requiring any large refactoring / ownership juggling. It is particularly useful in _emulators_, where it provides a powerful, non-intrusive way to debug code running within an emulated system. `gdbstub` is also _entirely `no_std`_, and can be run on bare-metal systems as well.
+`gdbstub` is particularly useful in emulators, where it provides a powerful, non-intrusive way to debug code running within an emulated system. The API aims to provide a "drop-in" way to add GDB support to an existing project, without requiring any large refactoring / ownership juggling.
+
+`gdbstub` is also entirely `no_std`, _without_ a dependency on `alloc`! If you're interested in adding remote debugging support to a resource-constrained bare-metal system, give `gdbstub` a shot!
 
 - [Documentation and Examples](https://docs.rs/gdbstub)
 
-**Disclaimer:** `gdbstub` is still experiencing a fair amount of API churn! Expect (potentially large) breaking API changes between minor releases!
+**Warning:** `gdbstub` is still experiencing a fair amount of API churn, so expect breaking API changes between minor releases!
 
 ## Debugging Features
 
@@ -44,10 +46,10 @@ The included `armv4t` example shows how `gdbstub` can be used to add `gdb` debug
 - Improve multiprocess / multi-thread / multi-core support
 - Improve packet-parsing infrastructure?
 - Support addresses larger than 64-bits?
-  - This would require plumbling-through the architecture's pointer size as a generic parameter into all the packet parsing code, which probably isn't _too_ difficult, just time consuming.
+  - This would require plumbing-through the architecture's pointer size as a generic parameter into all the packet parsing code, which probably isn't _too_ difficult, just time consuming.
 
 ## Using `gdbstub` on bare-metal hardware
 
-While the target use-case for `gdbstub` is emulation, the crate is entirely `no_std`, which means it _should_ be possible to implement a `gdbstub::Target` which uses low-level trap instructions + context switching to debug bare-metal code.
+Since `gdbstub` is entirely `no_std`, it _should_ be possible to implement a `gdbstub::Target` which uses low-level trap instructions + context switching to debug bare-metal code.
 
-If you happen to stumble across this crate and use it to debug bare-metal hardware, please let me know!
+If you happen to stumble across this crate and use it to debug bare-metal hardware, please let me know! I'd love to link to your project!

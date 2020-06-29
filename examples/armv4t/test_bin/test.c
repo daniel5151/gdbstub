@@ -1,8 +1,14 @@
 int main() {
     int x = 4;
+    int y = 3;
+
     x += 1;
-    for (int i = 0; i < 10; i++) {
-        x += 2;
+    y += 3;
+
+    // big, useless loop to test ctrl-c functionality
+    for (int i = 0; i < 1024 * 32; i++) {
+        x += 1;
     }
+
     return x;
 }

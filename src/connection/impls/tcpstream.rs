@@ -1,6 +1,8 @@
+use std::net::TcpStream;
+
 use crate::Connection;
 
-impl Connection for std::net::TcpStream {
+impl Connection for TcpStream {
     type Error = std::io::Error;
 
     fn read(&mut self) -> Result<u8, Self::Error> {
@@ -15,13 +17,11 @@ impl Connection for std::net::TcpStream {
         }
     }
 
-    fn read_nonblocking(&mut self) -> Result<Option<u8>, Self::Error> {
-        use std::io::Read;
-
+    fn peek(&mut self) -> Result<Option<u8>, Self::Error> {
         self.set_nonblocking(true)?;
 
         let mut buf = [0u8];
-        match Read::read_exact(self, &mut buf) {
+        match Self::peek(self, &mut buf) {
             Ok(_) => Ok(Some(buf[0])),
             Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => Ok(None),
             Err(e) => Err(e),

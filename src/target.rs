@@ -31,7 +31,16 @@ pub trait Target {
     /// A target-specific fatal error.
     type Error;
 
-    /// Resume execution, specifying different resume actions for each thread.
+    /// Resume execution.
+    ///
+    /// `actions` specifies how each thread should be resumed
+    /// (i.e: single-step vs. resume).
+    ///
+    /// The `check_gdb_interrupt` callback can be invoked to check if a GDB
+    /// Interrupt packet was sent (i.e: the user pressed Ctrl-C). It's
+    /// recommended to invoke this callback every-so-often while the system is
+    /// running (e.g: every X cycles/milliseconds). Checking for interrupt
+    /// packets is _not_ required, but it is _recommended_.
     ///
     /// _Author's recommendation:_ If you're implementing `Target` to debug
     /// bare-metal code (emulated or not), treat the `tid` field as a _core_ ID
@@ -39,6 +48,7 @@ pub trait Target {
     fn resume(
         &mut self,
         actions: impl Iterator<Item = (Tid, ResumeAction)>,
+        check_gdb_interrupt: impl FnMut() -> bool,
     ) -> Result<StopReason<<Self::Arch as Arch>::Usize>, Self::Error>;
 
     /// Read the target's registers.
@@ -124,7 +134,7 @@ pub trait Target {
     }
 }
 
-/// What kind of watchpoint.
+/// Various Watchpoint kinds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WatchKind {
     /// Fire when the memory location is written to.
@@ -144,11 +154,13 @@ pub enum BreakOp {
     Remove,
 }
 
-/// The system's current execution state.
+/// Describes why the target stopped.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StopReason<U> {
-    /// Running
-    Running,
+    /// Completed the single-step request.
+    DoneStep,
+    /// `check_gdb_interrupt` returned `true`
+    GdbInterrupt,
     /// Halted
     Halted,
     /// Hit a software breakpoint (e.g. due to a trap instruction).
