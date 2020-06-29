@@ -27,6 +27,7 @@ pub struct GdbStub<'a, T: Target, C: Connection> {
     conn: Option<C>,
     packet_buffer: Option<&'a mut [u8]>,
 
+    packet_buffer_len: usize,
     current_tid: Tid,
     _target: core::marker::PhantomData<T>,
 }
@@ -34,10 +35,13 @@ pub struct GdbStub<'a, T: Target, C: Connection> {
 impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
     /// Create a new `GdbStub` using the provided connection + packet buffer.
     pub fn new(conn: C, packet_buffer: &'a mut [u8]) -> GdbStub<T, C> {
+        let packet_buffer_len = packet_buffer.len();
+
         GdbStub {
             conn: Some(conn),
             packet_buffer: Some(packet_buffer),
 
+            packet_buffer_len,
             current_tid: Tid {
                 pid: None,
                 tid: TidKind::Any,
@@ -46,54 +50,93 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
         }
     }
 
-    fn do_vcont(
-        &mut self,
-        res: &mut ResponseWriter<C>,
-        target: &mut T,
-        actions: impl Iterator<Item = (TidKind, ResumeAction)>,
-    ) -> Result<Option<DisconnectReason>, Error<T, C>> {
-        let stop_reason = target.resume(actions).map_err(Error::TargetError)?;
+    /// Starts a GDB remote debugging session.
+    ///
+    /// Returns once the GDB client closes the debugging session, or if the
+    /// target halts.
+    pub fn run(&mut self, target: &mut T) -> Result<DisconnectReason, Error<T, C>> {
+        let packet_buffer = self.packet_buffer.take().unwrap();
+        let mut conn = self.conn.take().unwrap();
 
-        // if the target isn't running, send a stop-response packet
-        if stop_reason != StopReason::Running {
-            // if the target Halted, send a "process exited with status code 0" packet,
-            // and break the loop.
-            if stop_reason == StopReason::Halted {
-                res.write_str("W00")?;
-                return Ok(Some(DisconnectReason::TargetHalted));
-            }
-
-            // if the target's still running, just say it was a signal 05
-            if stop_reason == StopReason::Running {
-                res.write_str("S05")?;
-                return Ok(None);
-            }
-
-            // otherwise, a breakpoint was hit
-            res.write_str("T")?;
-            res.write_hex(5)?;
-
-            match stop_reason {
-                // don't include addr on sw/hw break
-                StopReason::SwBreak => res.write_str("swbreak:")?,
-                StopReason::HwBreak => res.write_str("hwbreak:")?,
-                StopReason::Watch { kind, addr } => {
-                    match kind {
-                        WatchKind::Write => res.write_str("watch:")?,
-                        WatchKind::Read => res.write_str("rwatch:")?,
-                        WatchKind::ReadWrite => res.write_str("awatch:")?,
+        loop {
+            // Handle any incoming GDB packets
+            match self.recv_packet(&mut conn, packet_buffer, true)? {
+                None => {}
+                Some(packet) => match packet {
+                    Packet::Ack => {}
+                    Packet::Nack => {
+                        unimplemented!("GDB nack'd the packet, but retry isn't implemented yet")
                     }
-                    // XXX: get rid of this unwrap ahhh
-                    let addr: u64 = num_traits::NumCast::from(addr).unwrap();
-                    res.write_hex_buf(&addr.to_be_bytes())?;
-                }
-                _ => unreachable!(),
+                    Packet::Interrupt => unimplemented!(),
+                    Packet::Command(command) => {
+                        // Acknowledge the command
+                        conn.write(b'+').map_err(Error::ConnectionRead)?;
+
+                        let mut res = ResponseWriter::new(&mut conn);
+                        let status = self.handle_command(&mut res, target, command)?;
+
+                        // HACK: this could be more elegant...
+                        if status != Some(DisconnectReason::Kill) {
+                            res.flush()?;
+                        }
+
+                        if let Some(disconnect_reason) = status {
+                            return Ok(disconnect_reason);
+                        }
+                    }
+                },
             };
-
-            res.write_str(";")?;
         }
+    }
 
-        Ok(None)
+    fn recv_packet<'b>(
+        &mut self,
+        conn: &mut C,
+        buf: &'b mut [u8],
+        blocking: bool,
+    ) -> Result<Option<Packet<'b>>, Error<T, C>> {
+        let header_byte = if blocking {
+            conn.read().map(Some)
+        } else {
+            conn.read_nonblocking()
+        };
+
+        match header_byte {
+            Ok(None) => Ok(None), // no incoming message
+            Ok(Some(header_byte)) => {
+                // use SliceVec as a convenient view into the packet buffer
+                let mut packet_buffer = SliceVec::new(buf);
+
+                packet_buffer.clear();
+                packet_buffer.push(header_byte)?;
+                if header_byte == b'$' {
+                    // read the packet body
+                    loop {
+                        let c = conn.read().map_err(Error::ConnectionRead)?;
+                        packet_buffer.push(c)?;
+                        if c == b'#' {
+                            break;
+                        }
+                    }
+                    // read the checksum as well
+                    packet_buffer.push(conn.read().map_err(Error::ConnectionRead)?)?;
+                    packet_buffer.push(conn.read().map_err(Error::ConnectionRead)?)?;
+                }
+
+                let len = packet_buffer.len();
+                drop(packet_buffer);
+
+                match Packet::from_buf(&buf[..len]) {
+                    Ok(packet) => Ok(Some(packet)),
+                    Err(e) => {
+                        // TODO: preserve this context within Error::PacketParse
+                        error!("Could not parse packet: {:?}", e);
+                        Err(Error::PacketParse)
+                    }
+                }
+            }
+            Err(e) => Err(Error::ConnectionRead(e)),
+        }
     }
 
     fn handle_command(
@@ -105,7 +148,13 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
         match command {
             // ------------------ Handshaking and Queries ------------------- //
             Command::qSupported(cmd) => {
+                // XXX: actually read what the client supports, and enable/disable features
+                // appropriately
                 let _features = cmd.features.into_iter();
+
+                res.write_str("PacketSize=")?;
+                res.write_hex_buf(&self.packet_buffer_len.to_be_bytes())?;
+                res.write_str(";")?;
 
                 res.write_str("vContSupported+;")?;
                 res.write_str("multiprocess+;")?;
@@ -343,93 +392,54 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
         Ok(None)
     }
 
-    fn recv_packet<'b>(
+    fn do_vcont(
         &mut self,
-        conn: &mut C,
-        buf: &'b mut [u8],
-        blocking: bool,
-    ) -> Result<Option<Packet<'b>>, Error<T, C>> {
-        let header_byte = if blocking {
-            conn.read().map(Some)
-        } else {
-            conn.read_nonblocking()
-        };
+        res: &mut ResponseWriter<C>,
+        target: &mut T,
+        actions: impl Iterator<Item = (TidKind, ResumeAction)>,
+    ) -> Result<Option<DisconnectReason>, Error<T, C>> {
+        let stop_reason = target.resume(actions).map_err(Error::TargetError)?;
 
-        match header_byte {
-            Ok(None) => Ok(None), // no incoming message
-            Ok(Some(header_byte)) => {
-                // use SliceVec as a convenient view into the packet buffer
-                let mut packet_buffer = SliceVec::new(buf);
-
-                packet_buffer.clear();
-                packet_buffer.push(header_byte)?;
-                if header_byte == b'$' {
-                    // read the packet body
-                    loop {
-                        let c = conn.read().map_err(Error::ConnectionRead)?;
-                        packet_buffer.push(c)?;
-                        if c == b'#' {
-                            break;
-                        }
-                    }
-                    // read the checksum as well
-                    packet_buffer.push(conn.read().map_err(Error::ConnectionRead)?)?;
-                    packet_buffer.push(conn.read().map_err(Error::ConnectionRead)?)?;
-                }
-
-                let len = packet_buffer.len();
-                drop(packet_buffer);
-
-                match Packet::from_buf(&buf[..len]) {
-                    Ok(packet) => Ok(Some(packet)),
-                    Err(e) => {
-                        // TODO: preserve this context within Error::PacketParse
-                        error!("Could not parse packet: {:?}", e);
-                        Err(Error::PacketParse)
-                    }
-                }
+        // if the target isn't running, send a stop-response packet
+        if stop_reason != StopReason::Running {
+            // if the target Halted, send a "process exited with status code 0" packet,
+            // and break the loop.
+            if stop_reason == StopReason::Halted {
+                res.write_str("W00")?;
+                return Ok(Some(DisconnectReason::TargetHalted));
             }
-            Err(e) => Err(Error::ConnectionRead(e)),
-        }
-    }
 
-    /// Starts a GDB remote debugging session.
-    ///
-    /// Returns once the GDB client closes the debugging session, or if the
-    /// target halts.
-    pub fn run(&mut self, target: &mut T) -> Result<DisconnectReason, Error<T, C>> {
-        let packet_buffer = self.packet_buffer.take().unwrap();
-        let mut conn = self.conn.take().unwrap();
+            // if the target's still running, just say it was a signal 05
+            if stop_reason == StopReason::Running {
+                res.write_str("S05")?;
+                return Ok(None);
+            }
 
-        loop {
-            // Handle any incoming GDB packets
-            match self.recv_packet(&mut conn, packet_buffer, true)? {
-                None => {}
-                Some(packet) => match packet {
-                    Packet::Ack => {}
-                    Packet::Nack => {
-                        unimplemented!("GDB nack'd the packet, but retry isn't implemented yet")
+            // otherwise, a breakpoint was hit
+            res.write_str("T")?;
+            res.write_hex(5)?;
+
+            match stop_reason {
+                // don't include addr on sw/hw break
+                StopReason::SwBreak => res.write_str("swbreak:")?,
+                StopReason::HwBreak => res.write_str("hwbreak:")?,
+                StopReason::Watch { kind, addr } => {
+                    match kind {
+                        WatchKind::Write => res.write_str("watch:")?,
+                        WatchKind::Read => res.write_str("rwatch:")?,
+                        WatchKind::ReadWrite => res.write_str("awatch:")?,
                     }
-                    Packet::Interrupt => unimplemented!(),
-                    Packet::Command(command) => {
-                        // Acknowledge the command
-                        conn.write(b'+').map_err(Error::ConnectionRead)?;
-
-                        let mut res = ResponseWriter::new(&mut conn);
-                        let status = self.handle_command(&mut res, target, command)?;
-
-                        // HACK: this could be more elegant...
-                        if status != Some(DisconnectReason::Kill) {
-                            res.flush()?;
-                        }
-
-                        if let Some(disconnect_reason) = status {
-                            return Ok(disconnect_reason);
-                        }
-                    }
-                },
+                    // XXX: get rid of this unwrap ahhh
+                    let addr: u64 = num_traits::NumCast::from(addr).unwrap();
+                    res.write_hex_buf(&addr.to_be_bytes())?;
+                }
+                _ => unreachable!(),
             };
+
+            res.write_str(";")?;
         }
+
+        Ok(None)
     }
 }
 

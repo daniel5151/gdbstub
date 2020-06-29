@@ -44,7 +44,7 @@ The included `armv4t` example shows how `gdbstub` can be used to add `gdb` debug
 - Improve multiprocess / multi-thread / multi-core support
 - Improve packet-parsing infrastructure?
 - Support addresses larger than 64-bits?
-  - This would require plumbling-through the achitecture's pointer size as a generic parameter into all the packet parsing code, which probably isn't _too_ difficult, just time consuming.
+  - This would require plumbling-through the architecture's pointer size as a generic parameter into all the packet parsing code, which probably isn't _too_ difficult, just time consuming.
 
 ## Using `gdbstub` on bare-metal hardware
 
