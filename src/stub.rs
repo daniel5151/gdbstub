@@ -20,9 +20,8 @@ pub enum DisconnectReason {
     Kill,
 }
 
-/// Facilitates the remote debugging of a [`Target`](trait.Target.html) using
-/// the GDB Remote Serial Protocol over a given
-/// [`Connection`](trait.Connection.html).
+/// Debug a [`Target`](trait.Target.html) across a
+/// [`Connection`](trait.Connection.html) using the GDB Remote Serial Protocol.
 pub struct GdbStub<'a, T: Target, C: Connection> {
     conn: Option<C>,
     packet_buffer: Option<&'a mut [u8]>,

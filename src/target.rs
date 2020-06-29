@@ -3,12 +3,8 @@ use core::ops::Range;
 
 use crate::{Arch, Tid};
 
-/// A collection of methods and metadata GDB can use to control + query a
-/// running system.
-///
-/// This trait describes the architecture and capabilities of a target system,
-/// and provides an interface for `GdbStub` to modify and control the system's
-/// state.
+/// A collection of methods and metadata `gdbstub` requires to control and debug
+/// a system.
 ///
 /// There are several [provided methods](#provided-methods) that can optionally
 /// be implemented to enable additional advanced GDB debugging functionality.
@@ -79,9 +75,8 @@ pub trait Target {
     /// Set/remove a software breakpoint.
     /// Return `Ok(false)` if the operation could not be completed.
     ///
-    /// See [this stackoverflow](https://stackoverflow.com/questions/8878716/what-is-the-difference-between-hardware-and-software-breakpoints)
-    /// discussion about the differences between hardware and software
-    /// breakpoints.
+    /// See [this stackoverflow discussion](https://stackoverflow.com/questions/8878716/what-is-the-difference-between-hardware-and-software-breakpoints)
+    /// about the differences between hardware and software breakpoints.
     ///
     /// _Author's recommendation:_ If you're implementing `Target` for an
     /// emulator using an _interpreted_ CPU (as opposed to a JIT), the
@@ -96,9 +91,8 @@ pub trait Target {
     /// (optional) Set/remove a hardware breakpoint.
     /// Return `Ok(false)` if the operation could not be completed.
     ///
-    /// See [this stackoverflow](https://stackoverflow.com/questions/8878716/what-is-the-difference-between-hardware-and-software-breakpoints)
-    /// discussion about the differences between hardware and software
-    /// breakpoints.
+    /// See [this stackoverflow discussion](https://stackoverflow.com/questions/8878716/what-is-the-difference-between-hardware-and-software-breakpoints)
+    /// about the differences between hardware and software breakpoints.
     ///
     /// _Author's recommendation:_ If you're implementing `Target` for an
     /// emulator using an _interpreted_ CPU (as opposed to a JIT), there
@@ -117,12 +111,12 @@ pub trait Target {
     /// Return `Ok(false)` if the operation could not be completed.
     ///
     /// See the [GDB documentation](https://sourceware.org/gdb/current/onlinedocs/gdb/Set-Watchpoints.html)
-    /// regarding watchpoints.
+    /// regarding watchpoints for how they're supposed to work.
     ///
     /// _NOTE:_ If this method isn't implemented, GDB will default to using
     /// _software watchpoints_, which tend to be excruciatingly slow (as
     /// they are implemented by single-stepping the system, and reading the
-    /// memory location after each step).
+    /// watched memory location after each step).
     fn update_hw_watchpoint(
         &mut self,
         addr: <Self::Arch as Arch>::Usize,
@@ -134,7 +128,7 @@ pub trait Target {
     }
 }
 
-/// Various Watchpoint kinds.
+/// The kind of watchpoint should be set/removed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WatchKind {
     /// Fire when the memory location is written to.

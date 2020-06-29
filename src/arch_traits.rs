@@ -2,7 +2,7 @@ use core::fmt::{self, Debug};
 
 use num_traits::{Num, PrimInt, Unsigned};
 
-/// A struct which corresponds to a particular architecture's registers.
+/// Methods to read/write architecture-specific registers.
 pub trait Registers: Default {
     /// Serialize `self` into a GDB register bytestream.
     ///
@@ -33,9 +33,6 @@ pub trait Arch: Eq + PartialEq {
 
     /// The architecture's register file
     type Registers: Registers;
-
-    /// Read the target's current PC.
-    fn read_pc(registers: &Self::Registers) -> Self::Usize;
 
     /// (optional) Return the platform's `features.xml` file.
     ///

@@ -1,6 +1,6 @@
 mod impls;
 
-/// A trait for reading / writing bytes across some transport layer.
+/// A trait to perform byte-wise I/O over a serial transport layer.
 pub trait Connection {
     /// Transport-specific error type.
     type Error;
