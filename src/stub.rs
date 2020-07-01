@@ -115,7 +115,7 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
                 let len = packet_buffer.len();
                 drop(packet_buffer);
 
-                match Packet::from_buf(&buf[..len]) {
+                match Packet::from_buf(&mut buf[..len]) {
                     Ok(packet) => Ok(packet),
                     Err(e) => {
                         // TODO: preserve this context within Error::PacketParse
@@ -225,7 +225,7 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
             }
             Command::G(cmd) => {
                 let mut regs: <T::Arch as Arch>::Registers = Default::default();
-                regs.gdb_deserialize(cmd.vals)
+                regs.gdb_deserialize(cmd.vals.iter().copied())
                     .map_err(|_| Error::PacketParse)?; // FIXME: more granular error?
                 target.write_registers(&regs).map_err(Error::TargetError)?;
                 res.write_str("OK")?;
@@ -359,6 +359,32 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
                     target,
                     core::iter::once((self.current_tid.tid, ResumeAction::Step)),
                 )
+            }
+
+            // ------------------ "Extended" Functionality ------------------ //
+            Command::qRcmd(cmd) => {
+                let mut err: Result<_, Error<T, C>> = Ok(());
+                let supported = target
+                    .handle_monitor_cmd(cmd.hex_cmd, |msg| {
+                        // TODO: replace this with a try block (once stabilized)
+                        let e = (|| {
+                            let mut res = ResponseWriter::new(res.as_conn());
+                            res.write_str("O")?;
+                            res.write_hex_buf(msg)?;
+                            res.flush()?;
+                            Ok(())
+                        })();
+
+                        if let Err(e) = e {
+                            err = Err(e)
+                        }
+                    })
+                    .map_err(Error::TargetError)?;
+                err?;
+
+                if supported.is_some() {
+                    res.write_str("OK")?
+                }
             }
 
             // ------------------- Stubbed Functionality -------------------- //

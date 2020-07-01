@@ -1,17 +1,14 @@
-use core::convert::TryFrom;
-
-use crate::protocol::common::Tid;
+use super::prelude::*;
 
 #[derive(Debug)]
 pub struct vCont<'a> {
     pub actions: Actions<'a>,
 }
 
-impl<'a> TryFrom<&'a str> for vCont<'a> {
-    type Error = ();
-
-    fn try_from(body: &'a str) -> Result<Self, ()> {
-        Ok(vCont {
+impl<'a> ParseCommand<'a> for vCont<'a> {
+    fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
+        let body = buf.into_body_str();
+        Some(vCont {
             actions: Actions(body),
         })
     }

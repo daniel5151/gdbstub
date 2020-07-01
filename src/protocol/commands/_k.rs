@@ -1,15 +1,14 @@
-use core::convert::TryFrom;
+use super::prelude::*;
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct k;
 
-impl TryFrom<&str> for k {
-    type Error = ();
-
-    fn try_from(body: &str) -> Result<Self, ()> {
+impl<'a> ParseCommand<'a> for k {
+    fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
+        let body = buf.into_body_str();
         if !body.is_empty() {
-            return Err(());
+            return None;
         }
-        Ok(k)
+        Some(k)
     }
 }

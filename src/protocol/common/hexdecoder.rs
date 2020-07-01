@@ -45,3 +45,22 @@ impl<'a> Iterator for HexDecoder<'a> {
         Some(ret as u8)
     }
 }
+
+/// Decode a hex string into a mutable bytes slice _in place_.
+pub fn decode_hex<'a>(buf: &'a mut [u8]) -> Result<&'a mut [u8], &'static str> {
+    const MUST_BE_ASCII: &str = "buf must only contain ASCII hexdigits";
+    const EVEN_LEN: &str = "buf must have even number of bytes";
+
+    if buf.len() % 2 != 0 {
+        return Err(EVEN_LEN);
+    }
+
+    let decoded_len = buf.len() / 2;
+    for i in 0..decoded_len {
+        let b = (buf[i * 2] as char).to_digit(16).ok_or(MUST_BE_ASCII)? << 4
+            | (buf[i * 2 + 1] as char).to_digit(16).ok_or(MUST_BE_ASCII)?;
+        buf[i] = b as u8;
+    }
+
+    Ok(&mut buf[..decoded_len])
+}

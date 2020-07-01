@@ -1,25 +1,32 @@
-use core::convert::TryFrom;
+use crate::protocol::packet::PacketBuf;
+
+pub mod prelude {
+    pub use super::ParseCommand;
+    pub use crate::protocol::common::*;
+    pub use crate::protocol::packet::PacketBuf;
+}
 
 // TODO: figure out how to make it accept exprs _and_ blocks
 // TODO: use a trie structure for more efficient longest-prefix matching
 macro_rules! prefix_match {
     (
-        match $val:expr => [$name:ident|$rest:ident] {
+        match ($val:expr) {
             $($prefix:literal => $arm:block)*
             _ => $other:block
         }
     ) => {{
-        let $name;
-        let $rest;
+        #[allow(clippy::string_lit_as_bytes)]
         match $val {
-            $(_ if $val.starts_with($prefix) => {
-                $name = &$val[..$prefix.len()];
-                $rest = &$val[$prefix.len()..];
+            $(_ if $val.starts_with($prefix.as_bytes()) => {
                 $arm
             })*
             _ => $other
         }
     }};
+}
+
+pub trait ParseCommand<'a>: Sized {
+    fn from_packet(buf: PacketBuf<'a>) -> Option<Self>;
 }
 
 macro_rules! commands {
@@ -39,20 +46,24 @@ macro_rules! commands {
         }
 
         impl<'a> Command<'a> {
-            pub fn from_packet_body(body: &'a str) -> Result<Command<'a>, CommandParseError<'a>> {
+            pub fn from_packet(
+                buf: PacketBuf<'a>
+            ) -> Result<Command<'a>, CommandParseError<'a>> {
+                let body = buf.as_body();
+
                 if body.is_empty() {
-                    // TODO: double check this
                     return Err(CommandParseError::Empty);
                 }
 
                 let command = prefix_match! {
-                    match body => [name | rest] {
+                    match (body) {
                         $($name => {
-                            let cmd = $command::try_from(rest)
-                                .map_err(|_| CommandParseError::MalformedCommand(name))?;
+                            let buf = buf.trim_body_bytes($name.len());
+                            let cmd = $command::from_packet(buf)
+                                .ok_or(CommandParseError::MalformedCommand($name))?;
                             Command::$command(cmd)
                         })*
-                        _ => { Command::Unknown(body) }
+                        _ => { Command::Unknown(buf.into_body_str()) }
                     }
                 };
 
@@ -85,6 +96,7 @@ commands! {
     "qAttached" => _qAttached::qAttached,
     "qC" => _qC::qC,
     "qfThreadInfo" => _qfThreadInfo::qfThreadInfo,
+    "qRcmd" => _qRcmd::qRcmd<'a>,
     "qsThreadInfo" => _qsThreadInfo::qsThreadInfo,
     "qSupported" => _qSupported::qSupported<'a>,
     "qXfer:features:read" => _qXfer_features_read::qXferFeaturesRead<'a>,

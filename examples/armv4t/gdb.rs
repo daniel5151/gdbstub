@@ -148,4 +148,33 @@ impl Target for Emu {
 
         Some(Ok(true))
     }
+
+    fn handle_monitor_cmd(
+        &mut self,
+        cmd: &[u8],
+        mut output: impl FnMut(&[u8]),
+    ) -> Result<Option<()>, Self::Error> {
+        // wrap `output` in a more comfy macro
+        macro_rules! outputln {
+            ($($args:tt)*) => {
+                output((format!($($args)*) + "\n").as_bytes())
+            };
+        }
+
+        let cmd = match core::str::from_utf8(cmd) {
+            Ok(cmd) => cmd,
+            Err(_) => {
+                outputln!("command must be valid UTF-8");
+                return Ok(Some(()));
+            }
+        };
+
+        match cmd {
+            "" => outputln!("Sorry, didn't catch that. Try `monitor ping`!"),
+            "ping" => outputln!("pong!"),
+            _ => outputln!("I don't know how to handle '{}'", cmd),
+        }
+
+        Ok(Some(()))
+    }
 }

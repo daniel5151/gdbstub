@@ -1,19 +1,18 @@
-use core::convert::TryFrom;
+use super::prelude::*;
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct s {
     pub addr: Option<u64>,
 }
 
-impl TryFrom<&str> for s {
-    type Error = ();
-
-    fn try_from(body: &str) -> Result<Self, ()> {
+impl<'a> ParseCommand<'a> for s {
+    fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
+        let body = buf.into_body_str();
         if body.is_empty() {
-            return Ok(s { addr: None });
+            return Some(s { addr: None });
         }
 
-        let addr = u64::from_str_radix(body, 16).map_err(drop)?;
-        Ok(s { addr: Some(addr) })
+        let addr = u64::from_str_radix(body, 16).ok()?;
+        Some(s { addr: Some(addr) })
     }
 }

@@ -126,6 +126,36 @@ pub trait Target {
         let _ = (addr, op, kind);
         None
     }
+
+    /// (optional) Handle custom commands sent using the `monitor` command.
+    ///
+    /// The GDB remote serial protocol includes a built-in mechanism to send
+    /// arbitrary commands to the remote stub: the `monitor` command. For
+    /// example, running `monitor dbg` from the GDB client will invoke
+    /// `handle_monitor_cmd` with `cmd = b"dbg"`.
+    ///
+    /// Commands are _not_ guaranteed to be valid UTF-8, hence the use of
+    /// `&[u8]` as opposed to `&str`.
+    ///
+    /// Output can be written back to the GDB client using the provided `output`
+    /// callback.
+    ///
+    /// _Note:_ Sending a single large output message is preferable to sending
+    /// multiple smaller output messages, as the `output` callback does not
+    /// provide any form of IO buffering. Each call to `output` will send a new
+    /// GDB packet over the `Connection`.
+    ///
+    /// _Note:_ The maximum length of incoming commands is dependent on the
+    /// length of the packet buffer used by [`GdbStub`](struct.GdbStub.html),
+    /// determined by the formula `(buf.len() - 10) / 2`.
+    fn handle_monitor_cmd(
+        &mut self,
+        cmd: &[u8],
+        output: impl FnMut(&[u8]),
+    ) -> Result<Option<()>, Self::Error> {
+        let _ = (cmd, output);
+        Ok(None)
+    }
 }
 
 /// The kind of watchpoint should be set/removed.

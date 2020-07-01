@@ -1,4 +1,4 @@
-use core::convert::TryFrom;
+use super::prelude::*;
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct qXferFeaturesRead<'a> {
@@ -7,23 +7,23 @@ pub struct qXferFeaturesRead<'a> {
     pub len: usize,
 }
 
-impl<'a> TryFrom<&'a str> for qXferFeaturesRead<'a> {
-    type Error = ();
+impl<'a> ParseCommand<'a> for qXferFeaturesRead<'a> {
+    fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
+        let body = buf.into_body_str();
 
-    fn try_from(body: &'a str) -> Result<Self, ()> {
         // body should be ":<target>:<offset>,<len>b"
         log::debug!("{}", body);
         if body.is_empty() {
-            return Err(());
+            return None;
         }
 
         let mut body = body.split(':').skip(1);
-        let annex = body.next().ok_or(())?;
+        let annex = body.next()?;
 
-        let mut body = body.next().ok_or(())?.split(',');
-        let offset = usize::from_str_radix(body.next().ok_or(())?, 16).map_err(drop)?;
-        let len = usize::from_str_radix(body.next().ok_or(())?, 16).map_err(drop)?;
+        let mut body = body.next()?.split(',');
+        let offset = usize::from_str_radix(body.next()?, 16).ok()?;
+        let len = usize::from_str_radix(body.next()?, 16).ok()?;
 
-        Ok(qXferFeaturesRead { annex, offset, len })
+        Some(qXferFeaturesRead { annex, offset, len })
     }
 }

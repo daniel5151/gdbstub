@@ -1,6 +1,4 @@
-use core::convert::TryFrom;
-
-use crate::protocol::common::Tid;
+use super::prelude::*;
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct H {
@@ -8,17 +6,16 @@ pub struct H {
     pub tid: Tid,
 }
 
-impl TryFrom<&str> for H {
-    type Error = ();
-
-    fn try_from(body: &str) -> Result<Self, ()> {
+impl<'a> ParseCommand<'a> for H {
+    fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
+        let body = buf.into_body_str();
         if body.is_empty() {
-            return Err(());
+            return None;
         }
 
-        let kind = body.chars().next().ok_or(())?;
-        let tid = body[1..].parse::<Tid>().map_err(drop)?;
+        let kind = body.chars().next()?;
+        let tid = body[1..].parse::<Tid>().ok()?;
 
-        Ok(H { kind, tid })
+        Some(H { kind, tid })
     }
 }

@@ -1,20 +1,14 @@
-use core::convert::TryFrom;
-
-use crate::protocol::common::TidKind;
+use super::prelude::*;
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct vKill {
     pub pid: TidKind,
 }
 
-impl TryFrom<&str> for vKill {
-    type Error = ();
-
-    fn try_from(body: &str) -> Result<Self, ()> {
-        let pid = body
-            .trim_start_matches(';')
-            .parse::<TidKind>()
-            .map_err(drop)?;
-        Ok(vKill { pid })
+impl<'a> ParseCommand<'a> for vKill {
+    fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
+        let body = buf.into_body_str();
+        let pid = body.trim_start_matches(';').parse::<TidKind>().ok()?;
+        Some(vKill { pid })
     }
 }

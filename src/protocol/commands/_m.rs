@@ -1,4 +1,4 @@
-use core::convert::TryFrom;
+use super::prelude::*;
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct m {
@@ -6,14 +6,13 @@ pub struct m {
     pub len: usize,
 }
 
-impl TryFrom<&str> for m {
-    type Error = ();
-
-    fn try_from(body: &str) -> Result<Self, ()> {
+impl<'a> ParseCommand<'a> for m {
+    fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
+        let body = buf.into_body_str();
         let mut body = body.split(',');
-        let addr = u64::from_str_radix(body.next().ok_or(())?, 16).map_err(drop)?;
-        let len = usize::from_str_radix(body.next().ok_or(())?, 16).map_err(drop)?;
+        let addr = u64::from_str_radix(body.next()?, 16).ok()?;
+        let len = usize::from_str_radix(body.next()?, 16).ok()?;
 
-        Ok(m { addr, len })
+        Some(m { addr, len })
     }
 }

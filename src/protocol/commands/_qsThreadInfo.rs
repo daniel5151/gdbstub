@@ -1,15 +1,14 @@
-use core::convert::TryFrom;
+use super::prelude::*;
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct qsThreadInfo;
 
-impl TryFrom<&str> for qsThreadInfo {
-    type Error = ();
-
-    fn try_from(body: &str) -> Result<Self, ()> {
+impl<'a> ParseCommand<'a> for qsThreadInfo {
+    fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
+        let body = buf.into_body_str();
         if !body.is_empty() {
-            return Err(());
+            return None;
         }
-        Ok(qsThreadInfo)
+        Some(qsThreadInfo)
     }
 }
