@@ -244,6 +244,9 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![deny(missing_docs)]
 
+#[cfg(feature = "alloc")]
+extern crate alloc;
+
 #[macro_use]
 extern crate log;
 

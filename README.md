@@ -31,11 +31,14 @@ The GDB Remote Serial Protocol is surprisingly complex, supporting advanced feat
 
 ## Feature flags
 
-`gdbstub` is `no_std` by default, though additional features can be enabled by toggling the `std` feature flag:
+`gdbstub` is `no_std` by default, though additional features can be enabled by toggling various feature flags:
 
-- Implements `Connection` for [`std::net::TcpStream`](https://doc.rust-lang.org/std/net/struct.TcpStream.html)
-- Implements [`std::error::Error`](https://doc.rust-lang.org/std/error/trait.Error.html) for `gdbstub::Error`
-- Outputs protocol responses via `log::trace!` (requires allocating a buffer for outgoing responses)
+- `alloc`
+    - Implements `Connection` for `Box<dyn Connection>`
+    - Log outgoing packets via `log::trace!` (using heap-allocated output buffer)
+- `std` (implies `alloc`)
+    - Implement `Connection` for [`TcpStream`](https://doc.rust-lang.org/std/net/struct.TcpStream.html) and [`UnixStream`](https://doc.rust-lang.org/std/os/unix/net/struct.UnixStream.html).
+    - Implement [`std::error::Error`](https://doc.rust-lang.org/std/error/trait.Error.html) for `gdbstub::Error`
 
 ## Examples
 

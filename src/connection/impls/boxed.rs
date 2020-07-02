@@ -1,18 +1,8 @@
-//! Implementations of the [`Connection`] trait for various built-in types
-// TODO: impl Connection for all `Read + Write` (blocked on specialization)
+use crate::Connection;
 
-#[cfg(feature = "alloc")]
-mod boxed;
+use alloc::boxed::Box;
 
-#[cfg(feature = "std")]
-mod tcpstream;
-
-#[cfg(all(feature = "std", unix))]
-mod unixstream;
-
-use super::Connection;
-
-impl<E> Connection for &mut dyn Connection<Error = E> {
+impl<E> Connection for Box<dyn Connection<Error = E>> {
     type Error = E;
 
     fn read(&mut self) -> Result<u8, Self::Error> {

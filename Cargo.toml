@@ -23,7 +23,8 @@ goblin = "0.2"
 
 [features]
 default = []
-std = []
+alloc = []
+std = ["alloc"]
 
 [[example]]
 name = "armv4t"
