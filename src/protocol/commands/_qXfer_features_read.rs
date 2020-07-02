@@ -21,8 +21,8 @@ impl<'a> ParseCommand<'a> for qXferFeaturesRead<'a> {
         let annex = body.next()?;
 
         let mut body = body.next()?.split(',');
-        let offset = usize::from_str_radix(body.next()?, 16).ok()?;
-        let len = usize::from_str_radix(body.next()?, 16).ok()?;
+        let offset = decode_hex(body.next()?.as_bytes()).ok()?;
+        let len = decode_hex(body.next()?.as_bytes()).ok()?;
 
         Some(qXferFeaturesRead { annex, offset, len })
     }

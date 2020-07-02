@@ -49,16 +49,14 @@ macro_rules! commands {
             pub fn from_packet(
                 buf: PacketBuf<'a>
             ) -> Result<Command<'a>, CommandParseError<'a>> {
-                let body = buf.as_body();
-
-                if body.is_empty() {
+                if buf.as_body().is_empty() {
                     return Err(CommandParseError::Empty);
                 }
 
                 let command = prefix_match! {
-                    match (body) {
+                    match (buf.as_body()) {
                         $($name => {
-                            let buf = buf.trim_body_bytes($name.len());
+                            let buf = buf.trim_start_body_bytes($name.len());
                             let cmd = $command::from_packet(buf)
                                 .ok_or(CommandParseError::MalformedCommand($name))?;
                             Command::$command(cmd)

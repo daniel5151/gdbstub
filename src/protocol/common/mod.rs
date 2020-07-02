@@ -1,5 +1,5 @@
-mod hexdecoder;
+mod hex;
 mod thread_id;
 
-pub use hexdecoder::*;
+pub use hex::*;
 pub use thread_id::{Tid, TidKind};

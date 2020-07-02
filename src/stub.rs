@@ -251,6 +251,8 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
                 let addr = cmd.addr;
                 let mut val = cmd
                     .val
+                    .iter()
+                    .copied()
                     .enumerate()
                     .map(|(i, v)| (addr + i as u64, v))
                     // XXX: get rid of this unwrap ahhh

@@ -60,14 +60,14 @@ impl core::str::FromStr for VContKind {
         let mut s = s.split(' ');
         let res = match s.next().unwrap() {
             "c" => Continue,
-            "C" => ContinueWithSig(u8::from_str_radix(s.next().ok_or(())?, 16).map_err(drop)?),
+            "C" => ContinueWithSig(decode_hex(s.next().ok_or(())?.as_bytes()).map_err(drop)?),
             "s" => Step,
-            "S" => StepWithSig(u8::from_str_radix(s.next().ok_or(())?, 16).map_err(drop)?),
+            "S" => StepWithSig(decode_hex(s.next().ok_or(())?.as_bytes()).map_err(drop)?),
             "t" => Stop,
             "r" => {
                 let mut range = s.next().ok_or(())?.split(',');
-                let start = u64::from_str_radix(range.next().ok_or(())?, 16).map_err(drop)?;
-                let end = u64::from_str_radix(range.next().ok_or(())?, 16).map_err(drop)?;
+                let start = decode_hex(range.next().ok_or(())?.as_bytes()).map_err(drop)?;
+                let end = decode_hex(range.next().ok_or(())?.as_bytes()).map_err(drop)?;
                 RangeStep(start, end)
             }
             _ => return Err(()),

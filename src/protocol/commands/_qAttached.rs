@@ -12,7 +12,7 @@ impl<'a> ParseCommand<'a> for qAttached {
             pid: if body.is_empty() {
                 None
             } else {
-                Some(isize::from_str_radix(body.trim_start_matches(':'), 16).ok()?)
+                Some(decode_hex(body.trim_start_matches(':').as_bytes()).ok()?)
             },
         })
     }

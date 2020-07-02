@@ -23,6 +23,7 @@ An easy-to-use and easy-to-integrate implementation of the [GDB Remote Serial Pr
     - (optional) Add + Remove Hardware Breakpoints
     - (optional) Read/Write/Access Watchpoints (i.e: value breakpoints)
 - Extended GDB Protocol
+    - (optional) Support custom GDB commands sent via `monitor`
     - (optional) Automatic architecture detection
 
 Features marked as (optional) are not required to be implemented, but can provide an enhanced debugging experience if implemented.

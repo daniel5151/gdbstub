@@ -7,11 +7,11 @@ pub struct qRcmd<'a> {
 
 impl<'a> ParseCommand<'a> for qRcmd<'a> {
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
-        let body = buf.into_body_buf();
+        let body = buf.into_body();
         match body {
             [] => Some(qRcmd { hex_cmd: &[] }),
             [b',', hex_cmd @ ..] => Some(qRcmd {
-                hex_cmd: decode_hex(hex_cmd).ok()?,
+                hex_cmd: decode_hex_buf(hex_cmd).ok()?,
             }),
             _ => None,
         }

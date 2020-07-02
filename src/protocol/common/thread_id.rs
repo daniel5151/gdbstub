@@ -1,6 +1,8 @@
 use core::convert::TryFrom;
 use core::str::FromStr;
 
+use super::decode_hex;
+
 /// Thread Identifier.
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum TidKind {
@@ -53,13 +55,13 @@ impl FromStr for Tid {
 }
 
 impl FromStr for TidKind {
-    type Err = core::num::ParseIntError;
+    type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s {
             "-1" => TidKind::All,
             "0" => TidKind::Any,
-            id => TidKind::WithID(usize::from_str_radix(id, 16)?),
+            id => TidKind::WithID(decode_hex(id.as_bytes()).map_err(drop)?),
         })
     }
 }

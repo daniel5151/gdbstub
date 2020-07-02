@@ -1,4 +1,4 @@
-use crate::protocol::{Command, CommandParseError};
+use crate::protocol::{common::decode_hex, Command, CommandParseError};
 
 /// Packet parse error.
 #[derive(Debug)]
@@ -27,43 +27,44 @@ pub struct PacketBuf<'a> {
 }
 
 impl<'a> PacketBuf<'a> {
-    pub fn new(buf: &'a mut [u8]) -> Result<PacketBuf<'a>, PacketParseError<'a>> {
+    /// Validate the contents of the raw packet buffer, checking for checksum
+    /// consistency, structural correctness, and ASCII validation.
+    pub fn new(pkt_buf: &'a mut [u8]) -> Result<PacketBuf<'a>, PacketParseError<'a>> {
         // validate the packet is valid ASCII
-        if !buf.is_ascii() {
+        if !pkt_buf.is_ascii() {
             return Err(PacketParseError::NotASCII);
         }
 
-        let end_of_body = buf
+        let end_of_body = pkt_buf
             .iter()
             .position(|b| *b == b'#')
             .ok_or(PacketParseError::MissingChecksum)?;
 
         // split buffer into body and checksum components
-        let (body, checksum) = buf.split_at_mut(end_of_body);
+        let (body, checksum) = pkt_buf.split_at_mut(end_of_body);
         let body = &mut body[1..]; // skip the '$'
         let checksum = &mut checksum[1..]; // skip the '#'
 
         // validate the checksum
-        let checksum = core::str::from_utf8(checksum).unwrap();
-        let checksum =
-            u8::from_str_radix(checksum, 16).map_err(|_| PacketParseError::MalformedChecksum)?;
+        let checksum = decode_hex(checksum).map_err(|_| PacketParseError::MalformedChecksum)?;
 
         if body.iter().fold(0u8, |a, x| a.wrapping_add(*x)) != checksum {
             return Err(PacketParseError::ChecksumMismatched);
         }
 
         if log_enabled!(log::Level::Trace) {
-            let body = core::str::from_utf8(body).unwrap();
+            // SAFETY: body confirmed to be `is_ascii()`
+            let body = unsafe { core::str::from_utf8_unchecked(body) };
             trace!("<-- ${}#{:02x?}", body, checksum);
         }
 
         Ok(PacketBuf {
-            buf,
+            buf: pkt_buf,
             body_range: 1..end_of_body,
         })
     }
 
-    pub fn trim_body_bytes(self, n: usize) -> Self {
+    pub fn trim_start_body_bytes(self, n: usize) -> Self {
         PacketBuf {
             buf: self.buf,
             body_range: (self.body_range.start + n)..self.body_range.end,
@@ -74,19 +75,20 @@ impl<'a> PacketBuf<'a> {
         &self.buf[self.body_range.clone()]
     }
 
-    pub fn into_body_str(self) -> &'a str {
-        // SAFETY: buffer confirmed to be `is_ascii()` in `new`, and no other PacketBuf
-        // member allow arbitrary modification of the mut buffer.
-        unsafe { core::str::from_utf8_unchecked(&self.buf[self.body_range.clone()]) }
-    }
-
     /// Return a mut reference to slice of the packet buffer corresponding to
     /// the current body.
-    pub fn into_body_buf(self) -> &'a mut [u8] {
+    pub fn into_body(self) -> &'a mut [u8] {
         &mut self.buf[self.body_range]
     }
 
-    /// Return a mut reference to the _entire_ underlying packet buffer.
+    pub fn into_body_str(self) -> &'a str {
+        // SAFETY: buffer confirmed to be `is_ascii()` in `new`, and no other PacketBuf
+        // member allow arbitrary modification of `self.buf`.
+        unsafe { core::str::from_utf8_unchecked(&self.buf[self.body_range.clone()]) }
+    }
+
+    /// Return a mut reference to the _entire_ underlying packet buffer, and the
+    /// current body's range.
     #[allow(dead_code)]
     pub fn into_raw_buf(self) -> (&'a mut [u8], core::ops::Range<usize>) {
         (self.buf, self.body_range)
