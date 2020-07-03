@@ -1,3 +1,5 @@
+use core::marker::PhantomData;
+
 use num_traits::ops::saturating::Saturating;
 
 use crate::{
@@ -6,7 +8,7 @@ use crate::{
     error::Error,
     protocol::{Command, Packet, ResponseWriter, Tid, TidKind},
     target::{BreakOp, ResumeAction, StopReason, Target, WatchKind},
-    util::slicevec::SliceVec,
+    util::{managed::ManagedSlice, managed_vec::ManagedVec},
 };
 
 /// Describes why the GDB session ended.
@@ -23,42 +25,88 @@ pub enum DisconnectReason {
 /// Debug a [`Target`](trait.Target.html) across a
 /// [`Connection`](trait.Connection.html) using the GDB Remote Serial Protocol.
 pub struct GdbStub<'a, T: Target, C: Connection> {
-    conn: Option<C>,
+    conn: C,
     packet_buffer: Option<&'a mut [u8]>,
+
+    _target: PhantomData<T>,
+}
+
+struct GdbStubImpl<T: Target, C: Connection> {
+    _target: PhantomData<T>,
+    _connection: PhantomData<C>,
 
     packet_buffer_len: usize,
     current_tid: Tid,
-    _target: core::marker::PhantomData<T>,
 }
 
 impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
-    /// Create a new `GdbStub` using the provided connection + packet buffer.
-    pub fn new(conn: C, packet_buffer: &'a mut [u8]) -> GdbStub<T, C> {
-        let packet_buffer_len = packet_buffer.len();
-
+    /// Create a new `GdbStub` using the provided Connection.
+    pub fn new(conn: C) -> GdbStub<'static, T, C> {
         GdbStub {
-            conn: Some(conn),
-            packet_buffer: Some(packet_buffer),
+            conn,
+            packet_buffer: None,
 
-            packet_buffer_len,
-            current_tid: Tid {
-                pid: None,
-                tid: TidKind::Any,
-            },
-            _target: core::marker::PhantomData,
+            _target: PhantomData,
         }
+    }
+
+    /// Use a pre-allocated packet buffer. If this method is not called,
+    /// `GdbStub` will heap-allocate a packet buffer instead.
+    ///
+    /// _Note:_ This method is _required_ when the `alloc` feature is disabled!
+    pub fn with_packet_buffer(mut self, packet_buffer: &'a mut [u8]) -> Self {
+        self.packet_buffer = Some(packet_buffer);
+        self
     }
 
     /// Starts a GDB remote debugging session.
     ///
     /// Returns once the GDB client closes the debugging session, or if the
     /// target halts.
-    pub fn run(&mut self, target: &mut T) -> Result<DisconnectReason, Error<T, C>> {
-        let packet_buffer = self.packet_buffer.take().unwrap();
-        let mut conn = self.conn.take().unwrap();
+    pub fn run(self, target: &mut T) -> Result<DisconnectReason, Error<T, C>> {
+        let (packet_buffer, packet_buffer_len) = match self.packet_buffer {
+            Some(buf) => {
+                let len = buf.len();
+                (ManagedSlice::Borrowed(buf), len)
+            }
+            None => {
+                cfg_if::cfg_if! {
+                    if #[cfg(feature = "alloc")] {
+                        use alloc::vec::Vec;
+                        // need to pick some arbitrary value to report to GDB
+                        // 4096 seems reasonable?
+                        const REPORTED_SIZE: usize = 4096;
+                        (ManagedSlice::Owned(Vec::with_capacity(REPORTED_SIZE)), REPORTED_SIZE)
+                    } else {
+                        return Err(Error::MissingPacketBuffer);
+                    }
+                }
+            }
+        };
 
+        GdbStubImpl {
+            _target: PhantomData,
+            _connection: PhantomData,
+
+            packet_buffer_len,
+            current_tid: Tid {
+                pid: None,
+                tid: TidKind::Any,
+            },
+        }
+        .run(target, self.conn, packet_buffer)
+    }
+}
+
+impl<T: Target, C: Connection> GdbStubImpl<T, C> {
+    fn run(
+        mut self,
+        target: &mut T,
+        mut conn: C,
+        mut packet_buffer: ManagedSlice<u8>,
+    ) -> Result<DisconnectReason, Error<T, C>> {
         loop {
-            match self.recv_packet(&mut conn, packet_buffer)? {
+            match Self::recv_packet(&mut conn, &mut packet_buffer)? {
                 Packet::Ack => {}
                 Packet::Nack => {
                     unimplemented!("GDB nack'd the packet, but retry isn't implemented yet")
@@ -84,47 +132,41 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
         }
     }
 
-    fn recv_packet<'b>(
-        &mut self,
+    fn recv_packet<'a, 'b>(
         conn: &mut C,
-        buf: &'b mut [u8],
-    ) -> Result<Packet<'b>, Error<T, C>> {
-        let header_byte = conn.read();
+        pkt_buf: &'a mut ManagedSlice<'b, u8>,
+    ) -> Result<Packet<'a>, Error<T, C>> {
+        let header_byte = conn.read().map_err(Error::ConnectionRead)?;
 
-        match header_byte {
-            Ok(header_byte) => {
-                // use SliceVec as a convenient view into the packet buffer
-                let mut packet_buffer = SliceVec::new(buf);
+        // Wrap the buf in a `ManagedVec` to keep the code readable.
+        let mut buf = ManagedVec::new(pkt_buf);
 
-                packet_buffer.clear();
-                packet_buffer.push(header_byte)?;
-                if header_byte == b'$' {
-                    // read the packet body
-                    loop {
-                        let c = conn.read().map_err(Error::ConnectionRead)?;
-                        packet_buffer.push(c)?;
-                        if c == b'#' {
-                            break;
-                        }
-                    }
-                    // read the checksum as well
-                    packet_buffer.push(conn.read().map_err(Error::ConnectionRead)?)?;
-                    packet_buffer.push(conn.read().map_err(Error::ConnectionRead)?)?;
-                }
-
-                let len = packet_buffer.len();
-                drop(packet_buffer);
-
-                match Packet::from_buf(&mut buf[..len]) {
-                    Ok(packet) => Ok(packet),
-                    Err(e) => {
-                        // TODO: preserve this context within Error::PacketParse
-                        error!("Could not parse packet: {:?}", e);
-                        Err(Error::PacketParse)
-                    }
+        buf.clear();
+        buf.push(header_byte)?;
+        if header_byte == b'$' {
+            // read the packet body
+            loop {
+                let c = conn.read().map_err(Error::ConnectionRead)?;
+                buf.push(c)?;
+                if c == b'#' {
+                    break;
                 }
             }
-            Err(e) => Err(Error::ConnectionRead(e)),
+            // read the checksum as well
+            buf.push(conn.read().map_err(Error::ConnectionRead)?)?;
+            buf.push(conn.read().map_err(Error::ConnectionRead)?)?;
+        }
+
+        drop(buf);
+
+        let len = pkt_buf.len();
+        match Packet::from_buf(&mut pkt_buf.as_mut()[..len]) {
+            Ok(packet) => Ok(packet),
+            Err(e) => {
+                // TODO: preserve this context within Error::PacketParse
+                error!("Could not parse packet: {:?}", e);
+                Err(Error::PacketParse)
+            }
         }
     }
 

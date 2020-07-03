@@ -1,7 +1,7 @@
 use core::fmt::{self, Debug, Display};
 
 use crate::protocol::ResponseWriterError;
-use crate::util::slicevec::CapacityError;
+use crate::util::managed_vec::CapacityError;
 use crate::{Connection, Target};
 
 /// Errors which may occur during a GDB debugging session.
@@ -10,7 +10,10 @@ pub enum Error<T: Target, C: Connection> {
     ConnectionRead(C::Error),
     /// Connection Error while writing response.
     ConnectionWrite(ResponseWriterError<C>),
-    /// Packet cannot fit in the provided packet buffer
+    /// GdbStub was not provided with a packet buffer in `no_std` mode
+    /// (missing call to `with_packet_buffer`)
+    MissingPacketBuffer,
+    /// Packet cannot fit in the provided packet buffer.
     PacketBufferOverlow,
     /// Could not parse the packet into a valid command.
     PacketParse,
@@ -52,6 +55,7 @@ where
         match self {
             ConnectionRead(e) => write!(f, "Connection Error while reading request: {:?}", e),
             ConnectionWrite(e) => write!(f, "Connection Error while writing response: {:?}", e),
+            MissingPacketBuffer => write!(f, "GdbStub was not provided with a packet buffer in `no_std` mode (missing call to `with_packet_buffer`)"),
             PacketBufferOverlow => write!(f, "Packet too big for provided buffer!"),
             PacketParse => write!(f, "Could not parse the packet into a valid command."),
             PacketUnexpected => write!(f, "Client sent an unexpected packet."),

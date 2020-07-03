@@ -1,8 +1,5 @@
 use core::fmt::{self, Debug};
 
-#[cfg(feature = "alloc")]
-use alloc::string::String;
-
 use crate::Connection;
 
 /// Newtype around a Connection error. Having a newtype allows implementing a
@@ -27,7 +24,7 @@ pub struct ResponseWriter<'a, C: Connection + 'a> {
     started: bool,
     checksum: u8,
     // buffer outgoing message, for logging purposes
-    #[cfg(feature = "alloc")]
+    #[cfg(feature = "std")]
     msg: String,
 }
 
@@ -38,7 +35,7 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
             inner,
             started: false,
             checksum: 0,
-            #[cfg(feature = "alloc")]
+            #[cfg(feature = "std")]
             msg: String::new(),
         }
     }
@@ -48,7 +45,7 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
         // don't include '#' in checksum calculation
         let checksum = self.checksum;
 
-        #[cfg(feature = "alloc")]
+        #[cfg(feature = "std")]
         trace!("--> ${}#{:02x?}", self.msg, checksum);
 
         self.write(b'#')?;
@@ -64,7 +61,7 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
 
     /// Write a single byte.
     pub fn write(&mut self, byte: u8) -> Result<(), Error<C>> {
-        #[cfg(feature = "alloc")]
+        #[cfg(feature = "std")]
         self.msg.push(byte as char);
 
         if !self.started {

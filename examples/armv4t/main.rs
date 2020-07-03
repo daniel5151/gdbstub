@@ -64,8 +64,7 @@ fn main() -> DynResult<()> {
     };
 
     // hook-up debugger
-    let mut pktbuf = [0; 4096];
-    let mut debugger = GdbStub::new(connection, &mut pktbuf);
+    let debugger = GdbStub::new(connection);
 
     match debugger.run(&mut emu)? {
         DisconnectReason::Disconnect => {
