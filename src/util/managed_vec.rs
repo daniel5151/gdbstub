@@ -1,4 +1,4 @@
-use super::managed::ManagedSlice;
+use managed::ManagedSlice;
 
 /// Error value indicating insufficient capacity.
 #[derive(Debug, Clone, Copy, Eq, Ord, PartialEq, PartialOrd)]

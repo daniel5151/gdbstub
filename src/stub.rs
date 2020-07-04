@@ -1,5 +1,6 @@
 use core::marker::PhantomData;
 
+use managed::ManagedSlice;
 use num_traits::ops::saturating::Saturating;
 
 use crate::{
@@ -8,7 +9,7 @@ use crate::{
     error::Error,
     protocol::{Command, Packet, ResponseWriter, Tid, TidKind},
     target::{BreakOp, ResumeAction, StopReason, Target, WatchKind},
-    util::{managed::ManagedSlice, managed_vec::ManagedVec},
+    util::managed_vec::ManagedVec,
 };
 
 /// Describes why the GDB session ended.
