@@ -7,7 +7,7 @@ An easy-to-use and easy-to-integrate implementation of the [GDB Remote Serial Pr
 
 `gdbstub` is particularly useful in emulators, where it provides a powerful, non-intrusive way to debug code running within an emulated system. The API aims to provide a "drop-in" way to add GDB support to an existing project, without requiring any large refactoring / ownership juggling.
 
-`gdbstub` is also `no_std` compatible, and can be used on platforms without a global allocator (`alloc`). In embedded contexts, `gdbstub` can be configured to use pre-allocated buffers and communicate over any serial I/O connection (e.g: UART).
+`gdbstub` is also `#![no_std]` compatible, and can be used on platforms without a global allocator. In embedded contexts, `gdbstub` can be configured to use pre-allocated buffers and communicate over any serial I/O connection (e.g: UART).
 
 - [Documentation and Examples](https://docs.rs/gdbstub)
 
@@ -33,7 +33,7 @@ The GDB Remote Serial Protocol is surprisingly complex, supporting advanced feat
 
 ## Feature flags
 
-`gdbstub` enables the `std` feature by default. In `no_std` contexts, use `default-features = false`.
+`gdbstub` enables the `std` feature by default. In `#![no_std]` contexts, use `default-features = false`.
 
 - `alloc`
     - Implements `Connection` for `Box<dyn Connection>`
@@ -61,6 +61,17 @@ There are already several projects which use `gdbstub`:
 - [clicky](https://github.com/daniel5151/clicky/) - An emulator for classic clickwheel iPods (dual-core ARMv4T SoC)
 - [ts7200](https://github.com/daniel5151/ts7200/) - An emulator for the TS-7200, a somewhat bespoke embedded ARMv4t platform
 
+## `unsafe` in `gdbstub`
+
+`gdbstub` "core" only has 2 lines of unsafe code:
+
+- A call to `NonZeroUsize::new_unchecked(1)` when defining the `SINGLE_THREAD_TID` constant.
+- A call to `str::from_utf8_unchecked()` when working with incoming GDB packets (the underlying `&[u8]` buffer is checked with `is_ascii()` prior to the call).
+
+With the `std` feature enabled, there is one additional line of `unsafe` code:
+
+- `gdbstub` includes an implementation of `UnixStream::peek` which uses `libc::recv`. This will be removed once [rust-lang/rust#73761](https://github.com/rust-lang/rust/pull/73761) is merged.
+
 ## Future Plans
 
 - Improve multiprocess / multi-thread / multi-core support
@@ -72,6 +83,6 @@ There are already several projects which use `gdbstub`:
 
 ## Using `gdbstub` on bare-metal hardware
 
-Since `gdbstub` is `no_std` compatible, it should be possible to implement a `gdbstub::Target` which uses low-level trap instructions + context switching to debug bare-metal code.
+Since `gdbstub` is `#![no_std]` compatible, it should be possible to implement a `gdbstub::Target` which uses low-level trap instructions + context switching to debug bare-metal code.
 
 If you happen to stumble across this crate and end up using it to debug some bare-metal code, please let me know! I'd love to link to your project!
