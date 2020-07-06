@@ -11,8 +11,7 @@ impl<'a> ParseCommand<'a> for s {
         if body.is_empty() {
             return Some(s { addr: None });
         }
-
-        let addr = decode_hex(&body[1..]).ok()?;
+        let addr = decode_hex(body).ok()?;
         Some(s { addr: Some(addr) })
     }
 }

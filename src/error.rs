@@ -21,6 +21,9 @@ pub enum Error<T: Target, C: Connection> {
     PacketUnexpected,
     /// Target threw a fatal error.
     TargetError(T::Error),
+    /// Target doesn't implement `set_current_thread`, but reported multiple
+    /// threads.
+    MissingSetCurrentTid,
 }
 
 impl<T: Target, C: Connection> From<ResponseWriterError<C>> for Error<T, C> {
@@ -60,6 +63,7 @@ where
             PacketParse => write!(f, "Could not parse the packet into a valid command."),
             PacketUnexpected => write!(f, "Client sent an unexpected packet."),
             TargetError(e) => write!(f, "Target threw a fatal error: {:?}", e),
+            MissingSetCurrentTid => write!(f, "Target doesn't implement `set_current_thread`, but reported multiple threads.")
         }
     }
 }

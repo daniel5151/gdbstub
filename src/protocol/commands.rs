@@ -99,6 +99,7 @@ commands! {
     "qSupported" => _qSupported::qSupported<'a>,
     "qXfer:features:read" => _qXfer_features_read::qXferFeaturesRead<'a>,
     "s" => _s::s,
+    "T" => _t_upcase::T,
     "z" => _z::z,
     "Z" => _z_upcase::Z,
 

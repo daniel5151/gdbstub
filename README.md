@@ -24,6 +24,7 @@ Features marked as (optional) are not required to be implemented, but can provid
     - Read/Write registers
     - (optional) Add + Remove Hardware Breakpoints
     - (optional) Read/Write/Access Watchpoints (i.e: value breakpoints)
+    - (optional) Multithreading support
 - Extended GDB Protocol
     - (optional) Handle custom commands sent via GDB's `monitor` command
     - (optional) Automatic architecture detection
@@ -43,11 +44,29 @@ The GDB Remote Serial Protocol is surprisingly complex, supporting advanced feat
 
 ## Examples
 
-The included `armv4t` example shows how `gdbstub` can be used to add `gdb` debugging support to an (incredibly simple) ARMv4T-based emulator. See `examples/armv4t/README.md` for details.
+### `armv4t`
+
+The `armv4t` example shows how `gdbstub` can be used to add `gdb` debugging support to an (incredibly simple) ARMv4T-based emulator. See `examples/armv4t/README.md` for details.
+
+### `armv4t_multicore`
+
+A dual-core variation of the `armv4t` example. Implements `gdbstub`'s multithread extensions to enable per-core debugging. See `examples/armv4t_multicore/README.md` for details.
+
+## Real-World Examples
+
+There are already several projects which use `gdbstub`:
+
+- [rustyboyadvance-ng](https://github.com/michelhe/rustboyadvance-ng/) - Nintendo GameBoy Advance emulator and debugger
+- [microcorruption-emu](https://github.com/sapir/microcorruption-emu) - msp430 emulator for the microcorruption.com ctf
+- [clicky](https://github.com/daniel5151/clicky/) - An emulator for classic clickwheel iPods (dual-core ARMv4T SoC)
+- [ts7200](https://github.com/daniel5151/ts7200/) - An emulator for the TS-7200, a somewhat bespoke embedded ARMv4t platform
 
 ## Future Plans
 
 - Improve multiprocess / multi-thread / multi-core support
+    - Support thread-specific breakpoints
+    - Support non-stop mode?
+    - Support disabling multiprocess extensions on older GDB clients
 - Support addresses larger than 64-bits?
   - This would require plumbing-through the architecture's pointer size as a generic parameter into all the packet parsing code, which probably isn't _too_ difficult, just time consuming.
 

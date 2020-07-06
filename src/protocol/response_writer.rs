@@ -1,6 +1,7 @@
 use core::fmt::{self, Debug};
 
-use crate::Connection;
+use crate::protocol::{Tid, TidSelector};
+use crate::{BeBytes, Connection};
 
 /// Newtype around a Connection error. Having a newtype allows implementing a
 /// `From<ResponseWriterError<C>> for crate::Error<T, C>`, which greatly
@@ -84,7 +85,7 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
     }
 
     /// Write a single byte as a hex string (two ascii chars)
-    pub fn write_hex(&mut self, byte: u8) -> Result<(), Error<C>> {
+    fn write_hex(&mut self, byte: u8) -> Result<(), Error<C>> {
         for digit in [(byte & 0xf0) >> 4, byte & 0x0f].iter() {
             let c = match digit {
                 0..=9 => b'0' + digit,
@@ -96,7 +97,7 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
         Ok(())
     }
 
-    /// Write an entire buffer as a hex string (two ascii chars / byte).
+    /// Write a byte-buffer as a hex string (i.e: two ascii chars / byte).
     pub fn write_hex_buf(&mut self, data: &[u8]) -> Result<(), Error<C>> {
         data.iter().try_for_each(|b| self.write_hex(*b))
     }
@@ -115,5 +116,37 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
             }
             _ => self.write(*b),
         })
+    }
+
+    /// Write a number as a big-endian hex string using the most compact
+    /// representation possible (i.e: trimming leading zeros).
+    pub fn write_num<D: BeBytes>(&mut self, digit: D) -> Result<(), Error<C>> {
+        let mut buf = [0; 16];
+        // infallible (unless digit is a >128 bit number)
+        let len = digit.to_be_bytes(&mut buf).unwrap();
+        let buf = &buf[..len];
+        buf.iter()
+            .copied()
+            .skip_while(|&b| b == 0)
+            .try_for_each(|b| self.write_hex(b))
+    }
+
+    pub fn write_tid_selector(&mut self, tid: TidSelector) -> Result<(), Error<C>> {
+        match tid {
+            TidSelector::All => self.write_str("-1")?,
+            TidSelector::Any => self.write_str("0")?,
+            TidSelector::WithID(id) => self.write_num(id.get())?,
+        };
+        Ok(())
+    }
+
+    pub fn write_tid(&mut self, tid: Tid) -> Result<(), Error<C>> {
+        if let Some(pid) = tid.pid {
+            self.write_str("p")?;
+            self.write_tid_selector(pid)?;
+            self.write_str(".")?;
+        }
+        self.write_tid_selector(tid.tid)?;
+        Ok(())
     }
 }

@@ -1,24 +1,27 @@
 use core::convert::TryFrom;
+use core::num::NonZeroUsize;
 use core::str::FromStr;
 
 use super::decode_hex;
 
-/// Thread Identifier.
+/// Thread ID Selector.
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
-pub enum TidKind {
-    /// All threads
+pub enum TidSelector {
+    /// All threads (-1)
     All,
-    /// Any thread
+    /// Any thread (0)
     Any,
-    /// Thread with specific ID
-    WithID(usize),
+    /// Thread with specific ID (id > 0)
+    WithID(NonZeroUsize),
 }
 
-/// Thread ID
+/// Thread ID.
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub struct Tid {
-    pub pid: Option<TidKind>,
-    pub tid: TidKind,
+    /// Process ID (may or may not be present).
+    pub pid: Option<TidSelector>,
+    /// Thread ID.
+    pub tid: TidSelector,
 }
 
 impl TryFrom<&str> for Tid {
@@ -28,10 +31,10 @@ impl TryFrom<&str> for Tid {
         if s.starts_with('p') {
             // p<pid>.<tid>
             let mut s = s.trim_start_matches('p').split('.');
-            let pid = s.next().ok_or(())?.parse::<TidKind>().map_err(drop)?;
+            let pid = s.next().ok_or(())?.parse::<TidSelector>().map_err(drop)?;
             let tid = match s.next() {
-                Some(s) => s.parse::<TidKind>().map_err(drop)?,
-                None => TidKind::All, // valid to pass only p<pid>
+                Some(s) => s.parse::<TidSelector>().map_err(drop)?,
+                None => TidSelector::All, // valid to pass only p<pid>
             };
 
             Ok(Tid {
@@ -40,7 +43,7 @@ impl TryFrom<&str> for Tid {
             })
         } else {
             // <tid>
-            let tid = s.parse::<TidKind>().map_err(drop)?;
+            let tid = s.parse::<TidSelector>().map_err(drop)?;
 
             Ok(Tid { pid: None, tid })
         }
@@ -54,14 +57,16 @@ impl FromStr for Tid {
     }
 }
 
-impl FromStr for TidKind {
+impl FromStr for TidSelector {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s {
-            "-1" => TidKind::All,
-            "0" => TidKind::Any,
-            id => TidKind::WithID(decode_hex(id.as_bytes()).map_err(drop)?),
+            "-1" => TidSelector::All,
+            "0" => TidSelector::Any,
+            id => TidSelector::WithID(
+                NonZeroUsize::new(decode_hex(id.as_bytes()).map_err(drop)?).ok_or(())?,
+            ),
         })
     }
 }

@@ -9,6 +9,11 @@ where
     btou_radix(buf, 16)
 }
 
+pub enum DecodeHexBufError {
+    NotAscii,
+    NotEvenLen,
+}
+
 fn ascii2byte(c: u8) -> Option<u8> {
     match c {
         b'0'..=b'9' => Some(c - b'0'),
@@ -19,18 +24,17 @@ fn ascii2byte(c: u8) -> Option<u8> {
 }
 
 /// Decode a hex string into a mutable bytes slice _in place_.
-pub fn decode_hex_buf<'a>(buf: &'a mut [u8]) -> Result<&'a mut [u8], &'static str> {
-    const MUST_BE_ASCII: &str = "buf must only contain ASCII hexdigits";
-    const EVEN_LEN: &str = "buf must have even number of bytes";
+pub fn decode_hex_buf(buf: &mut [u8]) -> Result<&mut [u8], DecodeHexBufError> {
+    use DecodeHexBufError::*;
 
     if buf.len() % 2 != 0 {
-        return Err(EVEN_LEN);
+        return Err(NotEvenLen);
     }
 
     let decoded_len = buf.len() / 2;
     for i in 0..decoded_len {
-        let b = ascii2byte(buf[i * 2]).ok_or(MUST_BE_ASCII)? << 4
-            | ascii2byte(buf[i * 2 + 1]).ok_or(MUST_BE_ASCII)?;
+        let b = ascii2byte(buf[i * 2]).ok_or(NotAscii)? << 4
+            | ascii2byte(buf[i * 2 + 1]).ok_or(NotAscii)?;
         buf[i] = b as u8;
     }
 

@@ -2,6 +2,8 @@ use core::fmt::{self, Debug};
 
 use num_traits::{Num, PrimInt, Unsigned};
 
+use crate::BeBytes;
+
 /// Methods to read/write architecture-specific registers.
 pub trait Registers: Default {
     /// Serialize `self` into a GDB register bytestream.
@@ -29,7 +31,7 @@ pub trait Registers: Default {
 /// layout, etc...
 pub trait Arch: Eq + PartialEq {
     /// The architecture's pointer size (e.g: `u32` on a 32-bit system).
-    type Usize: Num + PrimInt + Unsigned + Debug + fmt::LowerHex;
+    type Usize: Num + PrimInt + Unsigned + Debug + fmt::LowerHex + BeBytes;
 
     /// The architecture's register file
     type Registers: Registers;
