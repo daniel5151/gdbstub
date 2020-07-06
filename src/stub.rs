@@ -296,8 +296,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 }
 
                 let mut regs: <T::Arch as Arch>::Registers = Default::default();
-                // FIXME: tweak Arch interface to pass slice instead of iterator
-                regs.gdb_deserialize(cmd.vals.iter().copied())
+                regs.gdb_deserialize(cmd.vals)
                     .map_err(|_| Error::PacketParse)?; // FIXME: more granular error?
                 target.write_registers(&regs).map_err(Error::TargetError)?;
                 res.write_str("OK")?;
@@ -310,7 +309,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 let end = start.saturating_add(len);
 
                 target
-                    .read_addrs(start..end, |val| {
+                    .read_addrs(start..end, &mut |val| {
                         // TODO: assert the length is correct
                         if let Err(e) = res.write_hex_buf(&[val]) {
                             err = Err(e)
@@ -379,7 +378,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                 // map raw vCont action iterator to a format the `Target` expects
                 let mut err = Ok(());
-                let actions = cmd.actions.into_iter().filter_map(|action| {
+                let mut actions = cmd.actions.into_iter().filter_map(|action| {
                     let action = match action {
                         Ok(action) => action,
                         Err(e) => {
@@ -405,7 +404,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     Some((tid, resume_action))
                 });
 
-                let ret = self.do_vcont(res, target, actions);
+                let ret = self.do_vcont(res, target, &mut actions);
                 err.map_err(|_| Error::PacketParse)?;
                 return ret;
             }
@@ -414,14 +413,14 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 return self.do_vcont(
                     res,
                     target,
-                    core::iter::once((self.current_tid.tid, ResumeAction::Continue)),
+                    &mut core::iter::once((self.current_tid.tid, ResumeAction::Continue)),
                 )
             }
             Command::s(_) => {
                 return self.do_vcont(
                     res,
                     target,
-                    core::iter::once((self.current_tid.tid, ResumeAction::Step)),
+                    &mut core::iter::once((self.current_tid.tid, ResumeAction::Step)),
                 )
             }
 
@@ -448,7 +447,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 let mut err: Result<_, Error<T, C>> = Ok(());
                 let mut first = true;
                 target
-                    .list_active_threads(|tid| {
+                    .list_active_threads(&mut |tid| {
                         // TODO: replace this with a try block (once stabilized)
                         let e = (|| {
                             if !first {
@@ -491,7 +490,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             Command::qRcmd(cmd) => {
                 let mut err: Result<_, Error<T, C>> = Ok(());
                 let supported = target
-                    .handle_monitor_cmd(cmd.hex_cmd, |msg| {
+                    .handle_monitor_cmd(cmd.hex_cmd, &mut |msg| {
                         // TODO: replace this with a try block (once stabilized)
                         let e = (|| {
                             let mut res = ResponseWriter::new(res.as_conn());
@@ -526,11 +525,11 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         &mut self,
         res: &mut ResponseWriter<C>,
         target: &mut T,
-        actions: impl Iterator<Item = (TidSelector, ResumeAction)>,
+        actions: &mut dyn Iterator<Item = (TidSelector, ResumeAction)>,
     ) -> Result<Option<DisconnectReason>, Error<T, C>> {
         let mut err = Ok(());
         let (tid, stop_reason) = target
-            .resume(actions, || match res.as_conn().peek() {
+            .resume(actions, &mut || match res.as_conn().peek() {
                 Ok(Some(0x03)) => true, // 0x03 is the interrupt byte
                 Ok(Some(_)) => false,   // it's nothing that can't wait...
                 Ok(None) => false,

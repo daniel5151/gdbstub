@@ -31,8 +31,8 @@ impl Target for Emu {
 
     fn resume(
         &mut self,
-        actions: impl Iterator<Item = (TidSelector, ResumeAction)>,
-        mut check_gdb_interrupt: impl FnMut() -> bool,
+        actions: &mut dyn Iterator<Item = (TidSelector, ResumeAction)>,
+        check_gdb_interrupt: &mut dyn FnMut() -> bool,
     ) -> Result<(Tid, StopReason<u32>), Self::Error> {
         // in this emulator, we ignore the Tid associated with the action, and only care
         // if GDB requests execution to start / stop. Each core runs in lock-step.
@@ -116,7 +116,7 @@ impl Target for Emu {
     fn read_addrs(
         &mut self,
         addr: std::ops::Range<u32>,
-        mut push_byte: impl FnMut(u8),
+        push_byte: &mut dyn FnMut(u8),
     ) -> Result<(), &'static str> {
         for addr in addr {
             push_byte(self.mem.r8(addr))
@@ -180,7 +180,7 @@ impl Target for Emu {
     fn handle_monitor_cmd(
         &mut self,
         cmd: &[u8],
-        mut output: impl FnMut(&[u8]),
+        output: &mut dyn FnMut(&[u8]),
     ) -> Result<Option<()>, Self::Error> {
         // wrap `output` in a more comfy macro
         macro_rules! outputln {
@@ -208,7 +208,7 @@ impl Target for Emu {
 
     fn list_active_threads(
         &mut self,
-        mut register_thread: impl FnMut(Tid),
+        register_thread: &mut dyn FnMut(Tid),
     ) -> Result<(), Self::Error> {
         register_thread(cpuid_to_tid(CpuId::Cpu));
         register_thread(cpuid_to_tid(CpuId::Cop));

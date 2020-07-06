@@ -48,7 +48,7 @@ pub use target::*;
 pub use util::be_bytes::BeBytes;
 
 /// Thread ID
-// TODO: (breaking change) expose PID to client
+// TODO: FUTURE: expose full PID.TID to client?
 pub type Tid = core::num::NonZeroUsize;
 
 /// TID returned by `Target::resume` on single-threaded systems.

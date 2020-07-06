@@ -42,28 +42,30 @@ impl Registers for ArmCoreRegs {
         write_bytes!(&self.cpsr.to_le_bytes());
     }
 
-    fn gdb_deserialize(&mut self, mut bytes: impl Iterator<Item = u8>) -> Result<(), ()> {
-        let mut next_u32 = move || -> Option<u32> {
-            let val = (bytes.next()? as u32)
-                | (bytes.next()? as u32) << 8
-                | (bytes.next()? as u32) << 16
-                | (bytes.next()? as u32) << 24;
-            Some(val)
-        };
+    fn gdb_deserialize(&mut self, bytes: &[u8]) -> Result<(), ()> {
+        // ensure bytes.chunks_exact(4) won't panic
+        if bytes.len() % 4 != 0 {
+            return Err(());
+        }
+
+        use core::convert::TryInto;
+        let mut regs = bytes
+            .chunks_exact(4)
+            .map(|c| u32::from_le_bytes(c.try_into().unwrap()));
 
         for reg in self.r.iter_mut() {
-            *reg = next_u32().ok_or(())?
+            *reg = regs.next().ok_or(())?
         }
-        self.sp = next_u32().ok_or(())?;
-        self.lr = next_u32().ok_or(())?;
-        self.pc = next_u32().ok_or(())?;
+        self.sp = regs.next().ok_or(())?;
+        self.lr = regs.next().ok_or(())?;
+        self.pc = regs.next().ok_or(())?;
 
         // Floating point registers (unused)
         for _ in 0..25 {
-            next_u32().ok_or(())?;
+            regs.next().ok_or(())?;
         }
 
-        self.cpsr = next_u32().ok_or(())?;
+        self.cpsr = regs.next().ok_or(())?;
 
         Ok(())
     }

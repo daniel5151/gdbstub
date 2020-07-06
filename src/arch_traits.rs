@@ -24,7 +24,7 @@ pub trait Registers: Default {
     ///
     /// e.g: for ARM:
     /// github.com/bminor/binutils-gdb/blob/master/gdb/features/arm/arm-core.xml
-    fn gdb_deserialize(&mut self, bytes: impl Iterator<Item = u8>) -> Result<(), ()>;
+    fn gdb_deserialize(&mut self, bytes: &[u8]) -> Result<(), ()>;
 }
 
 /// Encodes architecture-specific information, such as pointer size, register

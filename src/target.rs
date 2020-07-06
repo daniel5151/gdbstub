@@ -83,8 +83,8 @@ pub trait Target {
     /// individual CPU cores.
     fn resume(
         &mut self,
-        actions: impl Iterator<Item = (TidSelector, ResumeAction)>,
-        check_gdb_interrupt: impl FnMut() -> bool,
+        actions: &mut dyn Iterator<Item = (TidSelector, ResumeAction)>,
+        check_gdb_interrupt: &mut dyn FnMut() -> bool,
     ) -> Result<(Tid, StopReason<<Self::Arch as Arch>::Usize>), Self::Error>;
 
     /// Read the target's registers.
@@ -109,7 +109,7 @@ pub trait Target {
     fn read_addrs(
         &mut self,
         addrs: Range<<Self::Arch as Arch>::Usize>,
-        val: impl FnMut(u8),
+        val: &mut dyn FnMut(u8),
     ) -> Result<(), Self::Error>;
 
     /// Write bytes to the specified address range.
@@ -198,7 +198,7 @@ pub trait Target {
     fn handle_monitor_cmd(
         &mut self,
         cmd: &[u8],
-        output: impl FnMut(&[u8]),
+        output: &mut dyn FnMut(&[u8]),
     ) -> Result<Option<()>, Self::Error> {
         let _ = (cmd, output);
         Ok(None)
@@ -210,7 +210,7 @@ pub trait Target {
     /// implementing thread-related methods on bare-metal (threadless) targets.
     fn list_active_threads(
         &mut self,
-        mut thread_is_active: impl FnMut(Tid),
+        thread_is_active: &mut dyn FnMut(Tid),
     ) -> Result<(), Self::Error> {
         thread_is_active(SINGLE_THREAD_TID);
         Ok(())
@@ -234,7 +234,7 @@ pub trait Target {
     /// to override this method with a more direct query.
     fn is_thread_alive(&mut self, tid: Tid) -> Result<bool, Self::Error> {
         let mut found = false;
-        self.list_active_threads(|active_tid| {
+        self.list_active_threads(&mut |active_tid| {
             if tid == active_tid {
                 found = true;
             }
@@ -300,3 +300,106 @@ pub enum ResumeAction {
      * Stop,
      * StepInRange(core::ops::Range<U>), */
 }
+
+macro_rules! impl_dyn_target {
+    ($type:ty) => {
+        #[allow(clippy::type_complexity)]
+        impl<A, E> Target for $type
+        where
+            A: Arch,
+        {
+            type Arch = A;
+            type Error = E;
+
+            fn resume(
+                &mut self,
+                actions: &mut dyn Iterator<Item = (TidSelector, ResumeAction)>,
+                check_gdb_interrupt: &mut dyn FnMut() -> bool,
+            ) -> Result<(Tid, StopReason<<Self::Arch as Arch>::Usize>), Self::Error> {
+                (**self).resume(actions, check_gdb_interrupt)
+            }
+
+            fn read_registers(
+                &mut self,
+                regs: &mut <Self::Arch as Arch>::Registers,
+            ) -> Result<(), Self::Error> {
+                (**self).read_registers(regs)
+            }
+
+            fn write_registers(
+                &mut self,
+                regs: &<Self::Arch as Arch>::Registers,
+            ) -> Result<(), Self::Error> {
+                (**self).write_registers(regs)
+            }
+
+            fn read_addrs(
+                &mut self,
+                addrs: Range<<Self::Arch as Arch>::Usize>,
+                val: &mut dyn FnMut(u8),
+            ) -> Result<(), Self::Error> {
+                (**self).read_addrs(addrs, val)
+            }
+
+            fn write_addrs(
+                &mut self,
+                start_addr: <Self::Arch as Arch>::Usize,
+                data: &[u8],
+            ) -> Result<(), Self::Error> {
+                (**self).write_addrs(start_addr, data)
+            }
+
+            fn update_sw_breakpoint(
+                &mut self,
+                addr: <Self::Arch as Arch>::Usize,
+                op: BreakOp,
+            ) -> Result<bool, Self::Error> {
+                (**self).update_sw_breakpoint(addr, op)
+            }
+
+            fn update_hw_breakpoint(
+                &mut self,
+                addr: <Self::Arch as Arch>::Usize,
+                op: BreakOp,
+            ) -> Option<Result<bool, Self::Error>> {
+                (**self).update_hw_breakpoint(addr, op)
+            }
+
+            fn update_hw_watchpoint(
+                &mut self,
+                addr: <Self::Arch as Arch>::Usize,
+                op: BreakOp,
+                kind: WatchKind,
+            ) -> Option<Result<bool, Self::Error>> {
+                (**self).update_hw_watchpoint(addr, op, kind)
+            }
+
+            fn handle_monitor_cmd(
+                &mut self,
+                cmd: &[u8],
+                output: &mut dyn FnMut(&[u8]),
+            ) -> Result<Option<()>, Self::Error> {
+                (**self).handle_monitor_cmd(cmd, output)
+            }
+
+            fn list_active_threads(
+                &mut self,
+                thread_is_active: &mut dyn FnMut(Tid),
+            ) -> Result<(), Self::Error> {
+                (**self).list_active_threads(thread_is_active)
+            }
+
+            fn set_current_thread(&mut self, tid: Tid) -> Option<Result<(), Self::Error>> {
+                (**self).set_current_thread(tid)
+            }
+
+            fn is_thread_alive(&mut self, tid: Tid) -> Result<bool, Self::Error> {
+                (**self).is_thread_alive(tid)
+            }
+        }
+    };
+}
+
+impl_dyn_target!(&mut dyn Target<Arch = A, Error = E>);
+#[cfg(feature = "alloc")]
+impl_dyn_target!(alloc::boxed::Box<dyn Target<Arch = A, Error = E>>);
