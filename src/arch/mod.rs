@@ -6,3 +6,4 @@
 //! implementations you happen to implement yourself!
 
 pub mod arm;
+pub mod msp430;

@@ -67,6 +67,10 @@ impl Registers for ArmCoreRegs {
 
         self.cpsr = regs.next().ok_or(())?;
 
+        if regs.next().is_some() {
+            return Err(());
+        }
+
         Ok(())
     }
 }

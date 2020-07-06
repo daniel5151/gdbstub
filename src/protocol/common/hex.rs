@@ -19,11 +19,16 @@ fn ascii2byte(c: u8) -> Option<u8> {
         b'0'..=b'9' => Some(c - b'0'),
         b'a'..=b'f' => Some(c - b'a' + 10),
         b'A'..=b'F' => Some(c - b'A' + 10),
+        b'x' | b'X' => Some(0),
         _ => None,
     }
 }
 
-/// Decode a hex string into a mutable bytes slice _in place_.
+/// Decode a GDB hex string into a byte slice _in place_.
+///
+/// GDB hex strings may include "xx", which represent "missing" data. This
+/// method simply treats "xx" as 0x00.
+// TODO: maybe don't blindly translate "xx" as 0x00?
 pub fn decode_hex_buf(buf: &mut [u8]) -> Result<&mut [u8], DecodeHexBufError> {
     use DecodeHexBufError::*;
 

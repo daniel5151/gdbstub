@@ -5,6 +5,9 @@ use num_traits::{Num, PrimInt, Unsigned};
 use crate::BeBytes;
 
 /// Methods to read/write architecture-specific registers.
+// TODO: add way to de/serialize arbitrary "missing"/"uncollected" registers.
+// TODO: add (optional?) trait methods for reading/writing specific register
+// (via it's GDB index)
 pub trait Registers: Default {
     /// Serialize `self` into a GDB register bytestream.
     ///
