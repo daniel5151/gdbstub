@@ -111,7 +111,20 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     conn.write(b'+').map_err(Error::ConnectionRead)?;
 
                     let mut res = ResponseWriter::new(conn);
-                    let disconnect = self.handle_command(&mut res, target, command)?;
+                    let disconnect = match self.handle_command(&mut res, target, command) {
+                        Ok(reason) => reason,
+                        Err(Error::TargetError(e)) => {
+                            // unlike all other errors, which are "unrecoverable", there's a chance
+                            // that a target may be able to recover from a target-specific error. In
+                            // this case, we may as well report a SIGABRT stop reason, giving the
+                            // target a chance to open a "post-mortem" GDB session.
+                            let mut res = ResponseWriter::new(conn);
+                            res.write_str("T06")?; // SIGABRT
+                            res.flush()?;
+                            return Err(Error::TargetError(e));
+                        }
+                        Err(e) => return Err(e),
+                    };
 
                     // HACK: this could be more elegant...
                     if disconnect != Some(DisconnectReason::Kill) {
