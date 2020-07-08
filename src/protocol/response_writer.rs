@@ -1,22 +1,11 @@
-use core::fmt::{self, Debug};
-
 use crate::protocol::{Tid, TidSelector};
 use crate::{BeBytes, Connection};
 
 /// Newtype around a Connection error. Having a newtype allows implementing a
 /// `From<ResponseWriterError<C>> for crate::Error<T, C>`, which greatly
 /// simplifies some of the error handling in the main gdbstub.
-pub struct Error<C: Connection>(C::Error);
-
-impl<C> Debug for Error<C>
-where
-    C: Connection,
-    C::Error: Debug,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        write!(f, "{:?}", self.0)
-    }
-}
+#[derive(Debug, Clone)]
+pub struct Error<C>(C);
 
 /// A wrapper around [`Connection`] that computes the single-byte checksum of
 /// incoming / outgoing data.
@@ -42,7 +31,7 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
     }
 
     /// Consumes self, writing out the final '#' and checksum
-    pub fn flush(mut self) -> Result<(), Error<C>> {
+    pub fn flush(mut self) -> Result<(), Error<C::Error>> {
         // don't include '#' in checksum calculation
         let checksum = self.checksum;
 
@@ -61,7 +50,7 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
     }
 
     /// Write a single byte.
-    pub fn write(&mut self, byte: u8) -> Result<(), Error<C>> {
+    pub fn write(&mut self, byte: u8) -> Result<(), Error<C::Error>> {
         #[cfg(feature = "std")]
         self.msg.push(byte as char);
 
@@ -75,17 +64,17 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
     }
 
     /// Write an entire buffer over the connection.
-    pub fn write_all(&mut self, data: &[u8]) -> Result<(), Error<C>> {
+    pub fn write_all(&mut self, data: &[u8]) -> Result<(), Error<C::Error>> {
         data.iter().try_for_each(|b| self.write(*b))
     }
 
     /// Write an entire string over the connection.
-    pub fn write_str(&mut self, s: &str) -> Result<(), Error<C>> {
+    pub fn write_str(&mut self, s: &str) -> Result<(), Error<C::Error>> {
         self.write_all(&s.as_bytes())
     }
 
     /// Write a single byte as a hex string (two ascii chars)
-    fn write_hex(&mut self, byte: u8) -> Result<(), Error<C>> {
+    fn write_hex(&mut self, byte: u8) -> Result<(), Error<C::Error>> {
         for digit in [(byte & 0xf0) >> 4, byte & 0x0f].iter() {
             let c = match digit {
                 0..=9 => b'0' + digit,
@@ -98,13 +87,13 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
     }
 
     /// Write a byte-buffer as a hex string (i.e: two ascii chars / byte).
-    pub fn write_hex_buf(&mut self, data: &[u8]) -> Result<(), Error<C>> {
+    pub fn write_hex_buf(&mut self, data: &[u8]) -> Result<(), Error<C::Error>> {
         data.iter().try_for_each(|b| self.write_hex(*b))
     }
 
     /// Write data using the binary protocol (i.e: escaping any bytes that are
     /// not 7-bit clean)
-    pub fn write_binary(&mut self, data: &[u8]) -> Result<(), Error<C>> {
+    pub fn write_binary(&mut self, data: &[u8]) -> Result<(), Error<C::Error>> {
         data.iter().try_for_each(|b| match b {
             b'#' | b'$' | b'}' | b'*' => {
                 self.write(0x7d)?;
@@ -120,7 +109,7 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
 
     /// Write a number as a big-endian hex string using the most compact
     /// representation possible (i.e: trimming leading zeros).
-    pub fn write_num<D: BeBytes>(&mut self, digit: D) -> Result<(), Error<C>> {
+    pub fn write_num<D: BeBytes>(&mut self, digit: D) -> Result<(), Error<C::Error>> {
         let mut buf = [0; 16];
         // infallible (unless digit is a >128 bit number)
         let len = digit.to_be_bytes(&mut buf).unwrap();
@@ -131,7 +120,7 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
             .try_for_each(|b| self.write_hex(b))
     }
 
-    pub fn write_tid_selector(&mut self, tid: TidSelector) -> Result<(), Error<C>> {
+    pub fn write_tid_selector(&mut self, tid: TidSelector) -> Result<(), Error<C::Error>> {
         match tid {
             TidSelector::All => self.write_str("-1")?,
             TidSelector::Any => self.write_str("0")?,
@@ -140,7 +129,7 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
         Ok(())
     }
 
-    pub fn write_tid(&mut self, tid: Tid) -> Result<(), Error<C>> {
+    pub fn write_tid(&mut self, tid: Tid) -> Result<(), Error<C::Error>> {
         if let Some(pid) = tid.pid {
             self.write_str("p")?;
             self.write_tid_selector(pid)?;

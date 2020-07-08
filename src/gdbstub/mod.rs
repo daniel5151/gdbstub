@@ -12,6 +12,9 @@ use crate::{
     util::{be_bytes::BeBytes, managed_vec::ManagedVec},
 };
 
+mod builder;
+pub use builder::{GdbStubBuilder, GdbStubBuilderError};
+
 /// Describes why the GDB session ended.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DisconnectReason {
@@ -27,9 +30,38 @@ pub enum DisconnectReason {
 /// [`Connection`](trait.Connection.html) using the GDB Remote Serial Protocol.
 pub struct GdbStub<'a, T: Target, C: Connection> {
     conn: C,
-    packet_buffer: Option<&'a mut [u8]>,
+    packet_buffer: ManagedSlice<'a, u8>,
+    state: GdbStubImpl<T, C>,
+}
 
-    _target: PhantomData<T>,
+impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
+    /// Create a `GdbStubBuilder` using the provided Connection.
+    pub fn builder(conn: C) -> GdbStubBuilder<'a, T, C> {
+        GdbStubBuilder::new(conn)
+    }
+
+    /// Create a new `GdbStub` using the provided connection.
+    ///
+    /// For fine-grained control over various GdbStub options, use the
+    /// [`builder()`](#method.builder) method instead.
+    ///
+    /// _Note:_ `new` is only available when the `alloc` feature is enabled.
+    #[cfg(feature = "alloc")]
+    pub fn new(conn: C) -> GdbStub<'a, T, C> {
+        GdbStubBuilder::new(conn).build().unwrap()
+    }
+
+    /// Starts a GDB remote debugging session.
+    ///
+    /// Returns once the GDB client closes the debugging session, or if the
+    /// target halts.
+    pub fn run<'b>(
+        &mut self,
+        target: &'b mut T,
+    ) -> Result<DisconnectReason, Error<T::Error, C::Error>> {
+        self.state
+            .run(target, &mut self.conn, &mut self.packet_buffer)
+    }
 }
 
 struct GdbStubImpl<T: Target, C: Connection> {
@@ -41,51 +73,8 @@ struct GdbStubImpl<T: Target, C: Connection> {
     multithread: bool,
 }
 
-impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
-    /// Create a new `GdbStub` using the provided Connection.
-    pub fn new(conn: C) -> GdbStub<'static, T, C> {
-        GdbStub {
-            conn,
-            packet_buffer: None,
-
-            _target: PhantomData,
-        }
-    }
-
-    /// Use a pre-allocated packet buffer. If this method is not called,
-    /// `GdbStub` will heap-allocate a packet buffer instead.
-    ///
-    /// _Note:_ This method is _required_ when the `alloc` feature is disabled!
-    pub fn with_packet_buffer(mut self, packet_buffer: &'a mut [u8]) -> Self {
-        self.packet_buffer = Some(packet_buffer);
-        self
-    }
-
-    /// Starts a GDB remote debugging session.
-    ///
-    /// Returns once the GDB client closes the debugging session, or if the
-    /// target halts.
-    pub fn run(self, target: &mut T) -> Result<DisconnectReason, Error<T, C>> {
-        let (packet_buffer, packet_buffer_len) = match self.packet_buffer {
-            Some(buf) => {
-                let len = buf.len();
-                (ManagedSlice::Borrowed(buf), len)
-            }
-            None => {
-                cfg_if::cfg_if! {
-                    if #[cfg(feature = "alloc")] {
-                        use alloc::vec::Vec;
-                        // need to pick some arbitrary value to report to GDB
-                        // 4096 seems reasonable?
-                        const REPORTED_SIZE: usize = 4096;
-                        (ManagedSlice::Owned(Vec::with_capacity(REPORTED_SIZE)), REPORTED_SIZE)
-                    } else {
-                        return Err(Error::MissingPacketBuffer);
-                    }
-                }
-            }
-        };
-
+impl<T: Target, C: Connection> GdbStubImpl<T, C> {
+    fn new(packet_buffer_len: usize) -> GdbStubImpl<T, C> {
         GdbStubImpl {
             _target: PhantomData,
             _connection: PhantomData,
@@ -97,26 +86,23 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
             },
             multithread: false,
         }
-        .run(target, self.conn, packet_buffer)
     }
-}
 
-impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     fn run(
-        mut self,
+        &mut self,
         target: &mut T,
-        mut conn: C,
-        mut packet_buffer: ManagedSlice<u8>,
-    ) -> Result<DisconnectReason, Error<T, C>> {
+        conn: &mut C,
+        packet_buffer: &mut ManagedSlice<u8>,
+    ) -> Result<DisconnectReason, Error<T::Error, C::Error>> {
         loop {
-            match Self::recv_packet(&mut conn, &mut packet_buffer)? {
+            match Self::recv_packet(conn, packet_buffer)? {
                 Packet::Ack => {}
                 Packet::Nack => {
                     unimplemented!("GDB nack'd the packet, but retry isn't implemented yet")
                 }
                 Packet::Interrupt => {
                     debug!("<-- interrupt packet");
-                    let mut res = ResponseWriter::new(&mut conn);
+                    let mut res = ResponseWriter::new(conn);
                     res.write_str("S05")?;
                     res.flush()?;
                 }
@@ -124,7 +110,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     // Acknowledge the command
                     conn.write(b'+').map_err(Error::ConnectionRead)?;
 
-                    let mut res = ResponseWriter::new(&mut conn);
+                    let mut res = ResponseWriter::new(conn);
                     let disconnect = self.handle_command(&mut res, target, command)?;
 
                     // HACK: this could be more elegant...
@@ -143,7 +129,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     fn recv_packet<'a, 'b>(
         conn: &mut C,
         pkt_buf: &'a mut ManagedSlice<'b, u8>,
-    ) -> Result<Packet<'a>, Error<T, C>> {
+    ) -> Result<Packet<'a>, Error<T::Error, C::Error>> {
         let header_byte = conn.read().map_err(Error::ConnectionRead)?;
 
         // Wrap the buf in a `ManagedVec` to keep the code readable.
@@ -183,7 +169,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         res: &mut ResponseWriter<C>,
         target: &mut T,
         command: Command<'_>,
-    ) -> Result<Option<DisconnectReason>, Error<T, C>> {
+    ) -> Result<Option<DisconnectReason>, Error<T::Error, C::Error>> {
         match command {
             // ------------------ Handshaking and Queries ------------------- //
             Command::qSupported(cmd) => {
@@ -303,8 +289,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             }
             Command::m(cmd) => {
                 let mut err = Ok(());
-                let start = to_target_usize(cmd.addr)?;
-                let len = to_target_usize(cmd.len)?;
+                let start = Self::to_target_usize(cmd.addr)?;
+                let len = Self::to_target_usize(cmd.len)?;
                 // TODO: double check: should this wrap around to low addresses on overflow?
                 let end = start.saturating_add(len);
 
@@ -320,7 +306,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             }
             Command::M(cmd) => {
                 target
-                    .write_addrs(to_target_usize(cmd.addr)?, cmd.val)
+                    .write_addrs(Self::to_target_usize(cmd.addr)?, cmd.val)
                     .map_err(Error::TargetError)?;
             }
             Command::k(_) | Command::vKill(_) => {
@@ -332,7 +318,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 return Ok(Some(DisconnectReason::Disconnect));
             }
             Command::Z(cmd) => {
-                let addr = to_target_usize(cmd.addr)?;
+                let addr = Self::to_target_usize(cmd.addr)?;
 
                 use BreakOp::*;
                 let supported = match cmd.type_ {
@@ -353,7 +339,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 }
             }
             Command::z(cmd) => {
-                let addr = to_target_usize(cmd.addr)?;
+                let addr = Self::to_target_usize(cmd.addr)?;
 
                 use BreakOp::*;
                 let supported = match cmd.type_ {
@@ -444,7 +430,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             Command::qfThreadInfo(_) => {
                 res.write_str("m")?;
 
-                let mut err: Result<_, Error<T, C>> = Ok(());
+                let mut err: Result<_, Error<T::Error, C::Error>> = Ok(());
                 let mut first = true;
                 target
                     .list_active_threads(&mut |tid| {
@@ -488,7 +474,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
             // ------------------ "Extended" Functionality ------------------ //
             Command::qRcmd(cmd) => {
-                let mut err: Result<_, Error<T, C>> = Ok(());
+                let mut err: Result<_, Error<T::Error, C::Error>> = Ok(());
                 let supported = target
                     .handle_monitor_cmd(cmd.hex_cmd, &mut |msg| {
                         // TODO: replace this with a try block (once stabilized)
@@ -526,7 +512,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         res: &mut ResponseWriter<C>,
         target: &mut T,
         actions: &mut dyn Iterator<Item = (TidSelector, ResumeAction)>,
-    ) -> Result<Option<DisconnectReason>, Error<T, C>> {
+    ) -> Result<Option<DisconnectReason>, Error<T::Error, C::Error>> {
         let mut err = Ok(());
         let (tid, stop_reason) = target
             .resume(actions, &mut || match res.as_conn().peek() {
@@ -585,15 +571,14 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             }
         }
     }
-}
 
-fn to_target_usize<T, C>(n: impl BeBytes) -> Result<<T::Arch as Arch>::Usize, Error<T, C>>
-where
-    T: Target,
-    C: Connection,
-{
-    // TODO?: more granular error when GDB sends a number which is too big?
-    let mut buf = [0; 16];
-    let len = n.to_be_bytes(&mut buf).ok_or(Error::PacketParse)?;
-    <T::Arch as Arch>::Usize::from_be_bytes(&buf[..len]).ok_or(Error::PacketParse)
+    #[allow(clippy::wrong_self_convention, clippy::type_complexity)]
+    fn to_target_usize(
+        n: impl BeBytes,
+    ) -> Result<<T::Arch as Arch>::Usize, Error<T::Error, C::Error>> {
+        // TODO?: more granular error when GDB sends a number which is too big?
+        let mut buf = [0; 16];
+        let len = n.to_be_bytes(&mut buf).ok_or(Error::PacketParse)?;
+        <T::Arch as Arch>::Usize::from_be_bytes(&buf[..len]).ok_or(Error::PacketParse)
+    }
 }
