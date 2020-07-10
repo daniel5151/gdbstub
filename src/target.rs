@@ -1,7 +1,8 @@
 use core::fmt::Debug;
 use core::ops::Range;
 
-use crate::{Arch, Tid, TidSelector, SINGLE_THREAD_TID};
+use crate::opt_result_impl::MaybeNoImpl;
+use crate::{Arch, OptResult, Tid, TidSelector, SINGLE_THREAD_TID};
 
 /// A collection of methods and metadata a `GdbStub` can use to control and
 /// debug a system.
@@ -149,9 +150,9 @@ pub trait Target {
         &mut self,
         addr: <Self::Arch as Arch>::Usize,
         op: BreakOp,
-    ) -> Option<Result<bool, Self::Error>> {
+    ) -> OptResult<bool, Self::Error> {
         let _ = (addr, op);
-        None
+        Err(MaybeNoImpl::no_impl())
     }
 
     /// (optional) Set/remove a hardware watchpoint.
@@ -169,9 +170,9 @@ pub trait Target {
         addr: <Self::Arch as Arch>::Usize,
         op: BreakOp,
         kind: WatchKind,
-    ) -> Option<Result<bool, Self::Error>> {
+    ) -> OptResult<bool, Self::Error> {
         let _ = (addr, op, kind);
-        None
+        Err(MaybeNoImpl::no_impl())
     }
 
     /// (optional) Handle custom commands sent using the `monitor` command.
@@ -199,9 +200,9 @@ pub trait Target {
         &mut self,
         cmd: &[u8],
         output: &mut dyn FnMut(&[u8]),
-    ) -> Result<Option<()>, Self::Error> {
+    ) -> OptResult<(), Self::Error> {
         let _ = (cmd, output);
-        Ok(None)
+        Err(MaybeNoImpl::no_impl())
     }
 
     /// (optional|multithreading) List all currently active threads.
@@ -221,9 +222,9 @@ pub trait Target {
     ///
     /// This method **must** be implemented if `list_active_threads` ever
     /// returns more than one thread!
-    fn set_current_thread(&mut self, tid: Tid) -> Option<Result<(), Self::Error>> {
+    fn set_current_thread(&mut self, tid: Tid) -> OptResult<(), Self::Error> {
         let _ = tid;
-        None
+        Err(MaybeNoImpl::no_impl())
     }
 
     /// (optional|multithreading) Check if the specified thread is alive.
@@ -232,7 +233,7 @@ pub trait Target {
     /// uses `list_active_threads` to do a linear-search through all active
     /// threads. On thread-heavy systems, it may be more efficient
     /// to override this method with a more direct query.
-    fn is_thread_alive(&mut self, tid: Tid) -> Result<bool, Self::Error> {
+    fn is_thread_alive(&mut self, tid: Tid) -> OptResult<bool, Self::Error> {
         let mut found = false;
         self.list_active_threads(&mut |active_tid| {
             if tid == active_tid {
@@ -361,7 +362,7 @@ macro_rules! impl_dyn_target {
                 &mut self,
                 addr: <Self::Arch as Arch>::Usize,
                 op: BreakOp,
-            ) -> Option<Result<bool, Self::Error>> {
+            ) -> OptResult<bool, Self::Error> {
                 (**self).update_hw_breakpoint(addr, op)
             }
 
@@ -370,7 +371,7 @@ macro_rules! impl_dyn_target {
                 addr: <Self::Arch as Arch>::Usize,
                 op: BreakOp,
                 kind: WatchKind,
-            ) -> Option<Result<bool, Self::Error>> {
+            ) -> OptResult<bool, Self::Error> {
                 (**self).update_hw_watchpoint(addr, op, kind)
             }
 
@@ -378,7 +379,7 @@ macro_rules! impl_dyn_target {
                 &mut self,
                 cmd: &[u8],
                 output: &mut dyn FnMut(&[u8]),
-            ) -> Result<Option<()>, Self::Error> {
+            ) -> OptResult<(), Self::Error> {
                 (**self).handle_monitor_cmd(cmd, output)
             }
 
@@ -389,11 +390,11 @@ macro_rules! impl_dyn_target {
                 (**self).list_active_threads(thread_is_active)
             }
 
-            fn set_current_thread(&mut self, tid: Tid) -> Option<Result<(), Self::Error>> {
+            fn set_current_thread(&mut self, tid: Tid) -> OptResult<(), Self::Error> {
                 (**self).set_current_thread(tid)
             }
 
-            fn is_thread_alive(&mut self, tid: Tid) -> Result<bool, Self::Error> {
+            fn is_thread_alive(&mut self, tid: Tid) -> OptResult<bool, Self::Error> {
                 (**self).is_thread_alive(tid)
             }
         }

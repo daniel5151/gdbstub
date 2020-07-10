@@ -35,6 +35,7 @@ mod arch_traits;
 mod connection;
 mod error;
 mod gdbstub;
+pub mod opt_result_impl;
 mod protocol;
 mod target;
 mod util;
@@ -54,3 +55,10 @@ pub type Tid = core::num::NonZeroUsize;
 /// TID returned by `Target::resume` on single-threaded systems.
 // SAFETY: 1 is a non-zero value :P
 pub const SINGLE_THREAD_TID: Tid = unsafe { Tid::new_unchecked(1) };
+
+/// A result type which includes an "unimplemented" state.
+///
+/// `OptResult<T, E>` should be indistinguishable from `Result<T, E>`, aside
+/// from the small caveat of having to use `.into()` when returning `Err`
+/// variants (i.e: `return Err(foo)` will fail to compile).
+pub type OptResult<T, E> = Result<T, opt_result_impl::MaybeNoImpl<E>>;

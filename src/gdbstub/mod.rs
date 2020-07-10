@@ -7,6 +7,7 @@ use crate::{
     arch_traits::{Arch, Registers},
     connection::Connection,
     error::Error,
+    opt_result_impl::*,
     protocol::{Command, Packet, ResponseWriter, Tid, TidSelector},
     target::{BreakOp, ResumeAction, StopReason, Target, WatchKind},
     util::{be_bytes::BeBytes, managed_vec::ManagedVec},
@@ -201,14 +202,22 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 let mut supports_hwbreak = false;
 
                 let test_addr = num_traits::zero();
-                if (target.update_hw_breakpoint(test_addr, BreakOp::Add)).is_some() {
-                    target.update_hw_breakpoint(test_addr, BreakOp::Remove);
+                if target
+                    .update_hw_breakpoint(test_addr, BreakOp::Add)
+                    .maybe_missing_impl()?
+                    .is_some()
+                {
+                    // FIXME: properly assert this succeeded
+                    let _ = target.update_hw_breakpoint(test_addr, BreakOp::Remove);
                     supports_hwbreak = true;
                 }
                 if (target.update_hw_watchpoint(test_addr, BreakOp::Add, WatchKind::Write))
+                    .maybe_missing_impl()?
                     .is_some()
                 {
-                    target.update_hw_watchpoint(test_addr, BreakOp::Remove, WatchKind::Write);
+                    // FIXME: properly assert this succeeded
+                    let _ =
+                        target.update_hw_watchpoint(test_addr, BreakOp::Remove, WatchKind::Write);
                     supports_hwbreak = true;
                 }
 
@@ -259,10 +268,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 // running in multithreaded mode.
                 if self.multithread {
                     if let TidSelector::WithID(tid) = self.current_tid.tid {
-                        match target.set_current_thread(tid) {
-                            None => return Err(Error::MissingSetCurrentTid),
-                            Some(result) => result.map_err(Error::TargetError)?,
-                        }
+                        target
+                            .set_current_thread(tid)
+                            .maybe_missing_impl()?
+                            .ok_or(Error::MissingSetCurrentTid)?
                     }
                 }
 
@@ -287,10 +296,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 // running in multithreaded mode.
                 if self.multithread {
                     if let TidSelector::WithID(tid) = self.current_tid.tid {
-                        match target.set_current_thread(tid) {
-                            None => return Err(Error::MissingSetCurrentTid),
-                            Some(result) => result.map_err(Error::TargetError)?,
-                        }
+                        target
+                            .set_current_thread(tid)
+                            .maybe_missing_impl()?
+                            .ok_or(Error::MissingSetCurrentTid)?
                     }
                 }
 
@@ -335,20 +344,23 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                 use BreakOp::*;
                 let supported = match cmd.type_ {
-                    0 => Some(target.update_sw_breakpoint(addr, Add).map(|_| true)),
+                    0 => target
+                        .update_sw_breakpoint(addr, Add)
+                        .map(|_| true)
+                        .map_err(MaybeNoImpl::error),
                     1 => target.update_hw_breakpoint(addr, Add),
                     2 => target.update_hw_watchpoint(addr, Add, WatchKind::Write),
                     3 => target.update_hw_watchpoint(addr, Add, WatchKind::Read),
                     4 => target.update_hw_watchpoint(addr, Add, WatchKind::ReadWrite),
                     // only 5 documented types in the protocol
-                    _ => None,
-                };
+                    _ => Err(MaybeNoImpl::no_impl()),
+                }
+                .maybe_missing_impl()?;
 
                 match supported {
                     None => {}
-                    Some(Ok(true)) => res.write_str("OK")?,
-                    Some(Ok(false)) => res.write_str("E22")?, // value of 22 grafted from QEMU
-                    Some(Err(e)) => return Err(Error::TargetError(e)),
+                    Some(true) => res.write_str("OK")?,
+                    Some(false) => res.write_str("E22")?, // value of 22 grafted from QEMU
                 }
             }
             Command::z(cmd) => {
@@ -356,20 +368,23 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                 use BreakOp::*;
                 let supported = match cmd.type_ {
-                    0 => Some(target.update_sw_breakpoint(addr, Remove).map(|_| true)),
+                    0 => target
+                        .update_sw_breakpoint(addr, Remove)
+                        .map(|_| true)
+                        .map_err(MaybeNoImpl::error),
                     1 => target.update_hw_breakpoint(addr, Remove),
                     2 => target.update_hw_watchpoint(addr, Remove, WatchKind::Write),
                     3 => target.update_hw_watchpoint(addr, Remove, WatchKind::Read),
                     4 => target.update_hw_watchpoint(addr, Remove, WatchKind::ReadWrite),
                     // only 5 documented types in the protocol
-                    _ => None,
-                };
+                    _ => Err(MaybeNoImpl::no_impl()),
+                }
+                .maybe_missing_impl()?;
 
                 match supported {
                     None => {}
-                    Some(Ok(true)) => res.write_str("OK")?,
-                    Some(Ok(false)) => res.write_str("E22")?, // value of 22 grafted from QEMU
-                    Some(Err(e)) => return Err(Error::TargetError(e)),
+                    Some(true) => res.write_str("OK")?,
+                    Some(false) => res.write_str("E22")?, // value of 22 grafted from QEMU
                 }
             }
             Command::vCont(cmd) => {
@@ -428,10 +443,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 self.current_tid = cmd.tid;
                 match self.current_tid.tid {
                     TidSelector::WithID(id) => {
-                        target
-                            .set_current_thread(id)
-                            .transpose()
-                            .map_err(Error::TargetError)?;
+                        target.set_current_thread(id).maybe_missing_impl()?;
                     }
                     // FIXME: this seems kinda sketchy
                     TidSelector::Any => {}
@@ -472,9 +484,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             }
             Command::T(cmd) => {
                 let alive = match cmd.tid.tid {
-                    TidSelector::WithID(tid) => {
-                        target.is_thread_alive(tid).map_err(Error::TargetError)?
-                    }
+                    TidSelector::WithID(tid) => target
+                        .is_thread_alive(tid)
+                        .maybe_missing_impl()?
+                        .unwrap_or(true),
                     // FIXME: this is pretty sketch :/
                     _ => unimplemented!(),
                 };
@@ -503,7 +516,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                             err = Err(e)
                         }
                     })
-                    .map_err(Error::TargetError)?;
+                    .maybe_missing_impl()?;
                 err?;
 
                 if supported.is_some() {
@@ -541,10 +554,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         err?;
 
         self.current_tid.tid = TidSelector::WithID(tid);
-        target
-            .set_current_thread(tid)
-            .transpose()
-            .map_err(Error::TargetError)?;
+        target.set_current_thread(tid).maybe_missing_impl()?;
 
         match stop_reason {
             StopReason::DoneStep | StopReason::GdbInterrupt => {

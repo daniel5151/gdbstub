@@ -1,6 +1,7 @@
 use armv4t_emu::{reg, Memory};
 use gdbstub::{
-    arch, BreakOp, ResumeAction, StopReason, Target, Tid, TidSelector, WatchKind, SINGLE_THREAD_TID,
+    arch, BreakOp, OptResult, ResumeAction, StopReason, Target, Tid, TidSelector, WatchKind,
+    SINGLE_THREAD_TID,
 };
 
 use crate::emu::{Emu, Event};
@@ -125,7 +126,7 @@ impl Target for Emu {
         addr: u32,
         op: BreakOp,
         kind: WatchKind,
-    ) -> Option<Result<bool, &'static str>> {
+    ) -> OptResult<bool, &'static str> {
         match op {
             BreakOp::Add => {
                 match kind {
@@ -136,7 +137,7 @@ impl Target for Emu {
             }
             BreakOp::Remove => {
                 let pos = match self.watchpoints.iter().position(|x| *x == addr) {
-                    None => return Some(Ok(false)),
+                    None => return Ok(false),
                     Some(pos) => pos,
                 };
 
@@ -148,14 +149,14 @@ impl Target for Emu {
             }
         }
 
-        Some(Ok(true))
+        Ok(true)
     }
 
     fn handle_monitor_cmd(
         &mut self,
         cmd: &[u8],
         output: &mut dyn FnMut(&[u8]),
-    ) -> Result<Option<()>, Self::Error> {
+    ) -> OptResult<(), Self::Error> {
         // wrap `output` in a more comfy macro
         macro_rules! outputln {
             ($($args:tt)*) => {
@@ -167,7 +168,7 @@ impl Target for Emu {
             Ok(cmd) => cmd,
             Err(_) => {
                 outputln!("command must be valid UTF-8");
-                return Ok(Some(()));
+                return Ok(());
             }
         };
 
@@ -177,6 +178,6 @@ impl Target for Emu {
             _ => outputln!("I don't know how to handle '{}'", cmd),
         }
 
-        Ok(Some(()))
+        Ok(())
     }
 }
