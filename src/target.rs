@@ -2,7 +2,7 @@ use core::fmt::Debug;
 use core::ops::Range;
 
 use crate::opt_result_impl::MaybeNoImpl;
-use crate::{Arch, OptResult, Tid, TidSelector, SINGLE_THREAD_TID};
+use crate::{Arch, ConsoleOutput, OptResult, Tid, TidSelector, SINGLE_THREAD_TID};
 
 /// A collection of methods and metadata a `GdbStub` can use to control and
 /// debug a system.
@@ -185,23 +185,19 @@ pub trait Target {
     /// Commands are _not_ guaranteed to be valid UTF-8, hence the use of
     /// `&[u8]` as opposed to `&str`.
     ///
-    /// Output can be written back to the GDB client using the provided `output`
-    /// callback.
+    /// Intermediate console output can be written back to the GDB client using
+    /// the provided `ConsoleOutput` object + the
+    /// [`gdbstub::output!`](macro.output.html) macro.
     ///
-    /// _Note:_ Sending a single large output message is preferable to sending
-    /// multiple smaller output messages, as the `output` callback does not
-    /// provide any form of IO buffering. Each call to `output` will send a new
-    /// GDB packet over the `Connection`.
-    ///
-    /// _Note:_ The maximum length of incoming commands is dependent on the
-    /// length of the packet buffer used by [`GdbStub`](struct.GdbStub.html),
-    /// determined by the formula `(buf.len() - 10) / 2`.
+    /// _Note:_ The maximum length of incoming commands is limited by the size
+    /// of the packet buffer provided to the [`GdbStub`](struct.GdbStub.html).
+    /// Specifically, commands can only be up to `(buf.len() - 10) / 2` bytes.
     fn handle_monitor_cmd(
         &mut self,
         cmd: &[u8],
-        output: &mut dyn FnMut(&[u8]),
+        out: ConsoleOutput<'_>,
     ) -> OptResult<(), Self::Error> {
-        let _ = (cmd, output);
+        let _ = (cmd, out);
         Err(MaybeNoImpl::no_impl())
     }
 
@@ -378,9 +374,9 @@ macro_rules! impl_dyn_target {
             fn handle_monitor_cmd(
                 &mut self,
                 cmd: &[u8],
-                output: &mut dyn FnMut(&[u8]),
+                out: ConsoleOutput<'_>,
             ) -> OptResult<(), Self::Error> {
-                (**self).handle_monitor_cmd(cmd, output)
+                (**self).handle_monitor_cmd(cmd, out)
             }
 
             fn list_active_threads(

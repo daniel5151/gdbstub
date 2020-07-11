@@ -44,7 +44,7 @@ pub use arch_traits::{Arch, Registers};
 pub use connection::Connection;
 pub use error::Error;
 pub use gdbstub::*;
-pub use protocol::TidSelector;
+pub use protocol::{ConsoleOutput, TidSelector};
 pub use target::*;
 pub use util::be_bytes::BeBytes;
 

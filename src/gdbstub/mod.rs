@@ -8,7 +8,7 @@ use crate::{
     connection::Connection,
     error::Error,
     opt_result_impl::*,
-    protocol::{Command, Packet, ResponseWriter, Tid, TidSelector},
+    protocol::{Command, ConsoleOutput, Packet, ResponseWriter, Tid, TidSelector},
     target::{BreakOp, ResumeAction, StopReason, Target, WatchKind},
     util::{be_bytes::BeBytes, managed_vec::ManagedVec},
 };
@@ -501,21 +501,23 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             // ------------------ "Extended" Functionality ------------------ //
             Command::qRcmd(cmd) => {
                 let mut err: Result<_, Error<T::Error, C::Error>> = Ok(());
-                let supported = target
-                    .handle_monitor_cmd(cmd.hex_cmd, &mut |msg| {
-                        // TODO: replace this with a try block (once stabilized)
-                        let e = (|| {
-                            let mut res = ResponseWriter::new(res.as_conn());
-                            res.write_str("O")?;
-                            res.write_hex_buf(msg)?;
-                            res.flush()?;
-                            Ok(())
-                        })();
+                let mut callback = |msg: &[u8]| {
+                    // TODO: replace this with a try block (once stabilized)
+                    let e = (|| {
+                        let mut res = ResponseWriter::new(res.as_conn());
+                        res.write_str("O")?;
+                        res.write_hex_buf(msg)?;
+                        res.flush()?;
+                        Ok(())
+                    })();
 
-                        if let Err(e) = e {
-                            err = Err(e)
-                        }
-                    })
+                    if let Err(e) = e {
+                        err = Err(e)
+                    }
+                };
+
+                let supported = target
+                    .handle_monitor_cmd(cmd.hex_cmd, ConsoleOutput::new(&mut callback))
                     .maybe_missing_impl()?;
                 err?;
 

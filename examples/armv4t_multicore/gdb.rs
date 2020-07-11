@@ -1,6 +1,7 @@
 use armv4t_emu::{reg, Memory};
 use gdbstub::{
-    arch, BreakOp, OptResult, ResumeAction, StopReason, Target, Tid, TidSelector, WatchKind,
+    arch, outputln, BreakOp, ConsoleOutput, OptResult, ResumeAction, StopReason, Target, Tid,
+    TidSelector, WatchKind,
 };
 
 use crate::emu::{CpuId, Emu, Event};
@@ -182,28 +183,21 @@ impl Target for Emu {
     fn handle_monitor_cmd(
         &mut self,
         cmd: &[u8],
-        output: &mut dyn FnMut(&[u8]),
+        mut out: ConsoleOutput<'_>,
     ) -> OptResult<(), Self::Error> {
-        // wrap `output` in a more comfy macro
-        macro_rules! outputln {
-            ($($args:tt)*) => {
-                output((format!($($args)*) + "\n").as_bytes())
-            };
-        }
-
         let cmd = match core::str::from_utf8(cmd) {
             Ok(cmd) => cmd,
             Err(_) => {
-                outputln!("command must be valid UTF-8");
+                outputln!(out, "command must be valid UTF-8");
                 return Ok(());
             }
         };
 
         match cmd {
-            "" => outputln!("Sorry, didn't catch that. Try `monitor ping`!"),
-            "ping" => outputln!("pong!"),
-            _ => outputln!("I don't know how to handle '{}'", cmd),
-        }
+            "" => outputln!(out, "Sorry, didn't catch that. Try `monitor ping`!"),
+            "ping" => outputln!(out, "pong!"),
+            _ => outputln!(out, "I don't know how to handle '{}'", cmd),
+        };
 
         Ok(())
     }
