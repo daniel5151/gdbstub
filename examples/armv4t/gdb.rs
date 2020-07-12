@@ -56,7 +56,6 @@ impl Target for Emu {
         ))
     }
 
-    // order specified in binutils-gdb/blob/master/gdb/features/arm/arm-core.xml
     fn read_registers(
         &mut self,
         regs: &mut arch::arm::reg::ArmCoreRegs,

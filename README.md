@@ -3,19 +3,17 @@
 [![](http://meritbadge.herokuapp.com/gdbstub)](https://crates.io/crates/gdbstub)
 [![](https://docs.rs/gdbstub/badge.svg)](https://docs.rs/gdbstub)
 
-An easy-to-use and easy-to-integrate implementation of the [GDB Remote Serial Protocol](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Protocol.html#Remote-Protocol) in Rust.
+An ergonomic and easy-to-integrate implementation of the [GDB Remote Serial Protocol](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Protocol.html#Remote-Protocol) in Rust.
 
-`gdbstub` is particularly useful in emulators, where it provides a powerful, non-intrusive way to debug code running within an emulated system. The API aims to provide a "drop-in" way to add GDB support to an existing project, without requiring any large refactoring / ownership juggling.
+`gdbstub` is entirely `#![no_std]` compatible, and can be used on platforms without a global allocator. In embedded contexts, `gdbstub` can be configured to use pre-allocated buffers and communicate over any available serial I/O connection (e.g: UART).
 
-`gdbstub` is also `#![no_std]` compatible, and can be used on platforms without a global allocator. In embedded contexts, `gdbstub` can be configured to use pre-allocated buffers and communicate over any serial I/O connection (e.g: UART).
+`gdbstub` is particularly well suited for _emulation_, making it easy to add powerful, non-intrusive debugging support to an emulated system. Just provide an implementation of [`gdbstub::Target`](https://docs.rs/gdbstub/*/gdbstub/trait.Target.html) for your target platform, and you're ready to start debugging!
 
-- [Documentation and Examples](https://docs.rs/gdbstub)
-
-**Warning:** `gdbstub` is still undergoing a fair amount of API churn. Beware when upgrading between minor releases!
+- [Documentation](https://docs.rs/gdbstub)
 
 ## Debugging Features
 
-Features marked as (optional) are not required to be implemented, but can provide an enhanced debugging experience if implemented.
+Features marked as (optional) aren't required to be implemented, but can be implemented to enhance the debugging experience.
 
 - Core GDB Protocol
     - Step + Continue
@@ -26,20 +24,23 @@ Features marked as (optional) are not required to be implemented, but can provid
     - (optional) Read/Write/Access Watchpoints (i.e: value breakpoints)
     - (optional) Multithreading support
 - Extended GDB Protocol
-    - (optional) Handle custom commands sent via GDB's `monitor` command
+    - (optional) Handle custom debug commands (sent via GDB's `monitor` command)
     - (optional) Automatic architecture detection
 
-The GDB Remote Serial Protocol is surprisingly complex, supporting advanced features such as remote file I/O, spawning new processes, "rewinding" program execution, and much, _much_ more. Thankfully, most of these features are completely optional, and getting a basic debugging session up-and-running only requires a small subset of commands to be implemented. Please open an issue / file a PR if `gdbstub` is missing a feature you'd like to use!
+The GDB Remote Serial Protocol is surprisingly complex, supporting advanced features such as remote file I/O, spawning new processes, "rewinding" program execution, and much, _much_ more. Thankfully, most of these features are completely optional, and getting a basic debugging session up-and-running only requires a small subset of commands to be implemented.
+
+If `gdbstub` is missing a feature you'd like to use, please file an issue / open a PR!
 
 ## Feature flags
 
-`gdbstub` enables the `std` feature by default. In `#![no_std]` contexts, use `default-features = false`.
+The `std` feature is enabled by default. In `#![no_std]` contexts, use `default-features = false`.
 
 - `alloc`
-    - Implements `Connection` for `Box<dyn Connection>`
+    - Implements `Connection` for `Box<dyn Connection>`.
+    - Adds output buffering to `ConsoleOutput`.
 - `std` (implies `alloc`)
-    - Implement `Connection` for [`TcpStream`](https://doc.rust-lang.org/std/net/struct.TcpStream.html) and [`UnixStream`](https://doc.rust-lang.org/std/os/unix/net/struct.UnixStream.html).
-    - Implement [`std::error::Error`](https://doc.rust-lang.org/std/error/trait.Error.html) for `gdbstub::Error`
+    - Implements `Connection` for [`TcpStream`](https://doc.rust-lang.org/std/net/struct.TcpStream.html) and [`UnixStream`](https://doc.rust-lang.org/std/os/unix/net/struct.UnixStream.html).
+    - Implements [`std::error::Error`](https://doc.rust-lang.org/std/error/trait.Error.html) for `gdbstub::Error`
     - Log outgoing packets via `log::trace!` (uses a heap-allocated output buffer)
 
 ## Examples
@@ -56,10 +57,16 @@ A dual-core variation of the `armv4t` example. Implements `gdbstub`'s multithrea
 
 There are already several projects which use `gdbstub`:
 
+- [clicky](https://github.com/daniel5151/clicky/) - An emulator for classic clickwheel iPods (dual-core ARMv4T SoC)
 - [rustyboyadvance-ng](https://github.com/michelhe/rustboyadvance-ng/) - Nintendo GameBoy Advance emulator and debugger
 - [microcorruption-emu](https://github.com/sapir/microcorruption-emu) - msp430 emulator for the microcorruption.com ctf
-- [clicky](https://github.com/daniel5151/clicky/) - An emulator for classic clickwheel iPods (dual-core ARMv4T SoC)
 - [ts7200](https://github.com/daniel5151/ts7200/) - An emulator for the TS-7200, a somewhat bespoke embedded ARMv4t platform
+
+## Using `gdbstub` on bare-metal hardware
+
+Since `gdbstub` is `#![no_std]` compatible, it should be possible to implement a `gdbstub::Target` which uses low-level trap instructions + context switching to debug bare-metal code.
+
+If you happen to stumble across this crate and end up using it to debug some bare-metal code, please let me know! I'd love to link to your project!
 
 ## `unsafe` in `gdbstub`
 
@@ -80,9 +87,3 @@ With the `std` feature enabled, there is one additional line of `unsafe` code:
     - Support disabling multiprocess extensions on older GDB clients
 - Support addresses larger than 64-bits?
   - This would require plumbing-through the architecture's pointer size as a generic parameter into all the packet parsing code, which probably isn't _too_ difficult, just time consuming.
-
-## Using `gdbstub` on bare-metal hardware
-
-Since `gdbstub` is `#![no_std]` compatible, it should be possible to implement a `gdbstub::Target` which uses low-level trap instructions + context switching to debug bare-metal code.
-
-If you happen to stumble across this crate and end up using it to debug some bare-metal code, please let me know! I'd love to link to your project!
