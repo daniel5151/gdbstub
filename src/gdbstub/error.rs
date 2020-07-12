@@ -5,7 +5,7 @@ use crate::util::managed_vec::CapacityError;
 
 /// Errors which may occur during a GDB debugging session.
 #[derive(Debug, Clone)]
-pub enum Error<T, C> {
+pub enum GdbStubError<T, C> {
     /// Connection Error while reading request.
     ConnectionRead(C),
     /// Connection Error while writing response.
@@ -26,25 +26,25 @@ pub enum Error<T, C> {
     MissingSetCurrentTid,
 }
 
-impl<T, C> From<ResponseWriterError<C>> for Error<T, C> {
+impl<T, C> From<ResponseWriterError<C>> for GdbStubError<T, C> {
     fn from(e: ResponseWriterError<C>) -> Self {
-        Error::ConnectionWrite(e)
+        GdbStubError::ConnectionWrite(e)
     }
 }
 
-impl<A, T, C> From<CapacityError<A>> for Error<T, C> {
+impl<A, T, C> From<CapacityError<A>> for GdbStubError<T, C> {
     fn from(_: CapacityError<A>) -> Self {
-        Error::PacketBufferOverlow
+        GdbStubError::PacketBufferOverlow
     }
 }
 
-impl<T, C> Display for Error<T, C>
+impl<T, C> Display for GdbStubError<T, C>
 where
     C: Debug,
     T: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use self::Error::*;
+        use self::GdbStubError::*;
         match self {
             ConnectionRead(e) => write!(f, "Connection Error while reading request: {:?}", e),
             ConnectionWrite(e) => write!(f, "Connection Error while writing response: {:?}", e),
@@ -59,7 +59,7 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<T, C> std::error::Error for Error<T, C>
+impl<T, C> std::error::Error for GdbStubError<T, C>
 where
     C: Debug,
     T: Debug,

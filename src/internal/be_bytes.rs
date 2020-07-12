@@ -1,4 +1,4 @@
-/// A trait to work with numbers as big-endian byte arrays. Automatically
+/// A trait for working with structs as big-endian byte arrays. Automatically
 /// implemented for all built-in signed/unsigned integers.
 pub trait BeBytes: Sized {
     /// Write the memory representation of `self` as a byte array in

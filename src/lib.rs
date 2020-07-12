@@ -96,6 +96,11 @@
 //! is different, it's up to the user to provide methods to read/write memory,
 //! start/stop execution, etc...
 //!
+//! The [`Target::Arch`](arch/trait.Arch.html) associated type encodes
+//! information about the target's architecture, such as it's pointer size,
+//! register layout, etc... `gdbstub` comes with several built-in architecture
+//! definitions, which can be found under the [`arch`](arch/index.html) module.
+//!
 //! One key ergonomic feature of the `Target` trait is that it "plumbs-through"
 //! any existing project-specific error-handling via the `Target::Error`
 //! associated type. Every method of `Target` returns a `Result<T,
@@ -250,17 +255,24 @@
 //!
 //!     // Instead of taking ownership of the system, GdbStub takes a &mut, yielding
 //!     // ownership once the debugging session is closed, or an error occurs.
-//!     match debugger.run(&mut emu)? {
-//!         DisconnectReason::Disconnect => {
-//!             // run to completion
-//!             while emu.step() != Some(EmuEvent::Halted) {}
+//!     match debugger.run(&mut emu) {
+//!         Ok(disconnect_reason) => match disconnect_reason {
+//!             DisconnectReason::Disconnect => {
+//!                 // run to completion
+//!                 while emu.step() != Some(EmuEvent::Halted) {}
+//!             }
+//!             DisconnectReason::TargetHalted => println!("Target halted!"),
+//!             DisconnectReason::Kill => {
+//!                 println!("GDB sent a kill command!");
+//!             }
 //!         }
-//!         DisconnectReason::TargetHalted => println!("Target halted!"),
-//!         DisconnectReason::Kill => {
-//!             println!("GDB sent a kill command!");
-//!             return Ok(());
+//!         Err(GdbStubError::TargetError(e)) => {
+//!             println!("Emu raised a fatal error: {:?}", e);
 //!         }
+//!         Err(e) => return Err(e.into())
 //!     }
+//!
+//!     Ok(())
 //! }
 //! ```
 
@@ -274,35 +286,32 @@ extern crate alloc;
 extern crate log;
 
 pub mod arch;
+pub mod internal;
 
-mod arch_traits;
 mod connection;
-mod error;
 mod gdbstub;
-pub mod opt_result_impl;
 mod protocol;
 mod target;
 mod util;
 
-pub use arch_traits::{Arch, Registers};
 pub use connection::Connection;
-pub use error::Error;
 pub use gdbstub::*;
 pub use protocol::{ConsoleOutput, TidSelector};
 pub use target::*;
-pub use util::be_bytes::BeBytes;
 
 /// Thread ID
 // TODO: FUTURE: expose full PID.TID to client?
 pub type Tid = core::num::NonZeroUsize;
 
-/// TID returned by `Target::resume` on single-threaded systems.
+/// TID which should be returned by
+/// [`Target::resume`](trait.Target.html#tymethod.resume) on single-threaded
+/// targets.
 // SAFETY: 1 is a non-zero value :P
 pub const SINGLE_THREAD_TID: Tid = unsafe { Tid::new_unchecked(1) };
 
-/// A result type which includes an "unimplemented" state.
+/// A result type used by optional [`Target`](trait.Target.html) methods.
 ///
 /// `OptResult<T, E>` should be indistinguishable from `Result<T, E>`, aside
 /// from the small caveat of having to use `.into()` when returning `Err`
 /// variants (i.e: `return Err(foo)` will fail to compile).
-pub type OptResult<T, E> = Result<T, opt_result_impl::MaybeNoImpl<E>>;
+pub type OptResult<T, E> = Result<T, internal::MaybeUnimpl<E>>;

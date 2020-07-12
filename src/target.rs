@@ -1,8 +1,8 @@
 use core::fmt::Debug;
 use core::ops::Range;
 
-use crate::opt_result_impl::MaybeNoImpl;
-use crate::{Arch, ConsoleOutput, OptResult, Tid, TidSelector, SINGLE_THREAD_TID};
+use crate::internal::*;
+use crate::{arch::Arch, ConsoleOutput, OptResult, Tid, TidSelector, SINGLE_THREAD_TID};
 
 /// A collection of methods and metadata a `GdbStub` can use to control and
 /// debug a system.
@@ -12,28 +12,25 @@ use crate::{Arch, ConsoleOutput, OptResult, Tid, TidSelector, SINGLE_THREAD_TID}
 ///
 /// ### Handling Threads on Bare-Metal Hardware
 ///
-/// On bare-metal targets, it's common to treat individual _CPU cores_ as a
-/// separate "threads". e.g: in a dual-core system, [CPU0, CPU1] might be mapped
-/// to [TID1, TID2] (note that TIDs cannot be zero).
+/// On bare-metal targets (such as microcontrollers or emulators), it's common
+/// to treat individual _CPU cores_ as a separate "threads". e.g: in a dual-core
+/// system, [CPU0, CPU1] might be mapped to [TID1, TID2] (note that TIDs cannot
+/// be zero).
 ///
 /// ### What's with the `<Self::Arch as Arch>::` syntax?
 ///
 /// Yeah, sorry about that!
 ///
 /// If [rust-lang/rust#38078](https://github.com/rust-lang/rust/issues/38078)
-/// every gets fixed, `<Self::Arch as Arch>::Usize` can be simplified to the
-/// much more readable `Self::Arch::Usize`.
+/// every gets fixed, `<Self::Arch as Arch>::Foo` will be simplified to just
+/// `Self::Arch::Foo`.
 ///
-/// Until then, when implementing `Target`, I recommend using the concrete
-/// type directly. (e.g: on a 32-bit platform, instead of writing `<Self::Arch
-/// as Arch>::Usize`, just use `u32` directly)
+/// Until then, when implementing `Target`, it's recommended to use the concrete
+/// type directly. e.g: on a 32-bit platform, instead of writing `<Self::Arch
+/// as Arch>::Usize`, use `u32` directly.
 #[allow(clippy::type_complexity)]
 pub trait Target {
-    /// The target's architecture. If that target's architecture isn't listed
-    /// under `gdbstub::arch`, it's straightforward to define a custom `Arch`.
-    ///
-    /// _Author's Note:_ If you end up implementing a missing `Arch`
-    /// implementation, please consider upstreaming it's implementation!
+    /// The target's architecture.
     type Arch: Arch;
 
     /// A target-specific fatal error.
@@ -62,20 +59,20 @@ pub trait Target {
     ///
     /// `let (_, action) = actions.next().unwrap();`
     ///
-    /// Lastly, When returning a `(Tid, StopReason)` pair, use the provided
+    /// Lastly, when returning a `(Tid, StopReason)` pair, the
     /// [`gdbstub::SINGLE_THREAD_TID`](constant.SINGLE_THREAD_TID.html) constant
-    /// for the `Tid` field.
+    /// should be used for the `Tid` field.
     ///
     /// ### Multi-Threaded Targets
     ///
     /// If a Target ever lists more than one thread as active in
-    /// `list_active_threads`, the GdbStub switches to multithreaded mode. In
+    /// `list_active_threads`, `gdbstub` switches to multithreaded mode. In
     /// this mode, the `actions` iterator may return more than one `action`.
     ///
     /// At the moment, `gdbstub` only supports GDB's
     /// ["All-Stop" mode](https://sourceware.org/gdb/current/onlinedocs/gdb/All_002dStop-Mode.html),
-    /// whereby _all_ threads should be stopped prior upon returning from
-    /// `resume`, not just the thread responsible for the `StopReason`.
+    /// whereby _all_ threads should be stopped when returning from `resume`
+    /// (not just the thread responsible for the `StopReason`).
     ///
     /// ### Bare-Metal Targets
     ///
@@ -152,7 +149,7 @@ pub trait Target {
         op: BreakOp,
     ) -> OptResult<bool, Self::Error> {
         let _ = (addr, op);
-        Err(MaybeNoImpl::no_impl())
+        Err(MaybeUnimpl::no_impl())
     }
 
     /// (optional) Set/remove a hardware watchpoint.
@@ -172,7 +169,7 @@ pub trait Target {
         kind: WatchKind,
     ) -> OptResult<bool, Self::Error> {
         let _ = (addr, op, kind);
-        Err(MaybeNoImpl::no_impl())
+        Err(MaybeUnimpl::no_impl())
     }
 
     /// (optional) Handle custom commands sent using the `monitor` command.
@@ -198,7 +195,7 @@ pub trait Target {
         out: ConsoleOutput<'_>,
     ) -> OptResult<(), Self::Error> {
         let _ = (cmd, out);
-        Err(MaybeNoImpl::no_impl())
+        Err(MaybeUnimpl::no_impl())
     }
 
     /// (optional|multithreading) List all currently active threads.
@@ -220,7 +217,7 @@ pub trait Target {
     /// returns more than one thread!
     fn set_current_thread(&mut self, tid: Tid) -> OptResult<(), Self::Error> {
         let _ = tid;
-        Err(MaybeNoImpl::no_impl())
+        Err(MaybeUnimpl::no_impl())
     }
 
     /// (optional|multithreading) Check if the specified thread is alive.

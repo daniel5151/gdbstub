@@ -6,11 +6,15 @@ use alloc::vec::Vec;
 /// Helper struct to send console output to GDB.
 ///
 /// The recommended way to interact with `ConsoleOutput` is through the provided
-/// [`output!`](macro.outputln.html) / [`outputln!`](macro.outputln.html)
-/// macros.
+/// [`output!`](macro.output.html) / [`outputln!`](macro.outputln.html) macros.
+///
+/// On resource constrained systems which might want to avoid using Rust's
+/// [fairly "heavy" formatting machinery](https://jamesmunns.com/blog/fmt-unreasonably-expensive/),
+/// the `write_raw()` method can be used to write raw data directly to the GDB
+/// console.
 ///
 /// When the `alloc` feature is disabled, all output buffering is disabled, and
-/// each `write` call will automatically flush data over the Connection.
+/// each call to `output!` will automatically flush data over the Connection.
 // TODO: support user-provided output buffers for no-`alloc` environments.
 pub struct ConsoleOutput<'a> {
     #[cfg(feature = "alloc")]

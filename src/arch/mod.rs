@@ -1,9 +1,16 @@
-//! Built-in implementations of the [`Arch`](arch/trait.Arch.html) and
-//! [`Registers`](arch/trait.Registers.html) traits for various
+//! Built-in implementations of [`Arch`](../trait.Arch.html) for various
 //! architectures.
 //!
-//! **Note:** Please consider upstreaming any missing `Arch` + `Registers`
-//! implementations you happen to implement yourself!
+//! _Note:_ If an architecture is missing from this module, that does _not_ mean
+//! that it can't be used with `gdbstub`! So-long as there's support for the
+//! target architecture in GDB, it should be fairly straightforward to implement
+//! `Arch` manually.
+//!
+//! Please consider upstreaming any missing `Arch` implementations you happen to
+//! implement yourself!
 
 pub mod arm;
 pub mod msp430;
+mod traits;
+
+pub use traits::*;

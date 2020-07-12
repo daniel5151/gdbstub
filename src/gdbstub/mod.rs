@@ -4,17 +4,21 @@ use managed::ManagedSlice;
 use num_traits::ops::saturating::Saturating;
 
 use crate::{
-    arch_traits::{Arch, Registers},
+    arch::{Arch, Registers},
     connection::Connection,
-    error::Error,
-    opt_result_impl::*,
+    internal::*,
     protocol::{Command, ConsoleOutput, Packet, ResponseWriter, Tid, TidSelector},
     target::{BreakOp, ResumeAction, StopReason, Target, WatchKind},
-    util::{be_bytes::BeBytes, managed_vec::ManagedVec},
+    util::managed_vec::ManagedVec,
 };
 
 mod builder;
+mod error;
+
 pub use builder::{GdbStubBuilder, GdbStubBuilderError};
+pub use error::GdbStubError;
+
+use GdbStubError as Error;
 
 /// Describes why the GDB session ended.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -347,13 +351,13 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     0 => target
                         .update_sw_breakpoint(addr, Add)
                         .map(|_| true)
-                        .map_err(MaybeNoImpl::error),
+                        .map_err(MaybeUnimpl::error),
                     1 => target.update_hw_breakpoint(addr, Add),
                     2 => target.update_hw_watchpoint(addr, Add, WatchKind::Write),
                     3 => target.update_hw_watchpoint(addr, Add, WatchKind::Read),
                     4 => target.update_hw_watchpoint(addr, Add, WatchKind::ReadWrite),
                     // only 5 documented types in the protocol
-                    _ => Err(MaybeNoImpl::no_impl()),
+                    _ => Err(MaybeUnimpl::no_impl()),
                 }
                 .maybe_missing_impl()?;
 
@@ -371,13 +375,13 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     0 => target
                         .update_sw_breakpoint(addr, Remove)
                         .map(|_| true)
-                        .map_err(MaybeNoImpl::error),
+                        .map_err(MaybeUnimpl::error),
                     1 => target.update_hw_breakpoint(addr, Remove),
                     2 => target.update_hw_watchpoint(addr, Remove, WatchKind::Write),
                     3 => target.update_hw_watchpoint(addr, Remove, WatchKind::Read),
                     4 => target.update_hw_watchpoint(addr, Remove, WatchKind::ReadWrite),
                     // only 5 documented types in the protocol
-                    _ => Err(MaybeNoImpl::no_impl()),
+                    _ => Err(MaybeUnimpl::no_impl()),
                 }
                 .maybe_missing_impl()?;
 

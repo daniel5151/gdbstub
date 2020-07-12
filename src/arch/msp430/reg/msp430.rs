@@ -1,4 +1,4 @@
-use crate::Registers;
+use crate::arch::Registers;
 
 /// 16-bit TI-MSP430 registers.
 #[derive(Default)]

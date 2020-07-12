@@ -1,6 +1,6 @@
 //! Implementations for various ARM architectures.
 
-use crate::Arch;
+use crate::arch::Arch;
 
 pub mod reg;
 

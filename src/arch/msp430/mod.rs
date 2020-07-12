@@ -1,6 +1,6 @@
 //! Implementations for the TI-MSP430 family of MCUs.
 
-use crate::Arch;
+use crate::arch::Arch;
 
 pub mod reg;
 

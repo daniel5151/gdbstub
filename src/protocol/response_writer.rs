@@ -1,5 +1,6 @@
+use crate::internal::BeBytes;
 use crate::protocol::{Tid, TidSelector};
-use crate::{BeBytes, Connection};
+use crate::Connection;
 
 /// Newtype around a Connection error. Having a newtype allows implementing a
 /// `From<ResponseWriterError<C>> for crate::Error<T, C>`, which greatly

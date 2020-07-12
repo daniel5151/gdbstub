@@ -1,4 +1,4 @@
-use crate::Registers;
+use crate::arch::Registers;
 
 /// 32-bit ARM core registers.
 ///

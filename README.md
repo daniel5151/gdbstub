@@ -55,12 +55,14 @@ A dual-core variation of the `armv4t` example. Implements `gdbstub`'s multithrea
 
 ## Real-World Examples
 
-There are already several projects which use `gdbstub`:
+Several projects are already using `gdbstub`.
 
 - [clicky](https://github.com/daniel5151/clicky/) - An emulator for classic clickwheel iPods (dual-core ARMv4T SoC)
 - [rustyboyadvance-ng](https://github.com/michelhe/rustboyadvance-ng/) - Nintendo GameBoy Advance emulator and debugger
 - [microcorruption-emu](https://github.com/sapir/microcorruption-emu) - msp430 emulator for the microcorruption.com ctf
 - [ts7200](https://github.com/daniel5151/ts7200/) - An emulator for the TS-7200, a somewhat bespoke embedded ARMv4t platform
+
+If you end up using `gdbstub` in your project, feel free to open a PR and add it to this list!
 
 ## Using `gdbstub` on bare-metal hardware
 
