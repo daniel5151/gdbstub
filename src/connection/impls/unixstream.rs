@@ -61,6 +61,14 @@ impl Connection for UnixStream {
         }
     }
 
+    fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
+        use std::io::Read;
+
+        self.set_nonblocking(false)?;
+
+        Read::read_exact(self, buf)
+    }
+
     fn peek(&mut self) -> Result<Option<u8>, Self::Error> {
         self.set_nonblocking(true)?;
 
