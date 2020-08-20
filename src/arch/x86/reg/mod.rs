@@ -1,5 +1,8 @@
 //! `GdbRegister` structs for x86 architectures.
 
-mod amd64_core;
+mod core64;
 
-pub use amd64_core::Amd64CoreRegs;
+pub use core64::X86_64CoreRegs;
+
+/// 80-bit floating point value
+pub type F80 = [u8; 10];

@@ -10,9 +10,9 @@ pub struct X86_64;
 
 impl Arch for X86_64 {
     type Usize = u64;
-    type Registers = reg::Amd64CoreRegs;
+    type Registers = reg::X86_64CoreRegs;
 
     fn target_description_xml() -> Option<&'static str> {
-        Some(r#"<target version="1.0"><architecture>i386:x86-64</architecture></target>"#)
+        Some(r#"<target version="1.0"><architecture>i386:x86-64</architecture><feature name="org.gnu.gdb.i386.sse"></feature></target>"#)
     }
 }
