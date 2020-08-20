@@ -13,6 +13,8 @@ impl Arch for X86_64 {
     type Registers = reg::X86_64CoreRegs;
 
     fn target_description_xml() -> Option<&'static str> {
-        Some(r#"<target version="1.0"><architecture>i386:x86-64</architecture><feature name="org.gnu.gdb.i386.sse"></feature></target>"#)
+        Some(
+            r#"<target version="1.0"><architecture>i386:x86-64</architecture><feature name="org.gnu.gdb.i386.sse"></feature></target>"#,
+        )
     }
 }
