@@ -10,6 +10,7 @@
 //! implement yourself!
 
 pub mod arm;
+pub mod mips;
 pub mod msp430;
 mod traits;
 pub mod x86;
