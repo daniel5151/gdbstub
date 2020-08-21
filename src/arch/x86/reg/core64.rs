@@ -103,6 +103,10 @@ impl Registers for X86_64CoreRegs {
     }
 
     fn gdb_deserialize(&mut self, bytes: &[u8]) -> Result<(), ()> {
+        if bytes.len() < 0x218 {
+            return Err(())
+        }
+
         let mut regs = bytes[0..0x80]
             .chunks_exact(8)
             .map(|x| u64::from_le_bytes(x.try_into().unwrap()));
@@ -143,10 +147,10 @@ impl Registers for X86_64CoreRegs {
 
         let mut regs = bytes[0x114..0x214]
             .chunks_exact(0x10)
-            .map(TryInto::try_into);
+            .map(|x| u128::from_le_bytes(x.try_into().unwrap()));
 
         for reg in self.xmm.iter_mut() {
-            *reg = u128::from_le_bytes(regs.next().ok_or(())?.unwrap());
+            *reg = regs.next().ok_or(())?;
         }
 
         self.mxcsr = u32::from_le_bytes(bytes[0x214..0x218].try_into().unwrap());
