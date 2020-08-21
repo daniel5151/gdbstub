@@ -12,5 +12,6 @@
 pub mod arm;
 pub mod msp430;
 mod traits;
+pub mod x86;
 
 pub use traits::*;
