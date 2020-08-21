@@ -94,7 +94,7 @@ where
     }
 
     fn gdb_deserialize(&mut self, bytes: &[u8]) -> Result<(), ()> {
-        let ptrsize = std::mem::size_of::<U>();
+        let ptrsize = core::mem::size_of::<U>();
 
         // ensure bytes.chunks_exact(ptrsize) won't panic
         if bytes.len() % ptrsize != 0 {
