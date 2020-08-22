@@ -3,6 +3,8 @@ use crate::internal::LeBytes;
 use num_traits::PrimInt;
 
 /// MIPS registers.
+/// This structure is identical for both 32 and 64-bit MIPS.
+/// The register width is set to `u32` or `u64` based on the `<U>` type.
 ///
 /// Source: https://github.com/bminor/binutils-gdb/blob/master/gdb/features/mips-cpu.xml
 #[derive(Default)]
@@ -21,7 +23,7 @@ pub struct MipsCoreRegs<U> {
     pub fpu: MipsFpuRegs<U>,
 }
 
-/// bit MIPS CP0 (coprocessor 0) registers.
+/// MIPS CP0 (coprocessor 0) registers.
 ///
 /// Source: https://github.com/bminor/binutils-gdb/blob/master/gdb/features/mips-cp0.xml
 #[derive(Default)]
@@ -52,7 +54,7 @@ where
     U: PrimInt + LeBytes + Default,
 {
     fn gdb_serialize(&self, mut write_byte: impl FnMut(Option<u8>)) {
-        macro_rules! write_bytes {
+        macro_rules! write_le_bytes {
             ($value:expr) => {
                 let mut buf = [0; 16];
                 // infallible (unless digit is a >128 bit number)
@@ -66,31 +68,31 @@ where
 
         // Write GPRs
         for reg in self.r.iter() {
-            write_bytes!(reg);
+            write_le_bytes!(reg);
         }
 
         // Status register is regnum 32
-        write_bytes!(&self.cp0.status);
+        write_le_bytes!(&self.cp0.status);
 
         // Low and high registers are regnums 33 and 34
-        write_bytes!(&self.lo);
-        write_bytes!(&self.hi);
+        write_le_bytes!(&self.lo);
+        write_le_bytes!(&self.hi);
 
         // Badvaddr and Cause registers are regnums 35 and 36
-        write_bytes!(&self.cp0.badvaddr);
-        write_bytes!(&self.cp0.cause);
+        write_le_bytes!(&self.cp0.badvaddr);
+        write_le_bytes!(&self.cp0.cause);
 
         // Program Counter is regnum 37
-        write_bytes!(&self.pc);
+        write_le_bytes!(&self.pc);
 
         // Write FPRs
         for reg in self.fpu.r.iter() {
-            write_bytes!(&reg);
+            write_le_bytes!(&reg);
         }
 
         // Write FCSR and FIR registers
-        write_bytes!(&self.fpu.fcsr);
-        write_bytes!(&self.fpu.fir);
+        write_le_bytes!(&self.fpu.fcsr);
+        write_le_bytes!(&self.fpu.fir);
     }
 
     fn gdb_deserialize(&mut self, bytes: &[u8]) -> Result<(), ()> {
