@@ -48,6 +48,27 @@ pub trait Target {
     /// every X cycles/milliseconds). Periodically checking for incoming
     /// interrupt packets is _not_ required, but it is _recommended_.
     ///
+    /// # Implementation requirements
+    ///
+    /// These requirements cannot be satisfied by `gdbstub` internally, and must
+    /// be handled on a per-target basis.
+    ///
+    /// ### Adjusting PC after a breakpoint is hit
+    ///
+    /// The [GDB remote serial protocol documentation](https://sourceware.org/gdb/current/onlinedocs/gdb/Stop-Reply-Packets.html#swbreak-stop-reason)
+    /// notes the following:
+    ///
+    /// > On some architectures, such as x86, at the architecture level, when a
+    /// > breakpoint instruction executes the program counter points at the
+    /// > breakpoint address plus an offset. On such targets, the stub is
+    /// > responsible for adjusting the PC to point back at the breakpoint
+    /// > address.
+    ///
+    /// Omitting PC adjustment may result in unexpected execution flow and/or
+    /// breakpoints not appearing to work correctly.
+    ///
+    /// # Kinds of Targets
+    ///
     /// ### Single-Threaded Targets
     ///
     /// For single-threaded Target's (i.e: those that have not implemented any
