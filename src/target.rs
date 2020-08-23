@@ -104,6 +104,10 @@ pub trait Target {
     ) -> Result<(), Self::Error>;
 
     /// Read bytes from the specified address range.
+    ///
+    /// If a read fails, there are two error handling modes: return `Ok(())` (without calling the
+    /// `val` callback), which is a recoverable error. Otherwise return `Err(Self::Error)` in order
+    /// to indicate a platform-specific unrecoverable error.
     fn read_addrs(
         &mut self,
         addrs: Range<<Self::Arch as Arch>::Usize>,
