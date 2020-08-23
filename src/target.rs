@@ -33,7 +33,7 @@ pub trait Target {
     /// The target's architecture.
     type Arch: Arch;
 
-    /// A target-specific fatal error.
+    /// A target-specific **fatal** error.
     type Error;
 
     /// Resume execution on the target.
@@ -125,6 +125,16 @@ pub trait Target {
     ) -> Result<(), Self::Error>;
 
     /// Read bytes from the specified address range.
+    ///
+    /// ### Handling non-fatal invalid memory reads
+    ///
+    /// If the requested address range could not be read (e.g: due to
+    /// MMU protection, unhanded page fault, etc...), the recommended behavior
+    /// is to early return `Ok(())`. This signals to the GDB client that the
+    /// requested memory could not be read.
+    ///
+    /// As a reminder, `Err(Self::Error)` should only be returned if a memory
+    /// read results in a **fatal** target error.
     fn read_addrs(
         &mut self,
         addrs: Range<<Self::Arch as Arch>::Usize>,
@@ -132,6 +142,16 @@ pub trait Target {
     ) -> Result<(), Self::Error>;
 
     /// Write bytes to the specified address range.
+    ///
+    /// ### Handling non-fatal invalid memory writes
+    ///
+    /// Due to an oversight in the API design, the current version of `gdbstub`
+    /// doesn't have any graceful mechanism to signal a non-fatal memory write.
+    /// This is being tracked under [daniel5151/gdbstub#17](https://github.com/daniel5151/gdbstub/issues/17),
+    /// and should be fixed in the next API-breaking release of `gdbstub`.
+    ///
+    /// As a reminder, `Err(Self::Error)` should only be returned if a memory
+    /// write results in a **fatal** target error.
     fn write_addrs(
         &mut self,
         start_addr: <Self::Arch as Arch>::Usize,
