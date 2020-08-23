@@ -289,13 +289,13 @@ pub mod arch;
 pub mod internal;
 
 mod connection;
-mod gdbstub;
+mod gdbstub_impl;
 mod protocol;
 mod target;
 mod util;
 
 pub use connection::Connection;
-pub use gdbstub::*;
+pub use gdbstub_impl::*;
 pub use protocol::{ConsoleOutput, TidSelector};
 pub use target::*;
 
