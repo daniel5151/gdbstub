@@ -103,10 +103,9 @@ where
             return Err(());
         }
 
-        use core::convert::TryInto;
         let mut regs = bytes
             .chunks_exact(ptrsize)
-            .map(|c| U::from_le_bytes(c.try_into().unwrap()).unwrap());
+            .map(|c| U::from_le_bytes(c).unwrap());
 
         // Read GPRs
         for reg in self.r.iter_mut() {

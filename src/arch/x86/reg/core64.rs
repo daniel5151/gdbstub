@@ -104,7 +104,7 @@ impl Registers for X86_64CoreRegs {
 
     fn gdb_deserialize(&mut self, bytes: &[u8]) -> Result<(), ()> {
         if bytes.len() < 0x218 {
-            return Err(())
+            return Err(());
         }
 
         let mut regs = bytes[0..0x80]
