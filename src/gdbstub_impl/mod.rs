@@ -8,7 +8,7 @@ use crate::{
     connection::Connection,
     internal::*,
     protocol::{Command, ConsoleOutput, Packet, ResponseWriter, Tid, TidSelector},
-    target::{BreakOp, ResumeAction, StopReason, Target, WatchKind},
+    target::{Actions, BreakOp, ResumeAction, StopReason, Target, WatchKind},
     util::managed_vec::ManagedVec,
 };
 
@@ -547,7 +547,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     ) -> Result<Option<DisconnectReason>, Error<T::Error, C::Error>> {
         let mut err = Ok(());
         let (tid, stop_reason) = target
-            .resume(actions, &mut || match res.as_conn().peek() {
+            .resume(Actions::new(actions), &mut || match res.as_conn().peek() {
                 Ok(Some(0x03)) => true, // 0x03 is the interrupt byte
                 Ok(Some(_)) => false,   // it's nothing that can't wait...
                 Ok(None) => false,

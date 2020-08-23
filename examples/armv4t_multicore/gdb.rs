@@ -1,7 +1,7 @@
 use armv4t_emu::{reg, Memory};
 use gdbstub::{
-    arch, outputln, BreakOp, ConsoleOutput, OptResult, ResumeAction, StopReason, Target, Tid,
-    TidSelector, WatchKind,
+    arch, outputln, Actions, BreakOp, ConsoleOutput, OptResult, ResumeAction, StopReason, Target,
+    Tid, WatchKind,
 };
 
 use crate::emu::{CpuId, Emu, Event};
@@ -34,7 +34,7 @@ impl Target for Emu {
 
     fn resume(
         &mut self,
-        actions: &mut dyn Iterator<Item = (TidSelector, ResumeAction)>,
+        actions: Actions,
         check_gdb_interrupt: &mut dyn FnMut() -> bool,
     ) -> Result<(Tid, StopReason<u32>), Self::Error> {
         // in this emulator, we ignore the Tid associated with the action, and only care

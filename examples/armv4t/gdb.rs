@@ -1,6 +1,6 @@
 use armv4t_emu::{reg, Memory};
 use gdbstub::{
-    arch, BreakOp, OptResult, ResumeAction, StopReason, Target, Tid, TidSelector, WatchKind,
+    arch, Actions, BreakOp, OptResult, ResumeAction, StopReason, Target, Tid, WatchKind,
     SINGLE_THREAD_TID,
 };
 
@@ -12,7 +12,7 @@ impl Target for Emu {
 
     fn resume(
         &mut self,
-        actions: &mut dyn Iterator<Item = (TidSelector, ResumeAction)>,
+        mut actions: Actions,
         check_gdb_interrupt: &mut dyn FnMut() -> bool,
     ) -> Result<(Tid, StopReason<u32>), Self::Error> {
         // only one thread, only one action

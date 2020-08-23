@@ -102,7 +102,7 @@ pub trait Target {
     /// individual CPU cores.
     fn resume(
         &mut self,
-        actions: &mut dyn Iterator<Item = (TidSelector, ResumeAction)>,
+        actions: Actions<'_>,
         check_gdb_interrupt: &mut dyn FnMut() -> bool,
     ) -> Result<(Tid, StopReason<<Self::Arch as Arch>::Usize>), Self::Error>;
 
@@ -336,6 +336,29 @@ pub enum ResumeAction {
      * StepInRange(core::ops::Range<U>), */
 }
 
+/// An iterator of `(TidSelector, ResumeAction)`, used to specify how particular
+/// threads should be resumed. It is _guaranteed_ to contain at least one
+/// action.
+///
+/// See the documentation for
+/// [`Target::resume`](trait.Target.html#tymethod.resume) for more details.
+pub struct Actions<'a> {
+    inner: &'a mut dyn Iterator<Item = (TidSelector, ResumeAction)>,
+}
+
+impl Actions<'_> {
+    pub(crate) fn new(iter: &mut dyn Iterator<Item = (TidSelector, ResumeAction)>) -> Actions<'_> {
+        Actions { inner: iter }
+    }
+}
+
+impl Iterator for Actions<'_> {
+    type Item = (TidSelector, ResumeAction);
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+
 macro_rules! impl_dyn_target {
     ($type:ty) => {
         #[allow(clippy::type_complexity)]
@@ -348,7 +371,7 @@ macro_rules! impl_dyn_target {
 
             fn resume(
                 &mut self,
-                actions: &mut dyn Iterator<Item = (TidSelector, ResumeAction)>,
+                actions: Actions<'_>,
                 check_gdb_interrupt: &mut dyn FnMut() -> bool,
             ) -> Result<(Tid, StopReason<<Self::Arch as Arch>::Usize>), Self::Error> {
                 (**self).resume(actions, check_gdb_interrupt)
