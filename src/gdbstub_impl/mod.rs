@@ -1,7 +1,6 @@
 use core::marker::PhantomData;
 
 use managed::ManagedSlice;
-use num_traits::ops::saturating::Saturating;
 
 use crate::{
     arch::{Arch, Registers},
@@ -314,26 +313,38 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 res.write_str("OK")?;
             }
             Command::m(cmd) => {
-                let mut err = Ok(());
-                let start = Self::to_target_usize(cmd.addr)?;
-                let len = Self::to_target_usize(cmd.len)?;
-                // TODO: double check: should this wrap around to low addresses on overflow?
-                let end = start.saturating_add(len);
+                let buf = cmd.buf;
 
-                target
-                    .read_addrs(start..end, &mut |val| {
-                        // TODO: assert the length is correct
-                        if let Err(e) = res.write_hex_buf(&[val]) {
-                            err = Err(e)
-                        }
-                    })
-                    .map_err(Error::TargetError)?;
-                err?;
+                let mut i = 0;
+                let mut n = cmd.len;
+                while n != 0 {
+                    let chunk_size = n.min(buf.len());
+
+                    let start_addr = Self::to_target_usize(cmd.addr + i as u64)?;
+                    let data = &mut buf[..chunk_size];
+                    let success = target
+                        .read_addrs(start_addr, data)
+                        .map_err(Error::TargetError)?;
+                    if !success {
+                        debug!("invalid memory read!");
+                        break;
+                    }
+
+                    n -= chunk_size;
+                    i += chunk_size;
+
+                    res.write_hex_buf(data)?;
+                }
             }
             Command::M(cmd) => {
-                target
+                let success = target
                     .write_addrs(Self::to_target_usize(cmd.addr)?, cmd.val)
                     .map_err(Error::TargetError)?;
+                if !success {
+                    res.write_str("E14")? // error code grafted from QEMU
+                } else {
+                    res.write_str("OK")?;
+                }
             }
             Command::k(_) | Command::vKill(_) => {
                 // no response

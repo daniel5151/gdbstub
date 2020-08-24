@@ -87,22 +87,18 @@ impl Target for Emu {
         Ok(())
     }
 
-    fn read_addrs(
-        &mut self,
-        addr: std::ops::Range<u32>,
-        push_byte: &mut dyn FnMut(u8),
-    ) -> Result<(), &'static str> {
-        for addr in addr {
-            push_byte(self.mem.r8(addr))
+    fn read_addrs(&mut self, start_addr: u32, data: &mut [u8]) -> Result<bool, &'static str> {
+        for (addr, val) in (start_addr..).zip(data.iter_mut()) {
+            *val = self.mem.r8(addr)
         }
-        Ok(())
+        Ok(true)
     }
 
-    fn write_addrs(&mut self, start_addr: u32, data: &[u8]) -> Result<(), &'static str> {
+    fn write_addrs(&mut self, start_addr: u32, data: &[u8]) -> Result<bool, &'static str> {
         for (addr, val) in (start_addr..).zip(data.iter().copied()) {
             self.mem.w8(addr, val)
         }
-        Ok(())
+        Ok(true)
     }
 
     fn update_sw_breakpoint(&mut self, addr: u32, op: BreakOp) -> Result<bool, &'static str> {

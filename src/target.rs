@@ -1,5 +1,4 @@
 use core::fmt::Debug;
-use core::ops::Range;
 
 use crate::internal::*;
 use crate::{arch::Arch, ConsoleOutput, OptResult, Tid, TidSelector, SINGLE_THREAD_TID};
@@ -128,27 +127,25 @@ pub trait Target {
     ///
     /// ### Handling non-fatal invalid memory reads
     ///
-    /// If the requested address range could not be read (e.g: due to
-    /// MMU protection, unhanded page fault, etc...), the recommended behavior
-    /// is to early return `Ok(())`. This signals to the GDB client that the
-    /// requested memory could not be read.
+    /// If the requested address range could not be accessed (e.g: due to
+    /// MMU protection, unhanded page fault, etc...), return `Ok(false)` to
+    /// signal that the requested memory could not be read.
     ///
     /// As a reminder, `Err(Self::Error)` should only be returned if a memory
     /// read results in a **fatal** target error.
     fn read_addrs(
         &mut self,
-        addrs: Range<<Self::Arch as Arch>::Usize>,
-        val: &mut dyn FnMut(u8),
-    ) -> Result<(), Self::Error>;
+        start_addr: <Self::Arch as Arch>::Usize,
+        data: &mut [u8],
+    ) -> Result<bool, Self::Error>;
 
     /// Write bytes to the specified address range.
     ///
     /// ### Handling non-fatal invalid memory writes
     ///
-    /// Due to an oversight in the API design, the current version of `gdbstub`
-    /// doesn't have any graceful mechanism to signal a non-fatal memory write.
-    /// This is being tracked under [daniel5151/gdbstub#17](https://github.com/daniel5151/gdbstub/issues/17),
-    /// and should be fixed in the next API-breaking release of `gdbstub`.
+    /// If the requested address range could not be accessed (e.g: due to
+    /// MMU protection, unhanded page fault, etc...), return `Ok(false)` to
+    /// signal that the requested memory could not be written to.
     ///
     /// As a reminder, `Err(Self::Error)` should only be returned if a memory
     /// write results in a **fatal** target error.
@@ -156,7 +153,7 @@ pub trait Target {
         &mut self,
         start_addr: <Self::Arch as Arch>::Usize,
         data: &[u8],
-    ) -> Result<(), Self::Error>;
+    ) -> Result<bool, Self::Error>;
 
     /// Set/remove a software breakpoint.
     /// Return `Ok(false)` if the operation could not be completed.
@@ -393,17 +390,17 @@ macro_rules! impl_dyn_target {
 
             fn read_addrs(
                 &mut self,
-                addrs: Range<<Self::Arch as Arch>::Usize>,
-                val: &mut dyn FnMut(u8),
-            ) -> Result<(), Self::Error> {
-                (**self).read_addrs(addrs, val)
+                start_addr: <Self::Arch as Arch>::Usize,
+                data: &mut [u8],
+            ) -> Result<bool, Self::Error> {
+                (**self).read_addrs(start_addr, data)
             }
 
             fn write_addrs(
                 &mut self,
                 start_addr: <Self::Arch as Arch>::Usize,
                 data: &[u8],
-            ) -> Result<(), Self::Error> {
+            ) -> Result<bool, Self::Error> {
                 (**self).write_addrs(start_addr, data)
             }
 

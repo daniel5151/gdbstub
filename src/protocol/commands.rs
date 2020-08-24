@@ -89,7 +89,7 @@ commands! {
     "G" => _g_upcase::G<'a>,
     "H" => _h_upcase::H,
     "k" => _k::k,
-    "m" => _m::m,
+    "m" => _m::m<'a>,
     "M" => _m_upcase::M<'a>,
     "qAttached" => _qAttached::qAttached,
     "qC" => _qC::qC,
