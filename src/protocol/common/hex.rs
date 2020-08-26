@@ -108,7 +108,7 @@ mod tests {
 
     #[test]
     fn encode_hex_in_chunks() {
-        let payload = (0..256).collect::<Vec<u8>>();
+        let payload = (0..=255).collect::<Vec<u8>>();
         let mut out = Vec::new();
 
         let mut buf = [0; 30];
@@ -121,7 +121,7 @@ mod tests {
             out.extend_from_slice(encode_hex_buf(&mut buf, start_idx).unwrap());
         }
 
-        let expect = (0..256).map(|b| format!("{:02X?}", b)).collect::<String>();
+        let expect = (0..=255).map(|b| format!("{:02X?}", b)).collect::<String>();
 
         assert_eq!(out, expect.as_bytes())
     }
