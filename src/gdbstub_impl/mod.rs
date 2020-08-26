@@ -578,6 +578,11 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 res.write_str("S05")?;
                 Ok(None)
             }
+            StopReason::Signal(code) => {
+                res.write_str("S")?;
+                res.write_num(code)?;
+                Ok(None)
+            }
             StopReason::Halted => {
                 res.write_str("W00")?;
                 Ok(Some(DisconnectReason::TargetHalted))

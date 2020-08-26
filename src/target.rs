@@ -319,6 +319,8 @@ pub enum StopReason<U> {
         /// Address of watched memory
         addr: U,
     },
+    /// The program received a signal
+    Signal(u8),
 }
 
 /// Describes how the target should resume the specified thread.
