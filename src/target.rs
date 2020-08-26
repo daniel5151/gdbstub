@@ -297,6 +297,7 @@ pub enum BreakOp {
 
 /// Describes why the target stopped.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum StopReason<U> {
     /// Completed the single-step request.
     DoneStep,
