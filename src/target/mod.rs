@@ -317,6 +317,11 @@ pub trait Target {
     fn monitor_cmd(&mut self) -> Option<ext::MonitorCmdOps<Self>> {
         None
     }
+
+    /// Handle `qOffsets` command
+    fn section_offsets(&mut self) -> Option<ext::SectionOffsetsOps<Self>> {
+        None
+    }
 }
 
 macro_rules! impl_dyn_target {

@@ -23,6 +23,32 @@ pub use error::GdbStubError;
 
 use GdbStubError as Error;
 
+/// Describes the offset the target loaded the image sections at so the target
+/// can notify GDB that it needs to adjust the addresses of symbols
+pub enum SectionOffsets<U> {
+    /// Section offsets relative to their base addresses
+    Relative {
+        /// The offset of the .text section relative to its base address
+        text: U,
+        /// The offset of the .data section relative to its base address
+        data: U,
+        /// The offset of the .bss section relative to its base address
+        ///
+        /// (Note: GDB currently expects that the bss offset is the same as the
+        /// data offset)
+        bss: Option<U>,
+    },
+
+    /// Section addresses defined with absolute values
+    Absolute {
+        /// The absolute address of the .text section
+        text_seg: U,
+        /// The absolute address of the .data section. If `None`, the GDB will
+        /// adjust the .data offset at a fixed offset from .text
+        data_seg: Option<U>,
+    },
+}
+
 /// Describes why the GDB session ended.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DisconnectReason {
@@ -619,6 +645,36 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     err?;
 
                     res.write_str("OK")?
+                }
+            }
+
+            Command::qOffsets(cmd) if cmd.__protocol_hint_(target) => {
+                crate::__dead_code_marker!("qOffsets", "impl");
+
+                if let Some(op) = target.section_offsets() {
+                    match op.get_section_offsets().map_err(Error::TargetError)? {
+                        SectionOffsets::Relative { text, data, bss } => {
+                            res.write_str("Text=")?;
+                            res.write_num(text)?;
+
+                            res.write_str(";Data=")?;
+                            res.write_num(data)?;
+
+                            if let Some(data) = bss {
+                                res.write_str(";Bss=")?;
+                                res.write_num(data)?;
+                            }
+                        }
+                        SectionOffsets::Absolute { text_seg, data_seg } => {
+                            res.write_str("TextSeg=")?;
+                            res.write_num(text_seg)?;
+
+                            if let Some(data) = data_seg {
+                                res.write_str(";DataSeg=")?;
+                                res.write_num(data)?;
+                            }
+                        }
+                    }
                 }
             }
 
