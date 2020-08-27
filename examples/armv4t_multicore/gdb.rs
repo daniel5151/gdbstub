@@ -1,8 +1,9 @@
 use armv4t_emu::{reg, Memory};
-use gdbstub::{
-    arch, outputln, Actions, BreakOp, ConsoleOutput, OptResult, ResumeAction, StopReason, Target,
-    Tid, WatchKind,
-};
+use gdbstub::arch;
+use gdbstub::target::base::{Actions, ResumeAction, StopReason, Tid};
+use gdbstub::target::ext::breakpoint::{BreakOp, WatchKind};
+use gdbstub::target::ext::monitor::{outputln, ConsoleOutput};
+use gdbstub::target::{base, ext, Target};
 
 use crate::emu::{CpuId, Emu, Event};
 
@@ -28,10 +29,36 @@ fn cpuid_to_tid(id: CpuId) -> Tid {
     }
 }
 
+fn tid_to_cpuid(tid: Tid) -> Result<CpuId, &'static str> {
+    match tid.get() {
+        1 => Ok(CpuId::Cpu),
+        2 => Ok(CpuId::Cop),
+        _ => Err("specified invalid core"),
+    }
+}
+
 impl Target for Emu {
     type Arch = arch::arm::Armv4t;
     type Error = &'static str;
 
+    fn base_ops(&mut self) -> base::BaseOps<Self::Arch, Self::Error> {
+        base::BaseOps::MultiThread(self)
+    }
+
+    fn sw_breakpoint(&mut self) -> ext::SwBreakpointExt<Self> {
+        self
+    }
+
+    fn hw_watchpoint(&mut self) -> Option<ext::HwWatchpointExt<Self>> {
+        Some(self)
+    }
+
+    fn monitor_cmd(&mut self) -> Option<ext::MonitorCmdExt<Self>> {
+        Some(self)
+    }
+}
+
+impl base::MultiThread for Emu {
     fn resume(
         &mut self,
         actions: Actions,
@@ -51,19 +78,24 @@ impl Target for Emu {
             // example, cut me some slack!
             return Err("too lazy to implement support for more than one action :P");
         }
-        let action = actions[0].1;
+        let (tid_selector, action) = actions[0];
+
+        let tid = match tid_selector {
+            base::TidSelector::WithID(id) => id,
+            _ => cpuid_to_tid(CpuId::Cpu), // ...
+        };
 
         match action {
             ResumeAction::Step => match self.step() {
                 Some((event, id)) => Ok((cpuid_to_tid(id), event_to_stopreason(event))),
-                None => Ok((cpuid_to_tid(self.selected_core), StopReason::DoneStep)),
+                None => Ok((tid, StopReason::DoneStep)),
             },
             ResumeAction::Continue => {
                 let mut cycles: usize = 0;
                 loop {
                     // check for GDB interrupt every 1024 instructions
                     if cycles % 1024 == 0 && check_gdb_interrupt() {
-                        return Ok((cpuid_to_tid(self.selected_core), StopReason::GdbInterrupt));
+                        return Ok((tid, StopReason::GdbInterrupt));
                     }
                     cycles += 1;
 
@@ -78,8 +110,9 @@ impl Target for Emu {
     fn read_registers(
         &mut self,
         regs: &mut arch::arm::reg::ArmCoreRegs,
+        tid: Tid,
     ) -> Result<(), &'static str> {
-        let cpu = match self.selected_core {
+        let cpu = match tid_to_cpuid(tid)? {
             CpuId::Cpu => &mut self.cpu,
             CpuId::Cop => &mut self.cop,
         };
@@ -97,8 +130,12 @@ impl Target for Emu {
         Ok(())
     }
 
-    fn write_registers(&mut self, regs: &arch::arm::reg::ArmCoreRegs) -> Result<(), &'static str> {
-        let cpu = match self.selected_core {
+    fn write_registers(
+        &mut self,
+        regs: &arch::arm::reg::ArmCoreRegs,
+        tid: Tid,
+    ) -> Result<(), &'static str> {
+        let cpu = match tid_to_cpuid(tid)? {
             CpuId::Cpu => &mut self.cpu,
             CpuId::Cop => &mut self.cop,
         };
@@ -116,20 +153,41 @@ impl Target for Emu {
         Ok(())
     }
 
-    fn read_addrs(&mut self, start_addr: u32, data: &mut [u8]) -> Result<bool, &'static str> {
+    fn read_addrs(
+        &mut self,
+        start_addr: u32,
+        data: &mut [u8],
+        _tid: Tid, // same address space for each core
+    ) -> Result<bool, &'static str> {
         for (addr, val) in (start_addr..).zip(data.iter_mut()) {
             *val = self.mem.r8(addr)
         }
         Ok(true)
     }
 
-    fn write_addrs(&mut self, start_addr: u32, data: &[u8]) -> Result<bool, &'static str> {
+    fn write_addrs(
+        &mut self,
+        start_addr: u32,
+        data: &[u8],
+        _tid: Tid, // same address space for each core
+    ) -> Result<bool, &'static str> {
         for (addr, val) in (start_addr..).zip(data.iter().copied()) {
             self.mem.w8(addr, val)
         }
         Ok(true)
     }
 
+    fn list_active_threads(
+        &mut self,
+        register_thread: &mut dyn FnMut(Tid),
+    ) -> Result<(), Self::Error> {
+        register_thread(cpuid_to_tid(CpuId::Cpu));
+        register_thread(cpuid_to_tid(CpuId::Cop));
+        Ok(())
+    }
+}
+
+impl ext::breakpoint::SwBreakpoint for Emu {
     fn update_sw_breakpoint(&mut self, addr: u32, op: BreakOp) -> Result<bool, &'static str> {
         match op {
             BreakOp::Add => self.breakpoints.push(addr),
@@ -144,13 +202,15 @@ impl Target for Emu {
 
         Ok(true)
     }
+}
 
+impl ext::breakpoint::HwWatchpoint for Emu {
     fn update_hw_watchpoint(
         &mut self,
         addr: u32,
         op: BreakOp,
         kind: WatchKind,
-    ) -> OptResult<bool, &'static str> {
+    ) -> Result<bool, &'static str> {
         match op {
             BreakOp::Add => {
                 match kind {
@@ -175,12 +235,14 @@ impl Target for Emu {
 
         Ok(true)
     }
+}
 
+impl ext::monitor::MonitorCmd for Emu {
     fn handle_monitor_cmd(
         &mut self,
         cmd: &[u8],
         mut out: ConsoleOutput<'_>,
-    ) -> OptResult<(), Self::Error> {
+    ) -> Result<(), Self::Error> {
         let cmd = match core::str::from_utf8(cmd) {
             Ok(cmd) => cmd,
             Err(_) => {
@@ -195,24 +257,6 @@ impl Target for Emu {
             _ => outputln!(out, "I don't know how to handle '{}'", cmd),
         };
 
-        Ok(())
-    }
-
-    fn list_active_threads(
-        &mut self,
-        register_thread: &mut dyn FnMut(Tid),
-    ) -> Result<(), Self::Error> {
-        register_thread(cpuid_to_tid(CpuId::Cpu));
-        register_thread(cpuid_to_tid(CpuId::Cop));
-        Ok(())
-    }
-
-    fn set_current_thread(&mut self, tid: Tid) -> OptResult<(), Self::Error> {
-        match tid.get() {
-            1 => self.selected_core = CpuId::Cpu,
-            2 => self.selected_core = CpuId::Cop,
-            _ => return Err("specified invalid core".into()),
-        }
         Ok(())
     }
 }

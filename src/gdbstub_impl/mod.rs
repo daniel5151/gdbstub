@@ -7,7 +7,9 @@ use crate::{
     connection::Connection,
     internal::*,
     protocol::{Command, ConsoleOutput, Packet, ResponseWriter, Tid, TidSelector},
-    target::{Actions, BreakOp, ResumeAction, StopReason, Target, WatchKind},
+    target::base::{Actions, BaseOps, ResumeAction, StopReason},
+    target::ext::breakpoint::{BreakOp, WatchKind},
+    target::Target,
     util::managed_vec::ManagedVec,
 };
 
@@ -18,6 +20,10 @@ pub use builder::{GdbStubBuilder, GdbStubBuilderError};
 pub use error::GdbStubError;
 
 use GdbStubError as Error;
+
+// SAFETY: 1 is non-zero
+const SINGLE_THREAD_TID: core::num::NonZeroUsize =
+    unsafe { core::num::NonZeroUsize::new_unchecked(1) };
 
 /// Describes why the GDB session ended.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -73,8 +79,8 @@ struct GdbStubImpl<T: Target, C: Connection> {
     _connection: PhantomData<C>,
 
     packet_buffer_len: usize,
-    current_tid: Tid,
-    multithread: bool,
+    current_mem_tid: Tid,
+    current_resume_tid: Tid,
 }
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
@@ -84,11 +90,23 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             _connection: PhantomData,
 
             packet_buffer_len,
-            current_tid: Tid {
+            current_mem_tid: Tid {
                 pid: None,
                 tid: TidSelector::Any,
             },
-            multithread: false,
+            current_resume_tid: Tid {
+                pid: None,
+                tid: TidSelector::All,
+            },
+        }
+    }
+
+    fn current_mem_tid(&self) -> core::num::NonZeroUsize {
+        match self.current_mem_tid.tid {
+            TidSelector::WithID(id) => id,
+            // XXX: what should happen in this case?
+            TidSelector::Any => unimplemented!(),
+            TidSelector::All => unimplemented!(),
         }
     }
 
@@ -98,6 +116,23 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         conn: &mut C,
         packet_buffer: &mut ManagedSlice<u8>,
     ) -> Result<DisconnectReason, Error<T::Error, C::Error>> {
+        // before even accepting packets, we query the target to get a sane value for
+        // `self.current_mem_tid`.
+
+        self.current_mem_tid.tid = match target.base_ops() {
+            BaseOps::SingleThread(_) => TidSelector::WithID(SINGLE_THREAD_TID),
+            BaseOps::MultiThread(ops) => {
+                let mut first_tid = None;
+                ops.list_active_threads(&mut |tid| {
+                    if first_tid.is_none() {
+                        first_tid = Some(tid);
+                    }
+                })
+                .map_err(Error::TargetError)?;
+                TidSelector::WithID(first_tid.unwrap())
+            }
+        };
+
         loop {
             match Self::recv_packet(conn, packet_buffer)? {
                 Packet::Ack => {}
@@ -201,41 +236,18 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 res.write_str(";multiprocess+")?;
                 res.write_str(";swbreak+")?;
 
-                // probe support for various watchpoints/breakpoints
-                let mut supports_hwbreak = false;
-
-                let test_addr = num_traits::zero();
-                if target
-                    .update_hw_breakpoint(test_addr, BreakOp::Add)
-                    .maybe_missing_impl()?
-                    .is_some()
-                {
-                    // FIXME: properly assert this succeeded
-                    let _ = target.update_hw_breakpoint(test_addr, BreakOp::Remove);
-                    supports_hwbreak = true;
-                }
-                if (target.update_hw_watchpoint(test_addr, BreakOp::Add, WatchKind::Write))
-                    .maybe_missing_impl()?
-                    .is_some()
-                {
-                    // FIXME: properly assert this succeeded
-                    let _ =
-                        target.update_hw_watchpoint(test_addr, BreakOp::Remove, WatchKind::Write);
-                    supports_hwbreak = true;
-                }
-
-                if supports_hwbreak {
+                if target.hw_breakpoint().is_some() || target.hw_watchpoint().is_some() {
                     res.write_str(";hwbreak+")?;
                 }
 
                 // TODO: implement conditional breakpoint support (since that's kool).
                 // res.write_str("ConditionalBreakpoints+;")?;
 
-                // probe support for target description xml
                 if T::Arch::target_description_xml().is_some() {
                     res.write_str(";qXfer:features:read+")?;
                 }
             }
+            // FIXME: should be "vCont;c;C;t;s;S"
             Command::vContQuestionMark(_) => res.write_str("vCont;c;s")?,
             Command::qXferFeaturesRead(cmd) => {
                 assert_eq!(cmd.annex, "target.xml");
@@ -267,21 +279,15 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             Command::QuestionMark(_) => res.write_str("S05")?,
             Command::qAttached(_) => res.write_str("1")?, // attached to existing process
             Command::g(_) => {
-                // sanity check that the target has implemented `set_current_thread` when
-                // running in multithreaded mode.
-                if self.multithread {
-                    if let TidSelector::WithID(tid) = self.current_tid.tid {
-                        target
-                            .set_current_thread(tid)
-                            .maybe_missing_impl()?
-                            .ok_or(Error::MissingSetCurrentTid)?
+                let mut regs: <T::Arch as Arch>::Registers = Default::default();
+                match target.base_ops() {
+                    BaseOps::SingleThread(ops) => ops.read_registers(&mut regs),
+                    BaseOps::MultiThread(ops) => {
+                        ops.read_registers(&mut regs, self.current_mem_tid())
                     }
                 }
+                .map_err(Error::TargetError)?;
 
-                let mut regs: <T::Arch as Arch>::Registers = Default::default();
-                target
-                    .read_registers(&mut regs)
-                    .map_err(Error::TargetError)?;
                 let mut err = Ok(());
                 regs.gdb_serialize(|val| {
                     let res = match val {
@@ -295,21 +301,16 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 err?;
             }
             Command::G(cmd) => {
-                // sanity check that the target has implemented `set_current_thread` when
-                // running in multithreaded mode.
-                if self.multithread {
-                    if let TidSelector::WithID(tid) = self.current_tid.tid {
-                        target
-                            .set_current_thread(tid)
-                            .maybe_missing_impl()?
-                            .ok_or(Error::MissingSetCurrentTid)?
-                    }
-                }
-
                 let mut regs: <T::Arch as Arch>::Registers = Default::default();
                 regs.gdb_deserialize(cmd.vals)
                     .map_err(|_| Error::PacketParse)?; // FIXME: more granular error?
-                target.write_registers(&regs).map_err(Error::TargetError)?;
+
+                match target.base_ops() {
+                    BaseOps::SingleThread(ops) => ops.write_registers(&regs),
+                    BaseOps::MultiThread(ops) => ops.write_registers(&regs, self.current_mem_tid()),
+                }
+                .map_err(Error::TargetError)?;
+
                 res.write_str("OK")?;
             }
             Command::m(cmd) => {
@@ -320,11 +321,16 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 while n != 0 {
                     let chunk_size = n.min(buf.len());
 
-                    let start_addr = Self::to_target_usize(cmd.addr + i as u64)?;
+                    let addr = Self::to_target_usize(cmd.addr + i as u64)?;
                     let data = &mut buf[..chunk_size];
-                    let success = target
-                        .read_addrs(start_addr, data)
-                        .map_err(Error::TargetError)?;
+                    let success = match target.base_ops() {
+                        BaseOps::SingleThread(ops) => ops.read_addrs(addr, data),
+                        BaseOps::MultiThread(ops) => {
+                            ops.read_addrs(addr, data, self.current_mem_tid())
+                        }
+                    }
+                    .map_err(Error::TargetError)?;
+
                     if !success {
                         debug!("invalid memory read!");
                         break;
@@ -337,9 +343,16 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 }
             }
             Command::M(cmd) => {
-                let success = target
-                    .write_addrs(Self::to_target_usize(cmd.addr)?, cmd.val)
-                    .map_err(Error::TargetError)?;
+                let addr = Self::to_target_usize(cmd.addr)?;
+
+                let success = match target.base_ops() {
+                    BaseOps::SingleThread(ops) => ops.write_addrs(addr, cmd.val),
+                    BaseOps::MultiThread(ops) => {
+                        ops.write_addrs(addr, cmd.val, self.current_mem_tid())
+                    }
+                }
+                .map_err(Error::TargetError)?;
+
                 if !success {
                     res.write_str("E14")? // error code grafted from QEMU
                 } else {
@@ -359,23 +372,28 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                 use BreakOp::*;
                 let supported = match cmd.type_ {
-                    0 => target
-                        .update_sw_breakpoint(addr, Add)
-                        .map(|_| true)
-                        .map_err(MaybeUnimpl::error),
-                    1 => target.update_hw_breakpoint(addr, Add),
-                    2 => target.update_hw_watchpoint(addr, Add, WatchKind::Write),
-                    3 => target.update_hw_watchpoint(addr, Add, WatchKind::Read),
-                    4 => target.update_hw_watchpoint(addr, Add, WatchKind::ReadWrite),
+                    0 => Some(target.sw_breakpoint().update_sw_breakpoint(addr, Add)),
+                    1 => target
+                        .hw_breakpoint()
+                        .map(|op| op.update_hw_breakpoint(addr, Add)),
+                    2 => target
+                        .hw_watchpoint()
+                        .map(|op| op.update_hw_watchpoint(addr, Add, WatchKind::Write)),
+                    3 => target
+                        .hw_watchpoint()
+                        .map(|op| op.update_hw_watchpoint(addr, Add, WatchKind::Read)),
+                    4 => target
+                        .hw_watchpoint()
+                        .map(|op| op.update_hw_watchpoint(addr, Add, WatchKind::ReadWrite)),
                     // only 5 documented types in the protocol
-                    _ => Err(MaybeUnimpl::no_impl()),
-                }
-                .maybe_missing_impl()?;
+                    _ => None,
+                };
 
                 match supported {
                     None => {}
-                    Some(true) => res.write_str("OK")?,
-                    Some(false) => res.write_str("E22")?, // value of 22 grafted from QEMU
+                    Some(Err(e)) => return Err(Error::TargetError(e)),
+                    Some(Ok(true)) => res.write_str("OK")?,
+                    Some(Ok(false)) => res.write_str("E22")?, // value of 22 grafted from QEMU
                 }
             }
             Command::z(cmd) => {
@@ -383,23 +401,28 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                 use BreakOp::*;
                 let supported = match cmd.type_ {
-                    0 => target
-                        .update_sw_breakpoint(addr, Remove)
-                        .map(|_| true)
-                        .map_err(MaybeUnimpl::error),
-                    1 => target.update_hw_breakpoint(addr, Remove),
-                    2 => target.update_hw_watchpoint(addr, Remove, WatchKind::Write),
-                    3 => target.update_hw_watchpoint(addr, Remove, WatchKind::Read),
-                    4 => target.update_hw_watchpoint(addr, Remove, WatchKind::ReadWrite),
+                    0 => Some(target.sw_breakpoint().update_sw_breakpoint(addr, Remove)),
+                    1 => target
+                        .hw_breakpoint()
+                        .map(|op| op.update_hw_breakpoint(addr, Remove)),
+                    2 => target
+                        .hw_watchpoint()
+                        .map(|op| op.update_hw_watchpoint(addr, Remove, WatchKind::Write)),
+                    3 => target
+                        .hw_watchpoint()
+                        .map(|op| op.update_hw_watchpoint(addr, Remove, WatchKind::Read)),
+                    4 => target
+                        .hw_watchpoint()
+                        .map(|op| op.update_hw_watchpoint(addr, Remove, WatchKind::ReadWrite)),
                     // only 5 documented types in the protocol
-                    _ => Err(MaybeUnimpl::no_impl()),
-                }
-                .maybe_missing_impl()?;
+                    _ => None,
+                };
 
                 match supported {
                     None => {}
-                    Some(true) => res.write_str("OK")?,
-                    Some(false) => res.write_str("E22")?, // value of 22 grafted from QEMU
+                    Some(Err(e)) => return Err(Error::TargetError(e)),
+                    Some(Ok(true)) => res.write_str("OK")?,
+                    Some(Ok(false)) => res.write_str("E22")?, // value of 22 grafted from QEMU
                 }
             }
             Command::p(p) => {
@@ -410,16 +433,31 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     None => return Ok(None),
                 };
                 let dst = &mut dst[0..reg_size];
-                target.read_register(reg_id, dst).maybe_missing_impl()?;
-                res.write_hex_buf(dst)?;
+                let supported = match target.base_ops() {
+                    BaseOps::SingleThread(ops) => {
+                        ops.read_register(reg_id, dst).map_err(Error::TargetError)?
+                    }
+                    BaseOps::MultiThread(ops) => ops
+                        .read_register(reg_id, dst, self.current_mem_tid())
+                        .map_err(Error::TargetError)?,
+                };
+                if supported {
+                    res.write_hex_buf(dst)?;
+                } else {
+                    res.write_str("E01")?;
+                }
             }
             Command::P(p) => {
                 let reg = <<T::Arch as Arch>::Registers as Registers>::RegId::from_raw_id(p.reg_id);
                 let supported = match reg {
-                    Some((reg_id, _)) => target
-                        .write_register(reg_id, p.val)
-                        .maybe_missing_impl()?
-                        .is_some(),
+                    Some((reg_id, _)) => match target.base_ops() {
+                        BaseOps::SingleThread(ops) => ops
+                            .write_register(reg_id, p.val)
+                            .map_err(Error::TargetError)?,
+                        BaseOps::MultiThread(ops) => ops
+                            .write_register(reg_id, p.val, self.current_mem_tid())
+                            .map_err(Error::TargetError)?,
+                    },
                     None => false,
                 };
                 if supported {
@@ -445,8 +483,6 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     let resume_action = match action.kind {
                         VContKind::Step => ResumeAction::Step,
                         VContKind::Continue => ResumeAction::Continue,
-                        // NOTE: this `unimplemented!` should never be hit so long as `vCont?`
-                        // returns only currently implemented vCont actions.
                         _ => unimplemented!("unimplemented vCont action {:?}", action.kind),
                     };
 
@@ -468,67 +504,72 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 return self.do_vcont(
                     res,
                     target,
-                    &mut core::iter::once((self.current_tid.tid, ResumeAction::Continue)),
-                );
+                    &mut core::iter::once((self.current_resume_tid.tid, ResumeAction::Continue)),
+                )
             }
             Command::s(_) => {
                 return self.do_vcont(
                     res,
                     target,
-                    &mut core::iter::once((self.current_tid.tid, ResumeAction::Step)),
-                );
+                    &mut core::iter::once((self.current_resume_tid.tid, ResumeAction::Step)),
+                )
             }
 
             // ------------------- Multi-threading Support ------------------ //
             Command::H(cmd) => {
-                self.current_tid = cmd.tid;
-                match self.current_tid.tid {
-                    TidSelector::WithID(id) => {
-                        target.set_current_thread(id).maybe_missing_impl()?;
-                    }
-                    // FIXME: this seems kinda sketchy
-                    TidSelector::Any => {}
-                    TidSelector::All => {}
+                match cmd.kind {
+                    'g' => match cmd.tid.tid {
+                        TidSelector::Any => {} // reuse old current_tid
+                        TidSelector::All => unreachable!(),
+                        _ => self.current_mem_tid = cmd.tid,
+                    },
+                    // technically, this variant is deprecated in favor of vCont...
+                    'c' => self.current_resume_tid = cmd.tid,
+                    _ => unimplemented!(), // TODO: this should really be an enum
                 }
-
                 res.write_str("OK")?
             }
             Command::qfThreadInfo(_) => {
                 res.write_str("m")?;
 
-                let mut err: Result<_, Error<T::Error, C::Error>> = Ok(());
-                let mut first = true;
-                target
-                    .list_active_threads(&mut |tid| {
-                        // TODO: replace this with a try block (once stabilized)
-                        let e = (|| {
-                            if !first {
-                                self.multithread = true;
-                                res.write_str(",")?
-                            }
-                            first = false;
-                            res.write_num(tid.get())?;
-                            Ok(())
-                        })();
+                match target.base_ops() {
+                    BaseOps::SingleThread(_) => res.write_num(SINGLE_THREAD_TID.get())?,
+                    BaseOps::MultiThread(ops) => {
+                        let mut err: Result<_, Error<T::Error, C::Error>> = Ok(());
+                        let mut first = true;
+                        ops.list_active_threads(&mut |tid| {
+                            // TODO: replace this with a try block (once stabilized)
+                            let e = (|| {
+                                if !first {
+                                    res.write_str(",")?
+                                }
+                                first = false;
+                                res.write_num(tid.get())?;
+                                Ok(())
+                            })();
 
-                        if let Err(e) = e {
-                            err = Err(e)
-                        }
-                    })
-                    .map_err(Error::TargetError)?;
-                err?;
+                            if let Err(e) = e {
+                                err = Err(e)
+                            }
+                        })
+                        .map_err(Error::TargetError)?;
+                        err?;
+                    }
+                }
             }
             Command::qsThreadInfo(_) => res.write_str("l")?,
             Command::qC(_) => {
                 res.write_str("QC")?;
-                res.write_tid(self.current_tid)?;
+                res.write_tid(self.current_resume_tid)?;
             }
             Command::T(cmd) => {
                 let alive = match cmd.tid.tid {
-                    TidSelector::WithID(tid) => target
-                        .is_thread_alive(tid)
-                        .maybe_missing_impl()?
-                        .unwrap_or(true),
+                    TidSelector::WithID(tid) => match target.base_ops() {
+                        BaseOps::SingleThread(_) => tid == SINGLE_THREAD_TID,
+                        BaseOps::MultiThread(ops) => {
+                            ops.is_thread_alive(tid).map_err(Error::TargetError)?
+                        }
+                    },
                     // FIXME: this is pretty sketch :/
                     _ => unimplemented!(),
                 };
@@ -541,28 +582,27 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
             // ------------------ "Extended" Functionality ------------------ //
             Command::qRcmd(cmd) => {
-                let mut err: Result<_, Error<T::Error, C::Error>> = Ok(());
-                let mut callback = |msg: &[u8]| {
-                    // TODO: replace this with a try block (once stabilized)
-                    let e = (|| {
-                        let mut res = ResponseWriter::new(res.as_conn());
-                        res.write_str("O")?;
-                        res.write_hex_buf(msg)?;
-                        res.flush()?;
-                        Ok(())
-                    })();
+                if let Some(ops) = target.monitor_cmd() {
+                    let mut err: Result<_, Error<T::Error, C::Error>> = Ok(());
+                    let mut callback = |msg: &[u8]| {
+                        // TODO: replace this with a try block (once stabilized)
+                        let e = (|| {
+                            let mut res = ResponseWriter::new(res.as_conn());
+                            res.write_str("O")?;
+                            res.write_hex_buf(msg)?;
+                            res.flush()?;
+                            Ok(())
+                        })();
 
-                    if let Err(e) = e {
-                        err = Err(e)
-                    }
-                };
+                        if let Err(e) = e {
+                            err = Err(e)
+                        }
+                    };
 
-                let supported = target
-                    .handle_monitor_cmd(cmd.hex_cmd, ConsoleOutput::new(&mut callback))
-                    .maybe_missing_impl()?;
-                err?;
+                    ops.handle_monitor_cmd(cmd.hex_cmd, ConsoleOutput::new(&mut callback))
+                        .map_err(Error::TargetError)?;
+                    err?;
 
-                if supported.is_some() {
                     res.write_str("OK")?
                 }
             }
@@ -583,21 +623,35 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         actions: &mut dyn Iterator<Item = (TidSelector, ResumeAction)>,
     ) -> Result<Option<DisconnectReason>, Error<T::Error, C::Error>> {
         let mut err = Ok(());
-        let (tid, stop_reason) = target
-            .resume(Actions::new(actions), &mut || match res.as_conn().peek() {
-                Ok(Some(0x03)) => true, // 0x03 is the interrupt byte
-                Ok(Some(_)) => false,   // it's nothing that can't wait...
-                Ok(None) => false,
-                Err(e) => {
-                    err = Err(Error::ConnectionRead(e));
-                    true // break ASAP if a connection error occurred
-                }
-            })
-            .map_err(Error::TargetError)?;
+
+        let mut check_gdb_interrupt = || match res.as_conn().peek() {
+            Ok(Some(0x03)) => true, // 0x03 is the interrupt byte
+            Ok(Some(_)) => false,   // it's nothing that can't wait...
+            Ok(None) => false,
+            Err(e) => {
+                err = Err(Error::ConnectionRead(e));
+                true // break ASAP if a connection error occurred
+            }
+        };
+
+        let (tid, stop_reason) = match target.base_ops() {
+            BaseOps::SingleThread(ops) => {
+                let stop_reason = ops
+                    .resume(
+                        actions.next().ok_or(Error::PacketParse)?.1,
+                        &mut check_gdb_interrupt,
+                    )
+                    .map_err(Error::TargetError)?;
+                (SINGLE_THREAD_TID, stop_reason)
+            }
+            BaseOps::MultiThread(ops) => ops
+                .resume(Actions::new(actions), &mut check_gdb_interrupt)
+                .map_err(Error::TargetError)?,
+        };
+
         err?;
 
-        self.current_tid.tid = TidSelector::WithID(tid);
-        target.set_current_thread(tid).maybe_missing_impl()?;
+        self.current_resume_tid.tid = TidSelector::WithID(tid);
 
         match stop_reason {
             StopReason::DoneStep | StopReason::GdbInterrupt => {
@@ -619,7 +673,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 res.write_str("T05")?;
 
                 res.write_str("thread:")?;
-                res.write_tid(self.current_tid)?;
+                res.write_tid(self.current_resume_tid)?;
                 res.write_str(";")?;
 
                 match stop_reason {

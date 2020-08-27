@@ -25,8 +25,6 @@ pub struct Emu {
     pub(crate) cop: Cpu,
     pub(crate) mem: ExampleMem,
 
-    pub(crate) selected_core: CpuId,
-
     pub(crate) watchpoints: Vec<u32>,
     pub(crate) breakpoints: Vec<u32>,
 }
@@ -71,7 +69,6 @@ impl Emu {
             cpu,
             cop,
             mem,
-            selected_core: CpuId::Cpu,
             watchpoints: Vec::new(),
             breakpoints: Vec::new(),
         })
