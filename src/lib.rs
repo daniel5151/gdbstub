@@ -91,149 +91,8 @@
 //!
 //! ### The `Target` Trait
 //!
-//! The [`Target`](trait.Target.html) trait describes how to control and modify
-//! a system's execution state during a GDB debugging session. Since each target
-//! is different, it's up to the user to provide methods to read/write memory,
-//! start/stop execution, etc...
-//!
-//! The [`Target::Arch`](arch/trait.Arch.html) associated type encodes
-//! information about the target's architecture, such as it's pointer size,
-//! register layout, etc... `gdbstub` comes with several built-in architecture
-//! definitions, which can be found under the [`arch`](arch/index.html) module.
-//!
-//! One key ergonomic feature of the `Target` trait is that it "plumbs-through"
-//! any existing project-specific error-handling via the `Target::Error`
-//! associated type. Every method of `Target` returns a `Result<T,
-//! Target::Error>`, which makes it's possible to use the `?` operator for error
-//! handling, _without_ having wrapping errors in `gdbstub` specific variants!
-//!
-//! For example, here's what an implementation of `Target` might look like for a
-//! single-core emulator targeting the ARMv4T instruction set. See the
-//! [examples](https://github.com/daniel5151/gdbstub/blob/master/README.md#examples)
-//! section of the project README for more fleshed-out examples.
-//!
-//! ```rust,ignore
-//! // Simplified and modified from gdbstub/examples/armv4t/gdb.rs
-//!
-//! use gdbstub::{
-//!     arch, BreakOp, ResumeAction, StopReason, Target, Tid, TidSelector,
-//!     SINGLE_THREAD_TID,
-//! };
-//!
-//! // ------------- Existing Emulator Code ------------- //
-//!
-//! enum EmuError {
-//!     BadRead,
-//!     BadWrite,
-//!     // ...
-//! }
-//!
-//! struct Emu {
-//!     breakpoints: Vec<u32>,
-//!     /* ... */
-//! }
-//! impl Emu {
-//!     fn step(&mut self) -> Result<Option<EmuEvent>, EmuError>;
-//!     fn read8(&mut self, addr: u32) -> Result<u8, EmuError>;
-//!     fn write8(&mut self, addr: u32, val: u8) -> Result<(), EmuError>;
-//! }
-//!
-//! enum EmuEvent {
-//!     Halted,
-//!     Break
-//! }
-//!
-//! // ------------- `gdbstub` Integration ------------- //
-//!
-//! impl Target for Emu {
-//!     type Arch = arch::arm::Armv4t;
-//!     type Error = EmuError;
-//!
-//!     fn resume(
-//!         &mut self,
-//!         actions: &mut dyn Iterator<Item = (TidSelector, ResumeAction)>,
-//!         check_gdb_interrupt: &mut dyn FnMut() -> bool,
-//!     ) -> Result<(Tid, StopReason<u32>), Self::Error> {
-//!         // one thread, only one action
-//!         let (_, action) = actions.next().unwrap();
-//!
-//!         let event = match action {
-//!             ResumeAction::Step => match self.step()? {
-//!                 Some(e) => e,
-//!                 None => return Ok((SINGLE_THREAD_TID, StopReason::DoneStep)),
-//!             },
-//!             ResumeAction::Continue => {
-//!                 let mut cycles = 0;
-//!                 loop {
-//!                     if let Some(event) = self.step()? {
-//!                         break event;
-//!                     };
-//!
-//!                     // check for GDB interrupt every 1024 instructions
-//!                     cycles += 1;
-//!                     if cycles % 1024 == 0 && check_gdb_interrupt() {
-//!                         return Ok((SINGLE_THREAD_TID, StopReason::GdbInterrupt));
-//!                     }
-//!                 }
-//!             }
-//!         };
-//!
-//!         Ok((
-//!             SINGLE_THREAD_TID,
-//!             match event {
-//!                 EmuEvent::Halted => StopReason::Halted,
-//!                 EmuEvent::Break => StopReason::HwBreak,
-//!             },
-//!         ))
-//!     }
-//!
-//!     fn read_registers(
-//!         &mut self,
-//!         regs: &mut arch::arm::reg::ArmCoreRegs,
-//!     ) -> Result<(), EmuError> {
-//!         // fill up `regs` be querying self
-//!         Ok(())
-//!     }
-//!
-//!     fn write_registers(&mut self, regs: &arch::arm::reg::ArmCoreRegs) -> Result<(), EmuError> {
-//!         // update `self` with data from `regs`
-//!         Ok(())
-//!     }
-//!
-//!     fn read_addrs(
-//!         &mut self,
-//!         addr: std::ops::Range<u32>,
-//!         push_byte: &mut dyn FnMut(u8),
-//!     ) -> Result<(), EmuError> {
-//!         for addr in addr {
-//!             push_byte(self.read8(addr)?)
-//!         }
-//!         Ok(())
-//!     }
-//!
-//!     fn write_addrs(&mut self, start_addr: u32, data: &[u8]) -> Result<(), EmuError> {
-//!         for (addr, val) in (start_addr..).zip(data.iter().copied()) {
-//!             self.write8(addr, val)?
-//!         }
-//!         Ok(())
-//!     }
-//!
-//!     fn update_sw_breakpoint(&mut self, addr: u32, op: BreakOp) -> Result<bool, EmuError> {
-//!         match op {
-//!             BreakOp::Add => self.breakpoints.push(addr),
-//!             BreakOp::Remove => {
-//!                 let pos = match self.breakpoints.iter().position(|x| *x == addr) {
-//!                     None => return Ok(false),
-//!                     Some(pos) => pos,
-//!                 };
-//!                 self.breakpoints.remove(pos);
-//!             }
-//!         }
-//!
-//!         Ok(true)
-//!     }
-//! }
-//! ```
+//! TODO: re-write this section to describe how the new trait-based modular
+//! approach works.
 //!
 //! ### Starting the debugging session
 //!
@@ -285,33 +144,19 @@ extern crate alloc;
 #[macro_use]
 extern crate log;
 
-pub mod arch;
-pub mod internal;
-
 mod connection;
 mod gdbstub_impl;
 mod protocol;
-mod target;
 mod util;
+
+#[doc(hidden)]
+pub mod internal;
+
+pub mod arch;
+pub mod target;
 
 pub use connection::Connection;
 pub use gdbstub_impl::*;
-pub use protocol::{ConsoleOutput, TidSelector};
-pub use target::*;
 
-/// Thread ID
-// TODO: FUTURE: expose full PID.TID to client?
-pub type Tid = core::num::NonZeroUsize;
-
-/// TID which should be returned by
-/// [`Target::resume`](trait.Target.html#tymethod.resume) on single-threaded
-/// targets.
-// SAFETY: 1 is a non-zero value :P
-pub const SINGLE_THREAD_TID: Tid = unsafe { Tid::new_unchecked(1) };
-
-/// A result type used by optional [`Target`](trait.Target.html) methods.
-///
-/// `OptResult<T, E>` should be indistinguishable from `Result<T, E>`, aside
-/// from the small caveat of having to use `.into()` when returning `Err`
-/// variants (i.e: `return Err(foo)` will fail to compile).
-pub type OptResult<T, E> = Result<T, internal::MaybeUnimpl<E>>;
+#[doc(inline)]
+pub use target::Target;

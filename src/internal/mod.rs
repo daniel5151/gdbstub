@@ -5,8 +5,6 @@
 
 mod be_bytes;
 mod le_bytes;
-mod maybe_unimpl;
 
 pub use be_bytes::*;
 pub use le_bytes::*;
-pub use maybe_unimpl::*;
