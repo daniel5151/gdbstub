@@ -1,19 +1,18 @@
-//! RISC-V Register Definitions.
-//!
-//! Useful links:
-//!     - [GNU binutils-gdb XML Descriptions](https://github.com/bminor/binutils-gdb/blob/master/gdb/features/riscv)
-//!     - [riscv-tdep.h](https://github.com/bminor/binutils-gdb/blob/master/gdb/riscv-tdep.h)
 use crate::arch::Registers;
 use crate::internal::LeBytes;
 use num_traits::PrimInt;
 
-/// RISC-V Integer registers
+/// RISC-V Integer registers.
 ///
 /// The register width is set to `u32` or `u64` based on the `<U>` type.
+///
+/// Useful links:
+/// * [GNU binutils-gdb XML descriptions](https://github.com/bminor/binutils-gdb/blob/master/gdb/features/riscv)
+/// * [riscv-tdep.h](https://github.com/bminor/binutils-gdb/blob/master/gdb/riscv-tdep.h)
 #[derive(Default)]
 pub struct RiscvCoreRegs<U> {
     /// General purpose registers (x0-x31)
-    pub r: [U; 32],
+    pub x: [U; 32],
     /// Program counter
     pub pc: U,
 }
@@ -36,7 +35,7 @@ where
         }
 
         // Write GPRs
-        for reg in self.r.iter() {
+        for reg in self.x.iter() {
             write_le_bytes!(reg);
         }
 
@@ -57,7 +56,7 @@ where
             .map(|c| U::from_le_bytes(c).unwrap());
 
         // Read GPRs
-        for reg in self.r.iter_mut() {
+        for reg in self.x.iter_mut() {
             *reg = regs.next().ok_or(())?
         }
         self.pc = regs.next().ok_or(())?;
@@ -65,6 +64,7 @@ where
         if regs.next().is_some() {
             return Err(());
         }
+
         Ok(())
     }
 }

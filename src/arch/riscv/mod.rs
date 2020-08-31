@@ -1,6 +1,6 @@
 //! Support for the [RISC-V](https://riscv.org/) architecture.
 //!
-//! *Note*: currently only supports integer version of the ISA
+//! *Note*: currently only supports integer versions of the ISA.
 
 use crate::arch::Arch;
 
