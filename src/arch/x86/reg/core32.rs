@@ -2,31 +2,45 @@ use crate::arch::x86::reg::{X87FpuInternalRegs, F80};
 use crate::arch::Registers;
 use core::convert::TryInto;
 
-/// 64-bit x86 core registers (+ SSE extensions).
+/// 32-bit x86 core registers (+ SSE extensions).
 ///
-/// Source: https://github.com/bminor/binutils-gdb/blob/master/gdb/features/i386/64bit-core.xml
-/// Additionally: https://github.com/bminor/binutils-gdb/blob/master/gdb/features/i386/64bit-sse.xml
+/// Source: https://github.com/bminor/binutils-gdb/blob/master/gdb/features/i386/32bit-core.xml
+/// Additionally: https://github.com/bminor/binutils-gdb/blob/master/gdb/features/i386/32bit-sse.xml
 #[derive(Default)]
-pub struct X86_64CoreRegs {
-    /// RAX, RBX, RCX, RDX, RSI, RDI, RBP, RSP, r8-r15
-    pub regs: [u64; 16],
+pub struct X86CoreRegs {
+    /// Accumulator
+    pub eax: u32,
+    /// Count register
+    pub ecx: u32,
+    /// Data register
+    pub edx: u32,
+    /// Base register
+    pub ebx: u32,
+    /// Stack pointer
+    pub esp: u32,
+    /// Base pointer
+    pub ebp: u32,
+    /// Source index
+    pub esi: u32,
+    /// Destination index
+    pub edi: u32,
+    /// Instruction pointer
+    pub eip: u32,
     /// Status register
     pub eflags: u32,
-    /// Instruction pointer
-    pub rip: u64,
     /// Segment registers: CS, SS, DS, ES, FS, GS
     pub segments: [u32; 6],
     /// FPU registers: ST0 through ST7
     pub st: [F80; 8],
     /// FPU internal registers
     pub fpu: X87FpuInternalRegs,
-    /// SIMD Registers: XMM0 through XMM15
-    pub xmm: [u128; 0x10],
+    /// SIMD Registers: XMM0 through XMM7
+    pub xmm: [u128; 8],
     /// SSE Status/Control Register
     pub mxcsr: u32,
 }
 
-impl Registers for X86_64CoreRegs {
+impl Registers for X86CoreRegs {
     fn gdb_serialize(&self, mut write_byte: impl FnMut(Option<u8>)) {
         macro_rules! write_bytes {
             ($bytes:expr) => {
@@ -36,16 +50,15 @@ impl Registers for X86_64CoreRegs {
             };
         }
 
-        // rax, rbx, rcx, rdx, rsi, rdi, rbp, rsp, r8-r15
-        for reg in &self.regs {
-            write_bytes!(&reg.to_le_bytes());
+        macro_rules! write_regs {
+            ($($reg:ident),*) => {
+                $(
+                    write_bytes!(&self.$reg.to_le_bytes());
+                )*
+            }
         }
 
-        // rip
-        write_bytes!(&self.rip.to_le_bytes());
-
-        // eflags
-        write_bytes!(&self.eflags.to_le_bytes());
+        write_regs!(eax, ecx, edx, ebx, esp, ebp, esi, edi, eip, eflags);
 
         // cs, ss, ds, es, fs, gs
         for seg in &self.segments {
@@ -67,29 +80,28 @@ impl Registers for X86_64CoreRegs {
         // mxcsr
         write_bytes!(&self.mxcsr.to_le_bytes());
 
-        // padding?
-        // XXX: Couldn't figure out what these do and GDB doesn't actually display any
-        // registers that use these values.
-        (0..0x18).for_each(|_| write_byte(None))
+        (0..4).for_each(|_| write_byte(None))
     }
 
     fn gdb_deserialize(&mut self, bytes: &[u8]) -> Result<(), ()> {
-        if bytes.len() < 0x218 {
+        if bytes.len() < 0x138 {
             return Err(());
         }
 
-        let mut regs = bytes[0..0x80]
-            .chunks_exact(8)
-            .map(|x| u64::from_le_bytes(x.try_into().unwrap()));
-
-        for reg in self.regs.iter_mut() {
-            *reg = regs.next().ok_or(())?;
+        macro_rules! parse_regs {
+            ($($reg:ident),*) => {
+                let mut regs = bytes[0..0x28]
+                    .chunks_exact(4)
+                    .map(|x| u32::from_le_bytes(x.try_into().unwrap()));
+                $(
+                    self.$reg = regs.next().ok_or(())?;
+                )*
+            }
         }
+        
+        parse_regs!(eax, ecx, edx, ebx, esp, ebp, esi, edi, eip, eflags);
 
-        self.rip = u64::from_le_bytes(bytes[0x80..0x88].try_into().unwrap());
-        self.eflags = u32::from_le_bytes(bytes[0x88..0x8C].try_into().unwrap());
-
-        let mut segments = bytes[0x8C..0xA4]
+        let mut segments = bytes[0x28..0x40]
             .chunks_exact(4)
             .map(|x| u32::from_le_bytes(x.try_into().unwrap()));
 
@@ -97,15 +109,15 @@ impl Registers for X86_64CoreRegs {
             *seg = segments.next().ok_or(())?;
         }
 
-        let mut regs = bytes[0xA4..0xF4].chunks_exact(10).map(TryInto::try_into);
+        let mut regs = bytes[0x40..0x90].chunks_exact(10).map(TryInto::try_into);
 
         for reg in self.st.iter_mut() {
             *reg = regs.next().ok_or(())?.map_err(|_| ())?;
         }
 
-        self.fpu = bytes[0xF4..0x114].try_into()?;
+        self.fpu = bytes[0x90..0xb0].try_into()?;
 
-        let mut regs = bytes[0x114..0x214]
+        let mut regs = bytes[0xb0..0x130]
             .chunks_exact(0x10)
             .map(|x| u128::from_le_bytes(x.try_into().unwrap()));
 
@@ -113,7 +125,7 @@ impl Registers for X86_64CoreRegs {
             *reg = regs.next().ok_or(())?;
         }
 
-        self.mxcsr = u32::from_le_bytes(bytes[0x214..0x218].try_into().unwrap());
+        self.mxcsr = u32::from_le_bytes(bytes[0x130..0x134].try_into().unwrap());
 
         Ok(())
     }
