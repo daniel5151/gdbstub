@@ -1,6 +1,7 @@
 //! `GdbRegister` structs for x86 architectures.
 
-use core::convert::{TryFrom, TryInto};
+use core::convert::TryInto;
+use crate::arch::Registers;
 
 mod core64;
 mod core32;
@@ -32,42 +33,8 @@ pub struct X87FpuInternalRegs {
     pub fop: u32,
 }
 
-impl TryFrom<&[u8]> for X87FpuInternalRegs {
-    type Error = ();
-
-    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
-        if bytes.len() != 0x20 {
-            return Err(())
-        }
-
-        let mut regs = bytes
-            .chunks_exact(4)
-            .map(|x| u32::from_le_bytes(x.try_into().unwrap()));
-
-        let fctrl = regs.next().ok_or(())?;
-        let fstat = regs.next().ok_or(())?;
-        let ftag = regs.next().ok_or(())?;
-        let fiseg = regs.next().ok_or(())?;
-        let fioff = regs.next().ok_or(())?;
-        let foseg = regs.next().ok_or(())?;
-        let fooff = regs.next().ok_or(())?;
-        let fop = regs.next().ok_or(())?;
-
-        Ok(Self {
-            fctrl,
-            fstat,           
-            ftag,
-            fiseg,
-            fioff,
-            foseg,
-            fooff,
-            fop,
-        })
-    }
-}
-
-impl X87FpuInternalRegs {
-    fn write(&self, mut write_byte: impl FnMut(Option<u8>)) {
+impl Registers for X87FpuInternalRegs {
+    fn gdb_serialize(&self, mut write_byte: impl FnMut(Option<u8>)) {
         macro_rules! write_bytes {
             ($bytes:expr) => {
                 for b in $bytes {
@@ -86,5 +53,26 @@ impl X87FpuInternalRegs {
         write_bytes!(&self.foseg.to_le_bytes());
         write_bytes!(&self.fooff.to_le_bytes());
         write_bytes!(&self.fop.to_le_bytes());
+    }
+
+    fn gdb_deserialize(&mut self, bytes: &[u8]) -> Result<(), ()> {
+        if bytes.len() != 0x20 {
+            return Err(())
+        }
+
+        let mut regs = bytes
+            .chunks_exact(4)
+            .map(|x| u32::from_le_bytes(x.try_into().unwrap()));
+
+        self.fctrl = regs.next().ok_or(())?;
+        self.fstat = regs.next().ok_or(())?;
+        self.ftag = regs.next().ok_or(())?;
+        self.fiseg = regs.next().ok_or(())?;
+        self.fioff = regs.next().ok_or(())?;
+        self.foseg = regs.next().ok_or(())?;
+        self.fooff = regs.next().ok_or(())?;
+        self.fop = regs.next().ok_or(())?;
+
+        Ok(())
     }
 }
