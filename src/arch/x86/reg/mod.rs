@@ -1,13 +1,13 @@
 //! `GdbRegister` structs for x86 architectures.
 
-use core::convert::TryInto;
 use crate::arch::Registers;
+use core::convert::TryInto;
 
-mod core64;
 mod core32;
+mod core64;
 
-pub use core64::X86_64CoreRegs;
 pub use core32::X86CoreRegs;
+pub use core64::X86_64CoreRegs;
 
 /// 80-bit floating point value
 pub type F80 = [u8; 10];
@@ -57,7 +57,7 @@ impl Registers for X87FpuInternalRegs {
 
     fn gdb_deserialize(&mut self, bytes: &[u8]) -> Result<(), ()> {
         if bytes.len() != 0x20 {
-            return Err(())
+            return Err(());
         }
 
         let mut regs = bytes

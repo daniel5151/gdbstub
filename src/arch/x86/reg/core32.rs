@@ -98,7 +98,7 @@ impl Registers for X86CoreRegs {
                 )*
             }
         }
-        
+
         parse_regs!(eax, ecx, edx, ebx, esp, ebp, esi, edi, eip, eflags);
 
         let mut segments = bytes[0x28..0x40]
