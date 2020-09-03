@@ -1,7 +1,7 @@
 use armv4t_emu::{reg, Memory};
 use gdbstub::arch;
 use gdbstub::target::base::{Actions, ResumeAction, StopReason, Tid};
-use gdbstub::target::ext::breakpoint::{BreakOp, WatchKind};
+use gdbstub::target::ext::breakpoint::WatchKind;
 use gdbstub::target::ext::monitor::{outputln, ConsoleOutput};
 use gdbstub::target::{base, ext, Target};
 
@@ -188,50 +188,43 @@ impl base::MultiThread for Emu {
 }
 
 impl ext::breakpoint::SwBreakpoint for Emu {
-    fn update_sw_breakpoint(&mut self, addr: u32, op: BreakOp) -> Result<bool, &'static str> {
-        match op {
-            BreakOp::Add => self.breakpoints.push(addr),
-            BreakOp::Remove => {
-                let pos = match self.breakpoints.iter().position(|x| *x == addr) {
-                    None => return Ok(false),
-                    Some(pos) => pos,
-                };
-                self.breakpoints.remove(pos);
-            }
-        }
+    fn add_sw_breakpoint(&mut self, addr: u32) -> Result<bool, &'static str> {
+        self.breakpoints.push(addr);
+        Ok(true)
+    }
+
+    fn remove_sw_breakpoint(&mut self, addr: u32) -> Result<bool, &'static str> {
+        match self.breakpoints.iter().position(|x| *x == addr) {
+            None => return Ok(false),
+            Some(pos) => self.breakpoints.remove(pos),
+        };
 
         Ok(true)
     }
 }
 
 impl ext::breakpoint::HwWatchpoint for Emu {
-    fn update_hw_watchpoint(
-        &mut self,
-        addr: u32,
-        op: BreakOp,
-        kind: WatchKind,
-    ) -> Result<bool, &'static str> {
-        match op {
-            BreakOp::Add => {
-                match kind {
-                    WatchKind::Write => self.watchpoints.push(addr),
-                    WatchKind::Read => self.watchpoints.push(addr),
-                    WatchKind::ReadWrite => self.watchpoints.push(addr),
-                };
-            }
-            BreakOp::Remove => {
-                let pos = match self.watchpoints.iter().position(|x| *x == addr) {
-                    None => return Ok(false),
-                    Some(pos) => pos,
-                };
+    fn add_hw_watchpoint(&mut self, addr: u32, kind: WatchKind) -> Result<bool, &'static str> {
+        match kind {
+            WatchKind::Write => self.watchpoints.push(addr),
+            WatchKind::Read => self.watchpoints.push(addr),
+            WatchKind::ReadWrite => self.watchpoints.push(addr),
+        };
 
-                match kind {
-                    WatchKind::Write => self.watchpoints.remove(pos),
-                    WatchKind::Read => self.watchpoints.remove(pos),
-                    WatchKind::ReadWrite => self.watchpoints.remove(pos),
-                };
-            }
-        }
+        Ok(true)
+    }
+
+    fn remove_hw_watchpoint(&mut self, addr: u32, kind: WatchKind) -> Result<bool, &'static str> {
+        let pos = match self.watchpoints.iter().position(|x| *x == addr) {
+            None => return Ok(false),
+            Some(pos) => pos,
+        };
+
+        match kind {
+            WatchKind::Write => self.watchpoints.remove(pos),
+            WatchKind::Read => self.watchpoints.remove(pos),
+            WatchKind::ReadWrite => self.watchpoints.remove(pos),
+        };
 
         Ok(true)
     }
