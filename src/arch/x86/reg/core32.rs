@@ -70,7 +70,7 @@ impl Registers for X86CoreRegs {
             write_bytes!(st_reg);
         }
 
-        self.fpu.write(&mut write_byte);
+        self.fpu.gdb_serialize(&mut write_byte);
 
         // xmm0 to xmm15
         for xmm_reg in &self.xmm {
@@ -80,6 +80,7 @@ impl Registers for X86CoreRegs {
         // mxcsr
         write_bytes!(&self.mxcsr.to_le_bytes());
 
+        // padding
         (0..4).for_each(|_| write_byte(None))
     }
 
@@ -98,7 +99,7 @@ impl Registers for X86CoreRegs {
                 )*
             }
         }
-        
+
         parse_regs!(eax, ecx, edx, ebx, esp, ebp, esi, edi, eip, eflags);
 
         let mut segments = bytes[0x28..0x40]
@@ -115,7 +116,7 @@ impl Registers for X86CoreRegs {
             *reg = regs.next().ok_or(())?.map_err(|_| ())?;
         }
 
-        self.fpu = bytes[0x90..0xb0].try_into()?;
+        self.fpu.gdb_deserialize(&bytes[0x90..0xb0])?;
 
         let mut regs = bytes[0xb0..0x130]
             .chunks_exact(0x10)

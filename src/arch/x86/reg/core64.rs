@@ -57,7 +57,7 @@ impl Registers for X86_64CoreRegs {
             write_bytes!(st_reg);
         }
 
-        self.fpu.write(&mut write_byte);
+        self.fpu.gdb_serialize(&mut write_byte);
 
         // xmm0 to xmm15
         for xmm_reg in &self.xmm {
@@ -103,7 +103,7 @@ impl Registers for X86_64CoreRegs {
             *reg = regs.next().ok_or(())?.map_err(|_| ())?;
         }
 
-        self.fpu = bytes[0xF4..0x114].try_into()?;
+        self.fpu.gdb_deserialize(&bytes[0xF4..0x114])?;
 
         let mut regs = bytes[0x114..0x214]
             .chunks_exact(0x10)
