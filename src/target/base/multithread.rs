@@ -2,7 +2,7 @@ use crate::arch::{Arch, Registers};
 use crate::target::base::*;
 use crate::target::Target;
 
-/// Core operations for multi threaded targets
+/// Base debugging operations for multi threaded targets
 #[allow(clippy::type_complexity)]
 pub trait MultiThread: Target {
     /// Resume execution on the target.

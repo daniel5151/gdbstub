@@ -2,7 +2,7 @@ use crate::arch::{Arch, Registers};
 use crate::target::base::*;
 use crate::target::Target;
 
-/// Core operations for single threaded targets
+/// Base debugging operations for single threaded targets
 #[allow(clippy::type_complexity)]
 pub trait SingleThread: Target {
     /// Resume execution on the target.

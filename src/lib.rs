@@ -14,21 +14,19 @@
 //!
 //! ## Debugging Features
 //!
-//! Features marked as (optional) aren't required to be implemented, but can be
-//! implemented to enhance the debugging experience.
-//!
-//! - Core GDB Protocol
-//!     - Step + Continue
-//!     - Add + Remove Software Breakpoints
+//! - [Base Debugging Functionality](target/base/index.html)
+//!     - Step/Continue Execution
 //!     - Read/Write memory
 //!     - Read/Write registers
-//!     - (optional) Add + Remove Hardware Breakpoints
-//!     - (optional) Read/Write/Access Watchpoints (i.e: value breakpoints)
+//!     - Add/Remove Software Breakpoints
 //!     - (optional) Multithreading support
-//! - Extended GDB Protocol
-//!     - (optional) Handle custom debug commands (sent via GDB's `monitor`
-//!       command)
-//!     - (optional) Automatic architecture detection
+//!
+//! Additionally, there are many [protocol extensions](target/ext/index.html)
+//! that can be optionally implemented to enhance the core debugging
+//! experience. For example: if your target supports _hardware watchpoints_
+//! (i.e: value breakpoints), consider implementing the
+//! [`target::ext::breakpoint::HwWatchpoint`](target/ext/breakpoint/index.html)
+//! extension.
 //!
 //! If `gdbstub` is missing a feature you'd like to use, please file an issue /
 //! open a PR!
@@ -46,7 +44,7 @@
 //!       and [`UnixStream`](https://doc.rust-lang.org/std/os/unix/net/struct.UnixStream.html).
 //!     - Implements [`std::error::Error`](https://doc.rust-lang.org/std/error/trait.Error.html)
 //!       for `gdbstub::Error`
-//!     - Log outgoing packets via `log::trace!` (uses a heap-allocated output
+//!     - Log outgoing packets via `log::trace!` (using a heap-allocated output
 //!       buffer)
 //!
 //! ## Getting Started
@@ -55,9 +53,11 @@
 //! `gdbstub`, and walks though the basic steps required to integrate `gdbstub`
 //! into a project.
 //!
-//! Additionally, if you're looking for some more fleshed-out examples, take a
-//! look at some of the [examples](https://github.com/daniel5151/gdbstub/blob/master/README.md#examples)
-//! listed in the project README.
+//! Additionally, I would **highly recommend** that you take a look at some of
+//! the [**examples**](https://github.com/daniel5151/gdbstub/blob/master/README.md#examples)
+//! listed in the project README. In particular, the included `armv4t` and
+//! `armv4t_multicore` examples should serve as a good overview of what a
+//! typical `gdbstub` integration might look like.
 //!
 //! ### The `Connection` Trait
 //!
@@ -91,48 +91,59 @@
 //!
 //! ### The `Target` Trait
 //!
-//! TODO: re-write this section to describe how the new trait-based modular
-//! approach works.
+//! The [`Target`](trait.Target.html) trait describes how to control and modify
+//! a system's execution state during a GDB debugging session, and serves as the
+//! primary bridge between `gdbstub`'s generic protocol implementation and a
+//! target's project/platform-specific code.
 //!
-//! ### Starting the debugging session
+//! For example: the `Target` trait includes a method called `read_registers()`,
+//! which the `GdbStub` calls whenever the GDB client queries the state of the
+//! target's registers.
 //!
-//! Once a `Connection` has been established and a `Target` is available, all
-//! that's left is to pass both of them over to
+//! **`Target` is the most important trait in `gdbstub`, and must be implemented
+//! by anyone who uses the library!**
+//!
+//! Please refer to the [`target` module documentation](target/index.html) for
+//! information on how to implement `Target`.
+//!
+//! ### Starting the debugging session using `GdbStub`
+//!
+//! Once a `Connection` has been established and the `Target` has been set-up,
+//! all that's left is to pass both of them over to
 //! [`GdbStub`](struct.GdbStub.html) and let it do the rest!
 //!
 //! ```rust,ignore
-//! fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     // Pre-existing setup code
-//!     let mut emu = Emu::new()?;
-//!     // ... etc ...
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! // Set-up a valid `Target`
+//! let mut target = MyTarget::new()?; // implements `Target`
 //!
-//!     // Establish a `Connection`
-//!     let connection = wait_for_gdb_connection(9001);
+//! // Establish a `Connection`
+//! let connection = wait_for_gdb_connection(9001);
 //!
-//!     // Create a new `GdbStub` using the established `Connection`.
-//!     let debugger = GdbStub::new(connection);
+//! // Create a new `GdbStub` using the established `Connection`.
+//! let mut debugger = GdbStub::new(connection);
 //!
-//!     // Instead of taking ownership of the system, GdbStub takes a &mut, yielding
-//!     // ownership once the debugging session is closed, or an error occurs.
-//!     match debugger.run(&mut emu) {
-//!         Ok(disconnect_reason) => match disconnect_reason {
-//!             DisconnectReason::Disconnect => {
-//!                 // run to completion
-//!                 while emu.step() != Some(EmuEvent::Halted) {}
-//!             }
-//!             DisconnectReason::TargetHalted => println!("Target halted!"),
-//!             DisconnectReason::Kill => {
-//!                 println!("GDB sent a kill command!");
-//!             }
+//! // Instead of taking ownership of the system, `GdbStub` takes a &mut, yielding
+//! // ownership back to the caller once the debugging session is closed.
+//! match debugger.run(&mut target) {
+//!     Ok(disconnect_reason) => match disconnect_reason {
+//!         DisconnectReason::Disconnect => {
+//!             // run to completion
+//!             while target.step() != Some(EmuEvent::Halted) {}
 //!         }
-//!         Err(GdbStubError::TargetError(e)) => {
-//!             println!("Emu raised a fatal error: {:?}", e);
+//!         DisconnectReason::TargetHalted => println!("Target halted!"),
+//!         DisconnectReason::Kill => {
+//!             println!("GDB sent a kill command!");
 //!         }
-//!         Err(e) => return Err(e.into())
 //!     }
-//!
-//!     Ok(())
+//!     Err(GdbStubError::TargetError(e)) => {
+//!         println!("Target raised a fatal error: {:?}", e);
+//!     }
+//!     Err(e) => return Err(e.into())
 //! }
+//!
+//! #   Ok(())
+//! # }
 //! ```
 
 #![cfg_attr(not(feature = "std"), no_std)]
@@ -157,6 +168,3 @@ pub mod target;
 
 pub use connection::Connection;
 pub use gdbstub_impl::*;
-
-#[doc(inline)]
-pub use target::Target;
