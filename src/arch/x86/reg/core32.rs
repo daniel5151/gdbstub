@@ -80,6 +80,7 @@ impl Registers for X86CoreRegs {
         // mxcsr
         write_bytes!(&self.mxcsr.to_le_bytes());
 
+        // padding
         (0..4).for_each(|_| write_byte(None))
     }
 
