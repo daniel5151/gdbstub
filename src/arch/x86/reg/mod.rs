@@ -34,6 +34,8 @@ pub struct X87FpuInternalRegs {
 }
 
 impl Registers for X87FpuInternalRegs {
+    type RegId = ();
+
     fn gdb_serialize(&self, mut write_byte: impl FnMut(Option<u8>)) {
         macro_rules! write_bytes {
             ($bytes:expr) => {

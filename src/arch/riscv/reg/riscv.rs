@@ -1,6 +1,26 @@
-use crate::arch::Registers;
+use crate::arch::{RegId, Registers};
 use crate::internal::LeBytes;
 use num_traits::PrimInt;
+
+/// RISC-V Register identifier.
+pub enum RiscvRegId {
+    Gpr(u8),
+    Fpr(u8),
+    Pc,
+    Csr(u16),
+    Priv,
+}
+
+impl RegId for RiscvRegId {
+    fn from_raw_id(id: usize) -> Option<(Self, usize)> {
+        // TODO: fill with missing registers (CSR and FPR)
+        match id {
+            0..=31 => Some((Self::Gpr(id as u8), 4)),
+            4161 => Some((Self::Priv, 1)),
+            _ => None,
+        }
+    }
+}
 
 /// RISC-V Integer registers.
 ///
@@ -21,6 +41,8 @@ impl<U> Registers for RiscvCoreRegs<U>
 where
     U: PrimInt + LeBytes + Default,
 {
+    type RegId = RiscvRegId;
+
     fn gdb_serialize(&self, mut write_byte: impl FnMut(Option<u8>)) {
         macro_rules! write_le_bytes {
             ($value:expr) => {

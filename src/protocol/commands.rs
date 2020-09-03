@@ -102,7 +102,7 @@ commands! {
     "T" => _t_upcase::T,
     "z" => _z::z,
     "Z" => _z_upcase::Z,
-
+    "p" => _p::p,
     // Order Matters (because of prefix matching)
     "vCont?" => vCont_question_mark::vContQuestionMark,
     "vCont" => _vCont::vCont<'a>,

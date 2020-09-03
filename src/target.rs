@@ -1,7 +1,9 @@
 use core::fmt::Debug;
 
 use crate::internal::*;
-use crate::{arch::Arch, ConsoleOutput, OptResult, Tid, TidSelector, SINGLE_THREAD_TID};
+use crate::{
+    arch::Arch, arch::Registers, ConsoleOutput, OptResult, Tid, TidSelector, SINGLE_THREAD_TID,
+};
 
 /// A collection of methods and metadata a `GdbStub` can use to control and
 /// debug a system.
@@ -104,6 +106,19 @@ pub trait Target {
         actions: Actions<'_>,
         check_gdb_interrupt: &mut dyn FnMut() -> bool,
     ) -> Result<(Tid, StopReason<<Self::Arch as Arch>::Usize>), Self::Error>;
+
+    /// Read a single register on the target.
+    ///
+    /// On multi-threaded systems, this method **must** respect the currently
+    /// selected thread (set via the `set_current_thread` method).
+    fn read_register(
+        &mut self,
+        reg_id: <<Self::Arch as Arch>::Registers as Registers>::RegId,
+        dst: &mut [u8],
+    ) -> OptResult<(), Self::Error> {
+        let _ = (dst, reg_id);
+        Err(MaybeUnimpl::no_impl())
+    }
 
     /// Read the target's registers.
     ///
@@ -375,6 +390,14 @@ macro_rules! impl_dyn_target {
                 check_gdb_interrupt: &mut dyn FnMut() -> bool,
             ) -> Result<(Tid, StopReason<<Self::Arch as Arch>::Usize>), Self::Error> {
                 (**self).resume(actions, check_gdb_interrupt)
+            }
+
+            fn read_register(
+                &mut self,
+                reg_number: <<Self::Arch as Arch>::Registers as Registers>::RegId,
+                dst: &mut [u8],
+            ) -> OptResult<(), Self::Error> {
+                (**self).read_register(reg_number, dst)
             }
 
             fn read_registers(
