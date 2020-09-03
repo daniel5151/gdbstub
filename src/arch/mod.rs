@@ -12,6 +12,7 @@
 pub mod arm;
 pub mod mips;
 pub mod msp430;
+pub mod ppc;
 pub mod riscv;
 mod traits;
 pub mod x86;
