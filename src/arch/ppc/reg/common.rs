@@ -3,14 +3,15 @@ use crate::arch::Registers;
 
 use core::convert::TryInto;
 
-/// 32-bit PowerPC core registers.
+/// 32-bit PowerPC core registers, fpu registers, and altivec SIMD registers.
 ///
 /// Sources:
-/// * https://github.com/bminor/binutils-gdb/blob/master/gdb/features/rs6000/powerpc-32.xml
+/// * https://github.com/bminor/binutils-gdb/blob/master/gdb/features/rs6000/powerpc-altivec32.xml
 /// * https://github.com/bminor/binutils-gdb/blob/master/gdb/features/rs6000/power-core.xml
 /// * https://github.com/bminor/binutils-gdb/blob/master/gdb/features/rs6000/power-fpu.xml
+/// * https://github.com/bminor/binutils-gdb/blob/master/gdb/features/rs6000/power-altivec.xml
 #[derive(Default, Debug, PartialEq)]
-pub struct PowerPcCoreRegs {
+pub struct PowerPcCommonRegs {
     /// General purpose registers
     pub r: [u32; 32],
     /// Float registers
@@ -37,7 +38,7 @@ pub struct PowerPcCoreRegs {
     pub vrsave: u32,
 }
 
-impl Registers for PowerPcCoreRegs {
+impl Registers for PowerPcCommonRegs {
     fn gdb_serialize(&self, mut write_byte: impl FnMut(Option<u8>)) {
         macro_rules! write_bytes {
             ($bytes:expr) => {
@@ -78,20 +79,20 @@ impl Registers for PowerPcCoreRegs {
             return Err(());
         }
 
-        let regs = bytes[0..0x80]
+        let mut regs = bytes[0..0x80]
             .chunks_exact(4)
             .map(|x| u32::from_le_bytes(x.try_into().unwrap()));
 
-        for (i, reg) in regs.enumerate() {
-            self.r[i] = reg;
+        for reg in &mut self.r {
+            *reg = regs.next().ok_or(())?;
         }
 
-        let regs = bytes[0x80..0x180]
+        let mut regs = bytes[0x80..0x180]
             .chunks_exact(8)
             .map(|x| f64::from_le_bytes(x.try_into().unwrap()));
 
-        for (i, reg) in regs.enumerate() {
-            self.f[i] = reg;
+        for reg in &mut self.f {
+            *reg = regs.next().ok_or(())?;
         }
 
         macro_rules! parse_regs {
@@ -107,12 +108,12 @@ impl Registers for PowerPcCoreRegs {
 
         parse_regs!(0x180..0x19c, pc, msr, cr, lr, ctr, xer, fpscr);
 
-        let regs = bytes[0x19c..0x39c]
+        let mut regs = bytes[0x19c..0x39c]
             .chunks_exact(0x10)
             .map(|x| u128::from_le_bytes(x.try_into().unwrap()));
 
-        for (i, reg) in regs.enumerate() {
-            self.vr[i] = reg.into();
+        for reg in &mut self.vr {
+            *reg = regs.next().ok_or(())?.into();
         }
 
         parse_regs!(0x39c..0x3a4, vscr, vrsave);
@@ -122,12 +123,12 @@ impl Registers for PowerPcCoreRegs {
 }
 
 #[cfg(test)]
-mod ppc_core_tests {
+mod tests {
     use super::*;
 
     #[test]
     fn ppc_core_round_trip() {
-        let regs_before = PowerPcCoreRegs {
+        let regs_before = PowerPcCommonRegs {
             r: [1; 32],
             pc: 2,
             msr: 3,
@@ -150,7 +151,7 @@ mod ppc_core_tests {
 
         assert_eq!(data.len(), 0x3a4);
 
-        let mut regs_after = PowerPcCoreRegs::default();
+        let mut regs_after = PowerPcCommonRegs::default();
         regs_after.gdb_deserialize(&data).unwrap();
 
         assert_eq!(regs_before, regs_after);

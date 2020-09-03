@@ -4,15 +4,15 @@ use crate::arch::Arch;
 
 pub mod reg;
 
-/// Implements `Arch` for 64-bit PowerPC
+/// Implements `Arch` for 32-bit PowerPC
 #[derive(Eq, PartialEq)]
-pub struct PowerPc;
+pub struct PowerPcAltivec32;
 
-impl Arch for PowerPc {
+impl Arch for PowerPcAltivec32 {
     type Usize = u32;
-    type Registers = reg::PowerPcCoreRegs;
+    type Registers = reg::PowerPcCommonRegs;
 
     fn target_description_xml() -> Option<&'static str> {
-        Some(r#"<target version="1.0"><architecture>powerpc:common</architecture></target>"#)
+        Some(r#"<target version="1.0"><architecture>powerpc:common</architecture><feature name="org.gnu.gdb.power.core"></feature><feature name="org.gnu.gdb.power.fpu"></feature><feature name="org.gnu.gdb.power.altivec"></feature></target>"#)
     }
 }
