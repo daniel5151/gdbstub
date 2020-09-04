@@ -4,7 +4,7 @@ use crate::arch::Arch;
 
 pub mod reg;
 
-/// Implements `Arch` for 32-bit PowerPC
+/// Implements `Arch` for 32-bit PowerPC + AltiVec SIMD
 #[derive(Eq, PartialEq)]
 pub struct PowerPcAltivec32;
 

@@ -3,7 +3,7 @@ use crate::arch::Registers;
 
 use core::convert::TryInto;
 
-/// 32-bit PowerPC core registers, fpu registers, and altivec SIMD registers.
+/// 32-bit PowerPC core registers, FPU registers, and AltiVec SIMD registers.
 ///
 /// Sources:
 /// * https://github.com/bminor/binutils-gdb/blob/master/gdb/features/rs6000/powerpc-altivec32.xml
@@ -67,7 +67,7 @@ impl Registers for PowerPcCommonRegs {
         write_regs!(pc, msr, cr, lr, ctr, xer, fpscr);
 
         for &reg in &self.vr {
-            let reg: u128 = reg.into();
+            let reg: u128 = reg;
             write_bytes!(&reg.to_be_bytes());
         }
 
@@ -113,7 +113,7 @@ impl Registers for PowerPcCommonRegs {
             .map(|x| u128::from_be_bytes(x.try_into().unwrap()));
 
         for reg in &mut self.vr {
-            *reg = regs.next().ok_or(())?.into();
+            *reg = regs.next().ok_or(())?;
         }
 
         parse_regs!(0x39c..0x3a4, vscr, vrsave);
