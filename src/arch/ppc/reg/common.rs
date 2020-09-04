@@ -51,24 +51,24 @@ impl Registers for PowerPcCommonRegs {
         macro_rules! write_regs {
             ($($reg:ident),*) => {
                 $(
-                    write_bytes!(&self.$reg.to_le_bytes());
+                    write_bytes!(&self.$reg.to_be_bytes());
                 )*
             }
         }
 
         for reg in &self.r {
-            write_bytes!(&reg.to_le_bytes());
+            write_bytes!(&reg.to_be_bytes());
         }
 
         for reg in &self.f {
-            write_bytes!(&reg.to_le_bytes());
+            write_bytes!(&reg.to_be_bytes());
         }
 
         write_regs!(pc, msr, cr, lr, ctr, xer, fpscr);
 
         for &reg in &self.vr {
             let reg: u128 = reg.into();
-            write_bytes!(&reg.to_le_bytes());
+            write_bytes!(&reg.to_be_bytes());
         }
 
         write_regs!(vscr, vrsave);
@@ -81,7 +81,7 @@ impl Registers for PowerPcCommonRegs {
 
         let mut regs = bytes[0..0x80]
             .chunks_exact(4)
-            .map(|x| u32::from_le_bytes(x.try_into().unwrap()));
+            .map(|x| u32::from_be_bytes(x.try_into().unwrap()));
 
         for reg in &mut self.r {
             *reg = regs.next().ok_or(())?;
@@ -89,7 +89,7 @@ impl Registers for PowerPcCommonRegs {
 
         let mut regs = bytes[0x80..0x180]
             .chunks_exact(8)
-            .map(|x| f64::from_le_bytes(x.try_into().unwrap()));
+            .map(|x| f64::from_be_bytes(x.try_into().unwrap()));
 
         for reg in &mut self.f {
             *reg = regs.next().ok_or(())?;
@@ -99,7 +99,7 @@ impl Registers for PowerPcCommonRegs {
             ($start:literal..$end:literal, $($reg:ident),*) => {
                 let mut regs = bytes[$start..$end]
                     .chunks_exact(4)
-                    .map(|x| u32::from_le_bytes(x.try_into().unwrap()));
+                    .map(|x| u32::from_be_bytes(x.try_into().unwrap()));
                 $(
                     self.$reg = regs.next().ok_or(())?;
                 )*
@@ -110,7 +110,7 @@ impl Registers for PowerPcCommonRegs {
 
         let mut regs = bytes[0x19c..0x39c]
             .chunks_exact(0x10)
-            .map(|x| u128::from_le_bytes(x.try_into().unwrap()));
+            .map(|x| u128::from_be_bytes(x.try_into().unwrap()));
 
         for reg in &mut self.vr {
             *reg = regs.next().ok_or(())?.into();
@@ -138,7 +138,7 @@ mod tests {
             xer: 7,
             fpscr: 8,
             f: [9.0; 32],
-            vr: [PpcVector::from([0u16, 1, 2, 3, 4, 5, 6, 7]); 32],
+            vr: [52; 32],
             vrsave: 10,
             vscr: 11,
         };
