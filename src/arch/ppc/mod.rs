@@ -13,6 +13,8 @@ impl Arch for PowerPcAltivec32 {
     type Registers = reg::PowerPcCommonRegs;
 
     fn target_description_xml() -> Option<&'static str> {
-        Some(r#"<target version="1.0"><architecture>powerpc:common</architecture><feature name="org.gnu.gdb.power.core"></feature><feature name="org.gnu.gdb.power.fpu"></feature><feature name="org.gnu.gdb.power.altivec"></feature></target>"#)
+        Some(
+            r#"<target version="1.0"><architecture>powerpc:common</architecture><feature name="org.gnu.gdb.power.core"></feature><feature name="org.gnu.gdb.power.fpu"></feature><feature name="org.gnu.gdb.power.altivec"></feature></target>"#,
+        )
     }
 }
