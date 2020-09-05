@@ -2,6 +2,7 @@ use core::marker::PhantomData;
 
 use managed::ManagedSlice;
 
+use crate::protocol::commands::ParseCommand;
 use crate::{
     arch::{Arch, RegId, Registers},
     connection::Connection,
@@ -134,7 +135,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         };
 
         loop {
-            match Self::recv_packet(conn, packet_buffer)? {
+            match Self::recv_packet(conn, target, packet_buffer)? {
                 Packet::Ack => {}
                 Packet::Nack => {
                     unimplemented!("GDB nack'd the packet, but retry isn't implemented yet")
@@ -180,6 +181,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
     fn recv_packet<'a, 'b>(
         conn: &mut C,
+        target: &mut T,
         pkt_buf: &'a mut ManagedSlice<'b, u8>,
     ) -> Result<Packet<'a>, Error<T::Error, C::Error>> {
         let header_byte = conn.read().map_err(Error::ConnectionRead)?;
@@ -206,7 +208,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         drop(buf);
 
         let len = pkt_buf.len();
-        match Packet::from_buf(&mut pkt_buf.as_mut()[..len]) {
+        match Packet::from_buf(target, &mut pkt_buf.as_mut()[..len]) {
             Ok(packet) => Ok(packet),
             Err(e) => {
                 // TODO: preserve this context within Error::PacketParse
@@ -566,8 +568,22 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 }
             }
 
-            // ------------------ "Extended" Functionality ------------------ //
-            Command::qRcmd(cmd) => {
+            // -------------------- Protocol Extensions --------------------- //
+            // > Hey, what's with the calls to `__protocol_hint_(target)`?
+            //
+            // If a target doesn't implement the packet's corresponding protocol extension, it would
+            // be nice if the Rust compiler would simply "omit" the entire packet handler from the
+            // output binary. The `__protocol_hint_` method "nudges" the Rust compiler in the right
+            // direction, and basically guarantees that the match arm is optimized out in release
+            // build binaries.
+            //
+            // Of course, this optimization likely won't occur if `GdbStub` is monomorphised with a
+            // `Box<Target>` or `&dyn Target`. Fortunately, in those cases, it's likely that
+            // `gdbstub` is being used in a "hosted" environment (e.g: an emulator), where a bit
+            // more binary bloat won't necessarily be the end of the world...
+            Command::qRcmd(cmd) if cmd.__protocol_hint_(target) => {
+                crate::__dead_code_marker!("qRcmd", "impl");
+
                 if let Some(ops) = target.monitor_cmd() {
                     let mut err: Result<_, Error<T::Error, C::Error>> = Ok(());
                     let mut callback = |msg: &[u8]| {

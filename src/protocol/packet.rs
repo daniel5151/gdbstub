@@ -1,4 +1,5 @@
 use crate::protocol::{common::decode_hex, Command, CommandParseError};
+use crate::target::Target;
 
 /// Packet parse error.
 #[derive(Debug)]
@@ -96,7 +97,10 @@ impl<'a> PacketBuf<'a> {
 }
 
 impl<'a> Packet<'a> {
-    pub fn from_buf(buf: &'a mut [u8]) -> Result<Packet<'a>, PacketParseError<'a>> {
+    pub fn from_buf(
+        target: &mut impl Target,
+        buf: &'a mut [u8],
+    ) -> Result<Packet<'a>, PacketParseError<'a>> {
         // cannot have empty packet
         if buf.is_empty() {
             return Err(PacketParseError::EmptyBuf);
@@ -104,7 +108,7 @@ impl<'a> Packet<'a> {
 
         match buf[0] {
             b'$' => Ok(Packet::Command(
-                Command::from_packet(PacketBuf::new(buf)?)
+                Command::from_packet(target, PacketBuf::new(buf)?)
                     .map_err(PacketParseError::MalformedCommand)?,
             )),
             b'+' => Ok(Packet::Ack),

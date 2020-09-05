@@ -1,4 +1,5 @@
-mod commands;
+pub(crate) mod commands;
+
 mod common;
 mod console_output;
 mod packet;
