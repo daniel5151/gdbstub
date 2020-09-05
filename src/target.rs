@@ -138,6 +138,19 @@ pub trait Target {
         regs: &<Self::Arch as Arch>::Registers,
     ) -> Result<(), Self::Error>;
 
+    /// Write a single register on the target.
+    ///
+    /// On multi-threaded systems, this method **must** respect the currently
+    /// selected thread (set via the `set_current_thread` method).
+    fn write_register(
+        &mut self,
+        reg_id: <<Self::Arch as Arch>::Registers as Registers>::RegId,
+        val: &[u8],
+    ) -> OptResult<(), Self::Error> {
+        let _ = (reg_id, val);
+        Err(MaybeUnimpl::no_impl())
+    }
+
     /// Read bytes from the specified address range.
     ///
     /// ### Handling non-fatal invalid memory reads
@@ -412,6 +425,14 @@ macro_rules! impl_dyn_target {
                 regs: &<Self::Arch as Arch>::Registers,
             ) -> Result<(), Self::Error> {
                 (**self).write_registers(regs)
+            }
+
+            fn write_register(
+                &mut self,
+                reg_number: <<Self::Arch as Arch>::Registers as Registers>::RegId,
+                val: &[u8],
+            ) -> OptResult<(), Self::Error> {
+                (**self).write_register(reg_number, val)
             }
 
             fn read_addrs(
