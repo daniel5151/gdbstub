@@ -6,7 +6,7 @@ use crate::internal::BeBytes;
 ///
 /// These identifiers are used by GDB for single register operations.
 pub trait RegId: Sized {
-    /// Map raw GDB register number to a (RegId, register size).
+    /// Map raw GDB register number corresponding `RegId` and register size.
     ///
     /// Returns `None` if the register is not available.
     fn from_raw_id(id: usize) -> Option<(Self, usize)>;
@@ -31,8 +31,12 @@ impl RegId for () {
 pub trait Registers: Default {
     /// Register identifier for addressing single registers.
     ///
-    /// If your target does not implement that feature, you can use `RegId = ()`
-    /// as a default, which implements the `RegId` trait.
+    /// Architectures that do not implement single register read can safely use
+    /// `RegId = ()` as a default.
+    ///
+    /// **Note**: the use `RegId = ()` in most architectures is temporary.
+    /// Contributions to implement `RegId` for architectures are welcome! Feel
+    /// free to open an issue/PR to get some support.
     type RegId: RegId;
 
     /// Serialize `self` into a GDB register bytestream.
