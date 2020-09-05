@@ -311,3 +311,40 @@ pub trait Target {
         None
     }
 }
+
+macro_rules! impl_dyn_target {
+    ($type:ty) => {
+        #[allow(clippy::type_complexity)]
+        impl<A, E> Target for $type
+        where
+            A: Arch,
+        {
+            type Arch = A;
+            type Error = E;
+
+            fn base_ops(&mut self) -> base::BaseOps<Self::Arch, Self::Error> {
+                (**self).base_ops()
+            }
+
+            fn sw_breakpoint(&mut self) -> ext::SwBreakpointExt<Self> {
+                (**self).sw_breakpoint()
+            }
+
+            fn hw_breakpoint(&mut self) -> Option<ext::HwBreakpointExt<Self>> {
+                (**self).hw_breakpoint()
+            }
+
+            fn hw_watchpoint(&mut self) -> Option<ext::HwWatchpointExt<Self>> {
+                (**self).hw_watchpoint()
+            }
+
+            fn monitor_cmd(&mut self) -> Option<ext::MonitorCmdExt<Self>> {
+                (**self).monitor_cmd()
+            }
+        }
+    };
+}
+
+impl_dyn_target!(&mut dyn Target<Arch = A, Error = E>);
+#[cfg(feature = "alloc")]
+impl_dyn_target!(alloc::boxed::Box<dyn Target<Arch = A, Error = E>>);
