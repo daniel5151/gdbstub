@@ -6,7 +6,13 @@ pub struct qRcmd<'a> {
 }
 
 impl<'a> ParseCommand<'a> for qRcmd<'a> {
+    fn __protocol_hint(target: &mut impl Target) -> bool {
+        target.monitor_cmd().is_some()
+    }
+
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
+        crate::__dead_code_marker!("qRcmd", "from_packet");
+
         let body = buf.into_body();
         match body {
             [] => Some(qRcmd { hex_cmd: &[] }),

@@ -8,3 +8,5 @@ mod le_bytes;
 
 pub use be_bytes::*;
 pub use le_bytes::*;
+
+pub(crate) mod dead_code_marker;
