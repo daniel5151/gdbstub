@@ -1,5 +1,9 @@
 use super::prelude::*;
 
+// TODO: instead of parsing lazily when invoked, parse the strings into a
+// compressed binary representations that can be stuffed back into the packet
+// buffer, and return an iterator over the binary data that's _guaranteed_ to be
+// valid. This would clean up some of the code in the vCont handler.
 #[derive(Debug)]
 pub struct vCont<'a> {
     pub actions: Actions<'a>,
@@ -14,22 +18,23 @@ impl<'a> ParseCommand<'a> for vCont<'a> {
     }
 }
 
+/// A lazily evaluated iterator over the actions specified in a vCont packet.
 #[derive(Debug)]
 pub struct Actions<'a>(&'a str);
 
 impl<'a> Actions<'a> {
-    pub fn into_iter(self) -> impl Iterator<Item = Result<VContAction, &'static str>> + 'a {
-        self.0.split(';').map(|act| {
+    pub fn into_iter(self) -> impl Iterator<Item = Option<VContAction>> + 'a {
+        self.0.split(';').skip(1).map(|act| {
             let mut s = act.split(':');
-            let kind = s.next().ok_or("missing kind")?;
-            let tid = match s.next() {
-                Some(s) => Some(s.parse::<Tid>().map_err(|_| "invalid tid")?),
+            let kind = s.next()?;
+            let thread = match s.next() {
+                Some(s) => Some(s.parse::<ThreadId>().ok()?),
                 None => None,
             };
 
-            Ok(VContAction {
-                kind: kind.parse().map_err(|_| "invalid kind")?,
-                tid,
+            Some(VContAction {
+                kind: VContKind::from_str(kind)?,
+                thread,
             })
         })
     }
@@ -38,7 +43,7 @@ impl<'a> Actions<'a> {
 #[derive(PartialEq, Eq, Debug)]
 pub struct VContAction {
     pub kind: VContKind,
-    pub tid: Option<Tid>,
+    pub thread: Option<ThreadId>,
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -51,27 +56,26 @@ pub enum VContKind {
     Stop,
 }
 
-impl core::str::FromStr for VContKind {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<VContKind, ()> {
+impl VContKind {
+    fn from_str(s: &str) -> Option<VContKind> {
         use self::VContKind::*;
 
         let mut s = s.split(' ');
         let res = match s.next().unwrap() {
             "c" => Continue,
-            "C" => ContinueWithSig(decode_hex(s.next().ok_or(())?.as_bytes()).map_err(drop)?),
+            "C" => ContinueWithSig(decode_hex(s.next()?.as_bytes()).ok()?),
             "s" => Step,
-            "S" => StepWithSig(decode_hex(s.next().ok_or(())?.as_bytes()).map_err(drop)?),
+            "S" => StepWithSig(decode_hex(s.next()?.as_bytes()).ok()?),
             "t" => Stop,
             "r" => {
-                let mut range = s.next().ok_or(())?.split(',');
-                let start = decode_hex(range.next().ok_or(())?.as_bytes()).map_err(drop)?;
-                let end = decode_hex(range.next().ok_or(())?.as_bytes()).map_err(drop)?;
+                let mut range = s.next()?.split(',');
+                let start = decode_hex(range.next()?.as_bytes()).ok()?;
+                let end = decode_hex(range.next()?.as_bytes()).ok()?;
                 RangeStep(start, end)
             }
-            _ => return Err(()),
+            _ => return None,
         };
-        Ok(res)
+
+        Some(res)
     }
 }

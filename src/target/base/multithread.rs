@@ -1,15 +1,39 @@
+//! Base debugging operations for multi threaded targets.
+
 use crate::arch::{Arch, Registers};
-use crate::target::base::*;
+use crate::target::ext::breakpoint::WatchKind;
 use crate::target::Target;
 
-/// Base debugging operations for multi threaded targets
+// Convenient re-export
+pub use super::ResumeAction;
+
+/// Thread ID
+// TODO: FUTURE: expose full PID.TID (i.e: the ThreadId struct) to client?
+pub type Tid = core::num::NonZeroUsize;
+
+/// Selects a thread corresponding to a ResumeAction.
+// NOTE: this is a subset of the internal `IdKind` type, albeit without an `Any` variant. Selecting
+// `Any` thread is something that's handled by `gdbstub` internally, and shouldn't be exposed to the
+// end user.
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
+pub enum TidSelector {
+    /// Thread with a specific ID.
+    WithID(Tid),
+    /// All (other) threads.
+    All,
+}
+
+/// Base debugging operations for multi threaded targets.
 #[allow(clippy::type_complexity)]
-pub trait MultiThread: Target {
+pub trait MultiThreadOps: Target {
     /// Resume execution on the target.
     ///
-    /// `actions` specifies how various threads should be resumed (i.e:
-    /// single-step vs. resume). It is _guaranteed_ to contain at least one
-    /// action.
+    /// `actions` is an iterator over `(TidSelector, ResumeAction)` pairs which
+    /// specify how various threads should be resumed (i.e: single-step vs.
+    /// resume). It is _guaranteed_ to contain at least one action. It is not
+    /// guaranteed to be exhaustive over all live threads, and any threads
+    /// without a corresponding `TidSelector` should be left in the same state
+    /// (if possible).
     ///
     /// The `check_gdb_interrupt` callback can be invoked to check if GDB sent
     /// an Interrupt packet (i.e: the user pressed Ctrl-C). It's recommended to
@@ -43,7 +67,7 @@ pub trait MultiThread: Target {
     /// At the moment, `gdbstub` only supports GDB's
     /// ["All-Stop" mode](https://sourceware.org/gdb/current/onlinedocs/gdb/All_002dStop-Mode.html),
     /// whereby _all_ threads should be stopped when returning from `resume`
-    /// (not just the thread responsible for the `StopReason`).
+    /// (not just the thread associated with the `ThreadStopReason`).
     ///
     /// ### Bare-Metal Targets
     ///
@@ -58,7 +82,7 @@ pub trait MultiThread: Target {
         &mut self,
         actions: Actions<'_>,
         check_gdb_interrupt: &mut dyn FnMut() -> bool,
-    ) -> Result<(Tid, StopReason<<Self::Arch as Arch>::Usize>), Self::Error>;
+    ) -> Result<ThreadStopReason<<Self::Arch as Arch>::Usize>, Self::Error>;
 
     /// Read the target's registers.
     fn read_registers(
@@ -163,8 +187,8 @@ pub trait MultiThread: Target {
 
     /// List all currently active threads.
     ///
-    /// See [the section above](#handling-threads-on-bare-metal-hardware) on
-    /// implementing thread-related methods on bare-metal (threadless) targets.
+    /// See [the section above](#bare-metal-targets) on implementing
+    /// thread-related methods on bare-metal (threadless) targets.
     fn list_active_threads(
         &mut self,
         thread_is_active: &mut dyn FnMut(Tid),
@@ -184,5 +208,58 @@ pub trait MultiThread: Target {
             }
         })?;
         Ok(found)
+    }
+}
+
+/// Describes why a thread stopped.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ThreadStopReason<U> {
+    /// Completed the single-step request.
+    DoneStep,
+    /// `check_gdb_interrupt` returned `true`
+    GdbInterrupt,
+    /// Halted
+    Halted,
+    /// A thread hit a software breakpoint (e.g. due to a trap instruction).
+    ///
+    /// NOTE: This does not necessarily have to be a breakpoint configured by
+    /// the client/user of the current GDB session.
+    SwBreak(Tid),
+    /// A thread hit a hardware breakpoint.
+    HwBreak(Tid),
+    /// A thread hit a watchpoint.
+    Watch {
+        /// Which thread hit the watchpoint
+        tid: Tid,
+        /// Kind of watchpoint that was hit
+        kind: WatchKind,
+        /// Address of watched memory
+        addr: U,
+    },
+    /// The program received a signal
+    Signal(u8),
+}
+
+/// An iterator of `(TidSelector, ResumeAction)` used to specify how threads
+/// should be resumed when running in multi threaded mode. It is _guaranteed_ to
+/// contain at least one action.
+///
+/// See the documentation for
+/// [`Target::resume`](trait.Target.html#tymethod.resume) for more details.
+pub struct Actions<'a> {
+    inner: &'a mut dyn Iterator<Item = (TidSelector, ResumeAction)>,
+}
+
+impl Actions<'_> {
+    pub(crate) fn new(iter: &mut dyn Iterator<Item = (TidSelector, ResumeAction)>) -> Actions<'_> {
+        Actions { inner: iter }
+    }
+}
+
+impl Iterator for Actions<'_> {
+    type Item = (TidSelector, ResumeAction);
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
     }
 }

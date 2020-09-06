@@ -1,10 +1,15 @@
+//! Base debugging operations for single threaded targets.
+
 use crate::arch::{Arch, Registers};
-use crate::target::base::*;
+use crate::target::ext::breakpoint::WatchKind;
 use crate::target::Target;
 
-/// Base debugging operations for single threaded targets
+// Convenient re-export
+pub use super::ResumeAction;
+
+/// Base debugging operations for single threaded targets.
 #[allow(clippy::type_complexity)]
-pub trait SingleThread: Target {
+pub trait SingleThreadOps: Target {
     /// Resume execution on the target.
     ///
     /// `action` specifies how the target should be resumed (i.e:
@@ -134,4 +139,34 @@ pub trait SingleThread: Target {
         start_addr: <Self::Arch as Arch>::Usize,
         data: &[u8],
     ) -> Result<bool, Self::Error>;
+}
+
+/// Describes why the target stopped.
+// NOTE: This is a simplified version of `multithread::ThreadStopReason` that omits any references
+// to Tid or threads. Internally, it is converted into multithread::ThreadStopReason.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum StopReason<U> {
+    /// Completed the single-step request.
+    DoneStep,
+    /// `check_gdb_interrupt` returned `true`
+    GdbInterrupt,
+    /// Halted
+    Halted,
+    /// Hit a software breakpoint (e.g. due to a trap instruction).
+    ///
+    /// NOTE: This does not necessarily have to be a breakpoint configured by
+    /// the client/user of the current GDB session.
+    SwBreak,
+    /// Hit a hardware breakpoint.
+    HwBreak,
+    /// Hit a watchpoint.
+    Watch {
+        /// Kind of watchpoint that was hit
+        kind: WatchKind,
+        /// Address of watched memory
+        addr: U,
+    },
+    /// The program received a signal
+    Signal(u8),
 }

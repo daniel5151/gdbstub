@@ -1,10 +1,12 @@
 use armv4t_emu::Memory;
 
+#[derive(Debug)]
 pub enum AccessKind {
     Read,
     Write,
 }
 
+#[derive(Debug)]
 pub struct Access {
     pub kind: AccessKind,
     pub addr: u32,

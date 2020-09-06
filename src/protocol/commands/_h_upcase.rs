@@ -1,9 +1,15 @@
 use super::prelude::*;
 
 #[derive(PartialEq, Eq, Debug)]
+pub enum Op {
+    StepContinue,
+    Other,
+}
+
+#[derive(PartialEq, Eq, Debug)]
 pub struct H {
-    pub kind: char, // TODO: make this an enum
-    pub tid: Tid,
+    pub kind: Op,
+    pub thread: ThreadId,
 }
 
 impl<'a> ParseCommand<'a> for H {
@@ -13,9 +19,13 @@ impl<'a> ParseCommand<'a> for H {
             return None;
         }
 
-        let kind = body.chars().next()?;
-        let tid = body[1..].parse::<Tid>().ok()?;
+        let kind = match body.chars().next()? {
+            'g' => Op::Other,
+            'c' => Op::StepContinue,
+            _ => return None,
+        };
+        let thread = body[1..].parse::<ThreadId>().ok()?;
 
-        Some(H { kind, tid })
+        Some(H { kind, thread })
     }
 }

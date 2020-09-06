@@ -1,21 +1,26 @@
 use armv4t_emu::{reg, Memory};
 use gdbstub::arch;
-use gdbstub::target::base::{Actions, ResumeAction, StopReason, Tid};
+use gdbstub::target::base::multithread::{
+    Actions, MultiThreadOps, ResumeAction, ThreadStopReason, Tid,
+};
 use gdbstub::target::ext::breakpoint::WatchKind;
 use gdbstub::target::ext::monitor::{outputln, ConsoleOutput};
 use gdbstub::target::{base, ext, Target};
 
 use crate::emu::{CpuId, Emu, Event};
 
-fn event_to_stopreason(e: Event) -> StopReason<u32> {
+fn event_to_stopreason(e: Event, id: CpuId) -> ThreadStopReason<u32> {
+    let tid = cpuid_to_tid(id);
     match e {
-        Event::Halted => StopReason::Halted,
-        Event::Break => StopReason::HwBreak,
-        Event::WatchWrite(addr) => StopReason::Watch {
+        Event::Halted => ThreadStopReason::Halted,
+        Event::Break => ThreadStopReason::SwBreak(tid),
+        Event::WatchWrite(addr) => ThreadStopReason::Watch {
+            tid,
             kind: WatchKind::Write,
             addr,
         },
-        Event::WatchRead(addr) => StopReason::Watch {
+        Event::WatchRead(addr) => ThreadStopReason::Watch {
+            tid,
             kind: WatchKind::Read,
             addr,
         },
@@ -58,49 +63,41 @@ impl Target for Emu {
     }
 }
 
-impl base::MultiThread for Emu {
+impl MultiThreadOps for Emu {
     fn resume(
         &mut self,
         actions: Actions,
         check_gdb_interrupt: &mut dyn FnMut() -> bool,
-    ) -> Result<(Tid, StopReason<u32>), Self::Error> {
-        // in this emulator, we ignore the Tid associated with the action, and only care
-        // if GDB requests execution to start / stop. Each core runs in lock-step.
+    ) -> Result<ThreadStopReason<u32>, Self::Error> {
+        // in this emulator, each core runs in lock-step, so we can ignore the
+        // TidSelector associated with each action, and only care if GDB
+        // requests execution to start / stop.
         //
         // In general, the behavior of multi-threaded systems during debugging is
         // determined by the system scheduler. On certain systems, this behavior can be
         // configured using the GDB command `set scheduler-locking _mode_`, but at the
-        // moment, `gdbstub` doesn't plumb-through that option.
+        // moment, `gdbstub` doesn't plumb-through that configuration command.
 
+        // FIXME: properly handle multiple actions...
         let actions = actions.collect::<Vec<_>>();
-        if actions.len() != 1 {
-            // AFAIK, this will never happen on such a simple system. Plus, it's just an
-            // example, cut me some slack!
-            return Err("too lazy to implement support for more than one action :P");
-        }
-        let (tid_selector, action) = actions[0];
-
-        let tid = match tid_selector {
-            base::TidSelector::WithID(id) => id,
-            _ => cpuid_to_tid(CpuId::Cpu), // ...
-        };
+        let (_, action) = actions[0];
 
         match action {
             ResumeAction::Step => match self.step() {
-                Some((event, id)) => Ok((cpuid_to_tid(id), event_to_stopreason(event))),
-                None => Ok((tid, StopReason::DoneStep)),
+                Some((event, id)) => Ok(event_to_stopreason(event, id)),
+                None => Ok(ThreadStopReason::DoneStep),
             },
             ResumeAction::Continue => {
                 let mut cycles: usize = 0;
                 loop {
                     // check for GDB interrupt every 1024 instructions
                     if cycles % 1024 == 0 && check_gdb_interrupt() {
-                        return Ok((tid, StopReason::GdbInterrupt));
+                        return Ok(ThreadStopReason::GdbInterrupt);
                     }
                     cycles += 1;
 
                     if let Some((event, id)) = self.step() {
-                        return Ok((cpuid_to_tid(id), event_to_stopreason(event)));
+                        return Ok(event_to_stopreason(event, id));
                     };
                 }
             }
@@ -205,26 +202,33 @@ impl ext::breakpoint::SwBreakpoint for Emu {
 
 impl ext::breakpoint::HwWatchpoint for Emu {
     fn add_hw_watchpoint(&mut self, addr: u32, kind: WatchKind) -> Result<bool, &'static str> {
+        self.watchpoints.push(addr);
+
+        let entry = self.watchpoint_kind.entry(addr).or_insert((false, false));
         match kind {
-            WatchKind::Write => self.watchpoints.push(addr),
-            WatchKind::Read => self.watchpoints.push(addr),
-            WatchKind::ReadWrite => self.watchpoints.push(addr),
+            WatchKind::Write => entry.1 = true,
+            WatchKind::Read => entry.0 = true,
+            WatchKind::ReadWrite => entry.0 = true, // arbitrary
         };
 
         Ok(true)
     }
 
     fn remove_hw_watchpoint(&mut self, addr: u32, kind: WatchKind) -> Result<bool, &'static str> {
-        let pos = match self.watchpoints.iter().position(|x| *x == addr) {
-            None => return Ok(false),
-            Some(pos) => pos,
+        let entry = self.watchpoint_kind.entry(addr).or_insert((false, false));
+        match kind {
+            WatchKind::Write => entry.1 = false,
+            WatchKind::Read => entry.0 = false,
+            WatchKind::ReadWrite => entry.0 = false, // arbitrary
         };
 
-        match kind {
-            WatchKind::Write => self.watchpoints.remove(pos),
-            WatchKind::Read => self.watchpoints.remove(pos),
-            WatchKind::ReadWrite => self.watchpoints.remove(pos),
-        };
+        if !self.watchpoint_kind.contains_key(&addr) {
+            let pos = match self.watchpoints.iter().position(|x| *x == addr) {
+                None => return Ok(false),
+                Some(pos) => pos,
+            };
+            self.watchpoints.remove(pos);
+        }
 
         Ok(true)
     }

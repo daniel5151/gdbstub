@@ -1,3 +1,16 @@
+//! ------------------------------------------------------------------------ !//
+//! ------------------------------ DISCLAIMER ------------------------------ !//
+//! ------------------------------------------------------------------------ !//
+//!
+//! This code is absolutely awful, and completely slapped together for the sake
+//! of example. The watchpoint implementation is particularly awful.
+//!
+//! While it technically "gets the job done" and provides a simple multicore
+//! system that can be debugged, it would really merit a re-write, since it's
+//! not a good example of "proper Rust coding practices"
+
+use std::collections::HashMap;
+
 use armv4t_emu::{reg, Cpu, ExampleMem, Memory, Mode};
 
 use crate::mem_sniffer::{AccessKind, MemSniffer};
@@ -26,7 +39,13 @@ pub struct Emu {
     pub(crate) mem: ExampleMem,
 
     pub(crate) watchpoints: Vec<u32>,
+    /// (read, write)
+    pub(crate) watchpoint_kind: HashMap<u32, (bool, bool)>,
     pub(crate) breakpoints: Vec<u32>,
+
+    // GDB seems to get gets very confused if two threads are executing the exact same code at the
+    // exact same time. Maybe this is a bug with `gdbstub`?
+    stall_cop_cycles: usize,
 }
 
 impl Emu {
@@ -70,14 +89,20 @@ impl Emu {
             cop,
             mem,
             watchpoints: Vec::new(),
+            watchpoint_kind: HashMap::new(),
             breakpoints: Vec::new(),
+            stall_cop_cycles: 24,
         })
     }
 
     pub fn step_core(&mut self, id: CpuId) -> Option<Event> {
         let cpu = match id {
-            CpuId::Cpu => &mut self.cpu,
+            CpuId::Cop if self.stall_cop_cycles != 0 => {
+                self.stall_cop_cycles -= 1;
+                return None;
+            }
             CpuId::Cop => &mut self.cop,
+            CpuId::Cpu => &mut self.cpu,
         };
 
         // set up magic memory location
@@ -97,25 +122,47 @@ impl Emu {
         cpu.step(&mut sniffer);
         let pc = cpu.reg_get(Mode::User, reg::PC);
 
-        if let Some(access) = hit_watchpoint {
-            let fixup = if cpu.thumb_mode() { 2 } else { 4 };
-            cpu.reg_set(Mode::User, reg::PC, pc - fixup);
-
-            return Some(match access.kind {
-                AccessKind::Read => Event::WatchRead(access.addr),
-                AccessKind::Write => Event::WatchWrite(access.addr),
-            });
-        }
-
-        if self.breakpoints.contains(&pc) {
-            return Some(Event::Break);
-        }
-
         if pc == HLE_RETURN_ADDR {
             match id {
                 CpuId::Cpu => return Some(Event::Halted),
                 CpuId::Cop => return Some(Event::Halted),
             }
+        }
+
+        if let Some(access) = hit_watchpoint {
+            // NOTE: this isn't a particularly elegant way to do watchpoints! This works
+            // fine for some example code, but don't use this as inspiration in your own
+            // emulator!
+            match access.kind {
+                AccessKind::Read => {
+                    if *self
+                        .watchpoint_kind
+                        .get(&access.addr)
+                        .map(|(r, _w)| r)
+                        .unwrap_or(&false)
+                    {
+                        let fixup = if cpu.thumb_mode() { 2 } else { 4 };
+                        cpu.reg_set(Mode::User, reg::PC, pc - fixup);
+                        return Some(Event::WatchRead(access.addr));
+                    }
+                }
+                AccessKind::Write => {
+                    if *self
+                        .watchpoint_kind
+                        .get(&access.addr)
+                        .map(|(_r, w)| w)
+                        .unwrap_or(&false)
+                    {
+                        let fixup = if cpu.thumb_mode() { 2 } else { 4 };
+                        cpu.reg_set(Mode::User, reg::PC, pc - fixup);
+                        return Some(Event::WatchWrite(access.addr));
+                    }
+                }
+            }
+        }
+
+        if self.breakpoints.contains(&pc) {
+            return Some(Event::Break);
         }
 
         None

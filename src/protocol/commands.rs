@@ -121,7 +121,6 @@ commands! {
     "p" => _p::p,
     "P" => _p_upcase::P<'a>,
     "qAttached" => _qAttached::qAttached,
-    "qC" => _qC::qC,
     "qfThreadInfo" => _qfThreadInfo::qfThreadInfo,
     "qRcmd" => _qRcmd::qRcmd<'a>,
     "qsThreadInfo" => _qsThreadInfo::qsThreadInfo,
