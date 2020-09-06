@@ -192,10 +192,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             buf.push(conn.read().map_err(Error::ConnectionRead)?)?;
         }
 
-        drop(buf);
-
-        let len = pkt_buf.len();
-        match Packet::from_buf(target, &mut pkt_buf.as_mut()[..len]) {
+        match Packet::from_buf(target, pkt_buf.as_mut()) {
             Ok(packet) => Ok(packet),
             Err(e) => {
                 // TODO: preserve this context within Error::PacketParse

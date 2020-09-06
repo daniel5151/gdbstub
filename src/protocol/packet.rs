@@ -44,7 +44,7 @@ impl<'a> PacketBuf<'a> {
         // split buffer into body and checksum components
         let (body, checksum) = pkt_buf.split_at_mut(end_of_body);
         let body = &mut body[1..]; // skip the '$'
-        let checksum = &mut checksum[1..]; // skip the '#'
+        let checksum = &mut checksum[1..][..2]; // skip the '#'
 
         // validate the checksum
         let checksum = decode_hex(checksum).map_err(|_| PacketParseError::MalformedChecksum)?;
