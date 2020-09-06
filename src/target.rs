@@ -109,6 +109,9 @@ pub trait Target {
 
     /// Read a single register on the target.
     ///
+    /// Implementations should write the value of the register using target's
+    /// native byte order in the buffer `dst`.
+    ///
     /// On multi-threaded systems, this method **must** respect the currently
     /// selected thread (set via the `set_current_thread` method).
     fn read_register(
@@ -129,16 +132,10 @@ pub trait Target {
         regs: &mut <Self::Arch as Arch>::Registers,
     ) -> Result<(), Self::Error>;
 
-    /// Write the target's registers.
-    ///
-    /// On multi-threaded systems, this method **must** respect the currently
-    /// selected thread (set via the `set_current_thread` method).
-    fn write_registers(
-        &mut self,
-        regs: &<Self::Arch as Arch>::Registers,
-    ) -> Result<(), Self::Error>;
-
     /// Write a single register on the target.
+    ///
+    /// The `val` buffer contains the new value of the register in the target's
+    /// native byte order.
     ///
     /// On multi-threaded systems, this method **must** respect the currently
     /// selected thread (set via the `set_current_thread` method).
@@ -150,6 +147,15 @@ pub trait Target {
         let _ = (reg_id, val);
         Err(MaybeUnimpl::no_impl())
     }
+
+    /// Write the target's registers.
+    ///
+    /// On multi-threaded systems, this method **must** respect the currently
+    /// selected thread (set via the `set_current_thread` method).
+    fn write_registers(
+        &mut self,
+        regs: &<Self::Arch as Arch>::Registers,
+    ) -> Result<(), Self::Error>;
 
     /// Read bytes from the specified address range.
     ///

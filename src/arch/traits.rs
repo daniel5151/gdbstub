@@ -31,10 +31,10 @@ impl RegId for () {
 pub trait Registers: Default {
     /// Register identifier for addressing single registers.
     ///
-    /// Architectures that do not implement single register read can safely use
-    /// `RegId = ()` as a default.
+    /// Architectures that do not support single register accesses can safely
+    /// use `RegId = ()` as a default.
     ///
-    /// **Note**: the use `RegId = ()` in most architectures is temporary.
+    /// **Note**: the use of `RegId = ()` in most architectures is temporary.
     /// Contributions to implement `RegId` for architectures are welcome! Feel
     /// free to open an issue/PR to get some support.
     type RegId: RegId;
