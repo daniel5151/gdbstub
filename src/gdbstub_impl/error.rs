@@ -21,9 +21,10 @@ pub enum GdbStubError<T, C> {
     PacketUnexpected,
     /// Target threw a fatal error.
     TargetError(T),
-    /// Target doesn't implement `set_current_thread`, but reported multiple
-    /// threads.
-    MissingSetCurrentTid,
+    /// Target didn't report any active threads.
+    NoActiveThreads,
+    /// Resuming with a signal is not implemented yet. Consider opening a PR?
+    ResumeWithSignalUnimplemented,
 }
 
 impl<T, C> From<ResponseWriterError<C>> for GdbStubError<T, C> {
@@ -53,7 +54,8 @@ where
             PacketParse => write!(f, "Could not parse the packet into a valid command."),
             PacketUnexpected => write!(f, "Client sent an unexpected packet."),
             TargetError(e) => write!(f, "Target threw a fatal error: {:?}", e),
-            MissingSetCurrentTid => write!(f, "Target doesn't implement `set_current_thread`, but reported multiple threads."),
+            NoActiveThreads => write!(f, "Target didn't report any active threads."),
+            ResumeWithSignalUnimplemented => write!(f, "Resuming with a signal is not implemented yet. Consider opening a PR?")
         }
     }
 }

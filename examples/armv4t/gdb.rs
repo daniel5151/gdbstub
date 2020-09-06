@@ -3,7 +3,7 @@ use core::convert::TryInto;
 use armv4t_emu::{reg, Memory};
 use gdbstub::arch;
 use gdbstub::arch::arm::reg::ArmCoreRegId;
-use gdbstub::target::base::{ResumeAction, StopReason};
+use gdbstub::target::base::singlethread::{ResumeAction, SingleThreadOps, StopReason};
 use gdbstub::target::ext::breakpoint::WatchKind;
 use gdbstub::target::{base, ext, Target};
 
@@ -38,7 +38,7 @@ impl Target for Emu {
     }
 }
 
-impl base::SingleThread for Emu {
+impl SingleThreadOps for Emu {
     fn resume(
         &mut self,
         action: ResumeAction,

@@ -1,5 +1,5 @@
 use crate::internal::BeBytes;
-use crate::protocol::{Tid, TidSelector};
+use crate::protocol::{IdKind, ThreadId};
 use crate::Connection;
 
 /// Newtype around a Connection error. Having a newtype allows implementing a
@@ -121,22 +121,22 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
             .try_for_each(|b| self.write_hex(b))
     }
 
-    pub fn write_tid_selector(&mut self, tid: TidSelector) -> Result<(), Error<C::Error>> {
+    pub fn write_id_kind(&mut self, tid: IdKind) -> Result<(), Error<C::Error>> {
         match tid {
-            TidSelector::All => self.write_str("-1")?,
-            TidSelector::Any => self.write_str("0")?,
-            TidSelector::WithID(id) => self.write_num(id.get())?,
+            IdKind::All => self.write_str("-1")?,
+            IdKind::Any => self.write_str("0")?,
+            IdKind::WithID(id) => self.write_num(id.get())?,
         };
         Ok(())
     }
 
-    pub fn write_tid(&mut self, tid: Tid) -> Result<(), Error<C::Error>> {
+    pub fn write_thread_id(&mut self, tid: ThreadId) -> Result<(), Error<C::Error>> {
         if let Some(pid) = tid.pid {
             self.write_str("p")?;
-            self.write_tid_selector(pid)?;
+            self.write_id_kind(pid)?;
             self.write_str(".")?;
         }
-        self.write_tid_selector(tid.tid)?;
+        self.write_id_kind(tid.tid)?;
         Ok(())
     }
 }
