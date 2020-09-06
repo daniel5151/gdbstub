@@ -415,12 +415,15 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             }
             Command::P(p) => {
                 let reg = <<T::Arch as Arch>::Registers as Registers>::RegId::from_raw_id(p.reg_id);
-                let (reg_id, _) = match reg {
-                    Some(v) => v,
-                    None => return Ok(None),
-                };
-                target.write_register(reg_id, p.val).maybe_missing_impl()?;
-                res.write_str("OK")?;
+                match reg {
+                    Some((reg_id, _)) => {
+                        target.write_register(reg_id, p.val).maybe_missing_impl()?;
+                        res.write_str("OK")?;
+                    }
+                    None => {
+                        res.write_str("E01")?;
+                    }
+                }
             }
             Command::vCont(cmd) => {
                 use crate::protocol::_vCont::VContKind;
