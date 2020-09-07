@@ -1,0 +1,20 @@
+[package]
+name = "gdbstub-nostd"
+version = "0.1.0"
+authors = ["Daniel Prilik <danielprilik@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+gdbstub = { path = "../", default-features = false }
+
+libc = { version = "0.2", default-features = false }
+log = { version = "0.4", features = ["release_max_level_off"] }
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+opt-level = 'z'  # Optimize for size.
+lto = true
+codegen-units = 1
