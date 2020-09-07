@@ -166,10 +166,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         }
     }
 
-    fn recv_packet<'a, 'b>(
+    fn recv_packet<'a>(
         conn: &mut C,
         target: &mut T,
-        pkt_buf: &'a mut ManagedSlice<'b, u8>,
+        pkt_buf: &'a mut ManagedSlice<u8>,
     ) -> Result<Packet<'a>, Error<T::Error, C::Error>> {
         let header_byte = conn.read().map_err(Error::ConnectionRead)?;
 
@@ -194,11 +194,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
         match Packet::from_buf(target, pkt_buf.as_mut()) {
             Ok(packet) => Ok(packet),
-            Err(e) => {
-                // TODO: preserve this context within Error::PacketParse
-                error!("Could not parse packet: {:?}", e);
-                Err(Error::PacketParse)
-            }
+            Err(e) => Err(Error::PacketParse(e)),
         }
     }
 
@@ -288,7 +284,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             Command::G(cmd) => {
                 let mut regs: <T::Arch as Arch>::Registers = Default::default();
                 regs.gdb_deserialize(cmd.vals)
-                    .map_err(|_| Error::PacketParse)?; // FIXME: more granular error?
+                    .map_err(|_| Error::PacketDataLenMismatch)?; // FIXME: more granular error?
 
                 match target.base_ops() {
                     BaseOps::SingleThread(ops) => ops.write_registers(&regs),
@@ -446,7 +442,9 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     let action = match action {
                         Some(action) => action,
                         None => {
-                            err = Err(Error::PacketParse);
+                            err = Err(Error::PacketParse(
+                                crate::protocol::PacketParseError::MalformedCommand,
+                            ));
                             return None;
                         }
                     };
@@ -614,8 +612,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
             // -------------------------------------------------------------- //
             Command::Unknown(cmd) => info!("Unknown command: {}", cmd),
-            #[allow(unreachable_patterns)]
-            c => warn!("Unimplemented command: {:?}", c),
+            _ => trace!("Unimplemented command"),
         }
 
         Ok(None)
@@ -711,10 +708,11 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     fn to_target_usize(
         n: impl BeBytes,
     ) -> Result<<T::Arch as Arch>::Usize, Error<T::Error, C::Error>> {
-        // TODO?: more granular error when GDB sends a number which is too big?
         let mut buf = [0; 16];
-        let len = n.to_be_bytes(&mut buf).ok_or(Error::PacketParse)?;
-        <T::Arch as Arch>::Usize::from_be_bytes(&buf[..len]).ok_or(Error::PacketParse)
+        let len = n
+            .to_be_bytes(&mut buf)
+            .ok_or(Error::PacketDataLenMismatch)?;
+        <T::Arch as Arch>::Usize::from_be_bytes(&buf[..len]).ok_or(Error::PacketDataLenMismatch)
     }
 }
 

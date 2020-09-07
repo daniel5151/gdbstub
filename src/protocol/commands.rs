@@ -1,11 +1,11 @@
 use crate::protocol::packet::PacketBuf;
 use crate::target::Target;
 
-pub mod prelude {
-    pub use super::ParseCommand;
-    pub use crate::protocol::common::*;
-    pub use crate::protocol::packet::PacketBuf;
-    pub use crate::target::Target;
+pub(crate) mod prelude {
+    pub(crate) use super::ParseCommand;
+    pub(crate) use crate::protocol::common::*;
+    pub(crate) use crate::protocol::packet::PacketBuf;
+    pub(crate) use crate::target::Target;
 }
 
 pub trait ParseCommand<'a>: Sized {
@@ -46,20 +46,9 @@ macro_rules! commands {
 
         /// GDB commands
         #[allow(non_camel_case_types)]
-        #[cfg_attr(not(feature = "__dead_code_marker"), derive(Debug))]
         pub enum Command<'a> {
             $($command($command<$($lifetime)?>),)*
             Unknown(&'a str),
-        }
-
-        // The dead-code-elimination tests grep for the packet's string, and
-        // only pass if none are found (i.e: the dead code eliminator did it's
-        // work). The default `Debug` derive would interfere with this.
-        #[cfg(feature = "__dead_code_marker")]
-        impl core::fmt::Debug for Command<'_> {
-            fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-                write!(f, "(compiled with __dead_code_marker)")
-            }
         }
 
         impl<'a> Command<'a> {
@@ -84,7 +73,7 @@ macro_rules! commands {
                             crate::__dead_code_marker!($name, "prefix_match");
 
                             let buf = buf.trim_start_body_bytes($name.len());
-                            let cmd = ParseCommand::from_packet(buf)
+                            let cmd = $command::from_packet(buf)
                                 .ok_or(CommandParseError::MalformedCommand($name))?;
                             Command::$command(cmd)
                         }
@@ -100,8 +89,7 @@ macro_rules! commands {
 }
 
 /// Command parse error
-// TODO: add more granular errors
-#[derive(Debug)]
+// TODO?: add more granular errors to command parsing code
 pub enum CommandParseError<'a> {
     Empty,
     /// catch-all

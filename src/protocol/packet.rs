@@ -1,20 +1,19 @@
-use crate::protocol::{common::decode_hex, Command, CommandParseError};
+use crate::protocol::{common::decode_hex, Command};
 use crate::target::Target;
 
 /// Packet parse error.
 #[derive(Debug)]
-pub enum PacketParseError<'a> {
+pub enum PacketParseError {
     ChecksumMismatched,
     EmptyBuf,
     MissingChecksum,
     MalformedChecksum,
-    MalformedCommand(CommandParseError<'a>),
+    MalformedCommand,
     NotASCII,
     UnexpectedHeader(u8),
 }
 
 /// Top-Level GDB packet
-#[derive(Debug)]
 pub enum Packet<'a> {
     Ack,
     Nack,
@@ -30,7 +29,7 @@ pub struct PacketBuf<'a> {
 impl<'a> PacketBuf<'a> {
     /// Validate the contents of the raw packet buffer, checking for checksum
     /// consistency, structural correctness, and ASCII validation.
-    pub fn new(pkt_buf: &'a mut [u8]) -> Result<PacketBuf<'a>, PacketParseError<'a>> {
+    pub fn new(pkt_buf: &'a mut [u8]) -> Result<PacketBuf<'a>, PacketParseError> {
         // validate the packet is valid ASCII
         if !pkt_buf.is_ascii() {
             return Err(PacketParseError::NotASCII);
@@ -100,7 +99,7 @@ impl<'a> Packet<'a> {
     pub fn from_buf(
         target: &mut impl Target,
         buf: &'a mut [u8],
-    ) -> Result<Packet<'a>, PacketParseError<'a>> {
+    ) -> Result<Packet<'a>, PacketParseError> {
         // cannot have empty packet
         if buf.is_empty() {
             return Err(PacketParseError::EmptyBuf);
@@ -109,7 +108,8 @@ impl<'a> Packet<'a> {
         match buf[0] {
             b'$' => Ok(Packet::Command(
                 Command::from_packet(target, PacketBuf::new(buf)?)
-                    .map_err(PacketParseError::MalformedCommand)?,
+                    // TODO?: preserve command parse error context
+                    .map_err(|_| PacketParseError::MalformedCommand)?,
             )),
             b'+' => Ok(Packet::Ack),
             b'-' => Ok(Packet::Nack),
