@@ -2,6 +2,9 @@ use crate::internal::BeBytes;
 use crate::protocol::{IdKind, ThreadId};
 use crate::Connection;
 
+#[cfg(feature = "alloc")]
+use alloc::string::String;
+
 /// Newtype around a Connection error. Having a newtype allows implementing a
 /// `From<ResponseWriterError<C>> for crate::Error<T, C>`, which greatly
 /// simplifies some of the error handling in the main gdbstub.
@@ -14,8 +17,10 @@ pub struct ResponseWriter<'a, C: Connection + 'a> {
     inner: &'a mut C,
     started: bool,
     checksum: u8,
-    // buffer outgoing message, for logging purposes
-    #[cfg(feature = "std")]
+    // buffer outgoing message
+    // TODO: add `write_all` method to Connection, and allow user to optionally pass outgoing
+    // packet buffer? This could improve performance (instead of writing a single byte at a time)
+    #[cfg(feature = "alloc")]
     msg: String,
 }
 
@@ -26,7 +31,7 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
             inner,
             started: false,
             checksum: 0,
-            #[cfg(feature = "std")]
+            #[cfg(feature = "alloc")]
             msg: String::new(),
         }
     }
@@ -36,7 +41,7 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
         // don't include '#' in checksum calculation
         let checksum = self.checksum;
 
-        #[cfg(feature = "std")]
+        #[cfg(feature = "alloc")]
         trace!("--> ${}#{:02x?}", self.msg, checksum);
 
         self.write(b'#')?;
@@ -52,7 +57,7 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
 
     /// Write a single byte.
     pub fn write(&mut self, byte: u8) -> Result<(), Error<C::Error>> {
-        #[cfg(feature = "std")]
+        #[cfg(feature = "alloc")]
         self.msg.push(byte as char);
 
         if !self.started {
