@@ -32,7 +32,7 @@ impl<'a> Features<'a> {
                     b'+' => FeatureSupported::Yes,
                     b'-' => FeatureSupported::No,
                     b'?' => FeatureSupported::Maybe,
-                    _ => unreachable!(),
+                    _ => return Err("invalid feature flag (must be +, -, or ?)"),
                 },
             }),
             Some(_) => {

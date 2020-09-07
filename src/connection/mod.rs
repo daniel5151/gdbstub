@@ -1,6 +1,11 @@
 mod impls;
 
 /// A trait to perform bytewise I/O over a serial transport layer.
+///
+/// When the `std` feature is enabled, this trait is automatically implemented
+/// for [`TcpStream`](https://doc.rust-lang.org/std/net/struct.TcpStream.html)
+/// and [`UnixStream`](https://doc.rust-lang.org/std/os/unix/net/struct.UnixStream.html)
+/// (on unix systems).
 pub trait Connection {
     /// Transport-specific error type.
     type Error;
