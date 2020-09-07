@@ -1,10 +1,10 @@
 use core::fmt::{self, Debug, Display};
 
-use crate::protocol::ResponseWriterError;
+use crate::protocol::{PacketParseError, ResponseWriterError};
 use crate::util::managed_vec::CapacityError;
 
 /// Errors which may occur during a GDB debugging session.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum GdbStubError<T, C> {
     /// Connection Error while reading request.
     ConnectionRead(C),
@@ -16,7 +16,9 @@ pub enum GdbStubError<T, C> {
     /// Packet cannot fit in the provided packet buffer.
     PacketBufferOverlow,
     /// Could not parse the packet into a valid command.
-    PacketParse,
+    PacketParse(PacketParseError),
+    /// Packet contains too much / too little data for the given target.
+    PacketDataLenMismatch,
     /// GDB client sent an unexpected packet.
     PacketUnexpected,
     /// Target threw a fatal error.
@@ -51,7 +53,8 @@ where
             ConnectionWrite(e) => write!(f, "Connection Error while writing response: {:?}", e),
             MissingPacketBuffer => write!(f, "GdbStub was not provided with a packet buffer in `no_std` mode (missing call to `with_packet_buffer`)"),
             PacketBufferOverlow => write!(f, "Packet too big for provided buffer!"),
-            PacketParse => write!(f, "Could not parse the packet into a valid command."),
+            PacketParse(e) => write!(f, "Could not parse the packet into a valid command: {:?}", e),
+            PacketDataLenMismatch => write!(f, "Packet contains too much / too little data for the given target."),
             PacketUnexpected => write!(f, "Client sent an unexpected packet."),
             TargetError(e) => write!(f, "Target threw a fatal error: {:?}", e),
             NoActiveThreads => write!(f, "Target didn't report any active threads."),
