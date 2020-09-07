@@ -166,19 +166,19 @@
 //! IDETs solve the numerous issues and shortcomings that arise from the
 //! traditional single trait + "optional" methods approach:
 //!
-//! - Reduced code-bloat, as there are significantly fewer methods that require
-//!   stubbed default implementations
+//! - **Reduced code-bloat**, as there are significantly fewer methods that
+//!   require stubbed default implementations
 //!    - Moreover, default implementations typically share the exact same
 //!      function signature (i.e: `fn(&mut self) -> Option<&T> { None }`), which
 //!      means an [optimizing compiler](http://llvm.org/docs/Passes.html#mergefunc-merge-functions)
 //!      should be able to emit a single function for the identical default
 //!      implementations (that is, if they're not entirely inlined / dead-code eliminated).
-//! - Compile-time enforcement of mutually-dependent methods
+//! - **Compile-time enforcement of mutually-dependent methods**
 //!    - By grouping mutually-dependent methods behind a single extension trait
 //!      and marking them all as required methods, the Rust compiler is able to
 //!      catch missing mutually-dependent methods at compile time, with no need
 //!      for any runtime checks!
-//! - Compile-time enforcement of mutually-exclusive methods
+//! - **Compile-time enforcement of mutually-exclusive methods**
 //!    - By grouping mutually-exclusive methods behind two extension traits, and
 //!      wrapping those in an `enum`, the API is able to document
 //!      mutually-exclusive functions _at the type-level_, in-turn enabling the
@@ -186,7 +186,16 @@
 //!    - _Note:_ Strictly speaking, this isn't really compile time
 //!      "enforcement", as there's nothing stopping an "adversarial"
 //!      implementation from implementing both sets of methods, and then
-//!      "flipping" between the two at runtime.
+//!      "flipping" between the two at runtime. Nonetheless, it serves as a good
+//!      guardrail for the average user.
+//! - **Enforce dead-code-elimination** _without_ `cargo` feature flags
+//!     - This is a really awesome trick: by wrapping code in a `if
+//!       target.ext_my_optfeat().is_some()` block, it's possible to specify
+//!       _arbitrary_ blocks of code to be feature-dependent!
+//!     - This is used to great effect in `gdbstub` to optimize-out any packet
+//!       parsing / handler code for unimplemented protocol extensions. `grep`
+//!       for `__protocol_hint` in `gdbstub` to see an example of this in
+//!       action!
 //!
 //! * * *
 //!
