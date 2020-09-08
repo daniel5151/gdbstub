@@ -12,9 +12,31 @@ pub trait RegId: Sized {
     fn from_raw_id(id: usize) -> Option<(Self, usize)>;
 }
 
-impl RegId for () {
-    fn from_raw_id(_: usize) -> Option<(Self, usize)> {
-        None
+/// A "stop-gap" `RegId` which contains the raw register number used by GDB.
+///
+/// If you come across this `RegId` while working with a built-in `arch`, please
+/// consider opening a PR to add a proper enum-based `RegId` instead!
+///
+/// Several of the built-in `arch` implementations predate the addition of the
+/// `read/write_register` methods to `gdbstub`. As such, until someone opens a
+/// PR to update them with a proper enum-based RegId, they are stuck using this
+/// temporary `RawRegId` instead.
+///
+/// While it is possible to implement the `read/write_register` methods using
+/// `RawRegId`, it does require looking up the architecture's corresponding
+/// feature.xml files in the [GDB source code](https://github.com/bminor/binutils-gdb/tree/master/gdb/features/).
+/// When using `RawRegId`, the `dst` and `val` buffers are conservatively sized
+/// to be at least 256 bits, which should be large enough to store any register
+/// size required by GDB.
+///
+/// It bears repeating: if you end up implementing the `read/write_register`
+/// methods using `RawRegId`, please consider upstreaming your implementation!
+pub struct RawRegId(pub usize);
+
+impl RegId for RawRegId {
+    // simply pass-through the raw register ID +
+    fn from_raw_id(id: usize) -> Option<(Self, usize)> {
+        Some((RawRegId(id), 256 / 8))
     }
 }
 
@@ -30,13 +52,6 @@ impl RegId for () {
 // (via it's GDB index)
 pub trait Registers: Default {
     /// Register identifier for addressing single registers.
-    ///
-    /// Architectures that do not support single register accesses can safely
-    /// use `RegId = ()` as a default.
-    ///
-    /// **Note**: the use of `RegId = ()` in most architectures is temporary.
-    /// Contributions to implement `RegId` for architectures are welcome! Feel
-    /// free to open an issue/PR to get some support.
     type RegId: RegId;
 
     /// Serialize `self` into a GDB register bytestream.

@@ -69,12 +69,11 @@ pub trait SingleThreadOps: Target {
     /// As a reminder, `Err(Self::Error)` should only be returned if a register
     /// read results in a **fatal** target error.
     ///
-    /// _Note:_ Reading/writing individual registers is a relatively recent
-    /// addition to `gdbstub`, and as such, there are still several built-in
-    /// `arch` implementations which have not been updated with a valid `RegId`
-    /// type. Instead, the use the default unit `()` type.
-    // FIXME: should change default RegId to `usize`, to at least allow users to
-    // implement the feature manually if a friendly `RegId` hasn't been defined yet!
+    /// _Note:_ This method includes a stubbed default implementation which
+    /// simply returns `Ok(false)`. This is due to the fact that several
+    /// built-in `arch` implementations still use the generic, albeit highly
+    /// un-ergonomic [`RawRegId`](../../../arch/struct.RawRegId.html)
+    /// type. See the docs for `RawRegId` for more info.
     fn read_register(
         &mut self,
         reg_id: <<Self::Arch as Arch>::Registers as Registers>::RegId,
@@ -97,12 +96,11 @@ pub trait SingleThreadOps: Target {
     /// As a reminder, `Err(Self::Error)` should only be returned if a register
     /// read results in a **fatal** target error.
     ///
-    /// _Note:_ Reading/writing individual registers is a relatively recent
-    /// addition to `gdbstub`, and as such, there are still several built-in
-    /// `arch` implementations which have not been updated with a valid `RegId`
-    /// type. Instead, the use the default unit `()` type.
-    // FIXME: should change default RegId to `usize`, to at least allow users to
-    // implement the feature manually if a friendly `RegId` hasn't been defined yet!
+    /// _Note:_ This method includes a stubbed default implementation which
+    /// simply returns `Ok(false)`. This is due to the fact that several
+    /// built-in `arch` implementations still use the generic, albeit highly
+    /// un-ergonomic [`RawRegId`](../../../arch/struct.RawRegId.html)
+    /// type. See the docs for `RawRegId` for more info.
     fn write_register(
         &mut self,
         reg_id: <<Self::Arch as Arch>::Registers as Registers>::RegId,

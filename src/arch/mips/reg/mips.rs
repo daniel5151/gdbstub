@@ -1,5 +1,7 @@
+use crate::arch::RawRegId;
 use crate::arch::Registers;
 use crate::internal::LeBytes;
+
 use num_traits::PrimInt;
 
 /// MIPS registers.
@@ -53,7 +55,7 @@ impl<U> Registers for MipsCoreRegs<U>
 where
     U: PrimInt + LeBytes + Default,
 {
-    type RegId = ();
+    type RegId = RawRegId;
 
     fn gdb_serialize(&self, mut write_byte: impl FnMut(Option<u8>)) {
         macro_rules! write_le_bytes {

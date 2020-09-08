@@ -393,7 +393,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 }
             }
             Command::p(p) => {
-                let mut dst = [0u8; 16];
+                let mut dst = [0u8; 32]; // enough for 256-bit registers
                 let reg = <<T::Arch as Arch>::Registers as Registers>::RegId::from_raw_id(p.reg_id);
                 let (reg_id, reg_size) = match reg {
                     Some(v) => v,

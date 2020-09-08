@@ -1,7 +1,9 @@
 //! `GdbRegister` structs for x86 architectures.
 
-use crate::arch::Registers;
 use core::convert::TryInto;
+
+use crate::arch::RawRegId;
+use crate::arch::Registers;
 
 mod core32;
 mod core64;
@@ -34,7 +36,7 @@ pub struct X87FpuInternalRegs {
 }
 
 impl Registers for X87FpuInternalRegs {
-    type RegId = ();
+    type RegId = RawRegId;
 
     fn gdb_serialize(&self, mut write_byte: impl FnMut(Option<u8>)) {
         macro_rules! write_bytes {

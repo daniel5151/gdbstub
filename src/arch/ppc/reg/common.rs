@@ -1,4 +1,5 @@
 use crate::arch::ppc::reg::PpcVector;
+use crate::arch::RawRegId;
 use crate::arch::Registers;
 
 use core::convert::TryInto;
@@ -39,7 +40,7 @@ pub struct PowerPcCommonRegs {
 }
 
 impl Registers for PowerPcCommonRegs {
-    type RegId = ();
+    type RegId = RawRegId;
 
     fn gdb_serialize(&self, mut write_byte: impl FnMut(Option<u8>)) {
         macro_rules! write_bytes {

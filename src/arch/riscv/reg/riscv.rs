@@ -1,6 +1,7 @@
+use num_traits::PrimInt;
+
 use crate::arch::{RegId, Registers};
 use crate::internal::LeBytes;
-use num_traits::PrimInt;
 
 /// RISC-V Register identifier.
 #[derive(Debug, Clone)]

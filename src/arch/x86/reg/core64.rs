@@ -1,6 +1,8 @@
-use crate::arch::x86::reg::{X87FpuInternalRegs, F80};
-use crate::arch::Registers;
 use core::convert::TryInto;
+
+use crate::arch::x86::reg::{X87FpuInternalRegs, F80};
+use crate::arch::RawRegId;
+use crate::arch::Registers;
 
 /// 64-bit x86 core registers (+ SSE extensions).
 ///
@@ -27,7 +29,7 @@ pub struct X86_64CoreRegs {
 }
 
 impl Registers for X86_64CoreRegs {
-    type RegId = ();
+    type RegId = RawRegId;
 
     fn gdb_serialize(&self, mut write_byte: impl FnMut(Option<u8>)) {
         macro_rules! write_bytes {
