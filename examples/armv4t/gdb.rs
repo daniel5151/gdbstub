@@ -1,12 +1,12 @@
+use core::convert::TryInto;
+
 use armv4t_emu::{reg, Memory};
 use gdbstub::{
-    arch, Actions, BreakOp, OptResult, ResumeAction, StopReason, Target, Tid, WatchKind,
-    SINGLE_THREAD_TID,
+    arch, arch::arm::reg::ArmCoreRegId, Actions, BreakOp, OptResult, ResumeAction, StopReason,
+    Target, Tid, WatchKind, SINGLE_THREAD_TID,
 };
 
 use crate::emu::{Emu, Event};
-use core::convert::TryInto;
-use gdbstub::arch::arm::reg::ArmCoreRegId;
 
 /// Turn a `ArmCoreRegId` into an internal register number of `armv4t_emu`.
 fn cpu_reg_id(id: ArmCoreRegId) -> Option<u8> {
@@ -68,6 +68,20 @@ impl Target for Emu {
                 },
             },
         ))
+    }
+
+    fn read_register(
+        &mut self,
+        reg_id: arch::arm::reg::ArmCoreRegId,
+        dst: &mut [u8],
+    ) -> OptResult<(), Self::Error> {
+        if let Some(i) = cpu_reg_id(reg_id) {
+            let w = self.cpu.reg_get(self.cpu.mode(), i);
+            dst.copy_from_slice(&w.to_le_bytes());
+            Ok(())
+        } else {
+            Err("unsupported register read".into())
+        }
     }
 
     fn read_registers(

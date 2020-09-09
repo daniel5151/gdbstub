@@ -91,6 +91,8 @@ commands! {
     "k" => _k::k,
     "m" => _m::m<'a>,
     "M" => _m_upcase::M<'a>,
+    "p" => _p::p,
+    "P" => _p_upcase::P<'a>,
     "qAttached" => _qAttached::qAttached,
     "qC" => _qC::qC,
     "qfThreadInfo" => _qfThreadInfo::qfThreadInfo,
@@ -102,8 +104,7 @@ commands! {
     "T" => _t_upcase::T,
     "z" => _z::z,
     "Z" => _z_upcase::Z,
-    "p" => _p::p,
-    "P" => _p_upcase::P<'a>,
+
     // Order Matters (because of prefix matching)
     "vCont?" => vCont_question_mark::vContQuestionMark,
     "vCont" => _vCont::vCont<'a>,
