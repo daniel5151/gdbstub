@@ -3,7 +3,7 @@ use core::marker::PhantomData;
 use managed::ManagedSlice;
 
 use crate::{
-    arch::{Arch, Registers},
+    arch::{Arch, RegId, Registers},
     connection::Connection,
     internal::*,
     protocol::{Command, ConsoleOutput, Packet, ResponseWriter, Tid, TidSelector},
@@ -402,6 +402,32 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     Some(false) => res.write_str("E22")?, // value of 22 grafted from QEMU
                 }
             }
+            Command::p(p) => {
+                let mut dst = [0u8; 16];
+                let reg = <<T::Arch as Arch>::Registers as Registers>::RegId::from_raw_id(p.reg_id);
+                let (reg_id, reg_size) = match reg {
+                    Some(v) => v,
+                    None => return Ok(None),
+                };
+                let dst = &mut dst[0..reg_size];
+                target.read_register(reg_id, dst).maybe_missing_impl()?;
+                res.write_hex_buf(dst)?;
+            }
+            Command::P(p) => {
+                let reg = <<T::Arch as Arch>::Registers as Registers>::RegId::from_raw_id(p.reg_id);
+                let supported = match reg {
+                    Some((reg_id, _)) => target
+                        .write_register(reg_id, p.val)
+                        .maybe_missing_impl()?
+                        .is_some(),
+                    None => false,
+                };
+                if supported {
+                    res.write_str("OK")?;
+                } else {
+                    res.write_str("E01")?;
+                }
+            }
             Command::vCont(cmd) => {
                 use crate::protocol::_vCont::VContKind;
 
@@ -443,14 +469,14 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     res,
                     target,
                     &mut core::iter::once((self.current_tid.tid, ResumeAction::Continue)),
-                )
+                );
             }
             Command::s(_) => {
                 return self.do_vcont(
                     res,
                     target,
                     &mut core::iter::once((self.current_tid.tid, ResumeAction::Step)),
-                )
+                );
             }
 
             // ------------------- Multi-threading Support ------------------ //

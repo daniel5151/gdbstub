@@ -91,6 +91,8 @@ commands! {
     "k" => _k::k,
     "m" => _m::m<'a>,
     "M" => _m_upcase::M<'a>,
+    "p" => _p::p,
+    "P" => _p_upcase::P<'a>,
     "qAttached" => _qAttached::qAttached,
     "qC" => _qC::qC,
     "qfThreadInfo" => _qfThreadInfo::qfThreadInfo,

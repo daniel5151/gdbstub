@@ -1,7 +1,9 @@
 use core::fmt::Debug;
 
 use crate::internal::*;
-use crate::{arch::Arch, ConsoleOutput, OptResult, Tid, TidSelector, SINGLE_THREAD_TID};
+use crate::{
+    arch::Arch, arch::Registers, ConsoleOutput, OptResult, Tid, TidSelector, SINGLE_THREAD_TID,
+};
 
 /// A collection of methods and metadata a `GdbStub` can use to control and
 /// debug a system.
@@ -105,6 +107,22 @@ pub trait Target {
         check_gdb_interrupt: &mut dyn FnMut() -> bool,
     ) -> Result<(Tid, StopReason<<Self::Arch as Arch>::Usize>), Self::Error>;
 
+    /// Read a single register on the target.
+    ///
+    /// Implementations should write the value of the register using target's
+    /// native byte order in the buffer `dst`.
+    ///
+    /// On multi-threaded systems, this method **must** respect the currently
+    /// selected thread (set via the `set_current_thread` method).
+    fn read_register(
+        &mut self,
+        reg_id: <<Self::Arch as Arch>::Registers as Registers>::RegId,
+        dst: &mut [u8],
+    ) -> OptResult<(), Self::Error> {
+        let _ = (dst, reg_id);
+        Err(MaybeUnimpl::no_impl())
+    }
+
     /// Read the target's registers.
     ///
     /// On multi-threaded systems, this method **must** respect the currently
@@ -113,6 +131,22 @@ pub trait Target {
         &mut self,
         regs: &mut <Self::Arch as Arch>::Registers,
     ) -> Result<(), Self::Error>;
+
+    /// Write a single register on the target.
+    ///
+    /// The `val` buffer contains the new value of the register in the target's
+    /// native byte order.
+    ///
+    /// On multi-threaded systems, this method **must** respect the currently
+    /// selected thread (set via the `set_current_thread` method).
+    fn write_register(
+        &mut self,
+        reg_id: <<Self::Arch as Arch>::Registers as Registers>::RegId,
+        val: &[u8],
+    ) -> OptResult<(), Self::Error> {
+        let _ = (reg_id, val);
+        Err(MaybeUnimpl::no_impl())
+    }
 
     /// Write the target's registers.
     ///
@@ -377,6 +411,14 @@ macro_rules! impl_dyn_target {
                 (**self).resume(actions, check_gdb_interrupt)
             }
 
+            fn read_register(
+                &mut self,
+                reg_number: <<Self::Arch as Arch>::Registers as Registers>::RegId,
+                dst: &mut [u8],
+            ) -> OptResult<(), Self::Error> {
+                (**self).read_register(reg_number, dst)
+            }
+
             fn read_registers(
                 &mut self,
                 regs: &mut <Self::Arch as Arch>::Registers,
@@ -389,6 +431,14 @@ macro_rules! impl_dyn_target {
                 regs: &<Self::Arch as Arch>::Registers,
             ) -> Result<(), Self::Error> {
                 (**self).write_registers(regs)
+            }
+
+            fn write_register(
+                &mut self,
+                reg_number: <<Self::Arch as Arch>::Registers as Registers>::RegId,
+                val: &[u8],
+            ) -> OptResult<(), Self::Error> {
+                (**self).write_register(reg_number, val)
             }
 
             fn read_addrs(

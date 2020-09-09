@@ -1,10 +1,24 @@
+use core::convert::TryInto;
+
 use armv4t_emu::{reg, Memory};
 use gdbstub::{
-    arch, Actions, BreakOp, OptResult, ResumeAction, StopReason, Target, Tid, WatchKind,
-    SINGLE_THREAD_TID,
+    arch, arch::arm::reg::ArmCoreRegId, Actions, BreakOp, OptResult, ResumeAction, StopReason,
+    Target, Tid, WatchKind, SINGLE_THREAD_TID,
 };
 
 use crate::emu::{Emu, Event};
+
+/// Turn a `ArmCoreRegId` into an internal register number of `armv4t_emu`.
+fn cpu_reg_id(id: ArmCoreRegId) -> Option<u8> {
+    match id {
+        ArmCoreRegId::Gpr(i) => Some(i),
+        ArmCoreRegId::Sp => Some(reg::SP),
+        ArmCoreRegId::Lr => Some(reg::LR),
+        ArmCoreRegId::Pc => Some(reg::PC),
+        ArmCoreRegId::Cpsr => Some(reg::CPSR),
+        _ => None,
+    }
+}
 
 impl Target for Emu {
     type Arch = arch::arm::Armv4t;
@@ -56,6 +70,20 @@ impl Target for Emu {
         ))
     }
 
+    fn read_register(
+        &mut self,
+        reg_id: arch::arm::reg::ArmCoreRegId,
+        dst: &mut [u8],
+    ) -> OptResult<(), Self::Error> {
+        if let Some(i) = cpu_reg_id(reg_id) {
+            let w = self.cpu.reg_get(self.cpu.mode(), i);
+            dst.copy_from_slice(&w.to_le_bytes());
+            Ok(())
+        } else {
+            Err("unsupported register read".into())
+        }
+    }
+
     fn read_registers(
         &mut self,
         regs: &mut arch::arm::reg::ArmCoreRegs,
@@ -71,6 +99,20 @@ impl Target for Emu {
         regs.cpsr = self.cpu.reg_get(mode, reg::CPSR);
 
         Ok(())
+    }
+
+    fn write_register(
+        &mut self,
+        reg_id: arch::arm::reg::ArmCoreRegId,
+        val: &[u8],
+    ) -> OptResult<(), Self::Error> {
+        let w = u32::from_le_bytes(val.try_into().map_err(|_| "invalid data")?);
+        if let Some(i) = cpu_reg_id(reg_id) {
+            self.cpu.reg_set(self.cpu.mode(), i, w);
+            Ok(())
+        } else {
+            Err("unsupported register write".into())
+        }
     }
 
     fn write_registers(&mut self, regs: &arch::arm::reg::ArmCoreRegs) -> Result<(), &'static str> {

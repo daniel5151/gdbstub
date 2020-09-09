@@ -3,3 +3,4 @@
 mod riscv;
 
 pub use riscv::RiscvCoreRegs;
+pub use riscv::RiscvRegId;

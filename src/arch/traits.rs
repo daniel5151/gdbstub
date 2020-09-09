@@ -2,6 +2,22 @@ use num_traits::{Num, PrimInt, Unsigned};
 
 use crate::internal::BeBytes;
 
+/// Register identifier for target registers.
+///
+/// These identifiers are used by GDB for single register operations.
+pub trait RegId: Sized {
+    /// Map raw GDB register number corresponding `RegId` and register size.
+    ///
+    /// Returns `None` if the register is not available.
+    fn from_raw_id(id: usize) -> Option<(Self, usize)>;
+}
+
+impl RegId for () {
+    fn from_raw_id(_: usize) -> Option<(Self, usize)> {
+        None
+    }
+}
+
 /// Methods to read/write architecture-specific registers.
 ///
 /// Registers must be de/serialized in the order specified by the architecture's
@@ -13,6 +29,16 @@ use crate::internal::BeBytes;
 // TODO: add (optional?) trait methods for reading/writing specific register
 // (via it's GDB index)
 pub trait Registers: Default {
+    /// Register identifier for addressing single registers.
+    ///
+    /// Architectures that do not support single register accesses can safely
+    /// use `RegId = ()` as a default.
+    ///
+    /// **Note**: the use of `RegId = ()` in most architectures is temporary.
+    /// Contributions to implement `RegId` for architectures are welcome! Feel
+    /// free to open an issue/PR to get some support.
+    type RegId: RegId;
+
     /// Serialize `self` into a GDB register bytestream.
     ///
     /// Missing registers are serialized by passing `None` to write_byte.

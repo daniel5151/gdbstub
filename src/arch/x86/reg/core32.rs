@@ -41,6 +41,8 @@ pub struct X86CoreRegs {
 }
 
 impl Registers for X86CoreRegs {
+    type RegId = ();
+
     fn gdb_serialize(&self, mut write_byte: impl FnMut(Option<u8>)) {
         macro_rules! write_bytes {
             ($bytes:expr) => {

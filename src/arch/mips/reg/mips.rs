@@ -53,6 +53,8 @@ impl<U> Registers for MipsCoreRegs<U>
 where
     U: PrimInt + LeBytes + Default,
 {
+    type RegId = ();
+
     fn gdb_serialize(&self, mut write_byte: impl FnMut(Option<u8>)) {
         macro_rules! write_le_bytes {
             ($value:expr) => {
