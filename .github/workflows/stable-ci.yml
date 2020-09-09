@@ -17,7 +17,11 @@ jobs:
         with:
           command: check
           args: --all --examples --features=std
-
+      # don't forget the no_std example!
+      - uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --manifest-path example_no_std/Cargo.toml
   test:
     name: Tests
     runs-on: ubuntu-latest
