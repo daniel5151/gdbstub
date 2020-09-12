@@ -10,6 +10,9 @@ pub enum GdbStubError<T, C> {
     ConnectionRead(C),
     /// Connection Error while writing response.
     ConnectionWrite(ResponseWriterError<C>),
+    /// Client nack'd the last packet, but `gdbstub` doesn't implement
+    /// re-transmission.
+    ClientSentNack,
     /// GdbStub was not provided with a packet buffer in `no_std` mode
     /// (missing call to `with_packet_buffer`)
     MissingPacketBuffer,
@@ -51,6 +54,7 @@ where
         match self {
             ConnectionRead(e) => write!(f, "Connection Error while reading request: {:?}", e),
             ConnectionWrite(e) => write!(f, "Connection Error while writing response: {:?}", e),
+            ClientSentNack => write!(f, "Client nack'd the last packet, but `gdbstub` doesn't implement re-transmission."),
             MissingPacketBuffer => write!(f, "GdbStub was not provided with a packet buffer in `no_std` mode (missing call to `with_packet_buffer`)"),
             PacketBufferOverlow => write!(f, "Packet too big for provided buffer!"),
             PacketParse(e) => write!(f, "Could not parse the packet into a valid command: {:?}", e),

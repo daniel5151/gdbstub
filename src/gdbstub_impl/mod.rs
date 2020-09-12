@@ -79,6 +79,7 @@ struct GdbStubImpl<T: Target, C: Connection> {
     packet_buffer_len: usize,
     current_mem_tid: Tid,
     current_resume_tid: TidSelector,
+    no_ack_mode: bool,
 }
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
@@ -94,6 +95,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             // for code-clarity purposes.
             current_mem_tid: SINGLE_THREAD_TID,
             current_resume_tid: TidSelector::All,
+            no_ack_mode: false,
         }
     }
 
@@ -124,9 +126,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         loop {
             match Self::recv_packet(conn, target, packet_buffer)? {
                 Packet::Ack => {}
-                Packet::Nack => {
-                    unimplemented!("GDB nack'd the packet, but retry isn't implemented yet")
-                }
+                Packet::Nack => return Err(Error::ClientSentNack),
                 Packet::Interrupt => {
                     debug!("<-- interrupt packet");
                     let mut res = ResponseWriter::new(conn);
@@ -135,7 +135,9 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 }
                 Packet::Command(command) => {
                     // Acknowledge the command
-                    conn.write(b'+').map_err(Error::ConnectionRead)?;
+                    if !self.no_ack_mode {
+                        conn.write(b'+').map_err(Error::ConnectionRead)?;
+                    }
 
                     let mut res = ResponseWriter::new(conn);
                     let disconnect = match self.handle_command(&mut res, target, command) {
@@ -216,8 +218,9 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                 res.write_str(";vContSupported+")?;
                 res.write_str(";multiprocess+")?;
-                res.write_str(";swbreak+")?;
+                res.write_str(";QStartNoAckMode+")?;
 
+                res.write_str(";swbreak+")?;
                 if target.hw_breakpoint().is_some() || target.hw_watchpoint().is_some() {
                     res.write_str(";hwbreak+")?;
                 }
@@ -228,6 +231,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 if T::Arch::target_description_xml().is_some() {
                     res.write_str(";qXfer:features:read+")?;
                 }
+            }
+            Command::QStartNoAckMode(_) => {
+                self.no_ack_mode = true;
+                res.write_str("OK")?;
             }
             Command::vContQuestionMark(_) => res.write_str("vCont;c;C;s;S")?,
             Command::qXferFeaturesRead(cmd) => {

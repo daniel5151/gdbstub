@@ -111,6 +111,7 @@ commands! {
     "qAttached" => _qAttached::qAttached,
     "qfThreadInfo" => _qfThreadInfo::qfThreadInfo,
     "qRcmd" => _qRcmd::qRcmd<'a>,
+    "QStartNoAckMode" => _QStartNoAckMode::QStartNoAckMode,
     "qsThreadInfo" => _qsThreadInfo::qsThreadInfo,
     "qSupported" => _qSupported::qSupported<'a>,
     "qXfer:features:read" => _qXfer_features_read::qXferFeaturesRead<'a>,
