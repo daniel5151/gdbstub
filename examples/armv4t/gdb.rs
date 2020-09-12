@@ -29,11 +29,11 @@ impl Target for Emu {
         base::BaseOps::SingleThread(self)
     }
 
-    fn sw_breakpoint(&mut self) -> ext::SwBreakpointExt<Self> {
-        self
+    fn sw_breakpoint(&mut self) -> Option<ext::SwBreakpointOps<Self>> {
+        Some(self)
     }
 
-    fn hw_watchpoint(&mut self) -> Option<ext::HwWatchpointExt<Self>> {
+    fn hw_watchpoint(&mut self) -> Option<ext::HwWatchpointOps<Self>> {
         Some(self)
     }
 }

@@ -360,7 +360,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                 use ext::breakpoint::WatchKind::*;
                 let supported = match cmd.type_ {
-                    0 => Some(target.sw_breakpoint().add_sw_breakpoint(addr)),
+                    0 => (target.sw_breakpoint()).map(|op| op.add_sw_breakpoint(addr)),
                     1 => (target.hw_breakpoint()).map(|op| op.add_hw_breakpoint(addr)),
                     2 => (target.hw_watchpoint()).map(|op| op.add_hw_watchpoint(addr, Write)),
                     3 => (target.hw_watchpoint()).map(|op| op.add_hw_watchpoint(addr, Read)),
@@ -381,7 +381,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                 use ext::breakpoint::WatchKind::*;
                 let supported = match cmd.type_ {
-                    0 => Some(target.sw_breakpoint().remove_sw_breakpoint(addr)),
+                    0 => (target.sw_breakpoint()).map(|op| op.remove_sw_breakpoint(addr)),
                     1 => (target.hw_breakpoint()).map(|op| op.remove_hw_breakpoint(addr)),
                     2 => (target.hw_watchpoint()).map(|op| op.remove_hw_watchpoint(addr, Write)),
                     3 => (target.hw_watchpoint()).map(|op| op.remove_hw_watchpoint(addr, Read)),

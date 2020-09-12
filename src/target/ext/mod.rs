@@ -1,5 +1,8 @@
-//! Target Extension traits which can optionally be implemented to enable
-//! additional GDB debugging features.
+//! Target Extension traits which can be implemented to support additional GDB
+//! debugging features.
+//!
+//! If there's a GDB feature that you need that isn't implemented yet, feel free
+//! to open an issue / file a PR on Github!
 
 use crate::target::Target;
 
@@ -16,7 +19,7 @@ macro_rules! define_ext {
     };
 }
 
-define_ext!(SwBreakpointExt, breakpoint::SwBreakpoint);
-define_ext!(HwBreakpointExt, breakpoint::HwBreakpoint);
-define_ext!(HwWatchpointExt, breakpoint::HwWatchpoint);
-define_ext!(MonitorCmdExt, monitor::MonitorCmd);
+define_ext!(SwBreakpointOps, breakpoint::SwBreakpoint);
+define_ext!(HwBreakpointOps, breakpoint::HwBreakpoint);
+define_ext!(HwWatchpointOps, breakpoint::HwWatchpoint);
+define_ext!(MonitorCmdOps, monitor::MonitorCmd);

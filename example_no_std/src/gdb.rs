@@ -1,7 +1,5 @@
 use gdbstub::arch;
 use gdbstub::target::base::multithread::{Actions, MultiThreadOps, ThreadStopReason, Tid};
-use gdbstub::target::ext::breakpoint::WatchKind;
-use gdbstub::target::ext::monitor::ConsoleOutput;
 use gdbstub::target::{base, ext, Target};
 
 use crate::print_str::print_str;
@@ -22,11 +20,7 @@ impl Target for DummyTarget {
         base::BaseOps::MultiThread(self)
     }
 
-    fn sw_breakpoint(&mut self) -> ext::SwBreakpointExt<Self> {
-        self
-    }
-
-    fn monitor_cmd(&mut self) -> Option<ext::MonitorCmdExt<Self>> {
+    fn sw_breakpoint(&mut self) -> Option<ext::SwBreakpointOps<Self>> {
         Some(self)
     }
 }
@@ -110,34 +104,5 @@ impl ext::breakpoint::SwBreakpoint for DummyTarget {
     #[inline(never)]
     fn remove_sw_breakpoint(&mut self, _addr: u32) -> Result<bool, &'static str> {
         Ok(true)
-    }
-}
-
-impl ext::breakpoint::HwWatchpoint for DummyTarget {
-    #[inline(never)]
-    fn add_hw_watchpoint(&mut self, _addr: u32, _kind: WatchKind) -> Result<bool, &'static str> {
-        Ok(true)
-    }
-
-    #[inline(never)]
-    fn remove_hw_watchpoint(&mut self, _addr: u32, _kind: WatchKind) -> Result<bool, &'static str> {
-        Ok(true)
-    }
-}
-
-impl ext::monitor::MonitorCmd for DummyTarget {
-    #[inline(never)]
-    fn handle_monitor_cmd(
-        &mut self,
-        cmd: &[u8],
-        mut out: ConsoleOutput<'_>,
-    ) -> Result<(), Self::Error> {
-        match cmd {
-            b"" => out.write_raw(b"Sorry, didn't catch that. Try `monitor ping`!\n"),
-            b"ping" => out.write_raw(b"pong!\n"),
-            _ => out.write_raw(b"I don't know how to handle that\n"),
-        };
-
-        Ok(())
     }
 }

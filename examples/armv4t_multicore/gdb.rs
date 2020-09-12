@@ -50,15 +50,15 @@ impl Target for Emu {
         base::BaseOps::MultiThread(self)
     }
 
-    fn sw_breakpoint(&mut self) -> ext::SwBreakpointExt<Self> {
-        self
-    }
-
-    fn hw_watchpoint(&mut self) -> Option<ext::HwWatchpointExt<Self>> {
+    fn sw_breakpoint(&mut self) -> Option<ext::SwBreakpointOps<Self>> {
         Some(self)
     }
 
-    fn monitor_cmd(&mut self) -> Option<ext::MonitorCmdExt<Self>> {
+    fn hw_watchpoint(&mut self) -> Option<ext::HwWatchpointOps<Self>> {
+        Some(self)
+    }
+
+    fn monitor_cmd(&mut self) -> Option<ext::MonitorCmdOps<Self>> {
         Some(self)
     }
 }
