@@ -17,10 +17,10 @@ pub enum GdbStubError<T, C> {
     PacketBufferOverlow,
     /// Could not parse the packet into a valid command.
     PacketParse(PacketParseError),
-    /// Packet contains too much / too little data for the given target.
-    PacketDataLenMismatch,
     /// GDB client sent an unexpected packet.
     PacketUnexpected,
+    /// GDB client sent a packet with too much data for the given target.
+    TargetMismatch,
     /// Target threw a fatal error.
     TargetError(T),
     /// Target didn't report any active threads.
@@ -54,8 +54,8 @@ where
             MissingPacketBuffer => write!(f, "GdbStub was not provided with a packet buffer in `no_std` mode (missing call to `with_packet_buffer`)"),
             PacketBufferOverlow => write!(f, "Packet too big for provided buffer!"),
             PacketParse(e) => write!(f, "Could not parse the packet into a valid command: {:?}", e),
-            PacketDataLenMismatch => write!(f, "Packet contains too much / too little data for the given target."),
             PacketUnexpected => write!(f, "Client sent an unexpected packet."),
+            TargetMismatch => write!(f, "GDB client sent a packet with too much data for the given target."),
             TargetError(e) => write!(f, "Target threw a fatal error: {:?}", e),
             NoActiveThreads => write!(f, "Target didn't report any active threads."),
             ResumeWithSignalUnimplemented => write!(f, "Resuming with a signal is not implemented yet. Consider opening a PR?")

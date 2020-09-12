@@ -284,7 +284,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             Command::G(cmd) => {
                 let mut regs: <T::Arch as Arch>::Registers = Default::default();
                 regs.gdb_deserialize(cmd.vals)
-                    .map_err(|_| Error::PacketDataLenMismatch)?; // FIXME: more granular error?
+                    .map_err(|_| Error::TargetMismatch)?;
 
                 match target.base_ops() {
                     BaseOps::SingleThread(ops) => ops.write_registers(&regs),
@@ -455,6 +455,9 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         _ => {
                             // there seems to be a GDB bug where it doesn't use `vCont` unless
                             // `vCont?` returns support for resuming with a signal.
+                            //
+                            // This error case can be removed once "Resume with Signal" is
+                            // implemented
                             err = Err(Error::ResumeWithSignalUnimplemented);
                             return None;
                         }
@@ -708,11 +711,9 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     fn to_target_usize(
         n: impl BeBytes,
     ) -> Result<<T::Arch as Arch>::Usize, Error<T::Error, C::Error>> {
-        let mut buf = [0; 16];
-        let len = n
-            .to_be_bytes(&mut buf)
-            .ok_or(Error::PacketDataLenMismatch)?;
-        <T::Arch as Arch>::Usize::from_be_bytes(&buf[..len]).ok_or(Error::PacketDataLenMismatch)
+        let mut buf = [0; 16]; // enough for 128-bit pointers
+        let len = n.to_be_bytes(&mut buf).ok_or(Error::TargetMismatch)?;
+        <T::Arch as Arch>::Usize::from_be_bytes(&buf[..len]).ok_or(Error::TargetMismatch)
     }
 }
 
