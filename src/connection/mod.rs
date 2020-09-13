@@ -1,6 +1,6 @@
 mod impls;
 
-/// A trait to perform bytewise I/O over a serial transport layer.
+/// A trait to perform in-order, serial, byte-wise I/O.
 ///
 /// When the `std` feature is enabled, this trait is automatically implemented
 /// for [`TcpStream`](https://doc.rust-lang.org/std/net/struct.TcpStream.html)
@@ -18,18 +18,39 @@ pub trait Connection {
     /// This method's default implementation calls `self.read()` for each byte
     /// in the buffer. This can be quite inefficient, so if a more efficient
     /// implementation exists (such as calling `read_exact()` on an underlying
-    /// std::io::Read object), this method should be overwritten.
+    /// `std::io::Read` object), this method should be overwritten.
     fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
-        buf.iter_mut().try_for_each(|b| {
+        for b in buf {
             *b = self.read()?;
-            Ok(())
-        })
+        }
+        Ok(())
     }
 
     /// Write a single byte.
     fn write(&mut self, byte: u8) -> Result<(), Self::Error>;
 
-    /// Peek a single byte. This should be a **non-blocking** operation
-    /// (returning None if no byte is available).
+    /// Write the entire buffer, blocking until complete.
+    ///
+    /// This method's default implementation calls `self.write()` on each byte
+    /// in the buffer. This can be quite inefficient, so if a more efficient
+    /// implementation exists (such as calling `write_all()` on an underlying
+    /// `std::io::Write` object), this method should be overwritten.
+    fn write_all(&mut self, buf: &[u8]) -> Result<(), Self::Error> {
+        for b in buf {
+            self.write(*b)?;
+        }
+        Ok(())
+    }
+
+    /// Peek a single byte. This MUST be a **non-blocking** operation, returning
+    /// None if no byte is available.
     fn peek(&mut self) -> Result<Option<u8>, Self::Error>;
+
+    /// Flush this Connection, ensuring that all intermediately buffered
+    /// contents reach their destination.
+    ///
+    /// _Note:_ Not all `Connection`s have internal buffering (e.g: writing data
+    /// to a UART TX register with FIFOs disabled). In these cases, it's fine to
+    /// simply return `Ok(())`.
+    fn flush(&mut self) -> Result<(), Self::Error>;
 }

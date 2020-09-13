@@ -90,4 +90,10 @@ impl Connection for TcpConnection {
             Ok(Some(buf[0]))
         }
     }
+
+    fn flush(&mut self) -> Result<(), &'static str> {
+        // huh, apparently flushing isn't a "thing" for Tcp streams.
+        // see https://doc.rust-lang.org/src/std/net/tcp.rs.html#592-609
+        Ok(())
+    }
 }

@@ -41,4 +41,16 @@ impl Connection for TcpStream {
 
         Write::write_all(self, &[byte])
     }
+
+    fn write_all(&mut self, buf: &[u8]) -> Result<(), Self::Error> {
+        use std::io::Write;
+
+        Write::write_all(self, buf)
+    }
+
+    fn flush(&mut self) -> Result<(), Self::Error> {
+        use std::io::Write;
+
+        Write::flush(self)
+    }
 }

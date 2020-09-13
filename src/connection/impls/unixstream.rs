@@ -5,7 +5,7 @@ use std::os::unix::net::UnixStream;
 
 use crate::Connection;
 
-// TODO: Remove PeekExt once rust-lang/rust#73761 is merged
+// TODO: Remove PeekExt once `gdbstub`'s MSRV >1.48 (rust-lang/rust#73761)
 trait PeekExt {
     fn peek(&self, buf: &mut [u8]) -> io::Result<usize>;
 }
@@ -84,5 +84,17 @@ impl Connection for UnixStream {
         use std::io::Write;
 
         Write::write_all(self, &[byte])
+    }
+
+    fn write_all(&mut self, buf: &[u8]) -> Result<(), Self::Error> {
+        use std::io::Write;
+
+        Write::write_all(self, buf)
+    }
+
+    fn flush(&mut self) -> Result<(), Self::Error> {
+        use std::io::Write;
+
+        Write::flush(self)
     }
 }

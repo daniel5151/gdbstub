@@ -17,7 +17,15 @@ impl<E> Connection for Box<dyn Connection<Error = E>> {
         (**self).write(byte)
     }
 
+    fn write_all(&mut self, buf: &[u8]) -> Result<(), Self::Error> {
+        (**self).write_all(buf)
+    }
+
     fn peek(&mut self) -> Result<Option<u8>, Self::Error> {
         (**self).peek()
+    }
+
+    fn flush(&mut self) -> Result<(), Self::Error> {
+        (**self).flush()
     }
 }
