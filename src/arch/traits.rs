@@ -27,12 +27,15 @@ pub trait RegId: Sized + Debug {
 /// While it is possible to implement the `read/write_register` methods using
 /// `RawRegId`, it does require looking up the architecture's corresponding
 /// feature.xml files in the [GDB source code](https://github.com/bminor/binutils-gdb/tree/master/gdb/features/).
+///
 /// When using `RawRegId`, the `dst` and `val` buffers are conservatively sized
 /// to be at least 256 bits, which should be large enough to store any register
-/// size required by GDB.
+/// size required by GDB. Please note that these buffer will be de/serialized as
+/// **big-endian** values!
 ///
 /// It bears repeating: if you end up implementing the `read/write_register`
-/// methods using `RawRegId`, please consider upstreaming your implementation!
+/// methods using `RawRegId`, please consider implementing a proper `RegId` enum
+/// instead and upstreaming it!
 #[derive(Debug)]
 pub struct RawRegId(pub usize);
 
