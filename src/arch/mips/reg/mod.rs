@@ -1,4 +1,4 @@
-//! `GdbRegister` structs for MIPS architectures.
+//! `Register` structs for MIPS architectures.
 
 mod mips;
 

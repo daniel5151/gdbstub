@@ -1,4 +1,4 @@
-//! `GdbRegister` structs for RISC-V architectures.
+//! `Register` structs for RISC-V architectures.
 
 mod riscv;
 

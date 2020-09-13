@@ -249,6 +249,12 @@ pub struct Actions<'a> {
     inner: &'a mut dyn Iterator<Item = (TidSelector, ResumeAction)>,
 }
 
+impl core::fmt::Debug for Actions<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "Actions {{ .. }}")
+    }
+}
+
 impl Actions<'_> {
     pub(crate) fn new(iter: &mut dyn Iterator<Item = (TidSelector, ResumeAction)>) -> Actions<'_> {
         Actions { inner: iter }

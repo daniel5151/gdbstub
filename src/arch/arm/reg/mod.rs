@@ -1,4 +1,4 @@
-//! `GdbRegister` structs for various ARM architectures.
+//! `Register` structs for various ARM architectures.
 
 mod arm_core;
 

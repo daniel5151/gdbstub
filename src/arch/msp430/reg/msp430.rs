@@ -2,7 +2,7 @@ use crate::arch::RawRegId;
 use crate::arch::Registers;
 
 /// 16-bit TI-MSP430 registers.
-#[derive(Default)]
+#[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct Msp430Regs {
     /// Program Counter (R0)
     pub pc: u16,

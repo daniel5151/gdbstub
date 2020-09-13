@@ -5,11 +5,11 @@ use crate::internal::LeBytes;
 use num_traits::PrimInt;
 
 /// MIPS registers.
-/// This structure is identical for both 32 and 64-bit MIPS.
+///
 /// The register width is set to `u32` or `u64` based on the `<U>` type.
 ///
 /// Source: https://github.com/bminor/binutils-gdb/blob/master/gdb/features/mips-cpu.xml
-#[derive(Default)]
+#[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct MipsCoreRegs<U> {
     /// General purpose registers (R0-R32)
     pub r: [U; 32],
@@ -28,7 +28,7 @@ pub struct MipsCoreRegs<U> {
 /// MIPS CP0 (coprocessor 0) registers.
 ///
 /// Source: https://github.com/bminor/binutils-gdb/blob/master/gdb/features/mips-cp0.xml
-#[derive(Default)]
+#[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct MipsCp0Regs<U> {
     /// Status register (regnum 32)
     pub status: U,
@@ -41,7 +41,7 @@ pub struct MipsCp0Regs<U> {
 /// MIPS FPU registers.
 ///
 /// Source: https://github.com/bminor/binutils-gdb/blob/master/gdb/features/mips-fpu.xml
-#[derive(Default)]
+#[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct MipsFpuRegs<U> {
     /// FP registers (F0-F32) starting at regnum 38
     pub r: [U; 32],
@@ -53,7 +53,7 @@ pub struct MipsFpuRegs<U> {
 
 impl<U> Registers for MipsCoreRegs<U>
 where
-    U: PrimInt + LeBytes + Default,
+    U: PrimInt + LeBytes + Default + core::fmt::Debug,
 {
     type RegId = RawRegId;
 

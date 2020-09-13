@@ -1,4 +1,4 @@
-//! Registers for PowerPC architectures
+//! `Register` structs for PowerPC architectures
 
 mod common;
 

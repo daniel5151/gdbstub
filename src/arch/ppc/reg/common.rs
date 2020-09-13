@@ -11,11 +11,11 @@ use core::convert::TryInto;
 /// * https://github.com/bminor/binutils-gdb/blob/master/gdb/features/rs6000/power-core.xml
 /// * https://github.com/bminor/binutils-gdb/blob/master/gdb/features/rs6000/power-fpu.xml
 /// * https://github.com/bminor/binutils-gdb/blob/master/gdb/features/rs6000/power-altivec.xml
-#[derive(Default, Debug, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct PowerPcCommonRegs {
     /// General purpose registers
     pub r: [u32; 32],
-    /// Float registers
+    /// Floating Point registers
     pub f: [f64; 32],
     /// Program counter
     pub pc: u32,

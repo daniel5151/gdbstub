@@ -1,7 +1,7 @@
 use crate::arch::{RegId, Registers};
 
 /// 32-bit ARM core register identifier.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum ArmCoreRegId {
     /// General purpose registers (R0-R12)
     Gpr(u8),
@@ -36,7 +36,7 @@ impl RegId for ArmCoreRegId {
 /// 32-bit ARM core registers.
 ///
 /// Source: https://github.com/bminor/binutils-gdb/blob/master/gdb/features/arm/arm-core.xml
-#[derive(Default)]
+#[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct ArmCoreRegs {
     /// General purpose registers (R0-R12)
     pub r: [u32; 13],

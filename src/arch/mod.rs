@@ -8,6 +8,11 @@
 //!
 //! Please consider upstreaming any missing `Arch` implementations you happen to
 //! implement yourself!
+//!
+//! **Disclaimer:** These implementations are all community contributions, and
+//! while they are tested (by the PR's author) and code-reviewed, it's not
+//! particularly feasible to write detailed tests for each architecture! If you
+//! spot a bug in any of the implementations, please file an issue / open a PR!
 
 pub mod arm;
 pub mod mips;

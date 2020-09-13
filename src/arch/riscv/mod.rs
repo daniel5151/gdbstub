@@ -1,4 +1,4 @@
-//! Support for the [RISC-V](https://riscv.org/) architecture.
+//! Implementations for the [RISC-V](https://riscv.org/) architecture.
 //!
 //! *Note*: currently only supports integer versions of the ISA.
 
@@ -7,12 +7,10 @@ use crate::arch::Arch;
 pub mod reg;
 
 /// Implements `Arch` for 32-bit RISC-V.
-#[derive(Eq, PartialEq)]
-pub struct Riscv32;
+pub enum Riscv32 {}
 
 /// Implements `Arch` for 64-bit RISC-V.
-#[derive(Eq, PartialEq)]
-pub struct Riscv64;
+pub enum Riscv64 {}
 
 impl Arch for Riscv32 {
     type Usize = u32;

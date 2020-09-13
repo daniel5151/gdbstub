@@ -1,11 +1,13 @@
-use num_traits::{Num, PrimInt, Unsigned};
+use core::fmt::Debug;
 
-use crate::internal::BeBytes;
+use num_traits::{PrimInt, Unsigned};
+
+use crate::internal::{BeBytes, LeBytes};
 
 /// Register identifier for target registers.
 ///
 /// These identifiers are used by GDB for single register operations.
-pub trait RegId: Sized {
+pub trait RegId: Sized + Debug {
     /// Map raw GDB register number corresponding `RegId` and register size.
     ///
     /// Returns `None` if the register is not available.
@@ -31,6 +33,7 @@ pub trait RegId: Sized {
 ///
 /// It bears repeating: if you end up implementing the `read/write_register`
 /// methods using `RawRegId`, please consider upstreaming your implementation!
+#[derive(Debug)]
 pub struct RawRegId(pub usize);
 
 impl RegId for RawRegId {
@@ -48,9 +51,7 @@ impl RegId for RawRegId {
 /// e.g: for ARM:
 /// github.com/bminor/binutils-gdb/blob/master/gdb/features/arm/arm-core.xml
 // TODO: add way to de/serialize arbitrary "missing"/"uncollected" registers.
-// TODO: add (optional?) trait methods for reading/writing specific register
-// (via it's GDB index)
-pub trait Registers: Default {
+pub trait Registers: Default + Debug + Clone + PartialEq {
     /// Register identifier for addressing single registers.
     type RegId: RegId;
 
@@ -65,9 +66,14 @@ pub trait Registers: Default {
 
 /// Encodes architecture-specific information, such as pointer size, register
 /// layout, etc...
-pub trait Arch: Eq + PartialEq {
+///
+/// Types implementing `Arch` should be
+/// [Zero-variant Enums](https://doc.rust-lang.org/reference/items/enumerations.html#zero-variant-enums),
+/// as they are only ever used at the type level, and should never be
+/// instantiated.
+pub trait Arch {
     /// The architecture's pointer size (e.g: `u32` on a 32-bit system).
-    type Usize: Num + PrimInt + Unsigned + BeBytes;
+    type Usize: PrimInt + Unsigned + BeBytes + LeBytes;
 
     /// The architecture's register file
     type Registers: Registers;

@@ -1,4 +1,4 @@
-//! `GdbRegister` structs for x86 architectures.
+//! `Register` structs for x86 architectures.
 
 use core::convert::TryInto;
 
@@ -15,7 +15,7 @@ pub use core64::X86_64CoreRegs;
 pub type F80 = [u8; 10];
 
 /// FPU registers
-#[derive(Default)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct X87FpuInternalRegs {
     /// Floating-point control register
     pub fctrl: u32,

@@ -5,12 +5,10 @@ use crate::arch::Arch;
 pub mod reg;
 
 /// Implements `Arch` for 32-bit MIPS.
-#[derive(Eq, PartialEq)]
-pub struct Mips;
+pub enum Mips {}
 
 /// Implements `Arch` for 64-bit MIPS.
-#[derive(Eq, PartialEq)]
-pub struct Mips64;
+pub enum Mips64 {}
 
 impl Arch for Mips {
     type Usize = u32;

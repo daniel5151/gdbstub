@@ -5,8 +5,7 @@ use crate::arch::Arch;
 pub mod reg;
 
 /// Implements `Arch` for standard 16-bit TI-MSP430 MCUs.
-#[derive(Eq, PartialEq)]
-pub struct Msp430;
+pub enum Msp430 {}
 
 impl Arch for Msp430 {
     type Usize = u32;

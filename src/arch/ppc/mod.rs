@@ -5,8 +5,7 @@ use crate::arch::Arch;
 pub mod reg;
 
 /// Implements `Arch` for 32-bit PowerPC + AltiVec SIMD
-#[derive(Eq, PartialEq)]
-pub struct PowerPcAltivec32;
+pub enum PowerPcAltivec32 {}
 
 impl Arch for PowerPcAltivec32 {
     type Usize = u32;

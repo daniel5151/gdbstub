@@ -5,8 +5,7 @@ use crate::arch::Arch;
 pub mod reg;
 
 /// Implements `Arch` for ARMv4T
-#[derive(Eq, PartialEq)]
-pub struct Armv4t;
+pub enum Armv4t {}
 
 impl Arch for Armv4t {
     type Usize = u32;

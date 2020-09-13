@@ -8,7 +8,7 @@ use crate::arch::Registers;
 ///
 /// Source: https://github.com/bminor/binutils-gdb/blob/master/gdb/features/i386/32bit-core.xml
 /// Additionally: https://github.com/bminor/binutils-gdb/blob/master/gdb/features/i386/32bit-sse.xml
-#[derive(Default)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct X86CoreRegs {
     /// Accumulator
     pub eax: u32,

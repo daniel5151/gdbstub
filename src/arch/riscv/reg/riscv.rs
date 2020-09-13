@@ -4,7 +4,7 @@ use crate::arch::{RegId, Registers};
 use crate::internal::LeBytes;
 
 /// RISC-V Register identifier.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum RiscvRegId {
     /// General Purpose Register (x0-x31).
     Gpr(u8),
@@ -38,7 +38,7 @@ impl RegId for RiscvRegId {
 /// Useful links:
 /// * [GNU binutils-gdb XML descriptions](https://github.com/bminor/binutils-gdb/blob/master/gdb/features/riscv)
 /// * [riscv-tdep.h](https://github.com/bminor/binutils-gdb/blob/master/gdb/riscv-tdep.h)
-#[derive(Default)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct RiscvCoreRegs<U> {
     /// General purpose registers (x0-x31)
     pub x: [U; 32],
@@ -48,7 +48,7 @@ pub struct RiscvCoreRegs<U> {
 
 impl<U> Registers for RiscvCoreRegs<U>
 where
-    U: PrimInt + LeBytes + Default,
+    U: PrimInt + LeBytes + Default + core::fmt::Debug,
 {
     type RegId = RiscvRegId;
 

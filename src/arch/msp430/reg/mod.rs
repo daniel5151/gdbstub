@@ -1,4 +1,4 @@
-//! `GdbRegister` structs for various TI-MSP430 CPUs.
+//! `Register` structs for various TI-MSP430 CPUs.
 
 mod msp430;
 
