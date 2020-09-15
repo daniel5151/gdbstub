@@ -53,4 +53,20 @@ pub trait Connection {
     /// to a UART TX register with FIFOs disabled). In these cases, it's fine to
     /// simply return `Ok(())`.
     fn flush(&mut self) -> Result<(), Self::Error>;
+
+    /// Called at the start of a debugging session _before_ any GDB packets have
+    /// been sent/received.
+    ///
+    /// This method's default implementation is a no-op.
+    ///
+    /// # Example
+    ///
+    /// The `on_session_start` implementation for `TcpStream` ensures that
+    /// [`set_nodelay(true)`](https://doc.rust-lang.org/std/net/struct.TcpStream.html#method.set_nodelay)
+    /// is called. The GDB remote serial protocol requires sending/receiving
+    /// many small packets, so forgetting to enable `TCP_NODELAY` can result in
+    /// a massively degraded debugging experience.
+    fn on_session_start(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
 }

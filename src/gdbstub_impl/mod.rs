@@ -105,6 +105,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         conn: &mut C,
         packet_buffer: &mut ManagedSlice<u8>,
     ) -> Result<DisconnectReason, Error<T::Error, C::Error>> {
+        conn.on_session_start().map_err(Error::ConnectionRead)?;
+
         // before even accepting packets, we query the target to get a sane value for
         // `self.current_mem_tid`.
         // NOTE: this will break if extended mode is ever implemented...

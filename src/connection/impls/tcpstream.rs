@@ -53,4 +53,9 @@ impl Connection for TcpStream {
 
         Write::flush(self)
     }
+
+    fn on_session_start(&mut self) -> Result<(), Self::Error> {
+        // see issue #28
+        self.set_nodelay(true)
+    }
 }

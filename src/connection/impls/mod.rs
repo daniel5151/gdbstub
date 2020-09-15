@@ -38,4 +38,8 @@ impl<E> Connection for &mut dyn Connection<Error = E> {
     fn flush(&mut self) -> Result<(), Self::Error> {
         (**self).flush()
     }
+
+    fn on_session_start(&mut self) -> Result<(), Self::Error> {
+        (**self).on_session_start()
+    }
 }
