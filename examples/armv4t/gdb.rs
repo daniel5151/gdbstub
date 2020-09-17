@@ -2,7 +2,7 @@ use core::convert::TryInto;
 
 use armv4t_emu::{reg, Memory};
 use gdbstub::arch;
-use gdbstub::arch::arm::reg::ArmCoreRegId;
+use gdbstub::arch::arm::reg::id::ArmCoreRegId;
 use gdbstub::target::base::singlethread::{ResumeAction, SingleThreadOps, StopReason};
 use gdbstub::target::ext::breakpoint::WatchKind;
 use gdbstub::target::{base, ext, Target};
@@ -112,7 +112,7 @@ impl SingleThreadOps for Emu {
 
     fn read_register(
         &mut self,
-        reg_id: arch::arm::reg::ArmCoreRegId,
+        reg_id: arch::arm::reg::id::ArmCoreRegId,
         dst: &mut [u8],
     ) -> Result<bool, Self::Error> {
         if let Some(i) = cpu_reg_id(reg_id) {
@@ -126,7 +126,7 @@ impl SingleThreadOps for Emu {
 
     fn write_register(
         &mut self,
-        reg_id: arch::arm::reg::ArmCoreRegId,
+        reg_id: arch::arm::reg::id::ArmCoreRegId,
         val: &[u8],
     ) -> Result<bool, Self::Error> {
         let w = u32::from_le_bytes(val.try_into().map_err(|_| "invalid data")?);

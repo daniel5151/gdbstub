@@ -10,6 +10,7 @@ pub enum PowerPcAltivec32 {}
 impl Arch for PowerPcAltivec32 {
     type Usize = u32;
     type Registers = reg::PowerPcCommonRegs;
+    type RegId = reg::id::PowerPc32RegId;
 
     fn target_description_xml() -> Option<&'static str> {
         Some(

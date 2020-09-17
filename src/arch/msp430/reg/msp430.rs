@@ -1,4 +1,3 @@
-use crate::arch::RawRegId;
 use crate::arch::Registers;
 
 /// 16-bit TI-MSP430 registers.
@@ -15,8 +14,6 @@ pub struct Msp430Regs {
 }
 
 impl Registers for Msp430Regs {
-    type RegId = RawRegId;
-
     fn gdb_serialize(&self, mut write_byte: impl FnMut(Option<u8>)) {
         macro_rules! write_bytes {
             ($bytes:expr) => {

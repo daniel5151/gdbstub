@@ -15,6 +15,7 @@ pub enum Riscv64 {}
 impl Arch for Riscv32 {
     type Usize = u32;
     type Registers = reg::RiscvCoreRegs<u32>;
+    type RegId = reg::id::RiscvRegId;
 
     fn target_description_xml() -> Option<&'static str> {
         Some(r#"<target version="1.0"><architecture>riscv</architecture></target>"#)
@@ -24,6 +25,7 @@ impl Arch for Riscv32 {
 impl Arch for Riscv64 {
     type Usize = u64;
     type Registers = reg::RiscvCoreRegs<u64>;
+    type RegId = reg::id::RiscvRegId;
 
     fn target_description_xml() -> Option<&'static str> {
         Some(r#"<target version="1.0"><architecture>riscv64</architecture></target>"#)

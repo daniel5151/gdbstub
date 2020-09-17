@@ -1,6 +1,6 @@
 //! Base debugging operations for multi threaded targets.
 
-use crate::arch::{Arch, Registers};
+use crate::arch::Arch;
 use crate::target::ext::breakpoint::WatchKind;
 use crate::target::Target;
 
@@ -117,7 +117,7 @@ pub trait MultiThreadOps: Target {
     /// type. See the docs for `RawRegId` for more info.
     fn read_register(
         &mut self,
-        reg_id: <<Self::Arch as Arch>::Registers as Registers>::RegId,
+        reg_id: <Self::Arch as Arch>::RegId,
         dst: &mut [u8],
         tid: Tid,
     ) -> Result<bool, Self::Error> {
@@ -145,7 +145,7 @@ pub trait MultiThreadOps: Target {
     /// type. See the docs for `RawRegId` for more info.
     fn write_register(
         &mut self,
-        reg_id: <<Self::Arch as Arch>::Registers as Registers>::RegId,
+        reg_id: <Self::Arch as Arch>::RegId,
         val: &[u8],
         tid: Tid,
     ) -> Result<bool, Self::Error> {

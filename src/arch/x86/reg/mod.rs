@@ -2,8 +2,10 @@
 
 use core::convert::TryInto;
 
-use crate::arch::RawRegId;
 use crate::arch::Registers;
+
+/// `RegId` definitions for x86 architectures.
+pub mod id;
 
 mod core32;
 mod core64;
@@ -36,8 +38,6 @@ pub struct X87FpuInternalRegs {
 }
 
 impl Registers for X87FpuInternalRegs {
-    type RegId = RawRegId;
-
     fn gdb_serialize(&self, mut write_byte: impl FnMut(Option<u8>)) {
         macro_rules! write_bytes {
             ($bytes:expr) => {

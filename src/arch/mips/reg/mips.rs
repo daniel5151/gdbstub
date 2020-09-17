@@ -1,4 +1,3 @@
-use crate::arch::RawRegId;
 use crate::arch::Registers;
 use crate::internal::LeBytes;
 
@@ -55,8 +54,6 @@ impl<U> Registers for MipsCoreRegs<U>
 where
     U: PrimInt + LeBytes + Default + core::fmt::Debug,
 {
-    type RegId = RawRegId;
-
     fn gdb_serialize(&self, mut write_byte: impl FnMut(Option<u8>)) {
         macro_rules! write_le_bytes {
             ($value:expr) => {

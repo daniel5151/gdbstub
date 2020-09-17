@@ -55,9 +55,6 @@ impl RegId for RawRegId {
 /// github.com/bminor/binutils-gdb/blob/master/gdb/features/arm/arm-core.xml
 // TODO: add way to de/serialize arbitrary "missing"/"uncollected" registers.
 pub trait Registers: Default + Debug + Clone + PartialEq {
-    /// Register identifier for addressing single registers.
-    type RegId: RegId;
-
     /// Serialize `self` into a GDB register bytestream.
     ///
     /// Missing registers are serialized by passing `None` to write_byte.
@@ -78,8 +75,17 @@ pub trait Arch {
     /// The architecture's pointer size (e.g: `u32` on a 32-bit system).
     type Usize: PrimInt + Unsigned + BeBytes + LeBytes;
 
-    /// The architecture's register file
+    /// The architecture's register file.
     type Registers: Registers;
+
+    /// Register identifier enum/struct.
+    ///
+    /// Used to access individual registers via `Target::read/write_register`.
+    ///
+    /// NOTE: The `RegId` type is not required to have a 1:1 correspondence with
+    /// the `Registers` type, and may include register identifiers which are
+    /// separate from the main `Registers` structure.
+    type RegId: RegId;
 
     /// (optional) Return the platform's `features.xml` file.
     ///

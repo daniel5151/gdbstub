@@ -11,6 +11,7 @@ pub enum X86_64_SSE {}
 impl Arch for X86_64_SSE {
     type Usize = u64;
     type Registers = reg::X86_64CoreRegs;
+    type RegId = reg::id::X86_64RegId;
 
     fn target_description_xml() -> Option<&'static str> {
         Some(
@@ -26,6 +27,7 @@ pub enum X86_SSE {}
 impl Arch for X86_SSE {
     type Usize = u32;
     type Registers = reg::X86CoreRegs;
+    type RegId = reg::id::X86RegId;
 
     fn target_description_xml() -> Option<&'static str> {
         Some(

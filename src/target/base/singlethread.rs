@@ -1,6 +1,6 @@
 //! Base debugging operations for single threaded targets.
 
-use crate::arch::{Arch, Registers};
+use crate::arch::Arch;
 use crate::target::ext::breakpoint::WatchKind;
 use crate::target::Target;
 
@@ -76,7 +76,7 @@ pub trait SingleThreadOps: Target {
     /// type. See the docs for `RawRegId` for more info.
     fn read_register(
         &mut self,
-        reg_id: <<Self::Arch as Arch>::Registers as Registers>::RegId,
+        reg_id: <Self::Arch as Arch>::RegId,
         dst: &mut [u8],
     ) -> Result<bool, Self::Error> {
         let _ = (reg_id, dst);
@@ -103,7 +103,7 @@ pub trait SingleThreadOps: Target {
     /// type. See the docs for `RawRegId` for more info.
     fn write_register(
         &mut self,
-        reg_id: <<Self::Arch as Arch>::Registers as Registers>::RegId,
+        reg_id: <Self::Arch as Arch>::RegId,
         val: &[u8],
     ) -> Result<bool, Self::Error> {
         let _ = (reg_id, val);
