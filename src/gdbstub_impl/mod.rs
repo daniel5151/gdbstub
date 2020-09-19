@@ -238,7 +238,6 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 self.no_ack_mode = true;
                 res.write_str("OK")?;
             }
-            Command::vContQuestionMark(_) => res.write_str("vCont;c;C;s;S")?,
             Command::qXferFeaturesRead(cmd) => {
                 assert_eq!(cmd.annex, "target.xml");
                 match T::Arch::target_description_xml() {
@@ -443,11 +442,19 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 }
             }
             Command::vCont(cmd) => {
-                use crate::protocol::commands::_vCont::VContKind;
+                use crate::protocol::commands::_vCont::{vCont, VContKind};
+
+                let actions = match cmd {
+                    vCont::Query => {
+                        res.write_str("vCont;c;C;s;S")?;
+                        return Ok(None);
+                    }
+                    vCont::Actions(actions) => actions,
+                };
 
                 // map raw vCont action iterator to a format the `Target` expects
                 let mut err = Ok(());
-                let mut actions = cmd.actions.into_iter().filter_map(|action| {
+                let mut actions = actions.into_iter().filter_map(|action| {
                     let action = match action {
                         Some(action) => action,
                         None => {

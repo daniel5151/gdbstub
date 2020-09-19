@@ -5,16 +5,19 @@ use super::prelude::*;
 // buffer, and return an iterator over the binary data that's _guaranteed_ to be
 // valid. This would clean up some of the code in the vCont handler.
 #[derive(Debug)]
-pub struct vCont<'a> {
-    pub actions: Actions<'a>,
+pub enum vCont<'a> {
+    Query,
+    Actions(Actions<'a>),
 }
 
 impl<'a> ParseCommand<'a> for vCont<'a> {
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
         let body = buf.into_body_str();
-        Some(vCont {
-            actions: Actions(body),
-        })
+        if body.starts_with('?') {
+            Some(vCont::Query)
+        } else {
+            Some(vCont::Actions(Actions(body)))
+        }
     }
 }
 

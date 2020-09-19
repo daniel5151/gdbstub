@@ -118,11 +118,8 @@ commands! {
     "qXfer:features:read" => _qXfer_features_read::qXferFeaturesRead<'a>,
     "s" => _s::s,
     "T" => _t_upcase::T,
-    "z" => _z::z,
-    "Z" => _z_upcase::Z,
-
-    // Order Matters (because of prefix matching)
-    "vCont?" => vCont_question_mark::vContQuestionMark,
     "vCont" => _vCont::vCont<'a>,
     "vKill" => _vKill::vKill,
+    "z" => _z::z,
+    "Z" => _z_upcase::Z,
 }
