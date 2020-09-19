@@ -169,10 +169,15 @@ pub mod target;
 pub use connection::Connection;
 pub use gdbstub_impl::*;
 
+/// Thread ID
+pub type Tid = core::num::NonZeroUsize;
+
+/// Process ID
+pub type Pid = core::num::NonZeroUsize;
+
 /// (Internal) The fake Tid that's used when running in single-threaded mode.
 // SAFETY: 1 is clearly non-zero.
-const SINGLE_THREAD_TID: core::num::NonZeroUsize =
-    unsafe { core::num::NonZeroUsize::new_unchecked(1) };
+const SINGLE_THREAD_TID: Tid = unsafe { Tid::new_unchecked(1) };
 /// (Internal) The fake Pid reported to GDB (since `gdbstub` only supports
 /// debugging a single process).
-const FAKE_PID: core::num::NonZeroUsize = unsafe { core::num::NonZeroUsize::new_unchecked(1) };
+const FAKE_PID: Pid = unsafe { Pid::new_unchecked(1) };

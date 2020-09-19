@@ -8,11 +8,11 @@ use crate::{
     connection::Connection,
     internal::*,
     protocol::{Command, ConsoleOutput, IdKind, Packet, ResponseWriter, ThreadId},
-    target::base::multithread::{Actions, ResumeAction, ThreadStopReason, Tid, TidSelector},
+    target::base::multithread::{Actions, ResumeAction, ThreadStopReason, TidSelector},
     target::base::BaseOps,
     target::{ext, Target},
     util::managed_vec::ManagedVec,
-    FAKE_PID, SINGLE_THREAD_TID,
+    Tid, FAKE_PID, SINGLE_THREAD_TID,
 };
 
 mod builder;

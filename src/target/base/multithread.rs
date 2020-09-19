@@ -3,13 +3,10 @@
 use crate::arch::Arch;
 use crate::target::ext::breakpoint::WatchKind;
 use crate::target::Target;
+use crate::Tid;
 
-// Convenient re-export
+// Convenient re-exports
 pub use super::ResumeAction;
-
-/// Thread ID
-// TODO: FUTURE: expose full PID.TID (i.e: the ThreadId struct) to client?
-pub type Tid = core::num::NonZeroUsize;
 
 /// Selects a thread corresponding to a ResumeAction.
 // NOTE: this is a subset of the internal `IdKind` type, albeit without an `Any` variant. Selecting

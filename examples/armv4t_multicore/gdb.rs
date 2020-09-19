@@ -1,11 +1,10 @@
 use armv4t_emu::{reg, Memory};
 use gdbstub::arch;
-use gdbstub::target::base::multithread::{
-    Actions, MultiThreadOps, ResumeAction, ThreadStopReason, Tid,
-};
+use gdbstub::target::base::multithread::{Actions, MultiThreadOps, ResumeAction, ThreadStopReason};
 use gdbstub::target::ext::breakpoint::WatchKind;
 use gdbstub::target::ext::monitor::{outputln, ConsoleOutput};
 use gdbstub::target::{base, ext, Target};
+use gdbstub::Tid;
 
 use crate::emu::{CpuId, Emu, Event};
 

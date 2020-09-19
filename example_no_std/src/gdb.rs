@@ -1,6 +1,7 @@
 use gdbstub::arch;
-use gdbstub::target::base::multithread::{Actions, MultiThreadOps, ThreadStopReason, Tid};
+use gdbstub::target::base::multithread::{Actions, MultiThreadOps, ThreadStopReason};
 use gdbstub::target::{base, ext, Target};
+use gdbstub::Tid;
 
 use crate::print_str::print_str;
 
