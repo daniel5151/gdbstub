@@ -1,12 +1,37 @@
-use btoi::{btou_radix, ParseIntegerError};
 use num_traits::{CheckedAdd, CheckedMul, FromPrimitive, Zero};
 
-#[inline]
-pub fn decode_hex<I>(buf: &[u8]) -> Result<I, ParseIntegerError>
+pub enum DecodeHexError {
+    NotAscii,
+    Empty,
+    Overflow,
+    InvalidOutput,
+}
+
+/// Decode a GDB dex string into the specified integer.
+///
+/// GDB hex strings may include "xx", which represent "missing" data. This
+/// method simply treats "xx" as 0x00.
+pub fn decode_hex<I>(buf: &[u8]) -> Result<I, DecodeHexError>
 where
     I: FromPrimitive + Zero + CheckedAdd + CheckedMul,
 {
-    btou_radix(buf, 16)
+    use DecodeHexError::*;
+
+    let radix = I::from_u8(16).ok_or(InvalidOutput)?;
+
+    if buf.is_empty() {
+        return Err(Empty);
+    }
+
+    let mut result = I::zero();
+
+    for &digit in buf {
+        let x = I::from_u8(ascii2byte(digit).ok_or(NotAscii)?).ok_or(InvalidOutput)?;
+        result = result.checked_mul(&radix).ok_or(Overflow)?;
+        result = result.checked_add(&x).ok_or(Overflow)?
+    }
+
+    Ok(result)
 }
 
 pub enum DecodeHexBufError {
