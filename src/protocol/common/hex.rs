@@ -1,5 +1,6 @@
 use num_traits::{CheckedAdd, CheckedMul, FromPrimitive, Zero};
 
+#[derive(Debug)]
 pub enum DecodeHexError {
     NotAscii,
     Empty,
@@ -34,9 +35,9 @@ where
     Ok(result)
 }
 
+#[derive(Debug)]
 pub enum DecodeHexBufError {
     NotAscii,
-    NotEvenLen,
 }
 
 fn ascii2byte(c: u8) -> Option<u8> {
@@ -49,6 +50,17 @@ fn ascii2byte(c: u8) -> Option<u8> {
     }
 }
 
+/// Check if the byte `c` is a valid GDB hex digit `[0-9][a-f][A-F][xX]`
+pub fn is_hex(c: u8) -> bool {
+    match c {
+        b'0'..=b'9' => true,
+        b'a'..=b'f' => true,
+        b'A'..=b'F' => true,
+        b'x' | b'X' => true,
+        _ => false,
+    }
+}
+
 /// Decode a GDB hex string into a byte slice _in place_.
 ///
 /// GDB hex strings may include "xx", which represent "missing" data. This
@@ -57,9 +69,12 @@ fn ascii2byte(c: u8) -> Option<u8> {
 pub fn decode_hex_buf(buf: &mut [u8]) -> Result<&mut [u8], DecodeHexBufError> {
     use DecodeHexBufError::*;
 
-    if buf.len() % 2 != 0 {
-        return Err(NotEvenLen);
-    }
+    let buf = if buf.len() % 2 != 0 {
+        buf[0] = ascii2byte(buf[0]).ok_or(NotAscii)?;
+        &mut buf[1..]
+    } else {
+        buf
+    };
 
     let decoded_len = buf.len() / 2;
     for i in 0..decoded_len {

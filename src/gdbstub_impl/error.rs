@@ -5,6 +5,7 @@ use crate::util::managed_vec::CapacityError;
 
 /// Errors which may occur during a GDB debugging session.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum GdbStubError<T, C> {
     /// Connection Error while reading request.
     ConnectionRead(C),
@@ -30,6 +31,9 @@ pub enum GdbStubError<T, C> {
     NoActiveThreads,
     /// Resuming with a signal is not implemented yet. Consider opening a PR?
     ResumeWithSignalUnimplemented,
+    /// Internal - A non-fatal error occurred (with errno-style error code)
+    #[doc(hidden)]
+    NonFatalError(u8),
 }
 
 impl<T, C> From<ResponseWriterError<C>> for GdbStubError<T, C> {
@@ -62,7 +66,8 @@ where
             TargetMismatch => write!(f, "GDB client sent a packet with too much data for the given target."),
             TargetError(e) => write!(f, "Target threw a fatal error: {:?}", e),
             NoActiveThreads => write!(f, "Target didn't report any active threads."),
-            ResumeWithSignalUnimplemented => write!(f, "Resuming with a signal is not implemented yet. Consider opening a PR?")
+            ResumeWithSignalUnimplemented => write!(f, "Resuming with a signal is not implemented yet. Consider opening a PR?"),
+            NonFatalError(_) => write!(f, "Internal - A non-fatal error occurred (with errno-style error code)"),
         }
     }
 }

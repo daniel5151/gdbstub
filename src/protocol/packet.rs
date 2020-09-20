@@ -64,6 +64,22 @@ impl<'a> PacketBuf<'a> {
         })
     }
 
+    /// (used for tests) Skip the header/checksum trimming stage, but _not_ the
+    /// ASCII validation.
+    #[cfg(test)]
+    pub fn new_with_raw_body(body: &'a mut [u8]) -> Result<PacketBuf<'a>, PacketParseError> {
+        // validate the packet is valid ASCII
+        if !body.is_ascii() {
+            return Err(PacketParseError::NotASCII);
+        }
+
+        let len = body.len();
+        Ok(PacketBuf {
+            buf: body,
+            body_range: 0..len,
+        })
+    }
+
     pub fn trim_start_body_bytes(self, n: usize) -> Self {
         PacketBuf {
             buf: self.buf,

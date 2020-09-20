@@ -262,8 +262,128 @@
 
 use crate::arch::Arch;
 
+/// Automatically derives various `From` implementation for `TargetError`
+/// wrappers.
+macro_rules! target_error_wrapper {
+    (
+        $( #[$meta:meta] )* // captures attributes and docstring
+        $pub:vis // (optional) pub, pub(crate), etc.
+        enum $name:ident
+        $($tt:tt)*
+    ) => {
+        $(#[$meta])*
+        $pub enum $name $($tt)*
+
+        #[cfg(feature = "std")]
+        impl<E> From<std::io::Error> for $name<E> {
+            fn from(e: std::io::Error) -> $name<E> {
+                $name::TargetError(TargetError::Io(e))
+            }
+        }
+
+        impl<E> From<()> for $name<E> {
+            fn from(_: ()) -> $name<E> {
+                $name::TargetError(TargetError::NonFatal)
+            }
+        }
+
+        impl<E> From<TargetError<E>> for $name<E> {
+            fn from(e: TargetError<E>) -> $name<E> {
+                $name::TargetError(e)
+            }
+        }
+    };
+}
+
 pub mod base;
 pub mod ext;
+
+/// The error type for various methods on `Target` and it's assorted associated
+/// extension traits.
+///
+/// # Error Handling over the GDB Remote Serial Protocol
+///
+/// The GDB Remote Serial Protocol has less-than-stellar support for error
+/// handling, typically taking the form of a single-byte
+/// [`errno`-style error codes](https://www-numi.fnal.gov/offline_software/srt_public_context/WebDocs/Errors/unix_system_errors.html).
+/// Moreover, often times the GDB client will simply _ignore_ the specific error
+/// code returned by the stub, and print a generic failure message instead.
+///
+/// As such, while it's certainly better to use appropriate error codes when
+/// possible (e.g: returning a `EFAULT` (14) when reading from invalid memory),
+/// it's often fine to simply return the more general `TargetError::NonFatal`
+/// instead, and avoid the headache of picking a "descriptive" error code. Under
+/// the good, `TargetError::NonFatal` is sent to the GDB client as a generic
+/// `EREMOTEIO` (121) error.
+///
+/// # `From` and `Into` implementations
+///
+/// - `From<()>` -> `TargetError::NonFatal`
+/// - `From<io::Error>` -> `TargetError::Io(io::Error)` (requires `std` feature)
+///
+/// When using a custom target-specific fatal error type, users are encouraged
+/// to write the following impl to simplify error handling in `Target` methods:
+///
+/// ```rust,ignore
+/// type MyTargetFatalError = ...; // Target-specific Fatal Error
+/// impl From<MyTargetFatalError> for TargetError<MyTargetFatalError> {
+///     fn from(e: MyTargetFatalError) -> Self {
+///         TargetError::Fatal(e)
+///     }
+/// }
+/// ```
+///
+/// Unfortunately, a blanket impl such as `impl<T: Target> From<T::Error> for
+/// TargetError<T::Error>` isn't possible, as it could result in impl conflicts.
+/// For example, if a Target decided to use `()` as it's fatal error type, then
+/// there would be conflict with the existing `From<()>` impl.
+#[non_exhaustive]
+pub enum TargetError<E> {
+    /// A non-specific, non-fatal error has occurred.
+    NonFatal,
+    /// I/O Error.
+    ///
+    /// At the moment, this is just shorthand for
+    /// `TargetError::NonFatal(e.raw_os_err().unwrap_or(121))`. Error code `121`
+    /// corresponds to `EREMOTEIO`.
+    ///
+    /// In the future, `gdbstub` may add support for the "QEnableErrorStrings"
+    /// LLDB protocol extension, which would allow sending additional error
+    /// context (in the form of an ASCII string) when an I/O error occurs. If
+    /// this is something you're interested in, consider opening a PR!
+    ///
+    /// Only available when the `std` feature is enabled.
+    #[cfg(feature = "std")]
+    Io(std::io::Error),
+    /// An operation-specific non-fatal error code.
+    Errno(u8),
+    /// A target-specific fatal error.
+    ///
+    /// **WARNING:** Returning this error will immediately halt the target's
+    /// execution and return a `GdbStubError::TargetError` from `GdbStub::run`!
+    /// Note that the debugging session will will _not_ be terminated, and can
+    /// be resumed by calling `GdbStub::run` after resolving the error and/or
+    /// setting up a post-mortem debugging environment.
+    Fatal(E),
+}
+
+/// Converts a `()` into a `TargetError::NonFatal`.
+impl<E> From<()> for TargetError<E> {
+    fn from(_: ()) -> TargetError<E> {
+        TargetError::NonFatal
+    }
+}
+
+/// Converts a `std::io::Error` into a `TargetError::Io`.
+#[cfg(feature = "std")]
+impl<E> From<std::io::Error> for TargetError<E> {
+    fn from(e: std::io::Error) -> TargetError<E> {
+        TargetError::Io(e)
+    }
+}
+
+/// A specialized `Result` type for `Target` operations.
+pub type TargetResult<T, Tgt> = Result<T, TargetError<<Tgt as Target>::Error>>;
 
 /// Describes a target which can be debugged by a
 /// [`GdbStub`](struct.GdbStub.html).
@@ -318,6 +438,11 @@ pub trait Target {
         None
     }
 
+    /// Supports extended mode operation.
+    fn extended_mode(&mut self) -> Option<ext::ExtendedModeOps<Self>> {
+        None
+    }
+
     /// Handle requests to get the target's current section (or segment)
     /// offsets.
     fn section_offsets(&mut self) -> Option<ext::SectionOffsetsOps<Self>> {
@@ -353,6 +478,14 @@ macro_rules! impl_dyn_target {
 
             fn monitor_cmd(&mut self) -> Option<ext::MonitorCmdOps<Self>> {
                 (**self).monitor_cmd()
+            }
+
+            fn extended_mode(&mut self) -> Option<ext::ExtendedModeOps<Self>> {
+                (**self).extended_mode()
+            }
+
+            fn section_offsets(&mut self) -> Option<ext::SectionOffsetsOps<Self>> {
+                (**self).section_offsets()
             }
         }
     };

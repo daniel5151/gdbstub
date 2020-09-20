@@ -1,2 +1,2 @@
 file test.elf
-target remote :9001
+target extended-remote :9001

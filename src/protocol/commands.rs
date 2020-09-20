@@ -6,6 +6,7 @@ pub(crate) mod prelude {
     pub(crate) use crate::protocol::common::*;
     pub(crate) use crate::protocol::packet::PacketBuf;
     pub(crate) use crate::target::Target;
+    pub(crate) use crate::Pid;
 }
 
 pub trait ParseCommand<'a>: Sized {
@@ -97,6 +98,7 @@ pub enum CommandParseError<'a> {
 }
 
 commands! {
+    "!" => exclamation_mark::ExclamationMark,
     "?" => question_mark::QuestionMark,
     "c" => _c::c,
     "D" => _d_upcase::D,
@@ -116,10 +118,13 @@ commands! {
     "qSupported" => _qSupported::qSupported<'a>,
     "qOffsets" => _qOffsets::qOffsets,
     "qXfer:features:read" => _qXfer_features_read::qXferFeaturesRead<'a>,
+    "R" => _r_upcase::R,
     "s" => _s::s,
     "T" => _t_upcase::T,
+    "vAttach" => _vAttach::vAttach,
     "vCont" => _vCont::vCont<'a>,
     "vKill" => _vKill::vKill,
+    "vRun" => _vRun::vRun<'a>,
     "z" => _z::z,
     "Z" => _z_upcase::Z,
 }

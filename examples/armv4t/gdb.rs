@@ -3,11 +3,15 @@ use core::convert::TryInto;
 use armv4t_emu::{reg, Memory};
 use gdbstub::arch;
 use gdbstub::arch::arm::reg::id::ArmCoreRegId;
-use gdbstub::target::base::singlethread::{ResumeAction, SingleThreadOps, StopReason};
 use gdbstub::target::ext::breakpoint::WatchKind;
 use gdbstub::target::{base, ext, Target};
 
+use base::singlethread::{ResumeAction, SingleThreadOps, StopReason};
+
 use crate::emu::{Emu, Event};
+
+// `extended_mode` extensions
+mod extended_mode;
 
 /// Turn a `ArmCoreRegId` into an internal register number of `armv4t_emu`.
 fn cpu_reg_id(id: ArmCoreRegId) -> Option<u8> {
@@ -34,6 +38,10 @@ impl Target for Emu {
     }
 
     fn hw_watchpoint(&mut self) -> Option<ext::HwWatchpointOps<Self>> {
+        Some(self)
+    }
+
+    fn extended_mode(&mut self) -> Option<ext::ExtendedModeOps<Self>> {
         Some(self)
     }
 }

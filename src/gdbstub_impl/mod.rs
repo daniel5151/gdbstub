@@ -1,5 +1,8 @@
 use core::marker::PhantomData;
 
+#[cfg(feature = "alloc")]
+use alloc::collections::BTreeMap;
+
 use managed::ManagedSlice;
 
 use crate::protocol::commands::ParseCommand;
@@ -12,14 +15,17 @@ use crate::{
     target::base::BaseOps,
     target::{ext, Target},
     util::managed_vec::ManagedVec,
-    Tid, FAKE_PID, SINGLE_THREAD_TID,
+    Pid, Tid, FAKE_PID, SINGLE_THREAD_TID,
 };
 
 mod builder;
 mod error;
+mod target_result_ext;
 
 pub use builder::{GdbStubBuilder, GdbStubBuilderError};
 pub use error::GdbStubError;
+
+use target_result_ext::TargetResultExt;
 
 use GdbStubError as Error;
 
@@ -80,6 +86,14 @@ struct GdbStubImpl<T: Target, C: Connection> {
     current_mem_tid: Tid,
     current_resume_tid: TidSelector,
     no_ack_mode: bool,
+
+    // Used to track which Pids were attached to / spawned when running in extended mode.
+    //
+    // An empty `BTreeMap<Pid, bool>` is only 24 bytes (on 64-bit systems), and doesn't allocate
+    // until the first element is inserted, so it should be fine to include it as part of the main
+    // state structure whether or not extended mode is actually being used.
+    #[cfg(feature = "alloc")]
+    attached_pids: BTreeMap<Pid, bool>,
 }
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
@@ -96,6 +110,9 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             current_mem_tid: SINGLE_THREAD_TID,
             current_resume_tid: TidSelector::All,
             no_ack_mode: false,
+
+            #[cfg(feature = "alloc")]
+            attached_pids: BTreeMap::new(),
         }
     }
 
@@ -144,6 +161,13 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     let mut res = ResponseWriter::new(conn);
                     let disconnect = match self.handle_command(&mut res, target, command) {
                         Ok(reason) => reason,
+                        // HACK: handling this "dummy" error is required as part of the
+                        // `TargetResultExt::handle_error()` machinery.
+                        Err(Error::NonFatalError(code)) => {
+                            res.write_str("E")?;
+                            res.write_num(code)?;
+                            None
+                        }
                         Err(Error::TargetError(e)) => {
                             // unlike all other errors, which are "unrecoverable", there's a chance
                             // that a target may be able to recover from a target-specific error. In
@@ -266,7 +290,32 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             // -------------------- "Core" Functionality -------------------- //
             // TODO: Improve the '?' response based on last-sent stop reason.
             Command::QuestionMark(_) => res.write_str("S05")?,
-            Command::qAttached(_) => res.write_str("1")?, // attached to existing process
+            Command::qAttached(cmd) => {
+                let is_attached = match target.extended_mode() {
+                    // when _not_ running in extended mode, just report that we're attaching to an
+                    // existing process.
+                    None => true, // assume attached to an existing process
+                    // When running in extended mode, we must defer to the target
+                    Some(ops) => {
+                        let pid: Pid = cmd.pid.ok_or(Error::PacketUnexpected)?;
+
+                        #[cfg(feature = "alloc")]
+                        {
+                            let _ = ops; // doesn't actually query the target
+                            *self.attached_pids.get(&pid).unwrap_or(&true)
+                        }
+
+                        #[cfg(not(feature = "alloc"))]
+                        {
+                            ops.base()
+                                .query_if_attached(pid)
+                                .handle_error()?
+                                .was_attached()
+                        }
+                    }
+                };
+                res.write_str(if is_attached { "1" } else { "0" })?;
+            }
             Command::g(_) => {
                 let mut regs: <T::Arch as Arch>::Registers = Default::default();
                 match target.base_ops() {
@@ -349,10 +398,28 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 }
             }
             Command::k(_) | Command::vKill(_) => {
-                // no response
-                return Ok(Some(DisconnectReason::Kill));
+                match target.extended_mode() {
+                    // When not running in extended mode, stop the `GdbStub` and disconnect.
+                    None => return Ok(Some(DisconnectReason::Kill)),
+
+                    // When running in extended mode, a kill command does not necessarily result in
+                    // a disconnect...
+                    Some(ops) => {
+                        let pid = match command {
+                            Command::vKill(cmd) => Some(cmd.pid),
+                            _ => None,
+                        };
+
+                        let should_terminate = ops.base().kill(pid).handle_error()?;
+                        res.write_str("OK")?;
+                        if should_terminate.into() {
+                            return Ok(Some(DisconnectReason::Kill));
+                        }
+                    }
+                }
             }
             Command::D(_) => {
+                // TODO: plumb-through Pid when running in full multiprocess debugging mode
                 res.write_str("OK")?;
                 return Ok(Some(DisconnectReason::Disconnect));
             }
@@ -588,7 +655,9 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 }
             }
 
-            // -------------------- Protocol Extensions --------------------- //
+            /*==================================================================
+            =                       Protocol Extensions                        =
+            ==================================================================*/
             // > Hey, what's with the calls to `__protocol_hint_(target)`?
             //
             // If a target doesn't implement the packet's corresponding protocol extension, it would
@@ -601,6 +670,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             // `Box<Target>` or `&dyn Target`. Fortunately, in those cases, it's likely that
             // `gdbstub` is being used in a "hosted" environment (e.g: an emulator), where a bit
             // more binary bloat won't necessarily be the end of the world...
+
+            // ------------------------ MonitorCmd ------------------------- //
             Command::qRcmd(cmd) if cmd.__protocol_hint_(target) => {
                 crate::__dead_code_marker!("qRcmd", "impl");
 
@@ -629,6 +700,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 }
             }
 
+            // ----------------------- SectionOffsets ----------------------- //
             Command::qOffsets(cmd) if cmd.__protocol_hint_(target) => {
                 use ext::section_offsets::Offsets;
 
@@ -661,9 +733,53 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 }
             }
 
+            // ------------------------ ExtendedMode ------------------------ //
+            Command::ExclamationMark(_cmd) if _cmd.__protocol_hint_(target) => {
+                if let Some(ops) = target.extended_mode() {
+                    ops.base().on_start().map_err(Error::TargetError)?;
+                    res.write_str("OK")?;
+                }
+            }
+            Command::R(_cmd) if _cmd.__protocol_hint_(target) => {
+                if let Some(ops) = target.extended_mode() {
+                    ops.base().restart().map_err(Error::TargetError)?
+                }
+            }
+            Command::vAttach(cmd) if cmd.__protocol_hint_(target) => {
+                if let Some(ops) = target.extended_mode() {
+                    ops.base().attach(cmd.pid).handle_error()?;
+
+                    #[cfg(feature = "alloc")]
+                    self.attached_pids.insert(cmd.pid, true);
+                }
+            }
+            Command::vRun(cmd) if cmd.__protocol_hint_(target) => {
+                use ext::extended_mode::{Args, RunError};
+
+                if let Some(ops) = target.extended_mode() {
+                    let status = ops
+                        .base()
+                        .run(cmd.filename, Args::new(&mut cmd.args.into_iter()));
+
+                    match status {
+                        Ok(pid) => {
+                            let _ = pid; // squelch warning on no_std targets
+                            #[cfg(feature = "alloc")]
+                            self.attached_pids.insert(pid, false);
+
+                            // TODO: send a more descriptive stop packet?
+                            res.write_str("S05")?
+                        }
+                        Err(RunError::InvalidArgs) => res.write_str("E16")?, // EINVAL
+                        Err(RunError::InvalidFilename) => res.write_str("E02")?, // ENOENT
+                        Err(RunError::TargetError(e)) => Err(e).handle_error()?,
+                    }
+                }
+            }
+
             // -------------------------------------------------------------- //
             Command::Unknown(cmd) => info!("Unknown command: {}", cmd),
-            _ => trace!("Unimplemented command"),
+            _ => warn!("Unimplemented command"),
         }
 
         Ok(None)

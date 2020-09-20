@@ -6,12 +6,6 @@
 
 use crate::target::Target;
 
-pub mod breakpoint;
-pub mod monitor;
-pub mod section_offsets;
-
-// This could probably be expressed much more cleanly using trait aliases, but
-// those aren't stable, so this'll have to do for now.
 macro_rules! define_ext {
     ($extname:ident, $($exttrait:tt)+) => {
         #[allow(missing_docs)]
@@ -20,8 +14,14 @@ macro_rules! define_ext {
     };
 }
 
-define_ext!(SwBreakpointOps, breakpoint::SwBreakpoint);
+pub mod breakpoint;
+pub mod extended_mode;
+pub mod monitor;
+pub mod section_offsets;
+
+define_ext!(ExtendedModeOps, extended_mode::ExtendedMode);
 define_ext!(HwBreakpointOps, breakpoint::HwBreakpoint);
 define_ext!(HwWatchpointOps, breakpoint::HwWatchpoint);
 define_ext!(MonitorCmdOps, monitor::MonitorCmd);
 define_ext!(SectionOffsetsOps, section_offsets::SectionOffsets);
+define_ext!(SwBreakpointOps, breakpoint::SwBreakpoint);
