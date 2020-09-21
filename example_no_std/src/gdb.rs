@@ -1,7 +1,8 @@
 use gdbstub::arch;
-use gdbstub::target::base::multithread::{Actions, MultiThreadOps, ThreadStopReason};
-use gdbstub::target::{base, ext, Target};
-use gdbstub::Tid;
+use gdbstub::common::Tid;
+use gdbstub::target::Target;
+use gdbstub::target_ext;
+use gdbstub::target_ext::base::multithread::{Actions, MultiThreadOps, ThreadStopReason};
 
 use crate::print_str::print_str;
 
@@ -17,11 +18,11 @@ impl Target for DummyTarget {
     type Arch = arch::arm::Armv4t;
     type Error = &'static str;
 
-    fn base_ops(&mut self) -> base::BaseOps<Self::Arch, Self::Error> {
-        base::BaseOps::MultiThread(self)
+    fn base_ops(&mut self) -> target_ext::base::BaseOps<Self::Arch, Self::Error> {
+        target_ext::base::BaseOps::MultiThread(self)
     }
 
-    fn sw_breakpoint(&mut self) -> Option<ext::SwBreakpointOps<Self>> {
+    fn sw_breakpoint(&mut self) -> Option<target_ext::breakpoints::SwBreakpointOps<Self>> {
         Some(self)
     }
 }
@@ -96,7 +97,7 @@ impl MultiThreadOps for DummyTarget {
     }
 }
 
-impl ext::breakpoint::SwBreakpoint for DummyTarget {
+impl target_ext::breakpoints::SwBreakpoint for DummyTarget {
     #[inline(never)]
     fn add_sw_breakpoint(&mut self, _addr: u32) -> Result<bool, &'static str> {
         Ok(true)

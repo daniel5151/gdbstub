@@ -1,9 +1,9 @@
 //! Base debugging operations for multi threaded targets.
 
 use crate::arch::Arch;
-use crate::target::ext::breakpoint::WatchKind;
+use crate::common::*;
 use crate::target::Target;
-use crate::Tid;
+use crate::target_ext::breakpoints::WatchKind;
 
 // Convenient re-exports
 pub use super::ResumeAction;

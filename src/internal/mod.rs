@@ -1,7 +1,5 @@
-//! Internal implementation details.
-//!
-//! These traits / types are part of the public interface, but shouldn't be used
-//! by consumers of `gdbstub` directly.
+//! Types / traits which are not expected to be directly implemented by
+//! `gdbstub` users.
 
 mod be_bytes;
 mod le_bytes;

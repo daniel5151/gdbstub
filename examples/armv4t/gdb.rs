@@ -3,10 +3,10 @@ use core::convert::TryInto;
 use armv4t_emu::{reg, Memory};
 use gdbstub::arch;
 use gdbstub::arch::arm::reg::id::ArmCoreRegId;
-use gdbstub::target::ext::breakpoint::WatchKind;
-use gdbstub::target::{base, ext, Target};
-
-use base::singlethread::{ResumeAction, SingleThreadOps, StopReason};
+use gdbstub::target::Target;
+use gdbstub::target_ext;
+use gdbstub::target_ext::base::singlethread::{ResumeAction, SingleThreadOps, StopReason};
+use gdbstub::target_ext::breakpoints::WatchKind;
 
 use crate::emu::{Emu, Event};
 
@@ -29,19 +29,19 @@ impl Target for Emu {
     type Arch = arch::arm::Armv4t;
     type Error = &'static str;
 
-    fn base_ops(&mut self) -> base::BaseOps<Self::Arch, Self::Error> {
-        base::BaseOps::SingleThread(self)
+    fn base_ops(&mut self) -> target_ext::base::BaseOps<Self::Arch, Self::Error> {
+        target_ext::base::BaseOps::SingleThread(self)
     }
 
-    fn sw_breakpoint(&mut self) -> Option<ext::SwBreakpointOps<Self>> {
+    fn sw_breakpoint(&mut self) -> Option<target_ext::breakpoints::SwBreakpointOps<Self>> {
         Some(self)
     }
 
-    fn hw_watchpoint(&mut self) -> Option<ext::HwWatchpointOps<Self>> {
+    fn hw_watchpoint(&mut self) -> Option<target_ext::breakpoints::HwWatchpointOps<Self>> {
         Some(self)
     }
 
-    fn extended_mode(&mut self) -> Option<ext::ExtendedModeOps<Self>> {
+    fn extended_mode(&mut self) -> Option<target_ext::extended_mode::ExtendedModeOps<Self>> {
         Some(self)
     }
 }
@@ -161,7 +161,7 @@ impl SingleThreadOps for Emu {
     }
 }
 
-impl ext::breakpoint::SwBreakpoint for Emu {
+impl target_ext::breakpoints::SwBreakpoint for Emu {
     fn add_sw_breakpoint(&mut self, addr: u32) -> Result<bool, &'static str> {
         self.breakpoints.push(addr);
         Ok(true)
@@ -177,7 +177,7 @@ impl ext::breakpoint::SwBreakpoint for Emu {
     }
 }
 
-impl ext::breakpoint::HwWatchpoint for Emu {
+impl target_ext::breakpoints::HwWatchpoint for Emu {
     fn add_hw_watchpoint(&mut self, addr: u32, kind: WatchKind) -> Result<bool, &'static str> {
         match kind {
             WatchKind::Write => self.watchpoints.push(addr),

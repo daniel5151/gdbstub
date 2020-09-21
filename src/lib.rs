@@ -21,11 +21,11 @@
 //!     - Add/Remove Software Breakpoints
 //!     - (optional) Multithreading support
 //!
-//! Additionally, there are many [protocol extensions](target/ext/index.html)
-//! that can be optionally implemented to enhance the core debugging
-//! experience. For example: if your target supports _hardware watchpoints_
-//! (i.e: value breakpoints), consider implementing the
-//! [`target::ext::breakpoint::HwWatchpoint`](target/ext/breakpoint/index.html)
+//! Additionally, there are many [protocol extensions](target_ext/index.html)
+//! that can be optionally implemented to enhance the core debugging experience.
+//! For example: if your target supports _hardware watchpoints_ (i.e: value
+//! breakpoints), consider implementing the
+//! [`target_ext::breakpoints::HwWatchpoint`](target_ext/breakpoints/index.html)
 //! extension.
 //!
 //! If `gdbstub` is missing a feature you'd like to use, please file an issue /
@@ -164,20 +164,16 @@ mod util;
 pub mod internal;
 
 pub mod arch;
+pub mod common;
 pub mod target;
+pub mod target_ext;
 
 pub use connection::Connection;
 pub use gdbstub_impl::*;
 
-/// Thread ID
-pub type Tid = core::num::NonZeroUsize;
-
-/// Process ID
-pub type Pid = core::num::NonZeroUsize;
-
 /// (Internal) The fake Tid that's used when running in single-threaded mode.
 // SAFETY: 1 is clearly non-zero.
-const SINGLE_THREAD_TID: Tid = unsafe { Tid::new_unchecked(1) };
+const SINGLE_THREAD_TID: common::Tid = unsafe { common::Tid::new_unchecked(1) };
 /// (Internal) The fake Pid reported to GDB (since `gdbstub` only supports
 /// debugging a single process).
-const FAKE_PID: Pid = unsafe { Pid::new_unchecked(1) };
+const FAKE_PID: common::Pid = unsafe { common::Pid::new_unchecked(1) };

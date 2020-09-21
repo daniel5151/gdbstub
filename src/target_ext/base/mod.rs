@@ -1,4 +1,5 @@
-//! Base operations required to debug any target.
+//! Base operations required to debug any target (read/write memory/registers,
+//! step/resume, etc...)
 //!
 //! While not strictly required, it's recommended that single threaded targets
 //! use the simplified `singlethread` API.

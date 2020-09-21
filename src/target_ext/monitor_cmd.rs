@@ -1,4 +1,5 @@
-//! Handle custom commands sent using GDB's `monitor` command.
+//! Create custom target-specific debugging commands accessible via GDB's
+//! `monitor` command!
 
 use crate::target::Target;
 
@@ -27,3 +28,5 @@ pub trait MonitorCmd: Target {
     fn handle_monitor_cmd(&mut self, cmd: &[u8], out: ConsoleOutput<'_>)
         -> Result<(), Self::Error>;
 }
+
+define_ext!(MonitorCmdOps, MonitorCmd);

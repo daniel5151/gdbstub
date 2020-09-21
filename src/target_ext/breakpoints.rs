@@ -1,7 +1,6 @@
 //! Add/Remove various kinds of breakpoints.
 
 use crate::arch::Arch;
-
 use crate::target::Target;
 
 /// The kind of watchpoint that should be set/removed.
@@ -24,7 +23,6 @@ pub enum WatchKind {
 /// using an _interpreted_ CPU (as opposed to a JIT), the simplest way to
 /// implement "software" breakpoints would be to check the `PC` value after each
 /// CPU cycle.
-#[allow(clippy::type_complexity)]
 pub trait SwBreakpoint: Target {
     /// Add a new software breakpoint.
     /// Return `Ok(false)` if the operation could not be completed.
@@ -38,6 +36,8 @@ pub trait SwBreakpoint: Target {
         addr: <Self::Arch as Arch>::Usize,
     ) -> Result<bool, Self::Error>;
 }
+
+define_ext!(SwBreakpointOps, SwBreakpoint);
 
 /// Target Extension - Set/remove Hardware Breakpoints.
 ///
@@ -61,6 +61,8 @@ pub trait HwBreakpoint: Target + SwBreakpoint {
         addr: <Self::Arch as Arch>::Usize,
     ) -> Result<bool, Self::Error>;
 }
+
+define_ext!(HwBreakpointOps, HwBreakpoint);
 
 /// Target Extension - Set/remove Hardware Watchpoints.
 ///
@@ -88,3 +90,5 @@ pub trait HwWatchpoint: Target + SwBreakpoint {
         kind: WatchKind,
     ) -> Result<bool, Self::Error>;
 }
+
+define_ext!(HwWatchpointOps, HwWatchpoint);

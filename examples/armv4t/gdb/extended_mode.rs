@@ -1,7 +1,9 @@
-use gdbstub::target::{ext, TargetResult};
-use gdbstub::Pid;
-
-use ext::extended_mode::{Args, ExtendedModeBaseOps, RunError, RunResult, ShouldTerminate};
+use gdbstub::common::Pid;
+use gdbstub::target::TargetResult;
+use gdbstub::target_ext;
+use gdbstub::target_ext::extended_mode::{
+    Args, ExtendedModeBaseOps, RunError, RunResult, ShouldTerminate,
+};
 
 use crate::emu::Emu;
 
@@ -19,13 +21,13 @@ use crate::emu::Emu;
 // If you happen to implement a "proper" extended mode gdbstub, feel free to
 // file an issue / open a PR that links to your project!
 
-impl ext::extended_mode::ExtendedMode for Emu {
+impl target_ext::extended_mode::ExtendedMode for Emu {
     fn base(&mut self) -> ExtendedModeBaseOps<Self> {
         self
     }
 }
 
-impl ext::extended_mode::ExtendedModeBase for Emu {
+impl target_ext::extended_mode::ExtendedModeBase for Emu {
     fn kill(&mut self, pid: Option<Pid>) -> TargetResult<ShouldTerminate, Self> {
         eprintln!("GDB sent a kill request for pid {:?}", pid);
         Ok(ShouldTerminate::No)

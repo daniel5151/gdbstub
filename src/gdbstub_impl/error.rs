@@ -3,7 +3,7 @@ use core::fmt::{self, Debug, Display};
 use crate::protocol::{PacketParseError, ResponseWriterError};
 use crate::util::managed_vec::CapacityError;
 
-/// Errors which may occur during a GDB debugging session.
+/// An error which may occur during a GDB debugging session.
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum GdbStubError<T, C> {

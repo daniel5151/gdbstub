@@ -3,10 +3,10 @@ use crate::target::Target;
 
 pub(crate) mod prelude {
     pub(crate) use super::ParseCommand;
+    pub(crate) use crate::common::*;
     pub(crate) use crate::protocol::common::*;
     pub(crate) use crate::protocol::packet::PacketBuf;
     pub(crate) use crate::target::Target;
-    pub(crate) use crate::Pid;
 }
 
 pub trait ParseCommand<'a>: Sized {

@@ -1,6 +1,6 @@
-//! Support for various
 //! [Extended Mode](https://sourceware.org/gdb/onlinedocs/gdb/Packets.html#extended-mode)
-//! features, such as spawning new processes / attaching to existing processes.
+//! functionality, such as spawning new processes / attaching to existing
+//! processes.
 //!
 //! # Disclaimer
 //!
@@ -14,8 +14,8 @@
 //! Work as expected, nonetheless file an issue so that this disclaimer can be
 //! removed in future releases!
 
+use crate::common::*;
 use crate::target::{Target, TargetError, TargetResult};
-use crate::Pid;
 
 /// Returned from `ExtendedModeBase::kill`
 ///
@@ -81,6 +81,8 @@ pub trait ExtendedMode: Target {
     /// Base required extended mode operations
     fn base(&mut self) -> ExtendedModeBaseOps<Self>;
 }
+
+define_ext!(ExtendedModeOps, ExtendedMode);
 
 /// Base operations required by all extended mode capable targets.
 pub trait ExtendedModeBase: ExtendedMode {

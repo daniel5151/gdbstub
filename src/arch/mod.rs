@@ -7,7 +7,9 @@
 //! `Arch` manually.
 //!
 //! Please consider upstreaming any missing `Arch` implementations you happen to
-//! implement yourself!
+//! implement yourself! Aside from the altruistic motive of improving `gdbstub`,
+//! upstreaming your `Arch` implementation will ensure that it's kept up-to-date
+//! with any future breaking API changes.
 //!
 //! **Disclaimer:** These implementations are all community contributions, and
 //! while they are tested (by the PR's author) and code-reviewed, it's not

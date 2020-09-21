@@ -20,6 +20,7 @@
 //! command. See issue [#20](https://github.com/daniel5151/gdbstub/issues/20)
 //! for more info.
 
+use crate::arch::Arch;
 use crate::target::Target;
 
 /// Describes the offset the target loaded the image sections at, so the target
@@ -59,7 +60,7 @@ pub enum Offsets<U> {
 /// documentation](index.html).
 pub trait SectionOffsets: Target {
     /// Return the target's current section (or segment) offsets.
-    fn get_section_offsets(
-        &mut self,
-    ) -> Result<Offsets<<Self::Arch as crate::target::Arch>::Usize>, Self::Error>;
+    fn get_section_offsets(&mut self) -> Result<Offsets<<Self::Arch as Arch>::Usize>, Self::Error>;
 }
+
+define_ext!(SectionOffsetsOps, SectionOffsets);
