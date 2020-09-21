@@ -10,8 +10,10 @@ use gdbstub::target_ext::breakpoints::WatchKind;
 
 use crate::emu::{Emu, Event};
 
-// `extended_mode` extensions
+// Additional GDB extensions
+
 mod extended_mode;
+mod monitor_cmd;
 
 /// Turn a `ArmCoreRegId` into an internal register number of `armv4t_emu`.
 fn cpu_reg_id(id: ArmCoreRegId) -> Option<u8> {
@@ -42,6 +44,10 @@ impl Target for Emu {
     }
 
     fn extended_mode(&mut self) -> Option<target_ext::extended_mode::ExtendedModeOps<Self>> {
+        Some(self)
+    }
+
+    fn monitor_cmd(&mut self) -> Option<target_ext::monitor_cmd::MonitorCmdOps<Self>> {
         Some(self)
     }
 }
