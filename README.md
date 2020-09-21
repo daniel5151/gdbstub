@@ -3,6 +3,9 @@
 [![](http://meritbadge.herokuapp.com/gdbstub)](https://crates.io/crates/gdbstub)
 [![](https://docs.rs/gdbstub/badge.svg)](https://docs.rs/gdbstub)
 
+> NOTE: gdbstub's master branch is currently preparing breaking changes. 
+> For the most recently released code, look to the `0.3.0` tag.
+
 An ergonomic and easy-to-integrate implementation of the [GDB Remote Serial Protocol](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Protocol.html#Remote-Protocol) in Rust.
 
 Why `gdbstub`?
