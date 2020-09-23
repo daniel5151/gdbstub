@@ -1,6 +1,5 @@
-//! [Extended Mode](https://sourceware.org/gdb/onlinedocs/gdb/Packets.html#extended-mode)
-//! functionality, such as spawning new processes / attaching to existing
-//! processes.
+//! Enables [Extended Mode](https://sourceware.org/gdb/current/onlinedocs/gdb/Connecting.html)
+//! functionality when connecting using `target extended-remote`.
 //!
 //! # Disclaimer
 //!
@@ -15,9 +14,9 @@
 //! removed in future releases!
 
 use crate::common::*;
-use crate::target::{Target, TargetError, TargetResult};
+use crate::target::{Target, TargetResult};
 
-/// Returned from `ExtendedModeBase::kill`
+/// Returned from `ExtendedMode::kill`
 ///
 /// Retuning `ShouldTerminate::Yes` will cause the `GdbStub` to immediately
 /// shut down and return a `DisconnectReason::Kill`. Returning
@@ -58,47 +57,37 @@ impl AttachKind {
     }
 }
 
-target_error_wrapper! {
-    /// Wrapper around `TargetError` which includes errors specific to the
-    /// `ExtendedModeBase::run` method.
-    #[non_exhaustive]
-    pub enum RunError<E> {
-        /// Could not construct valid filename from raw bytes.
-        InvalidFilename,
-        /// Could not construct valid args from raw bytes.
-        InvalidArgs,
-        /// Other, more general Target errors.
-        TargetError(TargetError<E>),
-    }
-}
-
-/// Result returned from `ExtendedModeBase::run`
-pub type RunResult<T, Tgt> = Result<T, RunError<<Tgt as Target>::Error>>;
-
-/// Target Extension - Support for various
-/// [Extended Mode](https://sourceware.org/gdb/onlinedocs/gdb/Packets.html#extended-mode) features.
+/// Target Extension - Support
+/// [Extended Mode](https://sourceware.org/gdb/current/onlinedocs/gdb/Connecting.html) functionality.
+///
+/// # Extended Mode for Single/Multi Threaded Targets
+///
+/// While extended-mode is primarily intended to be implemented by targets which
+/// support debugging multiple processes, there's no reason why a basic
+/// single/multi-threaded target can't implement these extensions as well.
+///
+/// For example, instead of "spawning" a process, the `run` command could be
+/// used to reset the execution state instead (e.g: resetting an emulator).
 pub trait ExtendedMode: Target {
-    /// Base required extended mode operations
-    fn base(&mut self) -> ExtendedModeBaseOps<Self>;
-}
-
-define_ext!(ExtendedModeOps, ExtendedMode);
-
-/// Base operations required by all extended mode capable targets.
-pub trait ExtendedModeBase: ExtendedMode {
-    /// Spawn and attach to a new process, returning the process's PID.
-    ///
-    /// Runs the program `filename`, passing it the provided `args` on its
-    /// command line. If no filename is provided, the stub may use a default
-    /// program (e.g. the last program run), or return a non-fatal error.
+    /// Spawn and attach to the program `filename`, passing it the provided
+    /// `args` on its command line.
     ///
     /// The program is created in the stopped state.
     ///
-    /// Filenames and arguments are passed as raw byte arrays, and are not
-    /// guaranteed to be valid UTF-8. If the filenames/arguments could not be
-    /// converted into an appropriate representation, return
-    /// `Err(RunError::InvalidFilename)` or `Err(RunError::InvalidFilename)`.
-    fn run(&mut self, filename: Option<&[u8]>, args: Args) -> RunResult<Pid, Self>;
+    /// If no filename is provided, the stub may use a default program (e.g. the
+    /// last program run), or a non fatal error should be returned.
+    ///
+    /// `filename` and `args` are not guaranteed to be valid UTF-8, and are
+    /// passed as raw byte arrays. If the filenames/arguments could not be
+    /// converted into an appropriate representation, a non fatal error should
+    /// be returned.
+    ///
+    /// _Note:_ This method's implementation should handle any additional
+    /// configuration options set via the various `ConfigureXXX` extensions to
+    /// `ExtendedMode`. e.g: if the [`ConfigureEnv`](trait.ConfigureEnv.html)
+    /// extension is implemented and enabled, this method should set the spawned
+    /// processes' environment variables accordingly.
+    fn run(&mut self, filename: Option<&[u8]>, args: Args) -> TargetResult<Pid, Self>;
 
     /// Attach to a new process with the specified PID.
     ///
@@ -147,19 +136,39 @@ pub trait ExtendedModeBase: ExtendedMode {
 
     /// (optional) Invoked when GDB client switches to extended mode.
     ///
-    /// Target implementations can override this implementation if they need to
-    /// perform any operations once extended mode is activated (e.g: setting a
-    /// flag, spawning a process, etc...).
-    ///
     /// The default implementation is a no-op.
+    ///
+    /// Target implementations can override this implementation if they need to
+    /// perform any operations once extended mode is activated.
     fn on_start(&mut self) -> Result<(), Self::Error> {
         Ok(())
     }
+
+    /// Enable/Disable ASLR for spawned processes.
+    fn configure_aslr(&mut self) -> Option<ConfigureASLROps<Self>> {
+        None
+    }
+
+    /// Set/Remove/Reset Environment variables for spawned processes.
+    fn configure_env(&mut self) -> Option<ConfigureEnvOps<Self>> {
+        None
+    }
+
+    /// Configure if spawned processes should be spawned using a shell.
+    fn configure_startup_shell(&mut self) -> Option<ConfigureStartupShellOps<Self>> {
+        None
+    }
+
+    /// Configure the working directory for spawned processes.
+    fn configure_working_dir(&mut self) -> Option<ConfigureWorkingDirOps<Self>> {
+        None
+    }
 }
 
-define_ext!(ExtendedModeBaseOps, ExtendedModeBase);
+define_ext!(ExtendedModeOps, ExtendedMode);
 
-/// Iterator over a set of `args` for the process to be run.
+/// Iterator of `args` passed to a spawned process (used in
+/// `ExtendedMode::run`)
 pub struct Args<'a, 'args> {
     inner: &'a mut dyn Iterator<Item = &'args [u8]>,
 }
@@ -183,3 +192,65 @@ impl<'args> Iterator for Args<'_, 'args> {
         self.inner.next()
     }
 }
+
+/// Enable/Disable ASLR for spawned processes (for a more consistent debugging
+/// experience).
+///
+/// Corresponds to GDB's [`set disable-randomization`](https://sourceware.org/gdb/onlinedocs/gdb/Starting.html) command.
+pub trait ConfigureASLR: ExtendedMode {
+    /// Enable/Disable ASLR for spawned processes.
+    fn cfg_aslr(&mut self, enabled: bool) -> TargetResult<(), Self>;
+}
+
+define_ext!(ConfigureASLROps, ConfigureASLR);
+
+/// Set/Remove/Reset the Environment variables for spawned processes.
+///
+/// Corresponds to GDB's [`set environment`](https://sourceware.org/gdb/onlinedocs/gdb/Environment.html#set-environment) cmd.
+///
+/// _Note:_ Environment variables are not guaranteed to be UTF-8, and are passed
+/// as raw byte arrays. If the provided keys/values could not be converted into
+/// an appropriate representation, a non fatal error should be returned.
+pub trait ConfigureEnv: ExtendedMode {
+    /// Set an environment variable.
+    fn set_env(&mut self, key: &[u8], val: Option<&[u8]>) -> TargetResult<(), Self>;
+
+    /// Remove an environment variable.
+    fn remove_env(&mut self, key: &[u8]) -> TargetResult<(), Self>;
+
+    /// Reset all environment variables to their initial state (i.e: undo all
+    /// previous `set/remove_env` calls).
+    fn reset_env(&mut self) -> TargetResult<(), Self>;
+}
+
+define_ext!(ConfigureEnvOps, ConfigureEnv);
+
+/// Configure if spawned processes should be spawned using a shell.
+///
+/// Corresponds to GDB's [`set startup-with-shell`](https://sourceware.org/gdb/onlinedocs/gdb/Starting.html) command.
+pub trait ConfigureStartupShell: ExtendedMode {
+    /// Configure if spawned processes should be spawned using a shell.
+    ///
+    /// On UNIX-like targets, it is possible to start the inferior using a shell
+    /// program. This is the default behavior on both `GDB` and `gdbserver`.
+    fn cfg_startup_with_shell(&mut self, enabled: bool) -> TargetResult<(), Self>;
+}
+
+define_ext!(ConfigureStartupShellOps, ConfigureStartupShell);
+
+/// Configure the working directory for spawned processes.
+///
+/// Corresponds to GDB's [`set cwd` and `cd`](https://sourceware.org/gdb/onlinedocs/gdb/Working-Directory.html) commands.
+pub trait ConfigureWorkingDir: ExtendedMode {
+    /// Set the working directory for spawned processes.
+    ///
+    /// If no directory is provided, the stub should reset the value to it's
+    /// original value.
+    ///
+    /// The path is not guaranteed to be valid UTF-8, and is passed as a raw
+    /// byte array. If the path could not be converted into an appropriate
+    /// representation, a non fatal error should be returned.
+    fn cfg_working_dir(&mut self, dir: Option<&[u8]>) -> TargetResult<(), Self>;
+}
+
+define_ext!(ConfigureWorkingDirOps, ConfigureWorkingDir);

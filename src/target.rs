@@ -161,6 +161,9 @@ impl<E> From<std::io::Error> for TargetError<E> {
 }
 
 /// A specialized `Result` type for `Target` operations.
+///
+/// _Note:_ While it's typically parameterized as `TargetResult<T, Self>`, the
+/// error value is in-fact `TargetError<Self::Error>` (not `Self`).
 pub type TargetResult<T, Tgt> = Result<T, TargetError<<Tgt as Target>::Error>>;
 
 /// Describes the architecture and capabilities of a target which can be

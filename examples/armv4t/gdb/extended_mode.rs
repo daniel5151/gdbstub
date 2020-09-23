@@ -1,9 +1,7 @@
 use gdbstub::common::Pid;
 use gdbstub::target::TargetResult;
 use gdbstub::target_ext;
-use gdbstub::target_ext::extended_mode::{
-    Args, ExtendedModeBaseOps, RunError, RunResult, ShouldTerminate,
-};
+use gdbstub::target_ext::extended_mode::{Args, ShouldTerminate};
 
 use crate::emu::Emu;
 
@@ -22,12 +20,6 @@ use crate::emu::Emu;
 // file an issue / open a PR that links to your project!
 
 impl target_ext::extended_mode::ExtendedMode for Emu {
-    fn base(&mut self) -> ExtendedModeBaseOps<Self> {
-        self
-    }
-}
-
-impl target_ext::extended_mode::ExtendedModeBase for Emu {
     fn kill(&mut self, pid: Option<Pid>) -> TargetResult<ShouldTerminate, Self> {
         eprintln!("GDB sent a kill request for pid {:?}", pid);
         Ok(ShouldTerminate::No)
@@ -43,7 +35,7 @@ impl target_ext::extended_mode::ExtendedModeBase for Emu {
         Err(().into()) // non-specific failure
     }
 
-    fn run(&mut self, filename: Option<&[u8]>, args: Args) -> RunResult<Pid, Self> {
+    fn run(&mut self, filename: Option<&[u8]>, args: Args) -> TargetResult<Pid, Self> {
         // simplified example: assume UTF-8 filenames / args
         //
         // To be 100% pedantically correct, consider converting to an `OsStr` in the
@@ -52,10 +44,10 @@ impl target_ext::extended_mode::ExtendedModeBase for Emu {
 
         let filename = match filename {
             None => None,
-            Some(raw) => Some(core::str::from_utf8(raw).map_err(|_| RunError::InvalidFilename)?),
+            Some(raw) => Some(core::str::from_utf8(raw).map_err(drop)?),
         };
         let args = args
-            .map(|raw| core::str::from_utf8(raw).map_err(|_| RunError::InvalidArgs))
+            .map(|raw| core::str::from_utf8(raw).map_err(drop))
             .collect::<Result<Vec<_>, _>>()?;
 
         eprintln!(
@@ -63,6 +55,90 @@ impl target_ext::extended_mode::ExtendedModeBase for Emu {
             filename, args
         );
 
-        Err(().into())
+        self.reset();
+
+        // when running in single-threaded mode, this PID can be anything
+        Ok(Pid::new(1337).unwrap())
+    }
+
+    fn configure_aslr(&mut self) -> Option<target_ext::extended_mode::ConfigureASLROps<Self>> {
+        Some(self)
+    }
+
+    fn configure_env(&mut self) -> Option<target_ext::extended_mode::ConfigureEnvOps<Self>> {
+        Some(self)
+    }
+
+    fn configure_startup_shell(
+        &mut self,
+    ) -> Option<target_ext::extended_mode::ConfigureStartupShellOps<Self>> {
+        Some(self)
+    }
+
+    fn configure_working_dir(
+        &mut self,
+    ) -> Option<target_ext::extended_mode::ConfigureWorkingDirOps<Self>> {
+        Some(self)
+    }
+}
+
+impl target_ext::extended_mode::ConfigureASLR for Emu {
+    fn cfg_aslr(&mut self, enabled: bool) -> TargetResult<(), Self> {
+        eprintln!("GDB {} ASLR", if enabled { "enabled" } else { "disabled" });
+        Ok(())
+    }
+}
+
+impl target_ext::extended_mode::ConfigureEnv for Emu {
+    fn set_env(&mut self, key: &[u8], val: Option<&[u8]>) -> TargetResult<(), Self> {
+        // simplified example: assume UTF-8 key/val env vars
+        let key = core::str::from_utf8(key).map_err(drop)?;
+        let val = match val {
+            None => None,
+            Some(raw) => Some(core::str::from_utf8(raw).map_err(drop)?),
+        };
+
+        eprintln!("GDB tried to set a new env var: {:?}={:?}", key, val);
+
+        Ok(())
+    }
+
+    fn remove_env(&mut self, key: &[u8]) -> TargetResult<(), Self> {
+        let key = core::str::from_utf8(key).map_err(drop)?;
+        eprintln!("GDB tried to set remove a env var: {:?}", key);
+
+        Ok(())
+    }
+
+    fn reset_env(&mut self) -> TargetResult<(), Self> {
+        eprintln!("GDB tried to reset env vars");
+
+        Ok(())
+    }
+}
+
+impl target_ext::extended_mode::ConfigureStartupShell for Emu {
+    fn cfg_startup_with_shell(&mut self, enabled: bool) -> TargetResult<(), Self> {
+        eprintln!(
+            "GDB {} startup with shell",
+            if enabled { "enabled" } else { "disabled" }
+        );
+        Ok(())
+    }
+}
+
+impl target_ext::extended_mode::ConfigureWorkingDir for Emu {
+    fn cfg_working_dir(&mut self, dir: Option<&[u8]>) -> TargetResult<(), Self> {
+        let dir = match dir {
+            None => None,
+            Some(raw) => Some(core::str::from_utf8(raw).map_err(drop)?),
+        };
+
+        match dir {
+            None => eprintln!("GDB reset the working directory"),
+            Some(dir) => eprintln!("GDB set the working directory to {:?}", dir),
+        }
+
+        Ok(())
     }
 }

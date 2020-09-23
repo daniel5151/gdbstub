@@ -27,6 +27,10 @@
 //! remote filesystem access, tracepoint support, etc...), consider opening an
 //! issue / filing a PR on Github!
 //!
+//! See the GDB [Remote Configuration Docs](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Configuration.html)
+//! for a table of GDB commands + their corresponding Remote Serial Protocol
+//! packets.
+//!
 //! ### Note: What's with all the `<Self::Arch as Arch>::` syntax?
 //!
 //! Many of the method signatures across the `Target` extension traits include
@@ -223,41 +227,6 @@
 //!       parsing / handler code for unimplemented protocol extensions. `grep`
 //!       for `__protocol_hint` in `gdbstub` to see an example of this in
 //!       action!
-
-/// Automatically derives various `From` implementation for `TargetError`
-/// wrappers.
-///
-/// Requires the wrapper to include a `TargetError` variant.
-macro_rules! target_error_wrapper {
-    (
-        $( #[$meta:meta] )* // captures attributes and docstring
-        $pub:vis // (optional) pub, pub(crate), etc.
-        enum $name:ident
-        $($tt:tt)*
-    ) => {
-        $(#[$meta])*
-        $pub enum $name $($tt)*
-
-        #[cfg(feature = "std")]
-        impl<E> From<std::io::Error> for $name<E> {
-            fn from(e: std::io::Error) -> $name<E> {
-                $name::TargetError(TargetError::Io(e))
-            }
-        }
-
-        impl<E> From<()> for $name<E> {
-            fn from(_: ()) -> $name<E> {
-                $name::TargetError(TargetError::NonFatal)
-            }
-        }
-
-        impl<E> From<TargetError<E>> for $name<E> {
-            fn from(e: TargetError<E>) -> $name<E> {
-                $name::TargetError(e)
-            }
-        }
-    };
-}
 
 macro_rules! define_ext {
     ($extname:ident, $($exttrait:tt)+) => {

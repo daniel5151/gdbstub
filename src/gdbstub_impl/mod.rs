@@ -247,6 +247,26 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 res.write_str(";multiprocess+")?;
                 res.write_str(";QStartNoAckMode+")?;
 
+                if let Some(ops) = target.extended_mode() {
+                    if ops.configure_aslr().is_some() {
+                        res.write_str(";QDisableRandomization+")?;
+                    }
+
+                    if ops.configure_env().is_some() {
+                        res.write_str(";QEnvironmentHexEncoded+")?;
+                        res.write_str(";QEnvironmentUnset+")?;
+                        res.write_str(";QEnvironmentReset+")?;
+                    }
+
+                    if ops.configure_startup_shell().is_some() {
+                        res.write_str(";QStartupWithShell+")?;
+                    }
+
+                    if ops.configure_working_dir().is_some() {
+                        res.write_str(";QSetWorkingDir+")?;
+                    }
+                }
+
                 res.write_str(";swbreak+")?;
                 if target.hw_breakpoint().is_some() || target.hw_watchpoint().is_some() {
                     res.write_str(";hwbreak+")?;
@@ -308,10 +328,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                         #[cfg(not(feature = "alloc"))]
                         {
-                            ops.base()
-                                .query_if_attached(pid)
-                                .handle_error()?
-                                .was_attached()
+                            ops.query_if_attached(pid).handle_error()?.was_attached()
                         }
                     }
                 };
@@ -411,7 +428,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                             _ => None,
                         };
 
-                        let should_terminate = ops.base().kill(pid).handle_error()?;
+                        let should_terminate = ops.kill(pid).handle_error()?;
                         res.write_str("OK")?;
                         if should_terminate.into() {
                             return Ok(Some(DisconnectReason::Kill));
@@ -737,43 +754,90 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             // ------------------------ ExtendedMode ------------------------ //
             Command::ExclamationMark(_cmd) if _cmd.__protocol_hint_(target) => {
                 if let Some(ops) = target.extended_mode() {
-                    ops.base().on_start().map_err(Error::TargetError)?;
+                    ops.on_start().map_err(Error::TargetError)?;
                     res.write_str("OK")?;
                 }
             }
             Command::R(_cmd) if _cmd.__protocol_hint_(target) => {
                 if let Some(ops) = target.extended_mode() {
-                    ops.base().restart().map_err(Error::TargetError)?
+                    ops.restart().map_err(Error::TargetError)?
                 }
             }
             Command::vAttach(cmd) if cmd.__protocol_hint_(target) => {
                 if let Some(ops) = target.extended_mode() {
-                    ops.base().attach(cmd.pid).handle_error()?;
+                    ops.attach(cmd.pid).handle_error()?;
 
                     #[cfg(feature = "alloc")]
                     self.attached_pids.insert(cmd.pid, true);
                 }
             }
             Command::vRun(cmd) if cmd.__protocol_hint_(target) => {
-                use crate::target_ext::extended_mode::{Args, RunError};
+                use crate::target_ext::extended_mode::Args;
 
                 if let Some(ops) = target.extended_mode() {
-                    let status = ops
-                        .base()
-                        .run(cmd.filename, Args::new(&mut cmd.args.into_iter()));
+                    let mut pid = ops
+                        .run(cmd.filename, Args::new(&mut cmd.args.into_iter()))
+                        .handle_error()?;
 
-                    match status {
-                        Ok(pid) => {
-                            let _ = pid; // squelch warning on no_std targets
-                            #[cfg(feature = "alloc")]
-                            self.attached_pids.insert(pid, false);
+                    // on single-threaded systems, we'll ignore the provided PID and keep using the
+                    // FAKE_PID.
+                    if let BaseOps::SingleThread(_) = target.base_ops() {
+                        pid = FAKE_PID;
+                    }
 
-                            // TODO: send a more descriptive stop packet?
-                            res.write_str("S05")?
-                        }
-                        Err(RunError::InvalidArgs) => res.write_str("E16")?, // EINVAL
-                        Err(RunError::InvalidFilename) => res.write_str("E02")?, // ENOENT
-                        Err(RunError::TargetError(e)) => Err(e).handle_error()?,
+                    let _ = pid; // squelch warning on no_std targets
+                    #[cfg(feature = "alloc")]
+                    self.attached_pids.insert(pid, false);
+
+                    // TODO: send a more descriptive stop packet?
+                    res.write_str("S05")?
+                }
+            }
+            Command::QDisableRandomization(cmd) if cmd.__protocol_hint_(target) => {
+                if let Some(ops) = target.extended_mode() {
+                    if let Some(ops) = ops.configure_aslr() {
+                        ops.cfg_aslr(cmd.value).handle_error()?;
+                        res.write_str("OK")?
+                    }
+                }
+            }
+            Command::QEnvironmentHexEncoded(cmd) if cmd.__protocol_hint_(target) => {
+                if let Some(ops) = target.extended_mode() {
+                    if let Some(ops) = ops.configure_env() {
+                        ops.set_env(cmd.key, cmd.value).handle_error()?;
+                        res.write_str("OK")?
+                    }
+                }
+            }
+            Command::QEnvironmentUnset(cmd) if cmd.__protocol_hint_(target) => {
+                if let Some(ops) = target.extended_mode() {
+                    if let Some(ops) = ops.configure_env() {
+                        ops.remove_env(cmd.key).handle_error()?;
+                        res.write_str("OK")?
+                    }
+                }
+            }
+            Command::QEnvironmentReset(cmd) if cmd.__protocol_hint_(target) => {
+                if let Some(ops) = target.extended_mode() {
+                    if let Some(ops) = ops.configure_env() {
+                        ops.reset_env().handle_error()?;
+                        res.write_str("OK")?
+                    }
+                }
+            }
+            Command::QSetWorkingDir(cmd) if cmd.__protocol_hint_(target) => {
+                if let Some(ops) = target.extended_mode() {
+                    if let Some(ops) = ops.configure_working_dir() {
+                        ops.cfg_working_dir(cmd.dir).handle_error()?;
+                        res.write_str("OK")?
+                    }
+                }
+            }
+            Command::QStartupWithShell(cmd) if cmd.__protocol_hint_(target) => {
+                if let Some(ops) = target.extended_mode() {
+                    if let Some(ops) = ops.configure_startup_shell() {
+                        ops.cfg_startup_with_shell(cmd.value).handle_error()?;
+                        res.write_str("OK")?
                     }
                 }
             }

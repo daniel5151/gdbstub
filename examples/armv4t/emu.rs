@@ -15,6 +15,8 @@ pub enum Event {
 
 /// incredibly barebones armv4t-based emulator
 pub struct Emu {
+    start_addr: u32,
+
     pub(crate) cpu: Cpu,
     pub(crate) mem: ExampleMem,
 
@@ -58,11 +60,19 @@ impl Emu {
         cpu.reg_set(Mode::User, reg::CPSR, 0x10); // user mode
 
         Ok(Emu {
+            start_addr: elf_header.entry as u32,
             cpu,
             mem,
             watchpoints: Vec::new(),
             breakpoints: Vec::new(),
         })
+    }
+
+    pub(crate) fn reset(&mut self) {
+        self.cpu.reg_set(Mode::User, reg::SP, 0x10000000);
+        self.cpu.reg_set(Mode::User, reg::LR, HLE_RETURN_ADDR);
+        self.cpu.reg_set(Mode::User, reg::PC, self.start_addr);
+        self.cpu.reg_set(Mode::User, reg::CPSR, 0x10);
     }
 
     pub fn step(&mut self) -> Option<Event> {
