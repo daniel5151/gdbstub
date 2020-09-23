@@ -228,11 +228,20 @@
 //!       for `__protocol_hint` in `gdbstub` to see an example of this in
 //!       action!
 
+macro_rules! doc_comment {
+    ($x:expr, $($tt:tt)*) => {
+        #[doc = $x]
+        $($tt)*
+    };
+}
+
 macro_rules! define_ext {
-    ($extname:ident, $($exttrait:tt)+) => {
-        #[allow(missing_docs)]
-        pub type $extname<'a, T> =
-            &'a mut dyn $($exttrait)+<Arch = <T as Target>::Arch, Error = <T as Target>::Error>;
+    ($extname:ident, $exttrait:ident) => {
+        doc_comment! {
+            concat!("See [`", stringify!($exttrait), "`](trait.", stringify!($exttrait), ".html)."),
+            pub type $extname<'a, T> =
+                &'a mut dyn $exttrait<Arch = <T as Target>::Arch, Error = <T as Target>::Error>;
+        }
     };
 }
 
