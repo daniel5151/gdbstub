@@ -6,7 +6,6 @@ use alloc::collections::BTreeMap;
 use managed::ManagedSlice;
 
 use crate::common::*;
-use crate::protocol::commands::ParseCommand;
 use crate::{
     arch::{Arch, RegId, Registers},
     connection::Connection,
@@ -95,6 +94,12 @@ struct GdbStubImpl<T: Target, C: Connection> {
     // state structure whether or not extended mode is actually being used.
     #[cfg(feature = "alloc")]
     attached_pids: BTreeMap<Pid, bool>,
+}
+
+enum HandlerStatus<'a> {
+    Handled,
+    NotHandled(Command<'a>),
+    DisconnectReason(DisconnectReason),
 }
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
@@ -231,8 +236,39 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         &mut self,
         res: &mut ResponseWriter<C>,
         target: &mut T,
-        command: Command<'_>,
+        cmd: Command<'_>,
     ) -> Result<Option<DisconnectReason>, Error<T::Error, C::Error>> {
+        if let Command::Unknown(cmd) = cmd {
+            info!("Unknown command: {}", cmd);
+            return Ok(None);
+        }
+
+        macro_rules! handle {
+            ($ext:ident <- $cmd:ident) => {
+                match self.$ext(res, target, $cmd)? {
+                    HandlerStatus::Handled => return Ok(None),
+                    HandlerStatus::DisconnectReason(dc) => return Ok(Some(dc)),
+                    HandlerStatus::NotHandled(cmd) => cmd,
+                }
+            };
+        }
+
+        let cmd = handle!(handle_base <- cmd);
+        let cmd = handle!(handle_extended_mode <- cmd);
+        let cmd = handle!(handle_monitor_cmd <- cmd);
+        let cmd = handle!(handle_section_offsets <- cmd);
+        let _ = cmd;
+        warn!("Unimplemented command");
+
+        Ok(None)
+    }
+
+    fn handle_base<'a>(
+        &mut self,
+        res: &mut ResponseWriter<C>,
+        target: &mut T,
+        command: Command<'a>,
+    ) -> Result<HandlerStatus<'a>, Error<T::Error, C::Error>> {
         match command {
             // ------------------ Handshaking and Queries ------------------- //
             Command::qSupported(cmd) => {
@@ -418,7 +454,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             Command::k(_) | Command::vKill(_) => {
                 match target.extended_mode() {
                     // When not running in extended mode, stop the `GdbStub` and disconnect.
-                    None => return Ok(Some(DisconnectReason::Kill)),
+                    None => return Ok(HandlerStatus::DisconnectReason(DisconnectReason::Kill)),
 
                     // When running in extended mode, a kill command does not necessarily result in
                     // a disconnect...
@@ -431,7 +467,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         let should_terminate = ops.kill(pid).handle_error()?;
                         res.write_str("OK")?;
                         if should_terminate.into() {
-                            return Ok(Some(DisconnectReason::Kill));
+                            return Ok(HandlerStatus::DisconnectReason(DisconnectReason::Kill));
                         }
                     }
                 }
@@ -439,7 +475,9 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             Command::D(_) => {
                 // TODO: plumb-through Pid when running in full multiprocess debugging mode
                 res.write_str("OK")?;
-                return Ok(Some(DisconnectReason::Disconnect));
+                return Ok(HandlerStatus::DisconnectReason(
+                    DisconnectReason::Disconnect,
+                ));
             }
             Command::Z(cmd) => {
                 let addr = Self::to_target_usize(cmd.addr)?;
@@ -490,7 +528,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 let reg = <T::Arch as Arch>::RegId::from_raw_id(p.reg_id);
                 let (reg_id, reg_size) = match reg {
                     Some(v) => v,
-                    None => return Ok(None),
+                    None => return Ok(HandlerStatus::Handled),
                 };
                 let dst = &mut dst[0..reg_size];
                 let supported = match target.base_ops() {
@@ -532,7 +570,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 let actions = match cmd {
                     vCont::Query => {
                         res.write_str("vCont;c;C;s;S")?;
-                        return Ok(None);
+                        return Ok(HandlerStatus::Handled);
                     }
                     vCont::Actions(actions) => actions,
                 };
@@ -580,24 +618,36 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     Some((tid, resume_action))
                 });
 
-                let ret = self.do_vcont(res, target, &mut actions);
+                let ret = match self.do_vcont(res, target, &mut actions) {
+                    Ok(None) => Ok(HandlerStatus::Handled),
+                    Ok(Some(dc)) => Ok(HandlerStatus::DisconnectReason(dc)),
+                    Err(e) => Err(e),
+                };
                 err?;
                 return ret;
             }
             // TODO?: support custom resume addr in 'c' and 's'
             Command::c(_) => {
-                return self.do_vcont(
+                return match self.do_vcont(
                     res,
                     target,
                     &mut core::iter::once((self.current_resume_tid, ResumeAction::Continue)),
-                )
+                ) {
+                    Ok(None) => Ok(HandlerStatus::Handled),
+                    Ok(Some(dc)) => Ok(HandlerStatus::DisconnectReason(dc)),
+                    Err(e) => Err(e),
+                }
             }
             Command::s(_) => {
-                return self.do_vcont(
+                return match self.do_vcont(
                     res,
                     target,
                     &mut core::iter::once((self.current_resume_tid, ResumeAction::Step)),
-                )
+                ) {
+                    Ok(None) => Ok(HandlerStatus::Handled),
+                    Ok(Some(dc)) => Ok(HandlerStatus::DisconnectReason(dc)),
+                    Err(e) => Err(e),
+                }
             }
 
             // ------------------- Multi-threading Support ------------------ //
@@ -673,181 +723,181 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 }
             }
 
-            /*==================================================================
-            =                       Protocol Extensions                        =
-            ==================================================================*/
-            // > Hey, what's with the calls to `__protocol_hint_(target)`?
-            //
-            // If a target doesn't implement the packet's corresponding protocol extension, it would
-            // be nice if the Rust compiler would simply "omit" the entire packet handler from the
-            // output binary. The `__protocol_hint_` method "nudges" the Rust compiler in the right
-            // direction, and basically guarantees that the match arm is optimized out in release
-            // build binaries.
-            //
-            // Of course, this optimization likely won't occur if `GdbStub` is monomorphised with a
-            // `Box<Target>` or `&dyn Target`. Fortunately, in those cases, it's likely that
-            // `gdbstub` is being used in a "hosted" environment (e.g: an emulator), where a bit
-            // more binary bloat won't necessarily be the end of the world...
+            c => return Ok(HandlerStatus::NotHandled(c)),
+        }
 
-            // ------------------------ MonitorCmd ------------------------- //
-            Command::qRcmd(cmd) if cmd.__protocol_hint_(target) => {
+        Ok(HandlerStatus::Handled)
+    }
+
+    fn handle_monitor_cmd<'a>(
+        &mut self,
+        res: &mut ResponseWriter<C>,
+        target: &mut T,
+        command: Command<'a>,
+    ) -> Result<HandlerStatus<'a>, Error<T::Error, C::Error>> {
+        let ops = match target.monitor_cmd() {
+            Some(ops) => ops,
+            None => return Ok(HandlerStatus::NotHandled(command)),
+        };
+
+        match command {
+            Command::qRcmd(cmd) => {
                 crate::__dead_code_marker!("qRcmd", "impl");
 
-                if let Some(ops) = target.monitor_cmd() {
-                    let mut err: Result<_, Error<T::Error, C::Error>> = Ok(());
-                    let mut callback = |msg: &[u8]| {
-                        // TODO: replace this with a try block (once stabilized)
-                        let e = (|| {
-                            let mut res = ResponseWriter::new(res.as_conn());
-                            res.write_str("O")?;
-                            res.write_hex_buf(msg)?;
-                            res.flush()?;
-                            Ok(())
-                        })();
+                let mut err: Result<_, Error<T::Error, C::Error>> = Ok(());
+                let mut callback = |msg: &[u8]| {
+                    // TODO: replace this with a try block (once stabilized)
+                    let e = (|| {
+                        let mut res = ResponseWriter::new(res.as_conn());
+                        res.write_str("O")?;
+                        res.write_hex_buf(msg)?;
+                        res.flush()?;
+                        Ok(())
+                    })();
 
-                        if let Err(e) = e {
-                            err = Err(e)
-                        }
-                    };
+                    if let Err(e) = e {
+                        err = Err(e)
+                    }
+                };
 
-                    ops.handle_monitor_cmd(cmd.hex_cmd, ConsoleOutput::new(&mut callback))
-                        .map_err(Error::TargetError)?;
-                    err?;
+                ops.handle_monitor_cmd(cmd.hex_cmd, ConsoleOutput::new(&mut callback))
+                    .map_err(Error::TargetError)?;
+                err?;
 
-                    res.write_str("OK")?
-                }
+                res.write_str("OK")?
             }
+            c => return Ok(HandlerStatus::NotHandled(c)),
+        }
+        Ok(HandlerStatus::Handled)
+    }
 
-            // ----------------------- SectionOffsets ----------------------- //
-            Command::qOffsets(cmd) if cmd.__protocol_hint_(target) => {
+    fn handle_section_offsets<'a>(
+        &mut self,
+        res: &mut ResponseWriter<C>,
+        target: &mut T,
+        command: Command<'a>,
+    ) -> Result<HandlerStatus<'a>, Error<T::Error, C::Error>> {
+        let ops = match target.section_offsets() {
+            Some(ops) => ops,
+            None => return Ok(HandlerStatus::NotHandled(command)),
+        };
+
+        match command {
+            Command::qOffsets(_cmd) => {
                 use crate::target_ext::section_offsets::Offsets;
 
                 crate::__dead_code_marker!("qOffsets", "impl");
 
-                if let Some(op) = target.section_offsets() {
-                    match op.get_section_offsets().map_err(Error::TargetError)? {
-                        Offsets::Sections { text, data, bss } => {
-                            res.write_str("Text=")?;
-                            res.write_num(text)?;
+                match ops.get_section_offsets().map_err(Error::TargetError)? {
+                    Offsets::Sections { text, data, bss } => {
+                        res.write_str("Text=")?;
+                        res.write_num(text)?;
 
-                            res.write_str(";Data=")?;
+                        res.write_str(";Data=")?;
+                        res.write_num(data)?;
+
+                        if let Some(data) = bss {
+                            res.write_str(";Bss=")?;
                             res.write_num(data)?;
-
-                            if let Some(data) = bss {
-                                res.write_str(";Bss=")?;
-                                res.write_num(data)?;
-                            }
                         }
-                        Offsets::Segments { text_seg, data_seg } => {
-                            res.write_str("TextSeg=")?;
-                            res.write_num(text_seg)?;
+                    }
+                    Offsets::Segments { text_seg, data_seg } => {
+                        res.write_str("TextSeg=")?;
+                        res.write_num(text_seg)?;
 
-                            if let Some(data) = data_seg {
-                                res.write_str(";DataSeg=")?;
-                                res.write_num(data)?;
-                            }
+                        if let Some(data) = data_seg {
+                            res.write_str(";DataSeg=")?;
+                            res.write_num(data)?;
                         }
                     }
                 }
             }
+            c => return Ok(HandlerStatus::NotHandled(c)),
+        }
+        Ok(HandlerStatus::Handled)
+    }
 
-            // ------------------------ ExtendedMode ------------------------ //
-            Command::ExclamationMark(_cmd) if _cmd.__protocol_hint_(target) => {
-                if let Some(ops) = target.extended_mode() {
-                    ops.on_start().map_err(Error::TargetError)?;
-                    res.write_str("OK")?;
-                }
-            }
-            Command::R(_cmd) if _cmd.__protocol_hint_(target) => {
-                if let Some(ops) = target.extended_mode() {
-                    ops.restart().map_err(Error::TargetError)?
-                }
-            }
-            Command::vAttach(cmd) if cmd.__protocol_hint_(target) => {
-                if let Some(ops) = target.extended_mode() {
-                    ops.attach(cmd.pid).handle_error()?;
+    fn handle_extended_mode<'a>(
+        &mut self,
+        res: &mut ResponseWriter<C>,
+        target: &mut T,
+        command: Command<'a>,
+    ) -> Result<HandlerStatus<'a>, Error<T::Error, C::Error>> {
+        let ops = match target.extended_mode() {
+            Some(ops) => ops,
+            None => return Ok(HandlerStatus::NotHandled(command)),
+        };
 
-                    #[cfg(feature = "alloc")]
-                    self.attached_pids.insert(cmd.pid, true);
-                }
+        match command {
+            Command::ExclamationMark(_cmd) => {
+                ops.on_start().map_err(Error::TargetError)?;
+                res.write_str("OK")?;
             }
-            Command::vRun(cmd) if cmd.__protocol_hint_(target) => {
+            Command::R(_cmd) => ops.restart().map_err(Error::TargetError)?,
+            Command::vAttach(cmd) => {
+                ops.attach(cmd.pid).handle_error()?;
+
+                #[cfg(feature = "alloc")]
+                self.attached_pids.insert(cmd.pid, true);
+            }
+            Command::vRun(cmd) => {
                 use crate::target_ext::extended_mode::Args;
 
-                if let Some(ops) = target.extended_mode() {
-                    let mut pid = ops
-                        .run(cmd.filename, Args::new(&mut cmd.args.into_iter()))
-                        .handle_error()?;
+                let mut pid = ops
+                    .run(cmd.filename, Args::new(&mut cmd.args.into_iter()))
+                    .handle_error()?;
 
-                    // on single-threaded systems, we'll ignore the provided PID and keep using the
-                    // FAKE_PID.
-                    if let BaseOps::SingleThread(_) = target.base_ops() {
-                        pid = FAKE_PID;
-                    }
+                // on single-threaded systems, we'll ignore the provided PID and keep
+                // using the FAKE_PID.
+                if let BaseOps::SingleThread(_) = target.base_ops() {
+                    pid = FAKE_PID;
+                }
 
-                    let _ = pid; // squelch warning on no_std targets
-                    #[cfg(feature = "alloc")]
-                    self.attached_pids.insert(pid, false);
+                let _ = pid; // squelch warning on no_std targets
+                #[cfg(feature = "alloc")]
+                self.attached_pids.insert(pid, false);
 
-                    // TODO: send a more descriptive stop packet?
-                    res.write_str("S05")?
-                }
+                // TODO: send a more descriptive stop packet?
+                res.write_str("S05")?
             }
-            Command::QDisableRandomization(cmd) if cmd.__protocol_hint_(target) => {
-                if let Some(ops) = target.extended_mode() {
-                    if let Some(ops) = ops.configure_aslr() {
-                        ops.cfg_aslr(cmd.value).handle_error()?;
-                        res.write_str("OK")?
-                    }
-                }
+            // --------- ASLR --------- //
+            Command::QDisableRandomization(cmd) if ops.configure_aslr().is_some() => {
+                let ops = ops.configure_aslr().unwrap();
+                ops.cfg_aslr(cmd.value).handle_error()?;
+                res.write_str("OK")?
             }
-            Command::QEnvironmentHexEncoded(cmd) if cmd.__protocol_hint_(target) => {
-                if let Some(ops) = target.extended_mode() {
-                    if let Some(ops) = ops.configure_env() {
-                        ops.set_env(cmd.key, cmd.value).handle_error()?;
-                        res.write_str("OK")?
-                    }
-                }
+            // --------- Environment --------- //
+            Command::QEnvironmentHexEncoded(cmd) if ops.configure_env().is_some() => {
+                let ops = ops.configure_env().unwrap();
+                ops.set_env(cmd.key, cmd.value).handle_error()?;
+                res.write_str("OK")?
             }
-            Command::QEnvironmentUnset(cmd) if cmd.__protocol_hint_(target) => {
-                if let Some(ops) = target.extended_mode() {
-                    if let Some(ops) = ops.configure_env() {
-                        ops.remove_env(cmd.key).handle_error()?;
-                        res.write_str("OK")?
-                    }
-                }
+            Command::QEnvironmentUnset(cmd) if ops.configure_env().is_some() => {
+                let ops = ops.configure_env().unwrap();
+                ops.remove_env(cmd.key).handle_error()?;
+                res.write_str("OK")?
             }
-            Command::QEnvironmentReset(cmd) if cmd.__protocol_hint_(target) => {
-                if let Some(ops) = target.extended_mode() {
-                    if let Some(ops) = ops.configure_env() {
-                        ops.reset_env().handle_error()?;
-                        res.write_str("OK")?
-                    }
-                }
+            Command::QEnvironmentReset(_cmd) if ops.configure_env().is_some() => {
+                let ops = ops.configure_env().unwrap();
+                ops.reset_env().handle_error()?;
+                res.write_str("OK")?
             }
-            Command::QSetWorkingDir(cmd) if cmd.__protocol_hint_(target) => {
-                if let Some(ops) = target.extended_mode() {
-                    if let Some(ops) = ops.configure_working_dir() {
-                        ops.cfg_working_dir(cmd.dir).handle_error()?;
-                        res.write_str("OK")?
-                    }
-                }
+            // --------- Working Dir --------- //
+            Command::QSetWorkingDir(cmd) if ops.configure_working_dir().is_some() => {
+                let ops = ops.configure_working_dir().unwrap();
+                ops.cfg_working_dir(cmd.dir).handle_error()?;
+                res.write_str("OK")?
             }
-            Command::QStartupWithShell(cmd) if cmd.__protocol_hint_(target) => {
-                if let Some(ops) = target.extended_mode() {
-                    if let Some(ops) = ops.configure_startup_shell() {
-                        ops.cfg_startup_with_shell(cmd.value).handle_error()?;
-                        res.write_str("OK")?
-                    }
-                }
+            // --------- Startup Shell --------- //
+            Command::QStartupWithShell(cmd) if ops.configure_startup_shell().is_some() => {
+                let ops = ops.configure_startup_shell().unwrap();
+                ops.cfg_startup_with_shell(cmd.value).handle_error()?;
+                res.write_str("OK")?
             }
-
-            // -------------------------------------------------------------- //
-            Command::Unknown(cmd) => info!("Unknown command: {}", cmd),
-            _ => warn!("Unimplemented command"),
+            c => return Ok(HandlerStatus::NotHandled(c)),
         }
 
-        Ok(None)
+        Ok(HandlerStatus::Handled)
     }
 
     fn do_vcont(
