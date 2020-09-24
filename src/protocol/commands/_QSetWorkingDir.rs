@@ -6,13 +6,6 @@ pub struct QSetWorkingDir<'a> {
 }
 
 impl<'a> ParseCommand<'a> for QSetWorkingDir<'a> {
-    fn __protocol_hint(target: &mut impl Target) -> bool {
-        if let Some(ops) = target.extended_mode() {
-            return ops.configure_working_dir().is_some();
-        }
-        false
-    }
-
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
         let body = buf.into_body();
         let dir = match body {

@@ -6,10 +6,6 @@ pub struct vAttach {
 }
 
 impl<'a> ParseCommand<'a> for vAttach {
-    fn __protocol_hint(target: &mut impl Target) -> bool {
-        target.extended_mode().is_some()
-    }
-
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
         crate::__dead_code_marker!("vAttach", "from_packet");
 

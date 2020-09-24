@@ -1,54 +1,47 @@
+use paste::paste;
+
 use crate::protocol::packet::PacketBuf;
 use crate::target::Target;
 
-pub(crate) mod prelude {
-    pub(crate) use super::ParseCommand;
-    pub(crate) use crate::common::*;
-    pub(crate) use crate::protocol::common::*;
-    pub(crate) use crate::protocol::packet::PacketBuf;
-    pub(crate) use crate::target::Target;
+pub(self) mod prelude {
+    pub use super::ParseCommand;
+    pub use crate::common::*;
+    pub use crate::protocol::common::*;
+    pub use crate::protocol::packet::PacketBuf;
 }
 
 pub trait ParseCommand<'a>: Sized {
-    /// Return a boolean indicating if the target implements the protocol
-    /// extension related to this packet.
-    ///
-    /// A typical implementation should look like
-    /// `target.<feature>().is_some()`.
-    ///
-    /// The default implementation will simply return `true`, implying that the
-    /// packet is _always_ required (i.e: is part of the base protocol).
-    #[inline(always)]
-    fn __protocol_hint(target: &mut impl Target) -> bool {
-        let _ = target;
-        true
-    }
-
-    /// Helper method to call `ParseCommand::__protocol_hint` on directly on a
-    /// `packet` reference.
-    #[inline(always)]
-    fn __protocol_hint_(&self, target: &mut impl Target) -> bool {
-        Self::__protocol_hint(target)
-    }
-
     /// Try to parse a packet from the packet buffer.
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self>;
 }
 
 macro_rules! commands {
     (
-        $($name:literal => $mod:ident::$command:ident$(<$lifetime:lifetime>)?,)*
-    ) => {
         $(
+            $ext:ident $(use $lt:lifetime)? {
+                $($name:literal => $mod:ident::$command:ident$(<$lifetime:lifetime>)?,)*
+            }
+        )*
+    ) => {paste! {
+        $($(
             #[allow(non_snake_case, non_camel_case_types)]
             pub mod $mod;
-        )*
-        $(pub use $mod::$command;)*
+        )*)*
+
+        pub mod ext {
+            $(
+                #[allow(non_camel_case_types)]
+                pub enum [<$ext:camel>] $(<$lt>)? {
+                    $($command(super::$mod::$command<$($lifetime)?>),)*
+                }
+            )*
+        }
 
         /// GDB commands
-        #[allow(non_camel_case_types)]
         pub enum Command<'a> {
-            $($command($command<$($lifetime)?>),)*
+            $(
+                [<$ext:camel>](ext::[<$ext:camel>]$(<$lt>)?),
+            )*
             Unknown(&'a str),
         }
 
@@ -63,30 +56,39 @@ macro_rules! commands {
 
                 let body = buf.as_body();
 
-                // TODO?: use a trie for more efficient longest prefix matching
-                #[allow(clippy::string_lit_as_bytes)]
-                let command = match body {
-                    $(
-                        // (see the comment in `mod gdbstub_impl` for info on __protocol_hint_)
-                        _ if <$command<$($lifetime)?>>::__protocol_hint(target)
-                         && body.starts_with($name.as_bytes()) =>
-                        {
+                // This scoped extension trait enables using `base` as an
+                // `$ext`, even through the `base` method on `Target` doesn't
+                // return an Option.
+                trait Hack { fn base(&mut self) -> Option<()> { Some(()) } }
+                impl<T: Target> Hack for T {}
+
+                $(
+                if target.$ext().is_some() {
+                    // TODO?: use tries for more efficient longest prefix matching
+                    #[allow(clippy::string_lit_as_bytes)]
+                    match body {
+                        $(_ if body.starts_with($name.as_bytes()) => {
                             crate::__dead_code_marker!($name, "prefix_match");
 
                             let buf = buf.trim_start_body_bytes($name.len());
-                            let cmd = $command::from_packet(buf)
+                            let cmd = $mod::$command::from_packet(buf)
                                 .ok_or(CommandParseError::MalformedCommand($name))?;
-                            Command::$command(cmd)
-                        }
-                    )*
-                    _ => Command::Unknown(buf.into_body_str()),
-                };
 
-                Ok(command)
+                            return Ok(
+                                Command::[<$ext:camel>](
+                                    ext::[<$ext:camel>]::$command(cmd)
+                                )
+                            )
+                        })*
+                        _ => {},
+                    }
+                }
+                )*
+
+                Ok(Command::Unknown(buf.into_body_str()))
             }
         }
-
-    };
+    }};
 }
 
 /// Command parse error
@@ -98,39 +100,50 @@ pub enum CommandParseError<'a> {
 }
 
 commands! {
-    "!" => exclamation_mark::ExclamationMark,
-    "?" => question_mark::QuestionMark,
-    "c" => _c::c,
-    "D" => _d_upcase::D,
-    "g" => _g::g,
-    "G" => _g_upcase::G<'a>,
-    "H" => _h_upcase::H,
-    "k" => _k::k,
-    "m" => _m::m<'a>,
-    "M" => _m_upcase::M<'a>,
-    "p" => _p::p,
-    "P" => _p_upcase::P<'a>,
-    "qAttached" => _qAttached::qAttached,
-    "QDisableRandomization" => _QDisableRandomization::QDisableRandomization,
-    "QEnvironmentHexEncoded" => _QEnvironmentHexEncoded::QEnvironmentHexEncoded<'a>,
-    "QEnvironmentReset" => _QEnvironmentReset::QEnvironmentReset,
-    "QEnvironmentUnset" => _QEnvironmentUnset::QEnvironmentUnset<'a>,
-    "qfThreadInfo" => _qfThreadInfo::qfThreadInfo,
-    "qRcmd" => _qRcmd::qRcmd<'a>,
-    "QSetWorkingDir" => _QSetWorkingDir::QSetWorkingDir<'a>,
-    "QStartNoAckMode" => _QStartNoAckMode::QStartNoAckMode,
-    "QStartupWithShell" => _QStartupWithShell::QStartupWithShell,
-    "qsThreadInfo" => _qsThreadInfo::qsThreadInfo,
-    "qSupported" => _qSupported::qSupported<'a>,
-    "qOffsets" => _qOffsets::qOffsets,
-    "qXfer:features:read" => _qXfer_features_read::qXferFeaturesRead<'a>,
-    "R" => _r_upcase::R,
-    "s" => _s::s,
-    "T" => _t_upcase::T,
-    "vAttach" => _vAttach::vAttach,
-    "vCont" => _vCont::vCont<'a>,
-    "vKill" => _vKill::vKill,
-    "vRun" => _vRun::vRun<'a>,
-    "z" => _z::z,
-    "Z" => _z_upcase::Z,
+    base use 'a {
+        "?" => question_mark::QuestionMark,
+        "c" => _c::c,
+        "D" => _d_upcase::D,
+        "g" => _g::g,
+        "G" => _g_upcase::G<'a>,
+        "H" => _h_upcase::H,
+        "k" => _k::k,
+        "m" => _m::m<'a>,
+        "M" => _m_upcase::M<'a>,
+        "p" => _p::p,
+        "P" => _p_upcase::P<'a>,
+        "qAttached" => _qAttached::qAttached,
+        "qfThreadInfo" => _qfThreadInfo::qfThreadInfo,
+        "QStartNoAckMode" => _QStartNoAckMode::QStartNoAckMode,
+        "qsThreadInfo" => _qsThreadInfo::qsThreadInfo,
+        "qSupported" => _qSupported::qSupported<'a>,
+        "qXfer:features:read" => _qXfer_features_read::qXferFeaturesRead<'a>,
+        "s" => _s::s,
+        "T" => _t_upcase::T,
+        "vCont" => _vCont::vCont<'a>,
+        "vKill" => _vKill::vKill,
+        "z" => _z::z,
+        "Z" => _z_upcase::Z,
+    }
+
+    extended_mode use 'a {
+        "!" => exclamation_mark::ExclamationMark,
+        "QDisableRandomization" => _QDisableRandomization::QDisableRandomization,
+        "QEnvironmentHexEncoded" => _QEnvironmentHexEncoded::QEnvironmentHexEncoded<'a>,
+        "QEnvironmentReset" => _QEnvironmentReset::QEnvironmentReset,
+        "QEnvironmentUnset" => _QEnvironmentUnset::QEnvironmentUnset<'a>,
+        "QSetWorkingDir" => _QSetWorkingDir::QSetWorkingDir<'a>,
+        "QStartupWithShell" => _QStartupWithShell::QStartupWithShell,
+        "R" => _r_upcase::R,
+        "vAttach" => _vAttach::vAttach,
+        "vRun" => _vRun::vRun<'a>,
+    }
+
+    monitor_cmd use 'a {
+        "qRcmd" => _qRcmd::qRcmd<'a>,
+    }
+
+    section_offsets {
+        "qOffsets" => _qOffsets::qOffsets,
+    }
 }

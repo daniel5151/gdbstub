@@ -22,10 +22,6 @@ impl<'a> Args<'a> {
 }
 
 impl<'a> ParseCommand<'a> for vRun<'a> {
-    fn __protocol_hint(target: &mut impl Target) -> bool {
-        target.extended_mode().is_some()
-    }
-
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
         let body = buf.into_body();
 

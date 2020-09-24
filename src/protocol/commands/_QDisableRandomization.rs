@@ -6,13 +6,6 @@ pub struct QDisableRandomization {
 }
 
 impl<'a> ParseCommand<'a> for QDisableRandomization {
-    fn __protocol_hint(target: &mut impl Target) -> bool {
-        if let Some(ops) = target.extended_mode() {
-            return ops.configure_aslr().is_some();
-        }
-        false
-    }
-
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
         let body = buf.into_body();
         let value = match body as &[u8] {

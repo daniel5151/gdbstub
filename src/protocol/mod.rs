@@ -1,10 +1,10 @@
-pub(crate) mod commands;
 mod common;
 mod console_output;
 mod packet;
 mod response_writer;
 
-pub(crate) use commands::Command;
+pub(crate) mod commands;
+
 pub(crate) use common::{IdKind, ThreadId};
 pub(crate) use packet::Packet;
 pub(crate) use response_writer::{Error as ResponseWriterError, ResponseWriter};

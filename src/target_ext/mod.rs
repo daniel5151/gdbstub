@@ -224,9 +224,7 @@
 //!       target.ext_optfeat().is_some()` block, it's possible to specify
 //!       _arbitrary_ blocks of code to be feature-dependent!
 //!     - This is used to great effect in `gdbstub` to optimize-out any packet
-//!       parsing / handler code for unimplemented protocol extensions. `grep`
-//!       for `__protocol_hint` in `gdbstub` to see an example of this in
-//!       action!
+//!       parsing / handler code for unimplemented protocol extensions.
 
 macro_rules! doc_comment {
     ($x:expr, $($tt:tt)*) => {

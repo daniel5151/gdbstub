@@ -10,7 +10,10 @@ use crate::{
     arch::{Arch, RegId, Registers},
     connection::Connection,
     internal::*,
-    protocol::{Command, ConsoleOutput, IdKind, Packet, ResponseWriter, ThreadId},
+    protocol::{
+        commands::{ext, Command},
+        ConsoleOutput, IdKind, Packet, ResponseWriter, ThreadId,
+    },
     target::Target,
     target_ext::base::multithread::{Actions, ResumeAction, ThreadStopReason, TidSelector},
     target_ext::base::BaseOps,
@@ -96,10 +99,9 @@ struct GdbStubImpl<T: Target, C: Connection> {
     attached_pids: BTreeMap<Pid, bool>,
 }
 
-enum HandlerStatus<'a> {
+enum HandlerStatus {
     Handled,
-    NotHandled(Command<'a>),
-    DisconnectReason(DisconnectReason),
+    Disconnect(DisconnectReason),
 }
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
@@ -166,7 +168,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                     let mut res = ResponseWriter::new(conn);
                     let disconnect = match self.handle_command(&mut res, target, command) {
-                        Ok(reason) => reason,
+                        Ok(HandlerStatus::Handled) => None,
+                        Ok(HandlerStatus::Disconnect(reason)) => Some(reason),
                         // HACK: handling this "dummy" error is required as part of the
                         // `TargetResultExt::handle_error()` machinery.
                         Err(Error::NonFatalError(code)) => {
@@ -237,41 +240,28 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         res: &mut ResponseWriter<C>,
         target: &mut T,
         cmd: Command<'_>,
-    ) -> Result<Option<DisconnectReason>, Error<T::Error, C::Error>> {
-        if let Command::Unknown(cmd) = cmd {
-            info!("Unknown command: {}", cmd);
-            return Ok(None);
+    ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
+        match cmd {
+            Command::Unknown(cmd) => {
+                info!("Unknown command: {}", cmd);
+                Ok(HandlerStatus::Handled)
+            }
+            Command::Base(cmd) => self.handle_base(res, target, cmd),
+            Command::ExtendedMode(cmd) => self.handle_extended_mode(res, target, cmd),
+            Command::MonitorCmd(cmd) => self.handle_monitor_cmd(res, target, cmd),
+            Command::SectionOffsets(cmd) => self.handle_section_offsets(res, target, cmd),
         }
-
-        macro_rules! handle {
-            ($ext:ident <- $cmd:ident) => {
-                match self.$ext(res, target, $cmd)? {
-                    HandlerStatus::Handled => return Ok(None),
-                    HandlerStatus::DisconnectReason(dc) => return Ok(Some(dc)),
-                    HandlerStatus::NotHandled(cmd) => cmd,
-                }
-            };
-        }
-
-        let cmd = handle!(handle_base <- cmd);
-        let cmd = handle!(handle_extended_mode <- cmd);
-        let cmd = handle!(handle_monitor_cmd <- cmd);
-        let cmd = handle!(handle_section_offsets <- cmd);
-        let _ = cmd;
-        warn!("Unimplemented command");
-
-        Ok(None)
     }
 
     fn handle_base<'a>(
         &mut self,
         res: &mut ResponseWriter<C>,
         target: &mut T,
-        command: Command<'a>,
-    ) -> Result<HandlerStatus<'a>, Error<T::Error, C::Error>> {
+        command: ext::Base<'a>,
+    ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
         match command {
             // ------------------ Handshaking and Queries ------------------- //
-            Command::qSupported(cmd) => {
+            ext::Base::qSupported(cmd) => {
                 // XXX: actually read what the client supports, and enable/disable features
                 // appropriately
                 let _features = cmd.features.into_iter();
@@ -315,11 +305,11 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     res.write_str(";qXfer:features:read+")?;
                 }
             }
-            Command::QStartNoAckMode(_) => {
+            ext::Base::QStartNoAckMode(_) => {
                 self.no_ack_mode = true;
                 res.write_str("OK")?;
             }
-            Command::qXferFeaturesRead(cmd) => {
+            ext::Base::qXferFeaturesRead(cmd) => {
                 assert_eq!(cmd.annex, "target.xml");
                 match T::Arch::target_description_xml() {
                     Some(xml) => {
@@ -346,8 +336,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
             // -------------------- "Core" Functionality -------------------- //
             // TODO: Improve the '?' response based on last-sent stop reason.
-            Command::QuestionMark(_) => res.write_str("S05")?,
-            Command::qAttached(cmd) => {
+            ext::Base::QuestionMark(_) => res.write_str("S05")?,
+            ext::Base::qAttached(cmd) => {
                 let is_attached = match target.extended_mode() {
                     // when _not_ running in extended mode, just report that we're attaching to an
                     // existing process.
@@ -370,7 +360,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 };
                 res.write_str(if is_attached { "1" } else { "0" })?;
             }
-            Command::g(_) => {
+            ext::Base::g(_) => {
                 let mut regs: <T::Arch as Arch>::Registers = Default::default();
                 match target.base_ops() {
                     BaseOps::SingleThread(ops) => ops.read_registers(&mut regs),
@@ -392,7 +382,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 });
                 err?;
             }
-            Command::G(cmd) => {
+            ext::Base::G(cmd) => {
                 let mut regs: <T::Arch as Arch>::Registers = Default::default();
                 regs.gdb_deserialize(cmd.vals)
                     .map_err(|_| Error::TargetMismatch)?;
@@ -405,7 +395,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                 res.write_str("OK")?;
             }
-            Command::m(cmd) => {
+            ext::Base::m(cmd) => {
                 let buf = cmd.buf;
 
                 let mut i = 0;
@@ -434,7 +424,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     res.write_hex_buf(data)?;
                 }
             }
-            Command::M(cmd) => {
+            ext::Base::M(cmd) => {
                 let addr = Self::to_target_usize(cmd.addr)?;
 
                 let success = match target.base_ops() {
@@ -451,35 +441,33 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     res.write_str("OK")?;
                 }
             }
-            Command::k(_) | Command::vKill(_) => {
+            ext::Base::k(_) | ext::Base::vKill(_) => {
                 match target.extended_mode() {
                     // When not running in extended mode, stop the `GdbStub` and disconnect.
-                    None => return Ok(HandlerStatus::DisconnectReason(DisconnectReason::Kill)),
+                    None => return Ok(HandlerStatus::Disconnect(DisconnectReason::Kill)),
 
                     // When running in extended mode, a kill command does not necessarily result in
                     // a disconnect...
                     Some(ops) => {
                         let pid = match command {
-                            Command::vKill(cmd) => Some(cmd.pid),
+                            ext::Base::vKill(cmd) => Some(cmd.pid),
                             _ => None,
                         };
 
                         let should_terminate = ops.kill(pid).handle_error()?;
                         res.write_str("OK")?;
                         if should_terminate.into() {
-                            return Ok(HandlerStatus::DisconnectReason(DisconnectReason::Kill));
+                            return Ok(HandlerStatus::Disconnect(DisconnectReason::Kill));
                         }
                     }
                 }
             }
-            Command::D(_) => {
+            ext::Base::D(_) => {
                 // TODO: plumb-through Pid when running in full multiprocess debugging mode
                 res.write_str("OK")?;
-                return Ok(HandlerStatus::DisconnectReason(
-                    DisconnectReason::Disconnect,
-                ));
+                return Ok(HandlerStatus::Disconnect(DisconnectReason::Disconnect));
             }
-            Command::Z(cmd) => {
+            ext::Base::Z(cmd) => {
                 let addr = Self::to_target_usize(cmd.addr)?;
 
                 use crate::target_ext::breakpoints::WatchKind::*;
@@ -500,7 +488,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     Some(Ok(false)) => res.write_str("E22")?, // value of 22 grafted from QEMU
                 }
             }
-            Command::z(cmd) => {
+            ext::Base::z(cmd) => {
                 let addr = Self::to_target_usize(cmd.addr)?;
 
                 use crate::target_ext::breakpoints::WatchKind::*;
@@ -523,7 +511,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     Some(Ok(false)) => res.write_str("E22")?, // value of 22 grafted from QEMU
                 }
             }
-            Command::p(p) => {
+            ext::Base::p(p) => {
                 let mut dst = [0u8; 32]; // enough for 256-bit registers
                 let reg = <T::Arch as Arch>::RegId::from_raw_id(p.reg_id);
                 let (reg_id, reg_size) = match reg {
@@ -545,7 +533,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     res.write_str("E01")?;
                 }
             }
-            Command::P(p) => {
+            ext::Base::P(p) => {
                 let reg = <T::Arch as Arch>::RegId::from_raw_id(p.reg_id);
                 let supported = match reg {
                     Some((reg_id, _)) => match target.base_ops() {
@@ -564,7 +552,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     res.write_str("E01")?;
                 }
             }
-            Command::vCont(cmd) => {
+            ext::Base::vCont(cmd) => {
                 use crate::protocol::commands::_vCont::{vCont, VContKind};
 
                 let actions = match cmd {
@@ -620,38 +608,38 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                 let ret = match self.do_vcont(res, target, &mut actions) {
                     Ok(None) => Ok(HandlerStatus::Handled),
-                    Ok(Some(dc)) => Ok(HandlerStatus::DisconnectReason(dc)),
+                    Ok(Some(dc)) => Ok(HandlerStatus::Disconnect(dc)),
                     Err(e) => Err(e),
                 };
                 err?;
                 return ret;
             }
             // TODO?: support custom resume addr in 'c' and 's'
-            Command::c(_) => {
+            ext::Base::c(_) => {
                 return match self.do_vcont(
                     res,
                     target,
                     &mut core::iter::once((self.current_resume_tid, ResumeAction::Continue)),
                 ) {
                     Ok(None) => Ok(HandlerStatus::Handled),
-                    Ok(Some(dc)) => Ok(HandlerStatus::DisconnectReason(dc)),
+                    Ok(Some(dc)) => Ok(HandlerStatus::Disconnect(dc)),
                     Err(e) => Err(e),
                 }
             }
-            Command::s(_) => {
+            ext::Base::s(_) => {
                 return match self.do_vcont(
                     res,
                     target,
                     &mut core::iter::once((self.current_resume_tid, ResumeAction::Step)),
                 ) {
                     Ok(None) => Ok(HandlerStatus::Handled),
-                    Ok(Some(dc)) => Ok(HandlerStatus::DisconnectReason(dc)),
+                    Ok(Some(dc)) => Ok(HandlerStatus::Disconnect(dc)),
                     Err(e) => Err(e),
                 }
             }
 
             // ------------------- Multi-threading Support ------------------ //
-            Command::H(cmd) => {
+            ext::Base::H(cmd) => {
                 use crate::protocol::commands::_h_upcase::Op;
                 match cmd.kind {
                     Op::Other => match cmd.thread.tid {
@@ -669,7 +657,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 }
                 res.write_str("OK")?
             }
-            Command::qfThreadInfo(_) => {
+            ext::Base::qfThreadInfo(_) => {
                 res.write_str("m")?;
 
                 match target.base_ops() {
@@ -703,8 +691,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     }
                 }
             }
-            Command::qsThreadInfo(_) => res.write_str("l")?,
-            Command::T(cmd) => {
+            ext::Base::qsThreadInfo(_) => res.write_str("l")?,
+            ext::Base::T(cmd) => {
                 let alive = match cmd.thread.tid {
                     IdKind::WithID(tid) => match target.base_ops() {
                         BaseOps::SingleThread(_) => tid == SINGLE_THREAD_TID,
@@ -722,8 +710,6 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     res.write_str("E01")?; // TODO: is this an okay error code?
                 }
             }
-
-            c => return Ok(HandlerStatus::NotHandled(c)),
         }
 
         Ok(HandlerStatus::Handled)
@@ -733,15 +719,15 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         &mut self,
         res: &mut ResponseWriter<C>,
         target: &mut T,
-        command: Command<'a>,
-    ) -> Result<HandlerStatus<'a>, Error<T::Error, C::Error>> {
+        command: ext::MonitorCmd<'a>,
+    ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
         let ops = match target.monitor_cmd() {
             Some(ops) => ops,
-            None => return Ok(HandlerStatus::NotHandled(command)),
+            None => return Ok(HandlerStatus::Handled),
         };
 
         match command {
-            Command::qRcmd(cmd) => {
+            ext::MonitorCmd::qRcmd(cmd) => {
                 crate::__dead_code_marker!("qRcmd", "impl");
 
                 let mut err: Result<_, Error<T::Error, C::Error>> = Ok(());
@@ -766,24 +752,24 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                 res.write_str("OK")?
             }
-            c => return Ok(HandlerStatus::NotHandled(c)),
         }
+
         Ok(HandlerStatus::Handled)
     }
 
-    fn handle_section_offsets<'a>(
+    fn handle_section_offsets(
         &mut self,
         res: &mut ResponseWriter<C>,
         target: &mut T,
-        command: Command<'a>,
-    ) -> Result<HandlerStatus<'a>, Error<T::Error, C::Error>> {
+        command: ext::SectionOffsets,
+    ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
         let ops = match target.section_offsets() {
             Some(ops) => ops,
-            None => return Ok(HandlerStatus::NotHandled(command)),
+            None => return Ok(HandlerStatus::Handled),
         };
 
         match command {
-            Command::qOffsets(_cmd) => {
+            ext::SectionOffsets::qOffsets(_cmd) => {
                 use crate::target_ext::section_offsets::Offsets;
 
                 crate::__dead_code_marker!("qOffsets", "impl");
@@ -812,8 +798,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     }
                 }
             }
-            c => return Ok(HandlerStatus::NotHandled(c)),
         }
+
         Ok(HandlerStatus::Handled)
     }
 
@@ -821,26 +807,28 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         &mut self,
         res: &mut ResponseWriter<C>,
         target: &mut T,
-        command: Command<'a>,
-    ) -> Result<HandlerStatus<'a>, Error<T::Error, C::Error>> {
+        command: ext::ExtendedMode<'a>,
+    ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
         let ops = match target.extended_mode() {
             Some(ops) => ops,
-            None => return Ok(HandlerStatus::NotHandled(command)),
+            None => return Ok(HandlerStatus::Handled),
         };
 
         match command {
-            Command::ExclamationMark(_cmd) => {
+            ext::ExtendedMode::ExclamationMark(_cmd) => {
                 ops.on_start().map_err(Error::TargetError)?;
                 res.write_str("OK")?;
             }
-            Command::R(_cmd) => ops.restart().map_err(Error::TargetError)?,
-            Command::vAttach(cmd) => {
+            ext::ExtendedMode::R(_cmd) => ops.restart().map_err(Error::TargetError)?,
+            ext::ExtendedMode::vAttach(cmd) => {
                 ops.attach(cmd.pid).handle_error()?;
 
                 #[cfg(feature = "alloc")]
                 self.attached_pids.insert(cmd.pid, true);
+
+                // TODO: sends OK when running in Non-Stop mode
             }
-            Command::vRun(cmd) => {
+            ext::ExtendedMode::vRun(cmd) => {
                 use crate::target_ext::extended_mode::Args;
 
                 let mut pid = ops
@@ -861,40 +849,42 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 res.write_str("S05")?
             }
             // --------- ASLR --------- //
-            Command::QDisableRandomization(cmd) if ops.configure_aslr().is_some() => {
+            ext::ExtendedMode::QDisableRandomization(cmd) if ops.configure_aslr().is_some() => {
                 let ops = ops.configure_aslr().unwrap();
                 ops.cfg_aslr(cmd.value).handle_error()?;
                 res.write_str("OK")?
             }
             // --------- Environment --------- //
-            Command::QEnvironmentHexEncoded(cmd) if ops.configure_env().is_some() => {
+            ext::ExtendedMode::QEnvironmentHexEncoded(cmd) if ops.configure_env().is_some() => {
                 let ops = ops.configure_env().unwrap();
                 ops.set_env(cmd.key, cmd.value).handle_error()?;
                 res.write_str("OK")?
             }
-            Command::QEnvironmentUnset(cmd) if ops.configure_env().is_some() => {
+            ext::ExtendedMode::QEnvironmentUnset(cmd) if ops.configure_env().is_some() => {
                 let ops = ops.configure_env().unwrap();
                 ops.remove_env(cmd.key).handle_error()?;
                 res.write_str("OK")?
             }
-            Command::QEnvironmentReset(_cmd) if ops.configure_env().is_some() => {
+            ext::ExtendedMode::QEnvironmentReset(_cmd) if ops.configure_env().is_some() => {
                 let ops = ops.configure_env().unwrap();
                 ops.reset_env().handle_error()?;
                 res.write_str("OK")?
             }
             // --------- Working Dir --------- //
-            Command::QSetWorkingDir(cmd) if ops.configure_working_dir().is_some() => {
+            ext::ExtendedMode::QSetWorkingDir(cmd) if ops.configure_working_dir().is_some() => {
                 let ops = ops.configure_working_dir().unwrap();
                 ops.cfg_working_dir(cmd.dir).handle_error()?;
                 res.write_str("OK")?
             }
             // --------- Startup Shell --------- //
-            Command::QStartupWithShell(cmd) if ops.configure_startup_shell().is_some() => {
+            ext::ExtendedMode::QStartupWithShell(cmd)
+                if ops.configure_startup_shell().is_some() =>
+            {
                 let ops = ops.configure_startup_shell().unwrap();
                 ops.cfg_startup_with_shell(cmd.value).handle_error()?;
                 res.write_str("OK")?
             }
-            c => return Ok(HandlerStatus::NotHandled(c)),
+            _ => {}
         }
 
         Ok(HandlerStatus::Handled)
