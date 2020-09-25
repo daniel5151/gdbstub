@@ -53,7 +53,7 @@ pub enum Offsets<U> {
 /// or by including a `AT_BASE` entry in the response to the more modern
 // `qXfer:auxv:read` command.
 pub trait SectionOffsets: Target {
-    /// Return the targets current section (or segment) offsets
+    /// Return the target's current section (or segment) offsets
     fn get_section_offsets(
         &mut self,
     ) -> Result<Offsets<<Self::Arch as crate::target::Arch>::Usize>, Self::Error>;
