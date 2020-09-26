@@ -2,7 +2,7 @@ use armv4t_emu::{reg, Memory};
 
 use gdbstub::arch;
 use gdbstub::common::Tid;
-use gdbstub::target::Target;
+use gdbstub::target::{Target, TargetError, TargetResult};
 use gdbstub::target_ext;
 use gdbstub::target_ext::base::multithread::{
     Actions, MultiThreadOps, ResumeAction, ThreadStopReason,
@@ -106,8 +106,8 @@ impl MultiThreadOps for Emu {
         &mut self,
         regs: &mut arch::arm::reg::ArmCoreRegs,
         tid: Tid,
-    ) -> Result<(), &'static str> {
-        let cpu = match tid_to_cpuid(tid)? {
+    ) -> TargetResult<(), Self> {
+        let cpu = match tid_to_cpuid(tid).map_err(TargetError::Fatal)? {
             CpuId::Cpu => &mut self.cpu,
             CpuId::Cop => &mut self.cop,
         };
@@ -129,8 +129,8 @@ impl MultiThreadOps for Emu {
         &mut self,
         regs: &arch::arm::reg::ArmCoreRegs,
         tid: Tid,
-    ) -> Result<(), &'static str> {
-        let cpu = match tid_to_cpuid(tid)? {
+    ) -> TargetResult<(), Self> {
+        let cpu = match tid_to_cpuid(tid).map_err(TargetError::Fatal)? {
             CpuId::Cpu => &mut self.cpu,
             CpuId::Cop => &mut self.cop,
         };
@@ -153,11 +153,11 @@ impl MultiThreadOps for Emu {
         start_addr: u32,
         data: &mut [u8],
         _tid: Tid, // same address space for each core
-    ) -> Result<bool, &'static str> {
+    ) -> TargetResult<(), Self> {
         for (addr, val) in (start_addr..).zip(data.iter_mut()) {
             *val = self.mem.r8(addr)
         }
-        Ok(true)
+        Ok(())
     }
 
     fn write_addrs(
@@ -165,11 +165,11 @@ impl MultiThreadOps for Emu {
         start_addr: u32,
         data: &[u8],
         _tid: Tid, // same address space for each core
-    ) -> Result<bool, &'static str> {
+    ) -> TargetResult<(), Self> {
         for (addr, val) in (start_addr..).zip(data.iter().copied()) {
             self.mem.w8(addr, val)
         }
-        Ok(true)
+        Ok(())
     }
 
     fn list_active_threads(
@@ -183,12 +183,12 @@ impl MultiThreadOps for Emu {
 }
 
 impl target_ext::breakpoints::SwBreakpoint for Emu {
-    fn add_sw_breakpoint(&mut self, addr: u32) -> Result<bool, &'static str> {
+    fn add_sw_breakpoint(&mut self, addr: u32) -> TargetResult<bool, Self> {
         self.breakpoints.push(addr);
         Ok(true)
     }
 
-    fn remove_sw_breakpoint(&mut self, addr: u32) -> Result<bool, &'static str> {
+    fn remove_sw_breakpoint(&mut self, addr: u32) -> TargetResult<bool, Self> {
         match self.breakpoints.iter().position(|x| *x == addr) {
             None => return Ok(false),
             Some(pos) => self.breakpoints.remove(pos),
@@ -199,7 +199,7 @@ impl target_ext::breakpoints::SwBreakpoint for Emu {
 }
 
 impl target_ext::breakpoints::HwWatchpoint for Emu {
-    fn add_hw_watchpoint(&mut self, addr: u32, kind: WatchKind) -> Result<bool, &'static str> {
+    fn add_hw_watchpoint(&mut self, addr: u32, kind: WatchKind) -> TargetResult<bool, Self> {
         self.watchpoints.push(addr);
 
         let entry = self.watchpoint_kind.entry(addr).or_insert((false, false));
@@ -212,7 +212,7 @@ impl target_ext::breakpoints::HwWatchpoint for Emu {
         Ok(true)
     }
 
-    fn remove_hw_watchpoint(&mut self, addr: u32, kind: WatchKind) -> Result<bool, &'static str> {
+    fn remove_hw_watchpoint(&mut self, addr: u32, kind: WatchKind) -> TargetResult<bool, Self> {
         let entry = self.watchpoint_kind.entry(addr).or_insert((false, false));
         match kind {
             WatchKind::Write => entry.1 = false,

@@ -3,7 +3,7 @@ use core::convert::TryInto;
 use armv4t_emu::{reg, Memory};
 use gdbstub::arch;
 use gdbstub::arch::arm::reg::id::ArmCoreRegId;
-use gdbstub::target::Target;
+use gdbstub::target::{Target, TargetError, TargetResult};
 use gdbstub::target_ext;
 use gdbstub::target_ext::base::singlethread::{ResumeAction, SingleThreadOps, StopReason};
 use gdbstub::target_ext::breakpoints::WatchKind;
@@ -93,10 +93,7 @@ impl SingleThreadOps for Emu {
         })
     }
 
-    fn read_registers(
-        &mut self,
-        regs: &mut arch::arm::reg::ArmCoreRegs,
-    ) -> Result<(), &'static str> {
+    fn read_registers(&mut self, regs: &mut arch::arm::reg::ArmCoreRegs) -> TargetResult<(), Self> {
         let mode = self.cpu.mode();
 
         for i in 0..13 {
@@ -110,7 +107,7 @@ impl SingleThreadOps for Emu {
         Ok(())
     }
 
-    fn write_registers(&mut self, regs: &arch::arm::reg::ArmCoreRegs) -> Result<(), &'static str> {
+    fn write_registers(&mut self, regs: &arch::arm::reg::ArmCoreRegs) -> TargetResult<(), Self> {
         let mode = self.cpu.mode();
 
         for i in 0..13 {
@@ -128,13 +125,13 @@ impl SingleThreadOps for Emu {
         &mut self,
         reg_id: arch::arm::reg::id::ArmCoreRegId,
         dst: &mut [u8],
-    ) -> Result<bool, Self::Error> {
+    ) -> TargetResult<(), Self> {
         if let Some(i) = cpu_reg_id(reg_id) {
             let w = self.cpu.reg_get(self.cpu.mode(), i);
             dst.copy_from_slice(&w.to_le_bytes());
-            Ok(true)
+            Ok(())
         } else {
-            Ok(false)
+            Err(().into())
         }
     }
 
@@ -142,38 +139,41 @@ impl SingleThreadOps for Emu {
         &mut self,
         reg_id: arch::arm::reg::id::ArmCoreRegId,
         val: &[u8],
-    ) -> Result<bool, Self::Error> {
-        let w = u32::from_le_bytes(val.try_into().map_err(|_| "invalid data")?);
+    ) -> TargetResult<(), Self> {
+        let w = u32::from_le_bytes(
+            val.try_into()
+                .map_err(|_| TargetError::Fatal("invalid data"))?,
+        );
         if let Some(i) = cpu_reg_id(reg_id) {
             self.cpu.reg_set(self.cpu.mode(), i, w);
-            Ok(true)
+            Ok(())
         } else {
-            Ok(false)
+            Err(().into())
         }
     }
 
-    fn read_addrs(&mut self, start_addr: u32, data: &mut [u8]) -> Result<bool, &'static str> {
+    fn read_addrs(&mut self, start_addr: u32, data: &mut [u8]) -> TargetResult<(), Self> {
         for (addr, val) in (start_addr..).zip(data.iter_mut()) {
             *val = self.mem.r8(addr)
         }
-        Ok(true)
+        Ok(())
     }
 
-    fn write_addrs(&mut self, start_addr: u32, data: &[u8]) -> Result<bool, &'static str> {
+    fn write_addrs(&mut self, start_addr: u32, data: &[u8]) -> TargetResult<(), Self> {
         for (addr, val) in (start_addr..).zip(data.iter().copied()) {
             self.mem.w8(addr, val)
         }
-        Ok(true)
+        Ok(())
     }
 }
 
 impl target_ext::breakpoints::SwBreakpoint for Emu {
-    fn add_sw_breakpoint(&mut self, addr: u32) -> Result<bool, &'static str> {
+    fn add_sw_breakpoint(&mut self, addr: u32) -> TargetResult<bool, Self> {
         self.breakpoints.push(addr);
         Ok(true)
     }
 
-    fn remove_sw_breakpoint(&mut self, addr: u32) -> Result<bool, &'static str> {
+    fn remove_sw_breakpoint(&mut self, addr: u32) -> TargetResult<bool, Self> {
         match self.breakpoints.iter().position(|x| *x == addr) {
             None => return Ok(false),
             Some(pos) => self.breakpoints.remove(pos),
@@ -184,7 +184,7 @@ impl target_ext::breakpoints::SwBreakpoint for Emu {
 }
 
 impl target_ext::breakpoints::HwWatchpoint for Emu {
-    fn add_hw_watchpoint(&mut self, addr: u32, kind: WatchKind) -> Result<bool, &'static str> {
+    fn add_hw_watchpoint(&mut self, addr: u32, kind: WatchKind) -> TargetResult<bool, Self> {
         match kind {
             WatchKind::Write => self.watchpoints.push(addr),
             WatchKind::Read => self.watchpoints.push(addr),
@@ -194,7 +194,7 @@ impl target_ext::breakpoints::HwWatchpoint for Emu {
         Ok(true)
     }
 
-    fn remove_hw_watchpoint(&mut self, addr: u32, kind: WatchKind) -> Result<bool, &'static str> {
+    fn remove_hw_watchpoint(&mut self, addr: u32, kind: WatchKind) -> TargetResult<bool, Self> {
         let pos = match self.watchpoints.iter().position(|x| *x == addr) {
             None => return Ok(false),
             Some(pos) => pos,

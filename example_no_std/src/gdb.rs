@@ -1,6 +1,6 @@
 use gdbstub::arch;
 use gdbstub::common::Tid;
-use gdbstub::target::Target;
+use gdbstub::target::{Target, TargetResult};
 use gdbstub::target_ext;
 use gdbstub::target_ext::base::multithread::{Actions, MultiThreadOps, ThreadStopReason};
 
@@ -47,7 +47,7 @@ impl MultiThreadOps for DummyTarget {
         &mut self,
         _regs: &mut arch::arm::reg::ArmCoreRegs,
         _tid: Tid,
-    ) -> Result<(), &'static str> {
+    ) -> TargetResult<(), Self> {
         print_str("> read_registers");
         Ok(())
     }
@@ -57,7 +57,7 @@ impl MultiThreadOps for DummyTarget {
         &mut self,
         _regs: &arch::arm::reg::ArmCoreRegs,
         _tid: Tid,
-    ) -> Result<(), &'static str> {
+    ) -> TargetResult<(), Self> {
         print_str("> write_registers");
         Ok(())
     }
@@ -68,10 +68,10 @@ impl MultiThreadOps for DummyTarget {
         _start_addr: u32,
         data: &mut [u8],
         _tid: Tid, // same address space for each core
-    ) -> Result<bool, &'static str> {
+    ) -> TargetResult<(), Self> {
         print_str("> read_addrs");
         data.iter_mut().for_each(|b| *b = 0x55);
-        Ok(true)
+        Ok(())
     }
 
     #[inline(never)]
@@ -80,9 +80,9 @@ impl MultiThreadOps for DummyTarget {
         _start_addr: u32,
         _data: &[u8],
         _tid: Tid, // same address space for each core
-    ) -> Result<bool, &'static str> {
+    ) -> TargetResult<(), Self> {
         print_str("> write_addrs");
-        Ok(true)
+        Ok(())
     }
 
     #[inline(never)]
@@ -99,12 +99,12 @@ impl MultiThreadOps for DummyTarget {
 
 impl target_ext::breakpoints::SwBreakpoint for DummyTarget {
     #[inline(never)]
-    fn add_sw_breakpoint(&mut self, _addr: u32) -> Result<bool, &'static str> {
+    fn add_sw_breakpoint(&mut self, _addr: u32) -> TargetResult<bool, Self> {
         Ok(true)
     }
 
     #[inline(never)]
-    fn remove_sw_breakpoint(&mut self, _addr: u32) -> Result<bool, &'static str> {
+    fn remove_sw_breakpoint(&mut self, _addr: u32) -> TargetResult<bool, Self> {
         Ok(true)
     }
 }

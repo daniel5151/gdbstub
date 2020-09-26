@@ -1,7 +1,7 @@
 //! Base debugging operations for single threaded targets.
 
 use crate::arch::Arch;
-use crate::target::Target;
+use crate::target::{Target, TargetResult};
 use crate::target_ext::breakpoints::WatchKind;
 
 // Convenient re-export
@@ -49,38 +49,32 @@ pub trait SingleThreadOps: Target {
     fn read_registers(
         &mut self,
         regs: &mut <Self::Arch as Arch>::Registers,
-    ) -> Result<(), Self::Error>;
+    ) -> TargetResult<(), Self>;
 
     /// Write the target's registers.
-    fn write_registers(
-        &mut self,
-        regs: &<Self::Arch as Arch>::Registers,
-    ) -> Result<(), Self::Error>;
+    fn write_registers(&mut self, regs: &<Self::Arch as Arch>::Registers)
+        -> TargetResult<(), Self>;
 
     /// Read to a single register on the target.
     ///
     /// Implementations should write the value of the register using target's
     /// native byte order in the buffer `dst`.
     ///
-    /// If the requested register could not be accessed, return `Ok(false)` to
-    /// signal that the requested register could not be read from. Otherwise,
-    /// return `Ok(true)`.
-    ///
-    /// As a reminder, `Err(Self::Error)` should only be returned if a register
-    /// read results in a **fatal** target error.
+    /// If the requested register could not be accessed, an appropriate
+    /// non-fatal error should be returned.
     ///
     /// _Note:_ This method includes a stubbed default implementation which
-    /// simply returns `Ok(false)`. This is due to the fact that several
-    /// built-in `arch` implementations still use the generic, albeit highly
-    /// un-ergonomic [`RawRegId`](../../../arch/struct.RawRegId.html)
-    /// type. See the docs for `RawRegId` for more info.
+    /// simply returns `Ok(())`. This is due to the fact that several built-in
+    /// `arch` implementations still use the generic, albeit highly un-ergonomic
+    /// [`RawRegId`](../../../arch/struct.RawRegId.html) type. See the docs
+    /// for `RawRegId` for more info.
     fn read_register(
         &mut self,
         reg_id: <Self::Arch as Arch>::RegId,
         dst: &mut [u8],
-    ) -> Result<bool, Self::Error> {
+    ) -> TargetResult<(), Self> {
         let _ = (reg_id, dst);
-        Ok(false)
+        Ok(())
     }
 
     /// Write from a single register on the target.
@@ -89,54 +83,44 @@ pub trait SingleThreadOps: Target {
     /// native byte order. It is guaranteed to be the exact length as the target
     /// register.
     ///
-    /// If the requested register could not be accessed, return `Ok(false)` to
-    /// signal that the requested register could not be written to. Otherwise,
-    /// return `Ok(true)`.
-    ///
-    /// As a reminder, `Err(Self::Error)` should only be returned if a register
-    /// read results in a **fatal** target error.
+    /// If the requested register could not be accessed, an appropriate
+    /// non-fatal error should be returned.
     ///
     /// _Note:_ This method includes a stubbed default implementation which
-    /// simply returns `Ok(false)`. This is due to the fact that several
-    /// built-in `arch` implementations still use the generic, albeit highly
-    /// un-ergonomic [`RawRegId`](../../../arch/struct.RawRegId.html)
-    /// type. See the docs for `RawRegId` for more info.
+    /// simply returns `Ok(())`. This is due to the fact that several built-in
+    /// `arch` implementations still use the generic, albeit highly un-ergonomic
+    /// [`RawRegId`](../../../arch/struct.RawRegId.html) type. See the docs
+    /// for `RawRegId` for more info.
     fn write_register(
         &mut self,
         reg_id: <Self::Arch as Arch>::RegId,
         val: &[u8],
-    ) -> Result<bool, Self::Error> {
+    ) -> TargetResult<(), Self> {
         let _ = (reg_id, val);
-        Ok(false)
+        Ok(())
     }
 
     /// Read bytes from the specified address range.
     ///
     /// If the requested address range could not be accessed (e.g: due to
-    /// MMU protection, unhanded page fault, etc...), return `Ok(false)` to
-    /// signal that the requested memory could not be read.
-    ///
-    /// As a reminder, `Err(Self::Error)` should only be returned if a memory
-    /// read results in a **fatal** target error.
+    /// MMU protection, unhanded page fault, etc...), an appropriate
+    /// non-fatal error should be returned.
     fn read_addrs(
         &mut self,
         start_addr: <Self::Arch as Arch>::Usize,
         data: &mut [u8],
-    ) -> Result<bool, Self::Error>;
+    ) -> TargetResult<(), Self>;
 
     /// Write bytes to the specified address range.
     ///
     /// If the requested address range could not be accessed (e.g: due to
-    /// MMU protection, unhanded page fault, etc...), return `Ok(false)` to
-    /// signal that the requested memory could not be written to.
-    ///
-    /// As a reminder, `Err(Self::Error)` should only be returned if a memory
-    /// write results in a **fatal** target error.
+    /// MMU protection, unhanded page fault, etc...), an appropriate
+    /// non-fatal error should be returned.
     fn write_addrs(
         &mut self,
         start_addr: <Self::Arch as Arch>::Usize,
         data: &[u8],
-    ) -> Result<bool, Self::Error>;
+    ) -> TargetResult<(), Self>;
 }
 
 /// Describes why the target stopped.

@@ -368,7 +368,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         ops.read_registers(&mut regs, self.current_mem_tid)
                     }
                 }
-                .map_err(Error::TargetError)?;
+                .handle_error()?;
 
                 let mut err = Ok(());
                 regs.gdb_serialize(|val| {
@@ -391,7 +391,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     BaseOps::SingleThread(ops) => ops.write_registers(&regs),
                     BaseOps::MultiThread(ops) => ops.write_registers(&regs, self.current_mem_tid),
                 }
-                .map_err(Error::TargetError)?;
+                .handle_error()?;
 
                 res.write_str("OK")?;
             }
@@ -405,18 +405,13 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                     let addr = Self::to_target_usize(cmd.addr + i as u64)?;
                     let data = &mut buf[..chunk_size];
-                    let success = match target.base_ops() {
+                    match target.base_ops() {
                         BaseOps::SingleThread(ops) => ops.read_addrs(addr, data),
                         BaseOps::MultiThread(ops) => {
                             ops.read_addrs(addr, data, self.current_mem_tid)
                         }
                     }
-                    .map_err(Error::TargetError)?;
-
-                    if !success {
-                        debug!("invalid memory read!");
-                        break;
-                    }
+                    .handle_error()?;
 
                     n -= chunk_size;
                     i += chunk_size;
@@ -427,19 +422,15 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             ext::Base::M(cmd) => {
                 let addr = Self::to_target_usize(cmd.addr)?;
 
-                let success = match target.base_ops() {
+                match target.base_ops() {
                     BaseOps::SingleThread(ops) => ops.write_addrs(addr, cmd.val),
                     BaseOps::MultiThread(ops) => {
                         ops.write_addrs(addr, cmd.val, self.current_mem_tid)
                     }
                 }
-                .map_err(Error::TargetError)?;
+                .handle_error()?;
 
-                if !success {
-                    res.write_str("E14")? // error code grafted from QEMU
-                } else {
-                    res.write_str("OK")?;
-                }
+                res.write_str("OK")?;
             }
             ext::Base::k(_) | ext::Base::vKill(_) => {
                 match target.extended_mode() {
@@ -483,7 +474,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                 match supported {
                     None => {}
-                    Some(Err(e)) => return Err(Error::TargetError(e)),
+                    Some(Err(e)) => Err(e).handle_error()?,
                     Some(Ok(true)) => res.write_str("OK")?,
                     Some(Ok(false)) => res.write_str("E22")?, // value of 22 grafted from QEMU
                 }
@@ -506,7 +497,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                 match supported {
                     None => {}
-                    Some(Err(e)) => return Err(Error::TargetError(e)),
+                    Some(Err(e)) => Err(e).handle_error()?,
                     Some(Ok(true)) => res.write_str("OK")?,
                     Some(Ok(false)) => res.write_str("E22")?, // value of 22 grafted from QEMU
                 }
@@ -519,38 +510,28 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     None => return Ok(HandlerStatus::Handled),
                 };
                 let dst = &mut dst[0..reg_size];
-                let supported = match target.base_ops() {
-                    BaseOps::SingleThread(ops) => {
-                        ops.read_register(reg_id, dst).map_err(Error::TargetError)?
+                match target.base_ops() {
+                    BaseOps::SingleThread(ops) => ops.read_register(reg_id, dst),
+                    BaseOps::MultiThread(ops) => {
+                        ops.read_register(reg_id, dst, self.current_mem_tid)
                     }
-                    BaseOps::MultiThread(ops) => ops
-                        .read_register(reg_id, dst, self.current_mem_tid)
-                        .map_err(Error::TargetError)?,
-                };
-                if supported {
-                    res.write_hex_buf(dst)?;
-                } else {
-                    res.write_str("E01")?;
                 }
+                .handle_error()?;
+                res.write_hex_buf(dst)?;
             }
             ext::Base::P(p) => {
                 let reg = <T::Arch as Arch>::RegId::from_raw_id(p.reg_id);
-                let supported = match reg {
+                match reg {
                     Some((reg_id, _)) => match target.base_ops() {
-                        BaseOps::SingleThread(ops) => ops
-                            .write_register(reg_id, p.val)
-                            .map_err(Error::TargetError)?,
-                        BaseOps::MultiThread(ops) => ops
-                            .write_register(reg_id, p.val, self.current_mem_tid)
-                            .map_err(Error::TargetError)?,
-                    },
-                    None => false,
+                        BaseOps::SingleThread(ops) => ops.write_register(reg_id, p.val),
+                        BaseOps::MultiThread(ops) => {
+                            ops.write_register(reg_id, p.val, self.current_mem_tid)
+                        }
+                    }
+                    .handle_error()?,
+                    None => res.write_str("E01")?,
                 };
-                if supported {
-                    res.write_str("OK")?;
-                } else {
-                    res.write_str("E01")?;
-                }
+                res.write_str("OK")?;
             }
             ext::Base::vCont(cmd) => {
                 use crate::protocol::commands::_vCont::{vCont, VContKind};
