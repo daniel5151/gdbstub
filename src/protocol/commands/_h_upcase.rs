@@ -14,17 +14,17 @@ pub struct H {
 
 impl<'a> ParseCommand<'a> for H {
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
-        let body = buf.into_body_str();
+        let body = buf.into_body();
         if body.is_empty() {
             return None;
         }
 
-        let kind = match body.chars().next()? {
-            'g' => Op::Other,
-            'c' => Op::StepContinue,
+        let kind = match body[0] {
+            b'g' => Op::Other,
+            b'c' => Op::StepContinue,
             _ => return None,
         };
-        let thread = body[1..].parse::<ThreadId>().ok()?;
+        let thread: ThreadId = body[1..].try_into().ok()?;
 
         Some(H { kind, thread })
     }

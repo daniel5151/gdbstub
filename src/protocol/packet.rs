@@ -64,8 +64,8 @@ impl<'a> PacketBuf<'a> {
         })
     }
 
-    /// (used for tests) Skip the header/checksum trimming stage, but _not_ the
-    /// ASCII validation.
+    /// (used for tests) Create a packet buffer from a raw body buffer, skipping
+    /// the header/checksum trimming stage. ASCII validation is still performed.
     #[cfg(test)]
     pub fn new_with_raw_body(body: &'a mut [u8]) -> Result<PacketBuf<'a>, PacketParseError> {
         // validate the packet is valid ASCII
@@ -100,7 +100,7 @@ impl<'a> PacketBuf<'a> {
     pub fn into_body_str(self) -> &'a str {
         // SAFETY: buffer confirmed to be `is_ascii()` in `new`, and no other PacketBuf
         // member allow arbitrary modification of `self.buf`.
-        unsafe { core::str::from_utf8_unchecked(&self.buf[self.body_range.clone()]) }
+        unsafe { core::str::from_utf8_unchecked(&self.buf[self.body_range]) }
     }
 
     /// Return a mut reference to the _entire_ underlying packet buffer, and the

@@ -1,29 +1,29 @@
 use super::prelude::*;
 
-#[derive(PartialEq, Eq, Debug)]
-pub struct qXferFeaturesRead<'a> {
-    pub annex: &'a str,
+#[derive(Debug)]
+pub struct qXferFeaturesRead {
     pub offset: usize,
     pub len: usize,
 }
 
-impl<'a> ParseCommand<'a> for qXferFeaturesRead<'a> {
+impl<'a> ParseCommand<'a> for qXferFeaturesRead {
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
-        let body = buf.into_body_str();
+        let body = buf.into_body();
 
-        // body should be ":<target>:<offset>,<len>b"
-        log::debug!("{}", body);
         if body.is_empty() {
             return None;
         }
 
-        let mut body = body.split(':').skip(1);
+        let mut body = body.split(|b| *b == b':').skip(1);
         let annex = body.next()?;
+        if annex != b"target.xml" {
+            return None;
+        }
 
-        let mut body = body.next()?.split(',');
-        let offset = decode_hex(body.next()?.as_bytes()).ok()?;
-        let len = decode_hex(body.next()?.as_bytes()).ok()?;
+        let mut body = body.next()?.split(|b| *b == b',');
+        let offset = decode_hex(body.next()?).ok()?;
+        let len = decode_hex(body.next()?).ok()?;
 
-        Some(qXferFeaturesRead { annex, offset, len })
+        Some(qXferFeaturesRead { offset, len })
     }
 }

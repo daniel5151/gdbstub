@@ -7,7 +7,7 @@ pub struct qSupported<'a> {
 
 impl<'a> ParseCommand<'a> for qSupported<'a> {
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
-        let body = buf.into_body_str();
+        let body = buf.into_body();
         if body.is_empty() {
             return None;
         }
@@ -19,27 +19,27 @@ impl<'a> ParseCommand<'a> for qSupported<'a> {
 }
 
 #[derive(Debug)]
-pub struct Features<'a>(&'a str);
+pub struct Features<'a>(&'a [u8]);
 
 impl<'a> Features<'a> {
-    pub fn into_iter(self) -> impl Iterator<Item = Result<Feature<'a>, &'static str>> + 'a {
-        self.0.split(';').map(|s| match s.as_bytes().last() {
-            None => Err("packet shouldn't have two ';' in a row"),
-            Some(&c) if c == b'+' || c == b'-' || c == b'?' => Ok(Feature {
-                name: &s[..s.len() - 1],
+    pub fn into_iter(self) -> impl Iterator<Item = Option<Feature<'a>>> + 'a {
+        self.0.split(|b| *b == b';').map(|s| match s.last() {
+            None => None,
+            Some(&c) if c == b'+' || c == b'-' || c == b'?' => Some(Feature {
+                name: s[..s.len() - 1].into(),
                 val: None,
                 status: match c {
                     b'+' => FeatureSupported::Yes,
                     b'-' => FeatureSupported::No,
                     b'?' => FeatureSupported::Maybe,
-                    _ => return Err("invalid feature flag (must be +, -, or ?)"),
+                    _ => return None,
                 },
             }),
             Some(_) => {
-                let mut parts = s.split('=');
-                Ok(Feature {
-                    name: parts.next().unwrap(),
-                    val: Some(parts.next().ok_or("missing feature val")?),
+                let mut parts = s.split(|b| *b == b'=');
+                Some(Feature {
+                    name: parts.next()?.into(),
+                    val: Some(parts.next()?.into()),
                     status: FeatureSupported::Yes,
                 })
             }
@@ -47,16 +47,16 @@ impl<'a> Features<'a> {
     }
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(Debug)]
 pub enum FeatureSupported {
     Yes,
     No,
     Maybe,
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(Debug)]
 pub struct Feature<'a> {
-    name: &'a str,
-    val: Option<&'a str>,
+    name: Bstr<'a>,
+    val: Option<Bstr<'a>>,
     status: FeatureSupported,
 }

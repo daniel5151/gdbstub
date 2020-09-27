@@ -7,8 +7,9 @@ pub struct T {
 
 impl<'a> ParseCommand<'a> for T {
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
-        let body = buf.into_body_str();
-        let thread = body.parse::<ThreadId>().ok()?;
-        Some(T { thread })
+        let body = buf.into_body();
+        Some(T {
+            thread: body.try_into().ok()?,
+        })
     }
 }

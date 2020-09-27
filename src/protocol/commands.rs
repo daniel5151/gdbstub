@@ -8,6 +8,7 @@ pub(self) mod prelude {
     pub use crate::common::*;
     pub use crate::protocol::common::*;
     pub use crate::protocol::packet::PacketBuf;
+    pub use core::convert::{TryFrom, TryInto};
 }
 
 pub trait ParseCommand<'a>: Sized {
@@ -117,7 +118,7 @@ commands! {
         "QStartNoAckMode" => _QStartNoAckMode::QStartNoAckMode,
         "qsThreadInfo" => _qsThreadInfo::qsThreadInfo,
         "qSupported" => _qSupported::qSupported<'a>,
-        "qXfer:features:read" => _qXfer_features_read::qXferFeaturesRead<'a>,
+        "qXfer:features:read" => _qXfer_features_read::qXferFeaturesRead,
         "s" => _s::s,
         "T" => _t_upcase::T,
         "vCont" => _vCont::vCont<'a>,

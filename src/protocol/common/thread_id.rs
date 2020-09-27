@@ -1,6 +1,5 @@
-use core::convert::TryFrom;
+use core::convert::{TryFrom, TryInto};
 use core::num::NonZeroUsize;
-use core::str::FromStr;
 
 use super::decode_hex;
 
@@ -24,49 +23,59 @@ pub struct ThreadId {
     pub tid: IdKind,
 }
 
-impl TryFrom<&str> for ThreadId {
+impl TryFrom<&[u8]> for ThreadId {
     type Error = ();
 
-    fn try_from(s: &str) -> Result<Self, ()> {
-        if s.starts_with('p') {
-            // p<pid>.<tid>
-            let mut s = s.trim_start_matches('p').split('.');
-            let pid = s.next().ok_or(())?.parse::<IdKind>().map_err(drop)?;
-            let tid = match s.next() {
-                Some(s) => s.parse::<IdKind>().map_err(drop)?,
-                None => IdKind::All, // sending only p<pid> is valid
-            };
+    fn try_from(s: &[u8]) -> Result<Self, ()> {
+        match s {
+            [b'p', s @ ..] => {
+                // p<pid>.<tid>
+                let mut s = s.split(|b| *b == b'.');
+                let pid: IdKind = s.next().ok_or(())?.try_into()?;
+                let tid: IdKind = match s.next() {
+                    Some(s) => s.try_into()?,
+                    None => IdKind::All, // sending only p<pid> is valid
+                };
 
-            Ok(ThreadId {
-                pid: Some(pid),
-                tid,
-            })
-        } else {
-            // <tid>
-            let tid = s.parse::<IdKind>().map_err(drop)?;
+                Ok(ThreadId {
+                    pid: Some(pid),
+                    tid,
+                })
+            }
+            _ => {
+                // <tid>
+                let tid: IdKind = s.try_into()?;
 
-            Ok(ThreadId { pid: None, tid })
+                Ok(ThreadId { pid: None, tid })
+            }
         }
     }
 }
 
-impl FromStr for ThreadId {
-    type Err = ();
-    fn from_str(s: &str) -> Result<Self, ()> {
-        ThreadId::try_from(s)
+impl TryFrom<&[u8]> for IdKind {
+    type Error = ();
+
+    fn try_from(s: &[u8]) -> Result<Self, ()> {
+        Ok(match s {
+            b"-1" => IdKind::All,
+            b"0" => IdKind::Any,
+            id => IdKind::WithID(NonZeroUsize::new(decode_hex(id).map_err(drop)?).ok_or(())?),
+        })
     }
 }
 
-impl FromStr for IdKind {
-    type Err = ();
+impl TryFrom<&mut [u8]> for ThreadId {
+    type Error = ();
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(match s {
-            "-1" => IdKind::All,
-            "0" => IdKind::Any,
-            id => IdKind::WithID(
-                NonZeroUsize::new(decode_hex(id.as_bytes()).map_err(drop)?).ok_or(())?,
-            ),
-        })
+    fn try_from(s: &mut [u8]) -> Result<Self, ()> {
+        Self::try_from(s as &[u8])
+    }
+}
+
+impl TryFrom<&mut [u8]> for IdKind {
+    type Error = ();
+
+    fn try_from(s: &mut [u8]) -> Result<Self, ()> {
+        Self::try_from(s as &[u8])
     }
 }

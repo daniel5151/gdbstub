@@ -317,7 +317,6 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 HandlerStatus::NeedsOK
             }
             ext::Base::qXferFeaturesRead(cmd) => {
-                assert_eq!(cmd.annex, "target.xml");
                 match T::Arch::target_description_xml() {
                     Some(xml) => {
                         let xml = xml.trim();
