@@ -1,9 +1,9 @@
 use super::prelude::*;
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(Debug)]
 pub struct P<'a> {
     pub reg_id: usize,
-    pub val: &'a [u8]
+    pub val: &'a [u8],
 }
 
 impl<'a> ParseCommand<'a> for P<'a> {

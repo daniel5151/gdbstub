@@ -1,6 +1,6 @@
 use super::prelude::*;
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(Debug)]
 pub struct g;
 
 impl<'a> ParseCommand<'a> for g {

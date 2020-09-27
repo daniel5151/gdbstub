@@ -1,6 +1,6 @@
 use super::prelude::*;
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(Debug)]
 pub struct Z {
     pub type_: u8,
     pub addr: u64,

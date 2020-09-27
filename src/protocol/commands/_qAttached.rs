@@ -1,6 +1,6 @@
 use super::prelude::*;
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(Debug)]
 pub struct qAttached {
     pub pid: Option<Pid>,
 }

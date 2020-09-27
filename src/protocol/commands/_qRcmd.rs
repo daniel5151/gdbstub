@@ -1,6 +1,6 @@
 use super::prelude::*;
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(Debug)]
 pub struct qRcmd<'a> {
     pub hex_cmd: &'a [u8],
 }

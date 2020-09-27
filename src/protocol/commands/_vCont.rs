@@ -42,13 +42,13 @@ impl<'a> Actions<'a> {
     }
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(Debug)]
 pub struct VContAction {
     pub kind: VContKind,
     pub thread: Option<ThreadId>,
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(Debug)]
 pub enum VContKind {
     Continue,
     ContinueWithSig(u8),

@@ -1,12 +1,12 @@
 use super::prelude::*;
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(Debug)]
 pub enum Op {
     StepContinue,
     Other,
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(Debug)]
 pub struct H {
     pub kind: Op,
     pub thread: ThreadId,
