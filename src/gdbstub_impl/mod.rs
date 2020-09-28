@@ -622,6 +622,38 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 }
             }
 
+            Command::qOffsets(cmd) if cmd.__protocol_hint_(target) => {
+                use ext::section_offsets::Offsets;
+
+                crate::__dead_code_marker!("qOffsets", "impl");
+
+                if let Some(op) = target.section_offsets() {
+                    match op.get_section_offsets().map_err(Error::TargetError)? {
+                        Offsets::Sections { text, data, bss } => {
+                            res.write_str("Text=")?;
+                            res.write_num(text)?;
+
+                            res.write_str(";Data=")?;
+                            res.write_num(data)?;
+
+                            if let Some(data) = bss {
+                                res.write_str(";Bss=")?;
+                                res.write_num(data)?;
+                            }
+                        }
+                        Offsets::Segments { text_seg, data_seg } => {
+                            res.write_str("TextSeg=")?;
+                            res.write_num(text_seg)?;
+
+                            if let Some(data) = data_seg {
+                                res.write_str(";DataSeg=")?;
+                                res.write_num(data)?;
+                            }
+                        }
+                    }
+                }
+            }
+
             // -------------------------------------------------------------- //
             Command::Unknown(cmd) => info!("Unknown command: {}", cmd),
             _ => trace!("Unimplemented command"),

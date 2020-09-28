@@ -317,6 +317,12 @@ pub trait Target {
     fn monitor_cmd(&mut self) -> Option<ext::MonitorCmdOps<Self>> {
         None
     }
+
+    /// Handle requests to get the target's current section (or segment)
+    /// offsets.
+    fn section_offsets(&mut self) -> Option<ext::SectionOffsetsOps<Self>> {
+        None
+    }
 }
 
 macro_rules! impl_dyn_target {

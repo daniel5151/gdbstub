@@ -114,6 +114,7 @@ commands! {
     "QStartNoAckMode" => _QStartNoAckMode::QStartNoAckMode,
     "qsThreadInfo" => _qsThreadInfo::qsThreadInfo,
     "qSupported" => _qSupported::qSupported<'a>,
+    "qOffsets" => _qOffsets::qOffsets,
     "qXfer:features:read" => _qXfer_features_read::qXferFeaturesRead<'a>,
     "s" => _s::s,
     "T" => _t_upcase::T,
