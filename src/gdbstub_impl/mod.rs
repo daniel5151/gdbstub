@@ -623,11 +623,13 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             }
 
             Command::qOffsets(cmd) if cmd.__protocol_hint_(target) => {
+                use ext::section_offsets::Offsets;
+
                 crate::__dead_code_marker!("qOffsets", "impl");
 
                 if let Some(op) = target.section_offsets() {
                     match op.get_section_offsets().map_err(Error::TargetError)? {
-                        ext::section_offsets::Offsets::Sections { text, data, bss } => {
+                        Offsets::Sections { text, data, bss } => {
                             res.write_str("Text=")?;
                             res.write_num(text)?;
 
@@ -639,7 +641,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                                 res.write_num(data)?;
                             }
                         }
-                        ext::section_offsets::Offsets::Segments { text_seg, data_seg } => {
+                        Offsets::Segments { text_seg, data_seg } => {
                             res.write_str("TextSeg=")?;
                             res.write_num(text_seg)?;
 

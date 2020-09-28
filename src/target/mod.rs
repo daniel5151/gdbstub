@@ -318,7 +318,8 @@ pub trait Target {
         None
     }
 
-    /// Handle requests to get the target's current section (or segment) offsets
+    /// Handle requests to get the target's current section (or segment)
+    /// offsets.
     fn section_offsets(&mut self) -> Option<ext::SectionOffsetsOps<Self>> {
         None
     }
