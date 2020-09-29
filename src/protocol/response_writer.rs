@@ -1,9 +1,11 @@
+#[cfg(feature = "alloc")]
+use alloc::string::String;
+
+use num_traits::PrimInt;
+
 use crate::internal::BeBytes;
 use crate::protocol::{IdKind, ThreadId};
 use crate::Connection;
-
-#[cfg(feature = "alloc")]
-use alloc::string::String;
 
 /// Newtype around a Connection error. Having a newtype allows implementing a
 /// `From<ResponseWriterError<C>> for crate::Error<T, C>`, which greatly
@@ -115,7 +117,11 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
 
     /// Write a number as a big-endian hex string using the most compact
     /// representation possible (i.e: trimming leading zeros).
-    pub fn write_num<D: BeBytes>(&mut self, digit: D) -> Result<(), Error<C::Error>> {
+    pub fn write_num<D: BeBytes + PrimInt>(&mut self, digit: D) -> Result<(), Error<C::Error>> {
+        if digit.is_zero() {
+            return self.write_hex(0);
+        }
+
         let mut buf = [0; 16];
         // infallible (unless digit is a >128 bit number)
         let len = digit.to_be_bytes(&mut buf).unwrap();

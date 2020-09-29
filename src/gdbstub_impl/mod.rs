@@ -793,10 +793,16 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         res.write_str(";Data=")?;
                         res.write_num(data)?;
 
-                        if let Some(data) = bss {
-                            res.write_str(";Bss=")?;
-                            res.write_num(data)?;
-                        }
+                        // "Note: while a Bss offset may be included in the response,
+                        // GDB ignores this and instead applies the Data offset to the Bss section."
+                        //
+                        // While this would suggest that it's OK to omit `Bss=` entirely, recent
+                        // versions of GDB seem to require that `Bss=` is present.
+                        //
+                        // See https://github.com/bminor/binutils-gdb/blob/master/gdb/remote.c#L4149-L4159
+                        let bss = bss.unwrap_or(data);
+                        res.write_str(";Bss=")?;
+                        res.write_num(bss)?;
                     }
                     Offsets::Segments { text_seg, data_seg } => {
                         res.write_str("TextSeg=")?;

@@ -14,6 +14,7 @@ use crate::emu::{Emu, Event};
 
 mod extended_mode;
 mod monitor_cmd;
+mod section_offsets;
 
 /// Turn a `ArmCoreRegId` into an internal register number of `armv4t_emu`.
 fn cpu_reg_id(id: ArmCoreRegId) -> Option<u8> {
@@ -48,6 +49,10 @@ impl Target for Emu {
     }
 
     fn monitor_cmd(&mut self) -> Option<target_ext::monitor_cmd::MonitorCmdOps<Self>> {
+        Some(self)
+    }
+
+    fn section_offsets(&mut self) -> Option<target_ext::section_offsets::SectionOffsetsOps<Self>> {
         Some(self)
     }
 }
