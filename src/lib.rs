@@ -25,8 +25,8 @@
 //! that can be optionally implemented to enhance the core debugging experience.
 //! For example: if your target supports _hardware watchpoints_ (i.e: value
 //! breakpoints), consider implementing the
-//! [`target_ext::breakpoints::HwWatchpoint`](target_ext/breakpoints/index.html)
-//! extension.
+//! [`target::ext::breakpoints::HwWatchpoint`](target_ext/breakpoints/index.
+//! html) extension.
 //!
 //! If `gdbstub` is missing a feature you'd like to use, please file an issue /
 //! open a PR!
@@ -166,7 +166,6 @@ pub mod internal;
 pub mod arch;
 pub mod common;
 pub mod target;
-pub mod target_ext;
 
 pub use connection::Connection;
 pub use gdbstub_impl::*;

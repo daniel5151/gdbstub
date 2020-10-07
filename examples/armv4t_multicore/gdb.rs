@@ -2,12 +2,12 @@ use armv4t_emu::{reg, Memory};
 
 use gdbstub::arch;
 use gdbstub::common::Tid;
-use gdbstub::target::{Target, TargetError, TargetResult};
-use gdbstub::target_ext;
-use gdbstub::target_ext::base::multithread::{
+use gdbstub::target;
+use gdbstub::target::ext::base::multithread::{
     Actions, MultiThreadOps, ResumeAction, ThreadStopReason,
 };
-use gdbstub::target_ext::breakpoints::WatchKind;
+use gdbstub::target::ext::breakpoints::WatchKind;
+use gdbstub::target::{Target, TargetError, TargetResult};
 
 use crate::emu::{CpuId, Emu, Event};
 
@@ -48,15 +48,15 @@ impl Target for Emu {
     type Arch = arch::arm::Armv4t;
     type Error = &'static str;
 
-    fn base_ops(&mut self) -> target_ext::base::BaseOps<Self::Arch, Self::Error> {
-        target_ext::base::BaseOps::MultiThread(self)
+    fn base_ops(&mut self) -> target::ext::base::BaseOps<Self::Arch, Self::Error> {
+        target::ext::base::BaseOps::MultiThread(self)
     }
 
-    fn sw_breakpoint(&mut self) -> Option<target_ext::breakpoints::SwBreakpointOps<Self>> {
+    fn sw_breakpoint(&mut self) -> Option<target::ext::breakpoints::SwBreakpointOps<Self>> {
         Some(self)
     }
 
-    fn hw_watchpoint(&mut self) -> Option<target_ext::breakpoints::HwWatchpointOps<Self>> {
+    fn hw_watchpoint(&mut self) -> Option<target::ext::breakpoints::HwWatchpointOps<Self>> {
         Some(self)
     }
 }
@@ -182,7 +182,7 @@ impl MultiThreadOps for Emu {
     }
 }
 
-impl target_ext::breakpoints::SwBreakpoint for Emu {
+impl target::ext::breakpoints::SwBreakpoint for Emu {
     fn add_sw_breakpoint(&mut self, addr: u32) -> TargetResult<bool, Self> {
         self.breakpoints.push(addr);
         Ok(true)
@@ -198,7 +198,7 @@ impl target_ext::breakpoints::SwBreakpoint for Emu {
     }
 }
 
-impl target_ext::breakpoints::HwWatchpoint for Emu {
+impl target::ext::breakpoints::HwWatchpoint for Emu {
     fn add_hw_watchpoint(&mut self, addr: u32, kind: WatchKind) -> TargetResult<bool, Self> {
         self.watchpoints.push(addr);
 

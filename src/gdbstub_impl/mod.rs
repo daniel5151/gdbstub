@@ -14,9 +14,9 @@ use crate::{
         commands::{ext, Command},
         ConsoleOutput, IdKind, Packet, ResponseWriter, ThreadId,
     },
+    target::ext::base::multithread::{Actions, ResumeAction, ThreadStopReason, TidSelector},
+    target::ext::base::BaseOps,
     target::Target,
-    target_ext::base::multithread::{Actions, ResumeAction, ThreadStopReason, TidSelector},
-    target_ext::base::BaseOps,
     util::managed_vec::ManagedVec,
     FAKE_PID, SINGLE_THREAD_TID,
 };
@@ -477,7 +477,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             ext::Base::Z(cmd) => {
                 let addr = Self::to_target_usize(cmd.addr)?;
 
-                use crate::target_ext::breakpoints::WatchKind::*;
+                use crate::target::ext::breakpoints::WatchKind::*;
                 let supported = match cmd.type_ {
                     0 => (target.sw_breakpoint()).map(|op| op.add_sw_breakpoint(addr)),
                     1 => (target.hw_breakpoint()).map(|op| op.add_hw_breakpoint(addr)),
@@ -501,7 +501,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             ext::Base::z(cmd) => {
                 let addr = Self::to_target_usize(cmd.addr)?;
 
-                use crate::target_ext::breakpoints::WatchKind::*;
+                use crate::target::ext::breakpoints::WatchKind::*;
                 let supported = match cmd.type_ {
                     0 => (target.sw_breakpoint()).map(|op| op.remove_sw_breakpoint(addr)),
                     1 => (target.hw_breakpoint()).map(|op| op.remove_hw_breakpoint(addr)),
@@ -781,7 +781,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
         let handler_status = match command {
             ext::SectionOffsets::qOffsets(_cmd) => {
-                use crate::target_ext::section_offsets::Offsets;
+                use crate::target::ext::section_offsets::Offsets;
 
                 crate::__dead_code_marker!("qOffsets", "impl");
 
@@ -851,7 +851,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 HandlerStatus::Handled
             }
             ext::ExtendedMode::vRun(cmd) => {
-                use crate::target_ext::extended_mode::Args;
+                use crate::target::ext::extended_mode::Args;
 
                 let mut pid = ops
                     .run(cmd.filename, Args::new(&mut cmd.args.into_iter()))
@@ -982,7 +982,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     ThreadStopReason::SwBreak(_) => res.write_str("swbreak:")?,
                     ThreadStopReason::HwBreak(_) => res.write_str("hwbreak:")?,
                     ThreadStopReason::Watch { kind, addr, .. } => {
-                        use crate::target_ext::breakpoints::WatchKind;
+                        use crate::target::ext::breakpoints::WatchKind;
                         match kind {
                             WatchKind::Write => res.write_str("watch:")?,
                             WatchKind::Read => res.write_str("rwatch:")?,
@@ -1009,7 +1009,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     }
 }
 
-use crate::target_ext::base::singlethread::StopReason;
+use crate::target::ext::base::singlethread::StopReason;
 impl<U> From<StopReason<U>> for ThreadStopReason<U> {
     fn from(st_stop_reason: StopReason<U>) -> ThreadStopReason<U> {
         match st_stop_reason {

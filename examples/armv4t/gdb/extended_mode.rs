@@ -1,7 +1,7 @@
 use gdbstub::common::Pid;
+use gdbstub::target;
+use gdbstub::target::ext::extended_mode::{Args, ShouldTerminate};
 use gdbstub::target::TargetResult;
-use gdbstub::target_ext;
-use gdbstub::target_ext::extended_mode::{Args, ShouldTerminate};
 
 use crate::emu::Emu;
 
@@ -19,7 +19,7 @@ use crate::emu::Emu;
 // If you happen to implement a "proper" extended mode gdbstub, feel free to
 // file an issue / open a PR that links to your project!
 
-impl target_ext::extended_mode::ExtendedMode for Emu {
+impl target::ext::extended_mode::ExtendedMode for Emu {
     fn kill(&mut self, pid: Option<Pid>) -> TargetResult<ShouldTerminate, Self> {
         eprintln!("GDB sent a kill request for pid {:?}", pid);
         Ok(ShouldTerminate::No)
@@ -61,35 +61,35 @@ impl target_ext::extended_mode::ExtendedMode for Emu {
         Ok(Pid::new(1337).unwrap())
     }
 
-    fn configure_aslr(&mut self) -> Option<target_ext::extended_mode::ConfigureASLROps<Self>> {
+    fn configure_aslr(&mut self) -> Option<target::ext::extended_mode::ConfigureASLROps<Self>> {
         Some(self)
     }
 
-    fn configure_env(&mut self) -> Option<target_ext::extended_mode::ConfigureEnvOps<Self>> {
+    fn configure_env(&mut self) -> Option<target::ext::extended_mode::ConfigureEnvOps<Self>> {
         Some(self)
     }
 
     fn configure_startup_shell(
         &mut self,
-    ) -> Option<target_ext::extended_mode::ConfigureStartupShellOps<Self>> {
+    ) -> Option<target::ext::extended_mode::ConfigureStartupShellOps<Self>> {
         Some(self)
     }
 
     fn configure_working_dir(
         &mut self,
-    ) -> Option<target_ext::extended_mode::ConfigureWorkingDirOps<Self>> {
+    ) -> Option<target::ext::extended_mode::ConfigureWorkingDirOps<Self>> {
         Some(self)
     }
 }
 
-impl target_ext::extended_mode::ConfigureASLR for Emu {
+impl target::ext::extended_mode::ConfigureASLR for Emu {
     fn cfg_aslr(&mut self, enabled: bool) -> TargetResult<(), Self> {
         eprintln!("GDB {} ASLR", if enabled { "enabled" } else { "disabled" });
         Ok(())
     }
 }
 
-impl target_ext::extended_mode::ConfigureEnv for Emu {
+impl target::ext::extended_mode::ConfigureEnv for Emu {
     fn set_env(&mut self, key: &[u8], val: Option<&[u8]>) -> TargetResult<(), Self> {
         // simplified example: assume UTF-8 key/val env vars
         let key = core::str::from_utf8(key).map_err(drop)?;
@@ -117,7 +117,7 @@ impl target_ext::extended_mode::ConfigureEnv for Emu {
     }
 }
 
-impl target_ext::extended_mode::ConfigureStartupShell for Emu {
+impl target::ext::extended_mode::ConfigureStartupShell for Emu {
     fn cfg_startup_with_shell(&mut self, enabled: bool) -> TargetResult<(), Self> {
         eprintln!(
             "GDB {} startup with shell",
@@ -127,7 +127,7 @@ impl target_ext::extended_mode::ConfigureStartupShell for Emu {
     }
 }
 
-impl target_ext::extended_mode::ConfigureWorkingDir for Emu {
+impl target::ext::extended_mode::ConfigureWorkingDir for Emu {
     fn cfg_working_dir(&mut self, dir: Option<&[u8]>) -> TargetResult<(), Self> {
         let dir = match dir {
             None => None,

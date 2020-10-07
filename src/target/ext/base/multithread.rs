@@ -2,8 +2,8 @@
 
 use crate::arch::Arch;
 use crate::common::*;
+use crate::target::ext::breakpoints::WatchKind;
 use crate::target::{Target, TargetResult};
-use crate::target_ext::breakpoints::WatchKind;
 
 // Convenient re-exports
 pub use super::ResumeAction;

@@ -60,7 +60,7 @@
 //!
 //! ```rust,ignore
 //! use gdbstub::target::Target;
-//! use gdbstub::target_ext::base::singlethread::SingleThreadOps;
+//! use gdbstub::target::ext::base::singlethread::SingleThreadOps;
 //!
 //! impl SingleThreadOps for MyTarget {
 //!     // ... omitted for brevity
@@ -74,7 +74,8 @@
 //! ```
 
 use crate::arch::Arch;
-use crate::target_ext;
+
+pub mod ext;
 
 /// The error type for various methods on `Target` and it's assorted associated
 /// extension traits.
@@ -206,36 +207,36 @@ pub trait Target {
     ///     }
     /// }
     /// ```
-    fn base_ops(&mut self) -> target_ext::base::BaseOps<Self::Arch, Self::Error>;
+    fn base_ops(&mut self) -> ext::base::BaseOps<Self::Arch, Self::Error>;
 
     /// Set/Remote software breakpoints.
-    fn sw_breakpoint(&mut self) -> Option<target_ext::breakpoints::SwBreakpointOps<Self>> {
+    fn sw_breakpoint(&mut self) -> Option<ext::breakpoints::SwBreakpointOps<Self>> {
         None
     }
 
     /// Set/Remote hardware breakpoints.
-    fn hw_breakpoint(&mut self) -> Option<target_ext::breakpoints::HwBreakpointOps<Self>> {
+    fn hw_breakpoint(&mut self) -> Option<ext::breakpoints::HwBreakpointOps<Self>> {
         None
     }
 
     /// Set/Remote hardware watchpoints.
-    fn hw_watchpoint(&mut self) -> Option<target_ext::breakpoints::HwWatchpointOps<Self>> {
+    fn hw_watchpoint(&mut self) -> Option<ext::breakpoints::HwWatchpointOps<Self>> {
         None
     }
 
     /// Handle custom GDB `monitor` commands.
-    fn monitor_cmd(&mut self) -> Option<target_ext::monitor_cmd::MonitorCmdOps<Self>> {
+    fn monitor_cmd(&mut self) -> Option<ext::monitor_cmd::MonitorCmdOps<Self>> {
         None
     }
 
     /// Support for Extended Mode operations.
-    fn extended_mode(&mut self) -> Option<target_ext::extended_mode::ExtendedModeOps<Self>> {
+    fn extended_mode(&mut self) -> Option<ext::extended_mode::ExtendedModeOps<Self>> {
         None
     }
 
     /// Handle requests to get the target's current section (or segment)
     /// offsets.
-    fn section_offsets(&mut self) -> Option<target_ext::section_offsets::SectionOffsetsOps<Self>> {
+    fn section_offsets(&mut self) -> Option<ext::section_offsets::SectionOffsetsOps<Self>> {
         None
     }
 }
@@ -250,35 +251,31 @@ macro_rules! impl_dyn_target {
             type Arch = A;
             type Error = E;
 
-            fn base_ops(&mut self) -> target_ext::base::BaseOps<Self::Arch, Self::Error> {
+            fn base_ops(&mut self) -> ext::base::BaseOps<Self::Arch, Self::Error> {
                 (**self).base_ops()
             }
 
-            fn sw_breakpoint(&mut self) -> Option<target_ext::breakpoints::SwBreakpointOps<Self>> {
+            fn sw_breakpoint(&mut self) -> Option<ext::breakpoints::SwBreakpointOps<Self>> {
                 (**self).sw_breakpoint()
             }
 
-            fn hw_breakpoint(&mut self) -> Option<target_ext::breakpoints::HwBreakpointOps<Self>> {
+            fn hw_breakpoint(&mut self) -> Option<ext::breakpoints::HwBreakpointOps<Self>> {
                 (**self).hw_breakpoint()
             }
 
-            fn hw_watchpoint(&mut self) -> Option<target_ext::breakpoints::HwWatchpointOps<Self>> {
+            fn hw_watchpoint(&mut self) -> Option<ext::breakpoints::HwWatchpointOps<Self>> {
                 (**self).hw_watchpoint()
             }
 
-            fn monitor_cmd(&mut self) -> Option<target_ext::monitor_cmd::MonitorCmdOps<Self>> {
+            fn monitor_cmd(&mut self) -> Option<ext::monitor_cmd::MonitorCmdOps<Self>> {
                 (**self).monitor_cmd()
             }
 
-            fn extended_mode(
-                &mut self,
-            ) -> Option<target_ext::extended_mode::ExtendedModeOps<Self>> {
+            fn extended_mode(&mut self) -> Option<ext::extended_mode::ExtendedModeOps<Self>> {
                 (**self).extended_mode()
             }
 
-            fn section_offsets(
-                &mut self,
-            ) -> Option<target_ext::section_offsets::SectionOffsetsOps<Self>> {
+            fn section_offsets(&mut self) -> Option<ext::section_offsets::SectionOffsetsOps<Self>> {
                 (**self).section_offsets()
             }
         }

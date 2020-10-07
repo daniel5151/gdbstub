@@ -1,8 +1,8 @@
 use gdbstub::arch;
 use gdbstub::common::Tid;
+use gdbstub::target;
+use gdbstub::target::ext::base::multithread::{Actions, MultiThreadOps, ThreadStopReason};
 use gdbstub::target::{Target, TargetResult};
-use gdbstub::target_ext;
-use gdbstub::target_ext::base::multithread::{Actions, MultiThreadOps, ThreadStopReason};
 
 use crate::print_str::print_str;
 
@@ -18,11 +18,11 @@ impl Target for DummyTarget {
     type Arch = arch::arm::Armv4t;
     type Error = &'static str;
 
-    fn base_ops(&mut self) -> target_ext::base::BaseOps<Self::Arch, Self::Error> {
-        target_ext::base::BaseOps::MultiThread(self)
+    fn base_ops(&mut self) -> target::ext::base::BaseOps<Self::Arch, Self::Error> {
+        target::ext::base::BaseOps::MultiThread(self)
     }
 
-    fn sw_breakpoint(&mut self) -> Option<target_ext::breakpoints::SwBreakpointOps<Self>> {
+    fn sw_breakpoint(&mut self) -> Option<target::ext::breakpoints::SwBreakpointOps<Self>> {
         Some(self)
     }
 }
@@ -97,7 +97,7 @@ impl MultiThreadOps for DummyTarget {
     }
 }
 
-impl target_ext::breakpoints::SwBreakpoint for DummyTarget {
+impl target::ext::breakpoints::SwBreakpoint for DummyTarget {
     #[inline(never)]
     fn add_sw_breakpoint(&mut self, _addr: u32) -> TargetResult<bool, Self> {
         Ok(true)

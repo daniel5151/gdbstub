@@ -1,9 +1,9 @@
-use gdbstub::target_ext;
-use gdbstub::target_ext::monitor_cmd::{outputln, ConsoleOutput};
+use gdbstub::target;
+use gdbstub::target::ext::monitor_cmd::{outputln, ConsoleOutput};
 
 use crate::gdb::Emu;
 
-impl target_ext::monitor_cmd::MonitorCmd for Emu {
+impl target::ext::monitor_cmd::MonitorCmd for Emu {
     fn handle_monitor_cmd(
         &mut self,
         cmd: &[u8],
