@@ -65,9 +65,8 @@ pub trait SingleThreadOps: Target {
     ///
     /// _Note:_ This method includes a stubbed default implementation which
     /// simply returns `Ok(())`. This is due to the fact that several built-in
-    /// `arch` implementations still use the generic, albeit highly un-ergonomic
-    /// [`RawRegId`](../../../arch/struct.RawRegId.html) type. See the docs
-    /// for `RawRegId` for more info.
+    /// `arch` implementations haven't been updated with proper `RegId`
+    /// implementations.
     fn read_register(
         &mut self,
         reg_id: <Self::Arch as Arch>::RegId,
@@ -88,9 +87,8 @@ pub trait SingleThreadOps: Target {
     ///
     /// _Note:_ This method includes a stubbed default implementation which
     /// simply returns `Ok(())`. This is due to the fact that several built-in
-    /// `arch` implementations still use the generic, albeit highly un-ergonomic
-    /// [`RawRegId`](../../../arch/struct.RawRegId.html) type. See the docs
-    /// for `RawRegId` for more info.
+    /// `arch` implementations haven't been updated with proper `RegId`
+    /// implementations.
     fn write_register(
         &mut self,
         reg_id: <Self::Arch as Arch>::RegId,

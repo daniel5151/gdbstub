@@ -1,17 +1,24 @@
 //! Implementations for various x86 architectures.
 
 use crate::arch::Arch;
+use crate::arch::RegId;
 
 pub mod reg;
 
-/// Implements `Arch` for 64-bit x86 + SSE Extensions
+/// Implements `Arch` for 64-bit x86 + SSE Extensions.
+///
+/// Check out the [module level docs](../index.html#whats-with-regidimpl) for
+/// more info about the `RegIdImpl` type parameter.
 #[allow(non_camel_case_types)]
-pub enum X86_64_SSE {}
+pub enum X86_64_SSE<RegIdImpl: RegId> {
+    #[doc(hidden)]
+    _Marker(core::marker::PhantomData<RegIdImpl>),
+}
 
-impl Arch for X86_64_SSE {
+impl<RegIdImpl: RegId> Arch for X86_64_SSE<RegIdImpl> {
     type Usize = u64;
     type Registers = reg::X86_64CoreRegs;
-    type RegId = reg::id::X86_64RegId;
+    type RegId = RegIdImpl;
 
     fn target_description_xml() -> Option<&'static str> {
         Some(
@@ -20,14 +27,20 @@ impl Arch for X86_64_SSE {
     }
 }
 
-/// Implements `Arch` for 32-bit x86 + SSE Extensions
+/// Implements `Arch` for 32-bit x86 + SSE Extensions.
+///
+/// Check out the [module level docs](../index.html#whats-with-regidimpl) for
+/// more info about the `RegIdImpl` type parameter.
 #[allow(non_camel_case_types)]
-pub enum X86_SSE {}
+pub enum X86_SSE<RegIdImpl: RegId> {
+    #[doc(hidden)]
+    _Marker(core::marker::PhantomData<RegIdImpl>),
+}
 
-impl Arch for X86_SSE {
+impl<RegIdImpl: RegId> Arch for X86_SSE<RegIdImpl> {
     type Usize = u32;
     type Registers = reg::X86CoreRegs;
-    type RegId = reg::id::X86RegId;
+    type RegId = RegIdImpl;
 
     fn target_description_xml() -> Option<&'static str> {
         Some(

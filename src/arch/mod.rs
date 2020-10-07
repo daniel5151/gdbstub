@@ -15,13 +15,48 @@
 //! while they are tested (by the PR's author) and code-reviewed, it's not
 //! particularly feasible to write detailed tests for each architecture! If you
 //! spot a bug in any of the implementations, please file an issue / open a PR!
+//!
+//! # What's with `RegIdImpl`?
+//!
+//! Supporting the `Target::read/write_register` API required introducing a new
+//! [`RegId`](trait.RegId.html) trait + [`Arch` associated
+//! type](trait.Arch.html#associatedtype.RegId). `RegId` is used by `gdbstub`
+//! to translate raw GDB register ids (a protocol level arch-dependent `usize`)
+//! into human-readable enum variants.
+//!
+//! Unfortunately, this API was added after several contributors had already
+//! upstreamed their `Arch` implementations, and as a result, there are several
+//! built-in arch implementations which are missing proper `RegId` enums
+//! (tracked under [issue #29](https://github.com/daniel5151/gdbstub/issues/29)).
+//!
+//! As a stop-gap measure, affected `Arch` implementations have been modified to
+//! accept a `RegIdImpl` type parameter, which requires users to manually
+//! specify a `RegId` implementation.
+//!
+//! If you're not interested in implementing the `Target::read/write_register`
+//! methods and just want to get up-and-running with `gdbstub`, it's fine to
+//! set `RegIdImpl` to `()` and use the built-in stubbed `impl RegId for ()`.
+//!
+//! A better approach would be to implement (and hopefully upstream!) a proper
+//! `RegId` enum. While this will require doing a bit of digging through the GDB
+//! docs + [architecture XML definitions](https://github.com/bminor/binutils-gdb/tree/master/gdb/features/),
+//! it's not too tricky to get a working implementation up and running, and
+//! makes it possible to safely and efficiently implement the
+//! `Target::read/write_register` API. As an example, check out
+//! [`ArmCoreRegId`](arm/reg/id/enum.ArmCoreRegId.html#impl-RegId).
+//!
+//! Whenever a `RegId` enum is upstreamed, the associated `Arch`'s `RegIdImpl`
+//! parameter will be defaulted to the newly added enum. This will simplify the
+//! API without requiring an explicit breaking API change. Once all `RegIdImpl`
+//! have a default implementation, only a single breaking API change will be
+//! required to remove `RegIdImpl` entirely (along with this documentation).
 
 pub mod arm;
 pub mod mips;
 pub mod msp430;
 pub mod ppc;
 pub mod riscv;
-mod traits;
 pub mod x86;
 
+mod traits;
 pub use traits::*;

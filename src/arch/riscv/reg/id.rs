@@ -2,6 +2,7 @@ use crate::arch::RegId;
 
 /// RISC-V Register identifier.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub enum RiscvRegId {
     /// General Purpose Register (x0-x31).
     Gpr(u8),
@@ -17,13 +18,14 @@ pub enum RiscvRegId {
 
 impl RegId for RiscvRegId {
     fn from_raw_id(id: usize) -> Option<(Self, usize)> {
-        match id {
-            0..=31 => Some((Self::Gpr(id as u8), 4)),
-            32 => Some((Self::Pc, 4)),
-            33..=64 => Some((Self::Fpr((id - 33) as u8), 4)),
-            65..=4160 => Some((Self::Csr((id - 65) as u16), 4)),
-            4161 => Some((Self::Priv, 1)),
-            _ => None,
-        }
+        let reg_size = match id {
+            0..=31 => (Self::Gpr(id as u8), 4),
+            32 => (Self::Pc, 4),
+            33..=64 => (Self::Fpr((id - 33) as u8), 4),
+            65..=4160 => (Self::Csr((id - 65) as u16), 4),
+            4161 => (Self::Priv, 1),
+            _ => return None,
+        };
+        Some(reg_size)
     }
 }
