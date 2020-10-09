@@ -6,7 +6,7 @@
 > NOTE: gdbstub's master branch is currently preparing breaking changes for the upcoming `0.4.0` release.
 > For the most recently released code, look to the `0.3.0` tag.
 
-An ergonomic and easy-to-integrate implementation of the [GDB Remote Serial Protocol](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Protocol.html#Remote-Protocol) in Rust.
+An ergonomic and easy-to-integrate implementation of the [GDB Remote Serial Protocol](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Protocol.html#Remote-Protocol) in Rust, with full `#![no_std]` support.
 
 Why `gdbstub`?
 
@@ -18,7 +18,7 @@ Why `gdbstub`?
     -   `gdbstub`'s API is designed to be as unobtrusive as possible, and shouldn't require any large refactoring effort to integrate into an existing project. It doesn't require taking direct ownership of any key data structures, and aims to be a "drop in" solution when you need to add debugging to a project.
 -   **`#![no_std]` Ready & Size Optimized**
     -   Can be configured to use fixed-size, pre-allocated buffers. **`gdbstub` does _not_ depend on `alloc`.**
-    -   `gdbstub` is transport-layer agnostic, and uses a basic [`Connection`](https://docs.rs/gdbstub/*/gdbstub/trait.Connection.html) interface to communicate with the GDB server. As long as target has some method of performing in-order, serial, byte-wise I/O (e.g: putchar/getchar over UART), it's possible to run `gdbstub` on it.
+    -   `gdbstub` is transport-layer agnostic, and uses a basic [`Connection`](https://docs.rs/gdbstub/latest/gdbstub/trait.Connection.html) interface to communicate with the GDB server. As long as target has some method of performing in-order, serial, byte-wise I/O (e.g: putchar/getchar over UART), it's possible to run `gdbstub` on it.
     -   "You don't pay for what you don't use": If you don't implement a particular protocol extension, the resulting binary won't include _any_ code related to parsing/handling that extension's packets! See the [Zero-overhead Protocol Extensions](#zero-overhead-protocol-extensions) section below for more details.
     -   A lot of work has gone into reducing `gdbstub`'s binary and RAM footprints.
         -   In release builds, using all the tricks outlined in [`min-sized-rust`](https://github.com/johnthagen/min-sized-rust), a baseline `gdbstub` implementation weighs in at roughly **_10kb of `.text` and negligible `.rodata`!_** \*
@@ -26,15 +26,15 @@ Why `gdbstub`?
 
 \* Exact numbers vary by target platform, compiler version, and `gdbstub` revision. Data was collected using the included `example_no_std` project compiled on x86_64.
 
-`gdbstub` is particularly well suited for _emulation_, making it easy to add powerful, non-intrusive debugging support to an emulated system. Just provide an implementation of the [`Target`](https://docs.rs/gdbstub/*/gdbstub/target/trait.Target.html) trait for your target platform, and you're basically ready to start debugging!
+`gdbstub` is particularly well suited for _emulation_, making it easy to add powerful, non-intrusive debugging support to an emulated system. Just provide an implementation of the [`Target`](https://docs.rs/gdbstub/latest/gdbstub/target/trait.Target.html) trait for your target platform, and you're ready to start debugging!
 
 -   [Documentation](https://docs.rs/gdbstub)
 
-### Can I use `gdsbtub` in Production?
+### Can I Use `gdsbtub` in Production?
 
 **Yes, as long as you don't mind some API churn until `1.0.0` is released.**
 
-In terms of correctness, `gdbstub` has been integrated into several projects since its initial `0.1.0` release, and thusfar, no major bugs have been reported. Reported issues have typically been the result of faulty `Target` implementations (e.g: forgetting to adjust the PC after a breakpoint is hit), or were related to certain unimplemented GDB protocol features.
+In terms of correctness, `gdbstub` has been integrated into several projects since its initial `0.1.0` release, and thusfar, no _major_ bugs have been reported. Reported issues have typically been the result of faulty `Target` implementations (e.g: forgetting to adjust the PC after a breakpoint is hit), or were related to certain unimplemented GDB protocol features.
 
 That being said, due to `gdbstub`'s heavy use of Rust's type system in enforcing GDB protocol invariants at compile time, it's often been the case that implementing new GDB protocol features has required making some breaking Trait/Type changes (e.g: adding the `RegId` associated type to `Arch` to support addressing individual registers). While these changes are typically quite minor, they are nonetheless breaking, and may require a code-change when moving between versions.
 
@@ -62,11 +62,11 @@ Of course, most use-cases will want to support additional debugging features as 
     -   Pass environment variables / args to spawned processes
     -   Change working directory
 -   Section offsets
-    -   Get section/segment relocation offsets from the target.
+    -   Get section/segment relocation offsets from the target
 -   Custom `monitor` Commands
     -   Extend the GDB protocol with custom debug commands using GDB's `monitor` command
 
-_Note:_ Which GDB features are implemented are decided on an as-needed basis by `gdbstub`'s contributors. If there's a missing GDB feature that you'd like `gdbstub` to implement, please file an issue / open a PR!
+_Note:_ Which GDB features are implemented are decided on an as-needed basis by `gdbstub`'s contributors. If there's a missing GDB feature that you'd like `gdbstub` to implement, please file an issue / open a PR! Check out the [GDB Remote Configuration Docs](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Configuration.html) for a table of GDB commands + their corresponding Remote Serial Protocol packets.
 
 ### Zero-overhead Protocol Extensions
 
@@ -74,7 +74,7 @@ Using a technique called **Inlineable Dyn Extension Traits** (IDETs), `gdbstub` 
 
 For example, if your target doesn't implement a custom GDB `monitor` command handler, the resulting binary won't include any code related to parsing / handling the underlying `qRcmd` packet!
 
-If you're interested in the low-level technical details of how IDETs work, I've included a brief writeup in the documentation [here](https://docs.rs/gdbstub/*/gdbstub/target/index.html#inlineable-dyn-extension-traits-idets).
+If you're interested in the low-level technical details of how IDETs work, I've included a brief writeup in the documentation [here](https://docs.rs/gdbstub/*/gdbstub/target/ext/index.html#inlineable-dyn-extension-traits-idets).
 
 ## Feature flags
 

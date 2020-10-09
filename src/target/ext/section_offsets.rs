@@ -54,7 +54,7 @@ pub enum Offsets<U> {
     },
 }
 
-/// Target Extension - get section/segment relocation offsets from the target.
+/// Target Extension - Get section/segment relocation offsets from the target.
 ///
 /// Corresponds to the `qOffset` command. See the [section_offset module
 /// documentation](index.html).

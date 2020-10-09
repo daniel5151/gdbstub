@@ -1,22 +1,19 @@
-//! Extensions to [`Target`](../trait.Target.html) which add support for various
+//! Extensions to [`Target`](super::Target) which add support for various
 //! subsets of the GDB Remote Serial Protocol.
 //!
-//! On it's own, the [`Target`](../trait.Target.html) trait doesn't actually
-//! include any methods to debug the target; it simply describes the
-//! architecture and capabilities of a target. Instead, `Target` uses a
-//! collection of "Inlineable Dyn Extension Traits" (IDETs) to optionally
-//! implement various subsets of the GDB protocol. For more details on IDETs,
-//! see the
+//! On it's own, the [`Target`](super::Target) trait doesn't actually include
+//! any methods to debug the target. Instead, `Target` uses a collection of
+//! "Inlineable Dyn Extension Traits" (IDETs) to optionally implement various
+//! subsets of the GDB protocol. For more details on IDETs, scroll down to the
 //! [How Protocol Extensions Work - Inlineable Dyn Extension Traits
 //! (IDETs)](#how-protocol-extensions-work---inlineable-dyn-extension-traits-idets)
 //! section below.
 //!
 //! As a starting point, consider implementing some of the extensions under
-//! [`breakpoints`](breakpoints/index.html). For example, adding support for
-//! Software Breakpoints would require implementing the
-//! [`breakpoints::SwBreakpoint`](breakpoints/trait.SwBreakpoint.html)
-//! extension, and overriding the `Target::sw_breakpoint` method to return
-//! `Some(self)`.
+//! [`breakpoints`]. For example, adding support for Software Breakpoints would
+//! require implementing the
+//! [`breakpoints::SwBreakpoint`](breakpoints::SwBreakpoint) extension, and
+//! overriding the `Target::sw_breakpoint` method to return `Some(self)`.
 //!
 //! ### Note: Missing Protocol Extensions
 //!
@@ -27,7 +24,7 @@
 //! remote filesystem access, tracepoint support, etc...), consider opening an
 //! issue / filing a PR on Github!
 //!
-//! See the GDB [Remote Configuration Docs](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Configuration.html)
+//! Check out the [GDB Remote Configuration Docs](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Configuration.html)
 //! for a table of GDB commands + their corresponding Remote Serial Protocol
 //! packets.
 //!
@@ -50,42 +47,38 @@
 //! ## How Protocol Extensions Work - Inlineable Dyn Extension Traits (IDETs)
 //!
 //! The GDB protocol is massive, and contains all sorts of optional
-//! functionality. If the `Target` trait had a method for every single operation
-//! and extension the protocol supported, there would be literally _hundreds_ of
-//! associated methods!
+//! functionality. In previous versions of `gdbstub`, the `Target` trait would
+//! directly have a method for _every single protocol extension_, resulting in
+//! literally _hundreds_ of associated methods!
 //!
-//! This approach has numerous drawbacks:
+//! This approach had numerous drawbacks:
 //!
-//!  - Code-bloat from having to include hundreds of "stub" implementations for
-//!    optional methods.
-//!  - Requires the `GdbStub` implementation to include runtime checks that
-//!    catch incorrectly implemented `Target`s.
-//!      - No way to enforce "mutually-dependent" trait methods at compile-time
+//!  - Implementations that did not implement all available protocol extensions
+//!    still had to "pay" for the unused packet parsing/handler code, resulting
+//!    in substantial code bloat, even on `no_std` platforms.
+//!  - Required the `GdbStub` implementation to include runtime checks to deal
+//!    with incorrectly implemented `Target`s.
+//!      - No way to enforce "mutually-dependent" trait methods at compile-time.
 //!          - e.g: When implementing hardware breakpoint extensions, targets
 //!            _must_ implement both the `add_breakpoint` and
 //!            `remove_breakpoints` methods.
-//!      - No way to enforce "mutually-exclusive" trait methods at compile-time
+//!      - No way to enforce "mutually-exclusive" trait methods at compile-time.
 //!          - e.g: The `resume` method for single-threaded targets has a much
 //!            simpler API than for multi-threaded targets, but it would be
 //!            incorrect for a target to implement both.
 //!
-//! Versions of `gdbstub` prior to `0.4` actually used a variation of this
-//! approach, albeit with some clever type-level tricks to work around some
-//! of the ergonomic issues listed above. Of course, those workarounds weren't
-//! perfect, and resulted in a clunky API that still required users to manually
-//! enforce certain invariants themselves.
-//!
-//! Starting from version `0.4`, `gdbstub` is taking a new approach to
-//! implementing and enumerating available Target features, using a technique I
-//! like to call **Inlineable Dyn Extension Traits**.
+//! Starting from version `0.4.0`, `gdbstub` is taking a new approach to
+//! implementing and enumerating available Target features, using a technique
+//! called **Inlineable Dyn Extension Traits**.
 //!
 //! _Author's note:_ As far as I can tell, this isn't a very well-known trick,
-//! or at the very least, I've never encountered a library which uses this sort
-//! of API. At some point, I hope to write a standalone blog post which further
-//! explores this technique, comparing it to other/existing approaches, and
-//! diving into details of the how the compiler optimizes this sort of code.
+//! or at the very least, I've personally never encountered any library that
+//! uses this sort of API. As such, I've decided to be a bit cheeky and give it
+//! a name! At some point, I'm hoping to write a standalone blog post which
+//! further explores this technique, comparing it to other/existing approaches,
+//! and diving into details of the how the compiler optimizes this sort of code.
 //!
-//! What are "Inlineable Dyn Extension Traits"? Well, lets break it down:
+//! So, what are "Inlineable Dyn Extension Traits"? Well, let's break it down:
 //!
 //! - **Extension Traits** - A common [Rust convention](https://rust-lang.github.io/rfcs/0445-extension-trait-conventions.html#what-is-an-extension-trait)
 //!   to extend the functionality of a Trait, _without_ modifying the original
@@ -103,27 +96,32 @@
 //! The basic principles behind Inlineable Dyn Extension Traits are best
 //! explained though example:
 //!
-//! - (library) Create a new `trait OptFeat: Target { ... }`.
-//!    - Making `OptFeat` a supertrait of `Target` enables using `Target`'s
+//! Lets say we want to add an optional protocol extension described by an
+//! `OptExt` trait to the `Target` trait. How would we do that using IDETs?
+//!
+//! - (library) Define a `trait OptExt: Target { ... }` with all the optional
+//!   methods:
+//!    - Making `OptExt` a supertrait of `Target` enables using `Target`'s
 //!      associated types.
 //!
 //! ```rust,ignore
 //! /// `foo` and `bar` are mutually-dependent methods.
-//! trait OptFeat: Target {
+//! trait OptExt: Target {
 //!     fn foo(&self);
 //!     // can use associated types in method signature!
 //!     fn bar(&mut self) -> Result<(), Self::Error>;
 //! }
 //! ```
 //!
-//! - (library) "Tie" the `OptFeat` extension to the original `Target` trait
-//!   though a new `Target` method which simply returns `self` cast to a `&mut
-//!   dyn OptFeat`. The signature varies depending on the kind of extension:
+//! - (library) "Tie" the `OptExt` extension trait to the original `Target`
+//!   trait by adding a new `Target` method that simply returns `self` cast to a
+//!   `&mut dyn OptExt`:
 //!
 //! ```rust,ignore
 //! trait Target {
-//!     // Optional extension - disabled by default
-//!     fn ext_optfeat(&mut self) -> Option<OptFeatOps<Self>> {
+//!     // Optional extension
+//!     fn ext_optfeat(&mut self) -> Option<OptExtOps<Self>> {
+//!         // disabled by default
 //!         None
 //!     }
 //!     // Mutually-exclusive extensions
@@ -131,20 +129,20 @@
 //! }
 //!
 //! // Using a typedef for readability
-//! type OptFeatOps<T> =
-//!     &'a mut dyn OptFeat<Arch = <T as Target>::Arch, Error = <T as Target>::Error>;
+//! type OptExtOps<T> =
+//!     &'a mut dyn OptExt<Arch = <T as Target>::Arch, Error = <T as Target>::Error>;
 //!
 //! enum EitherOrExt<A, E> {
-//!     OptFeatA(&'a mut dyn OptFeatA<Arch = A, Error = E>),
-//!     OptFeatB(&'a mut dyn OptFeatB<Arch = A, Error = E>),
+//!     OptExtA(&'a mut dyn OptExtA<Arch = A, Error = E>),
+//!     OptExtB(&'a mut dyn OptExtB<Arch = A, Error = E>),
 //! }
 //! ```
 //!
-//! - (user) Implements the `OptFeat` extension for their target (just like a
+//! - (user) Implements the `OptExt` extension for their target (just like a
 //!   normal trait).
 //!
 //! ```rust,ignore
-//! impl OptFeat for Target {
+//! impl OptExt for Target {
 //!     fn foo(&self) { ... }
 //!     fn bar(&mut self) -> Result<(), Self::Error> { ... }
 //! }
@@ -156,33 +154,45 @@
 //! ```rust,ignore
 //! impl Target for MyTarget {
 //!     // Optional extension - Always enabled
-//!     fn ext_optfeat(&mut self) -> Option<OptFeatOps<Self>> {
-//!         Some(self) // will not compile unless `MyTarget` also implements `OptFeat`
+//!     fn ext_optfeat(&mut self) -> Option<OptExtOps<Self>> {
+//!         Some(self) // will not compile unless `MyTarget` also implements `OptExt`
 //!     }
 //!     // Mutually-exclusive extensions
 //!     fn ext_a_or_b(&mut self) -> EitherOrExt<Self::Arch, Self::Error> {
-//!         EitherOrExt::OptFeatA(self)
+//!         EitherOrExt::OptExtA(self)
 //!     }
 //! }
 //! ```
 //!
-//! - (library) Can now query whether or not the extension is available,
+//! If the user didn't implement `OptExt`, but tried to return `Some(self)`,
+//! they'll get an error similar to:
+//!
+//! ```text
+//! error[E0277]: the trait bound `MyTarget: OptExt` is not satisfied
+//!   --> path/to/implementation.rs:44:14
+//!    |
+//! 44 |         Some(self)
+//!    |              ^^^^ the trait `OptExt` is not implemented for `MyTarget`
+//!    |
+//!    = note: required for the cast to the object type `dyn OptExt<Arch = ..., Error = ...>`
+//! ```
+//!
+//! - (library) Can now _query_ whether or not the extension is available,
 //!   _without_ having to actually invoke any method on the target!
 //! ```rust,ignore
 //! // in a method that accepts `target: impl Target`
 //! match target.ext_optfeat() {
 //!     Some(ops) => ops.cool_feature(),
-//!     None => { /* report unsupported */ }
+//!     None => { /* do nothing */ }
 //! }
 //! ```
 //!
-//! If you take a look at the generated assembly (e.g: using godbolt.org),
-//! you'll find that the compiler is able to inline and devirtualize all the
-//! single-line `ext_` methods, which in-turn allows the dead-code-eliminator to
-//! work it's magic, and remove unused branches from the library code! i.e:
-//! If a target didn't implement the `OptFeat` extension, then the `match`
-//! statement above would be equivalent to calling `self.cool_feature()`
-//! directly!
+//! Moreover, if you take a look at the generated assembly (e.g: using
+//! godbolt.org), you'll find that the compiler is able to efficiently inline
+//! and devirtualize all the single-line `ext_` methods, which in-turn allows
+//! the dead-code-eliminator to work it's magic, and remove the unused branches
+//! from the generated code! i.e: If a target didn't implement the `OptExt`
+//! extension, then that `match` statement would be converted into a noop!
 //!
 //! Check out [daniel5151/optional-trait-methods](https://github.com/daniel5151/optional-trait-methods)
 //! for some sample code that shows off the power of IDETs. It includes code
@@ -191,19 +201,11 @@
 //!
 //! Optimizing compilers really are magic!
 //!
-//! #### Benefits of IDETs
+//! #### Summary: The Benefits of IDETs
 //!
 //! IDETs solve the numerous issues and shortcomings that arise from the
 //! traditional single trait + "optional" methods approach:
 //!
-//! - **Reduced code-bloat**
-//!   - There are significantly fewer methods that require stubbed default
-//!     implementations.
-//!    - Moreover, default implementations typically share the exact same
-//!      function signature (i.e: `fn(&mut self) -> Option<&T> { None }`), which
-//!      means an [optimizing compiler](http://llvm.org/docs/Passes.html#mergefunc-merge-functions)
-//!      should be able to emit a single function for the identical default
-//!      implementations (that is, if they're not entirely inlined / dead-code eliminated).
 //! - **Compile-time enforcement of mutually-dependent methods**
 //!    - By grouping mutually-dependent methods behind a single extension trait
 //!      and marking them all as required methods, the Rust compiler is able to

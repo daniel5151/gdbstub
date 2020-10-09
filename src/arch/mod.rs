@@ -1,5 +1,4 @@
-//! Built-in implementations of [`Arch`](../trait.Arch.html) for various
-//! architectures.
+//! Built-in implementations of [`Arch`] for various architectures.
 //!
 //! _Note:_ If an architecture is missing from this module, that does _not_ mean
 //! that it can't be used with `gdbstub`! So-long as there's support for the
@@ -19,10 +18,9 @@
 //! # What's with `RegIdImpl`?
 //!
 //! Supporting the `Target::read/write_register` API required introducing a new
-//! [`RegId`](trait.RegId.html) trait + [`Arch` associated
-//! type](trait.Arch.html#associatedtype.RegId). `RegId` is used by `gdbstub`
-//! to translate raw GDB register ids (a protocol level arch-dependent `usize`)
-//! into human-readable enum variants.
+//! [`RegId`] trait + [`Arch::RegId`] associated type. `RegId` is used by
+//! `gdbstub` to translate raw GDB register ids (a protocol level arch-dependent
+//! `usize`) into human-readable enum variants.
 //!
 //! Unfortunately, this API was added after several contributors had already
 //! upstreamed their `Arch` implementations, and as a result, there are several

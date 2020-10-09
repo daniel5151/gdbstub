@@ -1,5 +1,6 @@
 //! Enables [Extended Mode](https://sourceware.org/gdb/current/onlinedocs/gdb/Connecting.html)
-//! functionality when connecting using `target extended-remote`.
+//! functionality when connecting using `target extended-remote`, such as
+//! spawning new processes and/or attaching to existing processes.
 //!
 //! # Disclaimer
 //!

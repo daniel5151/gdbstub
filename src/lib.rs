@@ -1,51 +1,31 @@
 //! An ergonomic and easy-to-integrate implementation of the
 //! [GDB Remote Serial Protocol](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Protocol.html#Remote-Protocol)
-//! in Rust.
-//!
-//! `gdbstub` is entirely `#![no_std]` compatible, and can be used on platforms
-//! without a global allocator. In embedded contexts, `gdbstub` can be
-//! configured to use pre-allocated buffers and communicate over any available
-//! serial I/O connection (e.g: UART).
-//!
-//! `gdbstub` is particularly well suited for _emulation_, making it easy to add
-//! powerful, non-intrusive debugging support to an emulated system. Just
-//! provide an implementation of [`Target`](trait.Target.html) for your target
-//! platform, and you're ready to start debugging!
-//!
-//! ## Debugging Features
-//!
-//! - [Base Debugging Functionality](target/base/index.html)
-//!     - Step/Continue Execution
-//!     - Read/Write memory
-//!     - Read/Write registers
-//!     - Add/Remove Software Breakpoints
-//!     - (optional) Multithreading support
-//!
-//! Additionally, there are many [protocol extensions](target_ext/index.html)
-//! that can be optionally implemented to enhance the core debugging experience.
-//! For example: if your target supports _hardware watchpoints_ (i.e: value
-//! breakpoints), consider implementing the
-//! [`target::ext::breakpoints::HwWatchpoint`](target_ext/breakpoints/index.
-//! html) extension.
-//!
-//! If `gdbstub` is missing a feature you'd like to use, please file an issue /
-//! open a PR!
+//! in Rust, with full `#![no_std]` support.
 //!
 //! ## Feature flags
 //!
-//! The `std` feature is enabled by default. In `#![no_std]` contexts, use
+//! By default, the `std` and `alloc` features are enabled.
+//!
+//! When using `gdbstub` in `#![no_std]` contexts, make sure to set
 //! `default-features = false`.
 //!
 //! - `alloc`
-//!     - Implements `Connection` for `Box<dyn Connection>`.
-//!     - Adds output buffering to `ConsoleOutput`.
+//!     - Implement `Connection` for `Box<dyn Connection>`.
+//!     - Log outgoing packets via `log::trace!` (uses a heap-allocated output
+//!       buffer).
+//!     - Provide built-in implementations for certain protocol features:
+//!         - Use a heap-allocated packet buffer in `GdbStub` (if none is
+//!           provided via `GdbStubBuilder::with_packet_buffer`).
+//!         - (Monitor Command) Use a heap-allocated output buffer in
+//!           `ConsoleOutput`.
+//!         - (Extended Mode) Automatically track Attached/Spawned PIDs without
+//!           implementing `ExtendedMode::query_if_attached`.
 //! - `std` (implies `alloc`)
-//!     - Implements `Connection` for [`TcpStream`](https://doc.rust-lang.org/std/net/struct.TcpStream.html)
-//!       and [`UnixStream`](https://doc.rust-lang.org/std/os/unix/net/struct.UnixStream.html).
-//!     - Implements [`std::error::Error`](https://doc.rust-lang.org/std/error/trait.Error.html)
-//!       for `gdbstub::Error`
-//!     - Log outgoing packets via `log::trace!` (using a heap-allocated output
-//!       buffer)
+//!     - Implement `Connection` for [`TcpStream`](std::net::TcpStream) and
+//!       [`UnixStream`](std::os::unix::net::UnixStream).
+//!     - Implement [`std::error::Error`] for `gdbstub::Error`.
+//!     - Add a `TargetError::Io` error variant to simplify I/O Error handling
+//!       from `Target` methods.
 //!
 //! ## Getting Started
 //!
@@ -53,24 +33,27 @@
 //! `gdbstub`, and walks though the basic steps required to integrate `gdbstub`
 //! into a project.
 //!
-//! Additionally, I would **highly recommend** that you take a look at some of
-//! the [**examples**](https://github.com/daniel5151/gdbstub/blob/master/README.md#examples)
-//! listed in the project README. In particular, the included `armv4t` and
-//! `armv4t_multicore` examples should serve as a good overview of what a
-//! typical `gdbstub` integration might look like.
+//! It is **highly recommended** to take a look at some of the
+//! [**examples**](https://github.com/daniel5151/gdbstub/blob/master/README.md#examples)
+//! listed in the project README. In particular, the included
+//! [**`armv4t`**](https://github.com/daniel5151/gdbstub/tree/master/examples/armv4t)
+//! example implements most of `gdbstub`'s protocol extensions, and can be a
+//! valuable resource when getting up-and-running with `gdbstub`.
 //!
 //! ### The `Connection` Trait
 //!
-//! The [`Connection`](trait.Connection.html) trait describes how `gdbstub`
-//! should communicate with the main GDB process.
+//! The [`Connection`] trait describes how `gdbstub` should communicate with the
+//! main GDB process.
 //!
 //! `Connection` is automatically implemented for common `std` types such as
-//! `TcpStream` and `UnixStream`. In `#![no_std]` environments, `Connection`
-//! must be implemented manually, using whatever bytewise transport the
-//! hardware has available (e.g: UART).
+//! [`TcpStream`](std::net::TcpStream) and
+//! [`UnixStream`](std::os::unix::net::UnixStream). In `#![no_std]`
+//! environments, `Connection` must be manually implemented using whatever
+//! in-order, serial, byte-wise I/O the hardware has available (e.g:
+//! putchar/getchar over UART, an embedded TCP stack, etc.).
 //!
-//! A common way to start a remote debugging session is to wait for the GDB
-//! client to connect via TCP:
+//! A common way to start a remote debugging session is to wait for a GDB client
+//! to connect via TCP:
 //!
 //! ```rust
 //! use std::net::{TcpListener, TcpStream};
@@ -91,7 +74,7 @@
 //!
 //! ### The `Target` Trait
 //!
-//! The [`Target`](trait.Target.html) trait describes how to control and modify
+//! The [`Target`](target::Target) trait describes how to control and modify
 //! a system's execution state during a GDB debugging session, and serves as the
 //! primary bridge between `gdbstub`'s generic protocol implementation and a
 //! target's project/platform-specific code.
@@ -103,22 +86,20 @@
 //! **`Target` is the most important trait in `gdbstub`, and must be implemented
 //! by anyone who uses the library!**
 //!
-//! Please refer to the [`target` module documentation](target/index.html) for
-//! information on how to implement `Target`.
+//! Please refer to the [`target` module documentation](target) for in-depth
+//! instructions on implementing `Target`.
 //!
 //! ### Starting the debugging session using `GdbStub`
 //!
-//! Once a `Connection` has been established and the `Target` has been set-up,
-//! all that's left is to pass both of them over to
-//! [`GdbStub`](struct.GdbStub.html) and let it do the rest!
+//! Once a `Connection` has been established and `Target` has been all wired up,
+//! all that's left is to hand things off to [`GdbStub`] and let it do the rest!
 //!
 //! ```rust,ignore
-//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! // Set-up a valid `Target`
 //! let mut target = MyTarget::new()?; // implements `Target`
 //!
 //! // Establish a `Connection`
-//! let connection = wait_for_gdb_connection(9001);
+//! let connection: TcpStream = wait_for_gdb_connection(9001);
 //!
 //! // Create a new `GdbStub` using the established `Connection`.
 //! let mut debugger = GdbStub::new(connection);
@@ -127,23 +108,19 @@
 //! // ownership back to the caller once the debugging session is closed.
 //! match debugger.run(&mut target) {
 //!     Ok(disconnect_reason) => match disconnect_reason {
-//!         DisconnectReason::Disconnect => {
-//!             // run to completion
-//!             while target.step() != Some(EmuEvent::Halted) {}
-//!         }
+//!         DisconnectReason::Disconnect => println!("GDB client disconnected."),
 //!         DisconnectReason::TargetHalted => println!("Target halted!"),
-//!         DisconnectReason::Kill => {
-//!             println!("GDB sent a kill command!");
-//!         }
+//!         DisconnectReason::Kill => println!("GDB client sent a kill command!"),
 //!     }
+//!     // Handle any target-specific errors
 //!     Err(GdbStubError::TargetError(e)) => {
 //!         println!("Target raised a fatal error: {:?}", e);
+//!         // e.g: re-enter the debugging session after "freezing" a system to
+//!         // conduct some post-mortem debugging
+//!         debugger.run(&mut target)?;
 //!     }
 //!     Err(e) => return Err(e.into())
 //! }
-//!
-//! #   Ok(())
-//! # }
 //! ```
 
 #![cfg_attr(not(feature = "std"), no_std)]

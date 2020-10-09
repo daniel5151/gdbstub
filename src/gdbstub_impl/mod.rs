@@ -43,8 +43,8 @@ pub enum DisconnectReason {
     Kill,
 }
 
-/// Debug a [`Target`](trait.Target.html) across a
-/// [`Connection`](trait.Connection.html) using the GDB Remote Serial Protocol.
+/// Debug a [`Target`] using the GDB Remote Serial Protocol over a given
+/// [`Connection`].
 pub struct GdbStub<'a, T: Target, C: Connection> {
     conn: C,
     packet_buffer: ManagedSlice<'a, u8>,
@@ -52,15 +52,15 @@ pub struct GdbStub<'a, T: Target, C: Connection> {
 }
 
 impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
-    /// Create a `GdbStubBuilder` using the provided Connection.
+    /// Create a [`GdbStubBuilder`] using the provided Connection.
     pub fn builder(conn: C) -> GdbStubBuilder<'a, T, C> {
         GdbStubBuilder::new(conn)
     }
 
     /// Create a new `GdbStub` using the provided connection.
     ///
-    /// For fine-grained control over various GdbStub options, use the
-    /// [`builder()`](#method.builder) method instead.
+    /// For fine-grained control over various `GdbStub` options, use the
+    /// [`builder()`](GdbStub::builder) method instead.
     ///
     /// _Note:_ `new` is only available when the `alloc` feature is enabled.
     #[cfg(feature = "alloc")]

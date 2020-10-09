@@ -2,7 +2,7 @@
 //! step/resume, etc...)
 //!
 //! While not strictly required, it's recommended that single threaded targets
-//! use the simplified `singlethread` API.
+//! implement the simplified `singlethread` API.
 
 pub mod multithread;
 pub mod singlethread;

@@ -3,7 +3,7 @@ use crate::GdbStubError;
 
 /// Extension trait to ease working with `TargetResult` in the GdbStub
 /// implementation.
-pub trait TargetResultExt<V, T, C> {
+pub(super) trait TargetResultExt<V, T, C> {
     /// Encapsulates the boilerplate associated with handling `TargetError`s,
     /// such as bailing-out on Fatal errors, or returning response codes.
     fn handle_error(self) -> Result<V, GdbStubError<T, C>>;

@@ -1,7 +1,7 @@
-//! Core [`Target`](trait.Target.html) trait/types.
+//! Everything related to the [`Target`] trait + associated extension traits.
 //!
-//! The [`Target`](trait.Target.html) trait describes how to control and modify
-//! a system's execution state during a GDB debugging session, and serves as the
+//! The [`Target`] trait describes how to control and modify a system's
+//! execution state during a GDB debugging session, and serves as the
 //! primary bridge between `gdbstub`'s generic protocol implementation and a
 //! target's project/platform-specific code.
 //!
@@ -15,9 +15,9 @@
 //! not a very common pattern, and can seem a little "weird" at first glance,
 //! but it's actually very straightforward to use!
 //!
-//! Please refer to the [documentation in the `target_ext`
-//! module](../target_ext/index.html) for more information on IDETs, and how
-//! they're used to implement `Target` and it's various extension traits.
+//! Please refer to the [documentation in the `ext` module](ext) for more
+//! information on IDETs, and how they're used to implement `Target` and it's
+//! various extension traits.
 //!
 //! **TL;DR:** Whenever you see a method that has `Option<FooOps>` in the return
 //! type, that method should return `Some(self)` if the extension is

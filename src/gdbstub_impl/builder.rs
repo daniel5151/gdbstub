@@ -5,10 +5,10 @@ use managed::ManagedSlice;
 
 use super::{Connection, GdbStub, GdbStubImpl, Target};
 
-/// An error which may occur when building a GdbStub.
+/// An error which may occur when building a [`GdbStub`].
 #[derive(Debug)]
 pub enum GdbStubBuilderError {
-    /// GdbStubBuilder requires `with_packet_buffer` in #![no_std] mode.
+    /// Must provide buffer using `with_packet_buffer` in `#![no_std]` mode.
     MissingPacketBuffer,
     /// Custom packet buffer size is larger than the provided buffer's length.
     PacketBufSizeMismatch,
@@ -18,7 +18,10 @@ impl Display for GdbStubBuilderError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use self::GdbStubBuilderError::*;
         match self {
-            MissingPacketBuffer => write!(f, "Must provide buffer using `with_packet_buffer`."),
+            MissingPacketBuffer => write!(
+                f,
+                "Must provide buffer using `with_packet_buffer` in `#![no_std]` mode."
+            ),
             PacketBufSizeMismatch => write!(
                 f,
                 "`packet_buffer_size` is larger than `with_packet_buffer`'s size."
@@ -30,7 +33,7 @@ impl Display for GdbStubBuilderError {
 #[cfg(feature = "std")]
 impl std::error::Error for GdbStubBuilderError {}
 
-/// Helper to construct and customize [`GdbStub`](struct.GdbStub.html).
+/// Helper to construct and customize [`GdbStub`].
 pub struct GdbStubBuilder<'a, T: Target, C: Connection> {
     conn: C,
     packet_buffer: Option<&'a mut [u8]>,
