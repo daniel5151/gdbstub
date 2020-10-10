@@ -62,15 +62,14 @@ impl VContKind {
     fn from_bytes(s: &[u8]) -> Option<VContKind> {
         use self::VContKind::*;
 
-        let mut s = s.split(|b| *b == b' ');
-        let res = match s.next().unwrap() {
+        let res = match s {
             b"c" => Continue,
-            b"C" => ContinueWithSig(decode_hex(s.next()?).ok()?),
             b"s" => Step,
-            b"S" => StepWithSig(decode_hex(s.next()?).ok()?),
             b"t" => Stop,
-            b"r" => {
-                let mut range = s.next()?.split(|b| *b == b',');
+            [b'C', sig @ ..] => ContinueWithSig(decode_hex(sig).ok()?),
+            [b'S', sig @ ..] => StepWithSig(decode_hex(sig).ok()?),
+            [b'r', range @ ..] => {
+                let mut range = range.split(|b| *b == b',');
                 let start = decode_hex(range.next()?).ok()?;
                 let end = decode_hex(range.next()?).ok()?;
                 RangeStep(start, end)
