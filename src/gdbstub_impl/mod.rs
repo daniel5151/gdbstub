@@ -72,10 +72,7 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
     ///
     /// Returns once the GDB client closes the debugging session, or if the
     /// target halts.
-    pub fn run<'b>(
-        &mut self,
-        target: &'b mut T,
-    ) -> Result<DisconnectReason, Error<T::Error, C::Error>> {
+    pub fn run(&mut self, target: &mut T) -> Result<DisconnectReason, Error<T::Error, C::Error>> {
         self.state
             .run(target, &mut self.conn, &mut self.packet_buffer)
     }
