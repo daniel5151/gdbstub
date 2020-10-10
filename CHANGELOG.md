@@ -8,6 +8,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 This version includes a _major_ API overhaul, alongside a slew of new features and general improvements. While updating to `0.4.0` will require some substantial code modifications, it's well worth the effort, as `0.4.0` is the safest, leanest, and most featureful release of `gdbstub` yet!
 
+Fun fact: Even after adding a _bunch_ of new features and bug-fixes, the in-tree `example_no_std` has remained just as small! The example on the `semver-fix-0.2.2` branch is `20251` bytes, while the example on `0.4.0` is `20246` bytes.
+
 #### API Changes
 
 -   Rewrite the `Target` API in terms of "Inlineable Dyn Extension Traits" (IDETs)
@@ -18,8 +20,8 @@ This version includes a _major_ API overhaul, alongside a slew of new features a
     -   _The old approach of only allowing \*fatal\* errors was woefully inadequate when dealing with potentially fallible operations such as reading from unauthorized memory (which GDB likes to do a bunch), or handling non-fatal `std::io::Error` that occur as a result of `ExtendedMode` operations. The new `TargetResult`/`TargetError` result is much more robust, and opens to door to supporting additional error handling extensions (such as LLDB's ASCII Errors)._
 -   Update the `Connection` trait with new methods (`flush` - required, `write_all`, `on_session_start`)
 -   Lift `Registers::RegId` to `Arch::RegId`, and introduce new temporary `RegIdImpl` solution for avoiding breaking API changes due to new `RegId` implementations (see [\#29](https://github.com/daniel5151/gdbstub/pull/29))
--   Mark various `RegId` enums as `#[non-exhaustive]`, allowing more registers to be added if need be.
--   Error types are now marked as `#[non-exhaustive]`.
+-   Mark various `RegId` enums as `#[non_exhaustive]`, allowing more registers to be added if need be.
+-   Error types are now marked as `#[non_exhaustive]`.
 
 #### New Protocol Extensions
 
@@ -51,7 +53,7 @@ Thanks to [h33p](https://github.com/h33p) for reporting this issue ([\#27](https
 #### API Changes
 
 -   Update `Target::resume` API to replace raw `&mut dyn Iterator` with a functionally identical concrete `Actions` iterator.
--   Mark the `StopReason` enum as `#[non-exhaustive]`, allowing further types to be added without being considered as an API breaking change.
+-   Mark the `StopReason` enum as `#[non_exhaustive]`, allowing further types to be added without being considered as an API breaking change.
 
 #### New Protocol Extensions
 

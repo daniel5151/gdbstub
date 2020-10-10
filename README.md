@@ -3,9 +3,6 @@
 [![](http://meritbadge.herokuapp.com/gdbstub)](https://crates.io/crates/gdbstub)
 [![](https://docs.rs/gdbstub/badge.svg)](https://docs.rs/gdbstub)
 
-> NOTE: gdbstub's master branch is currently preparing breaking changes for the upcoming `0.4.0` release.
-> For the most recently released code, look to the `0.3.0` tag.
-
 An ergonomic and easy-to-integrate implementation of the [GDB Remote Serial Protocol](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Protocol.html#Remote-Protocol) in Rust, with full `#![no_std]` support.
 
 Why `gdbstub`?
@@ -74,7 +71,7 @@ Using a technique called **Inlineable Dyn Extension Traits** (IDETs), `gdbstub` 
 
 For example, if your target doesn't implement a custom GDB `monitor` command handler, the resulting binary won't include any code related to parsing / handling the underlying `qRcmd` packet!
 
-If you're interested in the low-level technical details of how IDETs work, I've included a brief writeup in the documentation [here](https://docs.rs/gdbstub/*/gdbstub/target/ext/index.html#inlineable-dyn-extension-traits-idets).
+If you're interested in the low-level technical details of how IDETs work, I've included a brief writeup in the documentation [here](https://docs.rs/gdbstub/latest/gdbstub/target/ext/index.html#inlineable-dyn-extension-traits-idets).
 
 ## Feature flags
 
@@ -152,8 +149,8 @@ The following features are most likely to require breaking API changes, and shou
 -   [ ] Implement GDB's various high-level operating modes:
     -   [x] Single/Multi Thread debugging
     -   [ ] Multiprocess Debugging
-        -   _Note:_ `gdbstub` already uses multiprocess extensions "under-the-hood" to implement single/multi thread debugging, hard-coding a fake PID.
-        -   [ ] Add a `base::multiprocess` API which exposes `Pid`s as well.
+        -   [ ] Add a third `base::multiprocess` API.
+        -   _Note:_ `gdbstub` already implements multiprocess extensions "under-the-hood", and just hard-codes a fake PID.
     -   [x] [Extended Mode](https://sourceware.org/gdb/current/onlinedocs/gdb/Connecting.html) (`target extended-remote`)
     -   [ ] [Non-Stop Mode](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Non_002dStop.html#Remote-Non_002dStop)
         -   This may require some breaking API changes and/or some internals rework -- more research is needed.
