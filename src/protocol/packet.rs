@@ -4,7 +4,7 @@ use crate::target::Target;
 /// Packet parse error.
 #[derive(Debug)]
 pub enum PacketParseError {
-    ChecksumMismatched,
+    ChecksumMismatched { checksum: u8, calculated: u8 },
     EmptyBuf,
     MissingChecksum,
     MalformedChecksum,
@@ -47,9 +47,12 @@ impl<'a> PacketBuf<'a> {
 
         // validate the checksum
         let checksum = decode_hex(checksum).map_err(|_| PacketParseError::MalformedChecksum)?;
-
-        if body.iter().fold(0u8, |a, x| a.wrapping_add(*x)) != checksum {
-            return Err(PacketParseError::ChecksumMismatched);
+        let calculated = body.iter().fold(0u8, |a, x| a.wrapping_add(*x));
+        if calculated != checksum {
+            return Err(PacketParseError::ChecksumMismatched {
+                checksum,
+                calculated,
+            });
         }
 
         if log_enabled!(log::Level::Trace) {
