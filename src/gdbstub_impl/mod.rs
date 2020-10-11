@@ -180,12 +180,12 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                             None
                         }
                         Err(Error::TargetError(e)) => {
-                            // unlike all other errors, which are "unrecoverable", there's a chance
-                            // that a target may be able to recover from a target-specific error. In
-                            // this case, we may as well report a SIGABRT stop reason, giving the
-                            // target a chance to open a "post-mortem" GDB session.
+                            // unlike all other errors which are "unrecoverable" in the sense that
+                            // the GDB session cannot continue, there's still a chance that a target
+                            // might want to keep the debugging session alive to do a "post-mortem"
+                            // analysis. As such, we simply report a standard TRAP stop reason.
                             let mut res = ResponseWriter::new(conn);
-                            res.write_str("T06")?; // SIGABRT
+                            res.write_str("S05")?;
                             res.flush()?;
                             return Err(Error::TargetError(e));
                         }
