@@ -2,7 +2,7 @@ use super::prelude::*;
 
 #[derive(Debug)]
 pub struct M<'a> {
-    pub addr: u64,
+    pub addr: &'a [u8],
     pub len: usize,
     pub val: &'a [u8],
 }
@@ -12,7 +12,7 @@ impl<'a> ParseCommand<'a> for M<'a> {
         let body = buf.into_body();
 
         let mut body = body.split_mut(|&b| b == b',' || b == b':');
-        let addr = decode_hex(body.next()?).ok()?;
+        let addr = decode_hex_buf(body.next()?).ok()?;
         let len = decode_hex(body.next()?).ok()?;
         let val = body.next()?;
 

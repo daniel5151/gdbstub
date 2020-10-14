@@ -103,7 +103,7 @@ pub enum CommandParseError<'a> {
 commands! {
     base use 'a {
         "?" => question_mark::QuestionMark,
-        "c" => _c::c,
+        "c" => _c::c<'a>,
         "D" => _d_upcase::D,
         "g" => _g::g,
         "G" => _g_upcase::G<'a>,
@@ -119,12 +119,12 @@ commands! {
         "qsThreadInfo" => _qsThreadInfo::qsThreadInfo,
         "qSupported" => _qSupported::qSupported<'a>,
         "qXfer:features:read" => _qXfer_features_read::qXferFeaturesRead,
-        "s" => _s::s,
+        "s" => _s::s<'a>,
         "T" => _t_upcase::T,
         "vCont" => _vCont::vCont<'a>,
         "vKill" => _vKill::vKill,
-        "z" => _z::z,
-        "Z" => _z_upcase::Z,
+        "z" => _z::z<'a>,
+        "Z" => _z_upcase::Z<'a>,
     }
 
     extended_mode use 'a {

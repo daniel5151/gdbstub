@@ -66,15 +66,15 @@ pub fn is_hex(c: u8) -> bool {
 /// GDB hex strings may include "xx", which represent "missing" data. This
 /// method simply treats "xx" as 0x00.
 // TODO: maybe don't blindly translate "xx" as 0x00?
-pub fn decode_hex_buf(buf: &mut [u8]) -> Result<&mut [u8], DecodeHexBufError> {
+// TODO: rewrite this method to elide bound checks
+pub fn decode_hex_buf(base_buf: &mut [u8]) -> Result<&mut [u8], DecodeHexBufError> {
     use DecodeHexBufError::*;
 
-    let buf = if buf.len() % 2 != 0 {
-        buf[0] = ascii2byte(buf[0]).ok_or(NotAscii)?;
-        &mut buf[1..]
-    } else {
-        buf
-    };
+    let odd_adust = base_buf.len() % 2;
+    if odd_adust != 0 {
+        base_buf[0] = ascii2byte(base_buf[0]).ok_or(NotAscii)?;
+    }
+    let buf = &mut base_buf[odd_adust..];
 
     let decoded_len = buf.len() / 2;
     for i in 0..decoded_len {
@@ -83,7 +83,7 @@ pub fn decode_hex_buf(buf: &mut [u8]) -> Result<&mut [u8], DecodeHexBufError> {
         buf[i] = b as u8;
     }
 
-    Ok(&mut buf[..decoded_len])
+    Ok(&mut base_buf[..decoded_len + odd_adust])
 }
 
 #[allow(dead_code)]
@@ -164,5 +164,26 @@ mod tests {
         let expect = (0..=255).map(|b| format!("{:02X?}", b)).collect::<String>();
 
         assert_eq!(out, expect.as_bytes())
+    }
+
+    #[test]
+    fn decode_hex_buf_odd() {
+        let mut payload = b"ffffff4".to_vec();
+        let res = decode_hex_buf(&mut payload).unwrap();
+        assert_eq!(res, [0xf, 0xff, 0xff, 0xf4]);
+    }
+
+    #[test]
+    fn decode_hex_buf_2() {
+        let mut payload = b"12345".to_vec();
+        let res = decode_hex_buf(&mut payload).unwrap();
+        assert_eq!(res, [0x1, 0x23, 0x45]);
+    }
+
+    #[test]
+    fn decode_hex_buf_short() {
+        let mut payload = b"1".to_vec();
+        let res = decode_hex_buf(&mut payload).unwrap();
+        assert_eq!(res, [0x1]);
     }
 }

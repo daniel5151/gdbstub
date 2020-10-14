@@ -406,13 +406,17 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             }
             ext::Base::m(cmd) => {
                 let buf = cmd.buf;
+                let addr = <T::Arch as Arch>::Usize::from_be_bytes(cmd.addr)
+                    .ok_or(Error::TargetMismatch)?;
 
                 let mut i = 0;
                 let mut n = cmd.len;
                 while n != 0 {
                     let chunk_size = n.min(buf.len());
 
-                    let addr = Self::to_target_usize(cmd.addr + i as u64)?;
+                    use num_traits::NumCast;
+
+                    let addr = addr + NumCast::from(i).ok_or(Error::TargetMismatch)?;
                     let data = &mut buf[..chunk_size];
                     match target.base_ops() {
                         BaseOps::SingleThread(ops) => ops.read_addrs(addr, data),
@@ -430,7 +434,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 HandlerStatus::Handled
             }
             ext::Base::M(cmd) => {
-                let addr = Self::to_target_usize(cmd.addr)?;
+                let addr = <T::Arch as Arch>::Usize::from_be_bytes(cmd.addr)
+                    .ok_or(Error::TargetMismatch)?;
 
                 match target.base_ops() {
                     BaseOps::SingleThread(ops) => ops.write_addrs(addr, cmd.val),
@@ -472,7 +477,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 HandlerStatus::Disconnect(DisconnectReason::Disconnect)
             }
             ext::Base::Z(cmd) => {
-                let addr = Self::to_target_usize(cmd.addr)?;
+                let addr = <T::Arch as Arch>::Usize::from_be_bytes(cmd.addr)
+                    .ok_or(Error::TargetMismatch)?;
 
                 use crate::target::ext::breakpoints::WatchKind::*;
                 let supported = match cmd.type_ {
@@ -496,7 +502,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 }
             }
             ext::Base::z(cmd) => {
-                let addr = Self::to_target_usize(cmd.addr)?;
+                let addr = <T::Arch as Arch>::Usize::from_be_bytes(cmd.addr)
+                    .ok_or(Error::TargetMismatch)?;
 
                 use crate::target::ext::breakpoints::WatchKind::*;
                 let supported = match cmd.type_ {
@@ -994,15 +1001,6 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 Ok(None)
             }
         }
-    }
-
-    #[allow(clippy::wrong_self_convention, clippy::type_complexity)]
-    fn to_target_usize(
-        n: impl BeBytes,
-    ) -> Result<<T::Arch as Arch>::Usize, Error<T::Error, C::Error>> {
-        let mut buf = [0; 16]; // enough for 128-bit pointers
-        let len = n.to_be_bytes(&mut buf).ok_or(Error::TargetMismatch)?;
-        <T::Arch as Arch>::Usize::from_be_bytes(&buf[..len]).ok_or(Error::TargetMismatch)
     }
 }
 
