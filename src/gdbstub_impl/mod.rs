@@ -952,6 +952,19 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
         err?;
 
+        self.finish_vcont(stop_reason, res)
+    }
+
+    // DEVNOTE: `do_vcont` and `finish_vcont` could be merged into a single
+    // function, at the expense of slightly larger code. In the future, if the
+    // `vCont` machinery is re-written, there's no reason why the two functions
+    // couldn't be re-merged.
+
+    fn finish_vcont(
+        &mut self,
+        stop_reason: ThreadStopReason<<T::Arch as Arch>::Usize>,
+        res: &mut ResponseWriter<C>,
+    ) -> Result<Option<DisconnectReason>, Error<T::Error, C::Error>> {
         match stop_reason {
             ThreadStopReason::DoneStep | ThreadStopReason::GdbInterrupt => {
                 res.write_str("S05")?;
