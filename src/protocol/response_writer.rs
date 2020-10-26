@@ -99,16 +99,11 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
         data.iter().try_for_each(|b| self.write_hex(*b))
     }
 
-    /// Write data using the binary protocol (i.e: escaping any bytes that are
-    /// not 7-bit clean)
+    /// Write data using the binary protocol.
     pub fn write_binary(&mut self, data: &[u8]) -> Result<(), Error<C::Error>> {
         data.iter().try_for_each(|b| match b {
             b'#' | b'$' | b'}' | b'*' => {
-                self.write(0x7d)?;
-                self.write(*b ^ 0x20)
-            }
-            b if b & 0x80 != 0 => {
-                self.write(0x7d)?;
+                self.write(b'}')?;
                 self.write(*b ^ 0x20)
             }
             _ => self.write(*b),
