@@ -108,8 +108,53 @@ impl RegId for X86CoreRegId {
     }
 }
 
-// TODO: Add proper `RegId` implementation. See [issue #29](https://github.com/daniel5151/gdbstub/issues/29)
-// pub enum X86_64RegId {}
+/// 64-bit x86 core + SSE register identifier.
+///
+/// Source: https://github.com/bminor/binutils-gdb/blob/master/gdb/features/i386/64bit-core.xml
+/// Additionally: https://github.com/bminor/binutils-gdb/blob/master/gdb/features/i386/64bit-sse.xml
+#[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
+pub enum X86_64CoreRegId {
+    /// General purpose registers:
+    /// RAX, RBX, RCX, RDX, RSI, RDI, RBP, RSP, r8-r15
+    Gpr(u8),
+    /// Instruction pointer
+    Rip,
+    /// Status register
+    Eflags,
+    /// Segment registers: CS, SS, DS, ES, FS, GS
+    Segment(u8),
+    /// FPU registers: ST0 through ST7
+    St(u8),
+    /// FPU internal registers
+    Fpu(X87FpuInternalRegId),
+    /// SIMD Registers: XMM0 through XMM15
+    Xmm(u8),
+    /// SSE Status/Control Register
+    Mxcsr,
+}
+
+impl RegId for X86_64CoreRegId {
+    fn from_raw_id(id: usize) -> Option<(Self, usize)> {
+        use self::X86_64CoreRegId::*;
+
+        let r = match id {
+            0..=15 => (Gpr(id as u8), 8),
+            16 => (Rip, 4),
+            17 => (Eflags, 8),
+            18..=23 => (Segment(id as u8 - 18), 4),
+            24..=31 => (St(id as u8 - 24), 10),
+            32..=39 => match X87FpuInternalRegId::from_u8(id as u8 - 32) {
+                Some(r) => (Fpu(r), 4),
+                None => unreachable!(),
+            },
+            40..=55 => (Xmm(id as u8 - 40), 16),
+            56 => (Mxcsr, 4),
+            _ => return None,
+        };
+        Some(r)
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -144,5 +189,10 @@ mod tests {
     #[test]
     fn test_x86() {
         test::<crate::arch::x86::reg::X86CoreRegs, crate::arch::x86::reg::id::X86CoreRegId>()
+    }
+
+    #[test]
+    fn test_x86_64() {
+        test::<crate::arch::x86::reg::X86_64CoreRegs, crate::arch::x86::reg::id::X86_64CoreRegId>()
     }
 }
