@@ -10,7 +10,7 @@ pub mod reg;
 /// Check out the [module level docs](../index.html#whats-with-regidimpl) for
 /// more info about the `RegIdImpl` type parameter.
 #[allow(non_camel_case_types)]
-pub enum X86_64_SSE<RegIdImpl: RegId> {
+pub enum X86_64_SSE<RegIdImpl: RegId = reg::id::X86_64CoreRegId> {
     #[doc(hidden)]
     _Marker(core::marker::PhantomData<RegIdImpl>),
 }
@@ -32,7 +32,7 @@ impl<RegIdImpl: RegId> Arch for X86_64_SSE<RegIdImpl> {
 /// Check out the [module level docs](../index.html#whats-with-regidimpl) for
 /// more info about the `RegIdImpl` type parameter.
 #[allow(non_camel_case_types)]
-pub enum X86_SSE<RegIdImpl: RegId> {
+pub enum X86_SSE<RegIdImpl: RegId = reg::id::X86CoreRegId> {
     #[doc(hidden)]
     _Marker(core::marker::PhantomData<RegIdImpl>),
 }
