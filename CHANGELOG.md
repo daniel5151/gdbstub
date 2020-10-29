@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+# 0.4.1
+
+#### New Arch Implementations
+
+-   Implement `RegId` for x86/x86_64 [\#34](https://github.com/daniel5151/gdbstub/pull/34) ([keiichiw](https://github.com/keiichiw))
+
+#### Bugfixes
+
+-   Switch fatal error signal from `T06` to `S05`,
+-   specify cfg-if 0.1.10 or later [\#33](https://github.com/daniel5151/gdbstub/pull/33) ([keiichiw](https://github.com/keiichiw))
+    -   `cargo build` fails if cfg-if is 0.1.9 or older
+
+#### Misc
+
+-   Don't hard-code u64 when parsing packets (use big-endian byte arrays + late conversion to `Target::Arch::Usize`).
+
 # 0.4.0
 
 This version includes a _major_ API overhaul, alongside a slew of new features and general improvements. While updating to `0.4.0` will require some substantial code modifications, it's well worth the effort, as `0.4.0` is the safest, leanest, and most featureful release of `gdbstub` yet!
