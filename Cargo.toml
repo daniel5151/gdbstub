@@ -11,6 +11,7 @@ homepage = "https://github.com/daniel5151/gdbstub"
 repository  = "https://github.com/daniel5151/gdbstub"
 keywords = ["gdb", "emulation", "no_std", "debugging"]
 categories = ["development-tools::debugging", "embedded", "emulators", "network-programming", "no-std"]
+exclude = ["examples/**/*.elf", "examples/**/*.o"]
 
 [dependencies]
 cfg-if = "0.1.10"
