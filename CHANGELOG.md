@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+# 0.4.2
+
+#### Packaging
+
+-   Exclude test object files from package [\#37](https://github.com/daniel5151/gdbstub/pull/37) ([keiichiw](https://github.com/keiichiw))
+
 # 0.4.1
 
 #### New Arch Implementations
