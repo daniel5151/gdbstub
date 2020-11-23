@@ -36,6 +36,7 @@ pub trait Registers: Default + Debug + Clone + PartialEq {
     fn gdb_serialize(&self, write_byte: impl FnMut(Option<u8>));
 
     /// Deserialize a GDB register bytestream into `self`.
+    #[allow(clippy::clippy::result_unit_err)]
     fn gdb_deserialize(&mut self, bytes: &[u8]) -> Result<(), ()>;
 }
 

@@ -51,6 +51,7 @@ fn ascii2byte(c: u8) -> Option<u8> {
 }
 
 /// Check if the byte `c` is a valid GDB hex digit `[0-9][a-f][A-F][xX]`
+#[allow(clippy::match_like_matches_macro)]
 pub fn is_hex(c: u8) -> bool {
     match c {
         b'0'..=b'9' => true,
