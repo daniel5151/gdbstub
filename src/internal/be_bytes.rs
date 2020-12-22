@@ -3,6 +3,7 @@
 pub trait BeBytes: Sized {
     /// Write the memory representation of `self` as a byte array in
     /// big-endian (network) byte order into the provided buffer.
+    #[allow(clippy::wrong_self_convention)]
     fn to_be_bytes(self, buf: &mut [u8]) -> Option<usize>;
 
     /// Parse `self` from a byte array in big-endian (network) byte order.
