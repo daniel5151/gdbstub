@@ -12,6 +12,7 @@ mod prelude {
 }
 
 mod base;
+mod breakpoints;
 mod extended_mode;
 mod monitor_cmd;
 mod section_offsets;

@@ -123,6 +123,9 @@ commands! {
         "T" => _t_upcase::T,
         "vCont" => _vCont::vCont<'a>,
         "vKill" => _vKill::vKill,
+    }
+
+    breakpoints use 'a {
         "z" => _z::z<'a>,
         "Z" => _z_upcase::Z<'a>,
     }

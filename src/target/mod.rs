@@ -53,8 +53,7 @@
 //! reading/writing memory, etc..
 //!
 //! All other methods are entirely optional! Check out the
-//! [`target_ext`](../target_ext/index.html) module for a full list of currently
-//! supported protocol extensions.
+//! [`ext`] module for a full list of currently supported protocol extensions.
 //!
 //! ## Example: A Bare-Minimum Single Threaded `Target`
 //!
@@ -209,18 +208,8 @@ pub trait Target {
     /// ```
     fn base_ops(&mut self) -> ext::base::BaseOps<Self::Arch, Self::Error>;
 
-    /// Set/Remote software breakpoints.
-    fn sw_breakpoint(&mut self) -> Option<ext::breakpoints::SwBreakpointOps<Self>> {
-        None
-    }
-
-    /// Set/Remote hardware breakpoints.
-    fn hw_breakpoint(&mut self) -> Option<ext::breakpoints::HwBreakpointOps<Self>> {
-        None
-    }
-
-    /// Set/Remote hardware watchpoints.
-    fn hw_watchpoint(&mut self) -> Option<ext::breakpoints::HwWatchpointOps<Self>> {
+    /// Set/Remove software breakpoints.
+    fn breakpoints(&mut self) -> Option<ext::breakpoints::BreakpointsOps<Self>> {
         None
     }
 
@@ -255,16 +244,8 @@ macro_rules! impl_dyn_target {
                 (**self).base_ops()
             }
 
-            fn sw_breakpoint(&mut self) -> Option<ext::breakpoints::SwBreakpointOps<Self>> {
-                (**self).sw_breakpoint()
-            }
-
-            fn hw_breakpoint(&mut self) -> Option<ext::breakpoints::HwBreakpointOps<Self>> {
-                (**self).hw_breakpoint()
-            }
-
-            fn hw_watchpoint(&mut self) -> Option<ext::breakpoints::HwWatchpointOps<Self>> {
-                (**self).hw_watchpoint()
+            fn breakpoints(&mut self) -> Option<ext::breakpoints::BreakpointsOps<Self>> {
+                (**self).breakpoints()
             }
 
             fn monitor_cmd(&mut self) -> Option<ext::monitor_cmd::MonitorCmdOps<Self>> {

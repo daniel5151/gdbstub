@@ -194,8 +194,8 @@ impl<'args> Iterator for Args<'_, 'args> {
     }
 }
 
-/// Enable/Disable ASLR for spawned processes (for a more consistent debugging
-/// experience).
+/// Nested Target Extension - Enable/Disable ASLR for spawned processes (for a
+/// more consistent debugging experience).
 ///
 /// Corresponds to GDB's [`set disable-randomization`](https://sourceware.org/gdb/onlinedocs/gdb/Starting.html) command.
 pub trait ConfigureASLR: ExtendedMode {
@@ -205,7 +205,8 @@ pub trait ConfigureASLR: ExtendedMode {
 
 define_ext!(ConfigureASLROps, ConfigureASLR);
 
-/// Set/Remove/Reset the Environment variables for spawned processes.
+/// Nested Target Extension - Set/Remove/Reset the Environment variables for
+/// spawned processes.
 ///
 /// Corresponds to GDB's [`set environment`](https://sourceware.org/gdb/onlinedocs/gdb/Environment.html#set-environment) cmd.
 ///
@@ -226,7 +227,8 @@ pub trait ConfigureEnv: ExtendedMode {
 
 define_ext!(ConfigureEnvOps, ConfigureEnv);
 
-/// Configure if spawned processes should be spawned using a shell.
+/// Nested Target Extension - Configure if spawned processes should be spawned
+/// using a shell.
 ///
 /// Corresponds to GDB's [`set startup-with-shell`](https://sourceware.org/gdb/onlinedocs/gdb/Starting.html) command.
 pub trait ConfigureStartupShell: ExtendedMode {
@@ -239,7 +241,8 @@ pub trait ConfigureStartupShell: ExtendedMode {
 
 define_ext!(ConfigureStartupShellOps, ConfigureStartupShell);
 
-/// Configure the working directory for spawned processes.
+/// Nested Target Extension - Configure the working directory for spawned
+/// processes.
 ///
 /// Corresponds to GDB's [`set cwd` and `cd`](https://sourceware.org/gdb/onlinedocs/gdb/Working-Directory.html) commands.
 pub trait ConfigureWorkingDir: ExtendedMode {

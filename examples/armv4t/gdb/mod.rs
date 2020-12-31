@@ -36,11 +36,7 @@ impl Target for Emu {
         target::ext::base::BaseOps::SingleThread(self)
     }
 
-    fn sw_breakpoint(&mut self) -> Option<target::ext::breakpoints::SwBreakpointOps<Self>> {
-        Some(self)
-    }
-
-    fn hw_watchpoint(&mut self) -> Option<target::ext::breakpoints::HwWatchpointOps<Self>> {
+    fn breakpoints(&mut self) -> Option<target::ext::breakpoints::BreakpointsOps<Self>> {
         Some(self)
     }
 
@@ -169,6 +165,16 @@ impl SingleThreadOps for Emu {
             self.mem.w8(addr, val)
         }
         Ok(())
+    }
+}
+
+impl target::ext::breakpoints::Breakpoints for Emu {
+    fn sw_breakpoint(&mut self) -> Option<target::ext::breakpoints::SwBreakpointOps<Self>> {
+        Some(self)
+    }
+
+    fn hw_watchpoint(&mut self) -> Option<target::ext::breakpoints::HwWatchpointOps<Self>> {
+        Some(self)
     }
 }
 

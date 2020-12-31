@@ -246,6 +246,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             }
             // `handle_X` methods are defined in the `ext` module
             Command::Base(cmd) => self.handle_base(res, target, cmd),
+            Command::Breakpoints(cmd) => self.handle_breakpoints(res, target, cmd),
             Command::ExtendedMode(cmd) => self.handle_extended_mode(res, target, cmd),
             Command::MonitorCmd(cmd) => self.handle_monitor_cmd(res, target, cmd),
             Command::SectionOffsets(cmd) => self.handle_section_offsets(res, target, cmd),

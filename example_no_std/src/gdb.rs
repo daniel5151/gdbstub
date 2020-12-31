@@ -22,7 +22,7 @@ impl Target for DummyTarget {
         target::ext::base::BaseOps::MultiThread(self)
     }
 
-    fn sw_breakpoint(&mut self) -> Option<target::ext::breakpoints::SwBreakpointOps<Self>> {
+    fn breakpoints(&mut self) -> Option<target::ext::breakpoints::BreakpointsOps<Self>> {
         Some(self)
     }
 }
@@ -94,6 +94,12 @@ impl MultiThreadOps for DummyTarget {
         register_thread(Tid::new(1).unwrap());
         register_thread(Tid::new(2).unwrap());
         Ok(())
+    }
+}
+
+impl target::ext::breakpoints::Breakpoints for DummyTarget {
+    fn sw_breakpoint(&mut self) -> Option<target::ext::breakpoints::SwBreakpointOps<Self>> {
+        Some(self)
     }
 }
 

@@ -48,9 +48,14 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     }
                 }
 
-                res.write_str(";swbreak+")?;
-                if target.hw_breakpoint().is_some() || target.hw_watchpoint().is_some() {
-                    res.write_str(";hwbreak+")?;
+                if let Some(ops) = target.breakpoints() {
+                    if ops.sw_breakpoint().is_some() {
+                        res.write_str(";swbreak+")?;
+                    }
+
+                    if ops.hw_breakpoint().is_some() || ops.hw_watchpoint().is_some() {
+                        res.write_str(";hwbreak+")?;
+                    }
                 }
 
                 // TODO: implement conditional breakpoint support (since that's kool).
@@ -228,58 +233,6 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 // TODO: plumb-through Pid when exposing full multiprocess + extended mode
                 res.write_str("OK")?; // manually write OK, since we need to return a DisconnectReason
                 HandlerStatus::Disconnect(DisconnectReason::Disconnect)
-            }
-            Base::Z(cmd) => {
-                let addr = <T::Arch as Arch>::Usize::from_be_bytes(cmd.addr)
-                    .ok_or(Error::TargetMismatch)?;
-
-                use crate::target::ext::breakpoints::WatchKind::*;
-                let supported = match cmd.type_ {
-                    0 => (target.sw_breakpoint()).map(|op| op.add_sw_breakpoint(addr)),
-                    1 => (target.hw_breakpoint()).map(|op| op.add_hw_breakpoint(addr)),
-                    2 => (target.hw_watchpoint()).map(|op| op.add_hw_watchpoint(addr, Write)),
-                    3 => (target.hw_watchpoint()).map(|op| op.add_hw_watchpoint(addr, Read)),
-                    4 => (target.hw_watchpoint()).map(|op| op.add_hw_watchpoint(addr, ReadWrite)),
-                    // only 5 types in the protocol
-                    _ => None,
-                };
-
-                match supported {
-                    None => HandlerStatus::Handled,
-                    Some(Err(e)) => {
-                        Err(e).handle_error()?;
-                        HandlerStatus::Handled
-                    }
-                    Some(Ok(true)) => HandlerStatus::NeedsOK,
-                    Some(Ok(false)) => return Err(Error::NonFatalError(22)),
-                }
-            }
-            Base::z(cmd) => {
-                let addr = <T::Arch as Arch>::Usize::from_be_bytes(cmd.addr)
-                    .ok_or(Error::TargetMismatch)?;
-
-                use crate::target::ext::breakpoints::WatchKind::*;
-                let supported = match cmd.type_ {
-                    0 => (target.sw_breakpoint()).map(|op| op.remove_sw_breakpoint(addr)),
-                    1 => (target.hw_breakpoint()).map(|op| op.remove_hw_breakpoint(addr)),
-                    2 => (target.hw_watchpoint()).map(|op| op.remove_hw_watchpoint(addr, Write)),
-                    3 => (target.hw_watchpoint()).map(|op| op.remove_hw_watchpoint(addr, Read)),
-                    4 => {
-                        (target.hw_watchpoint()).map(|op| op.remove_hw_watchpoint(addr, ReadWrite))
-                    }
-                    // only 5 types in the protocol
-                    _ => None,
-                };
-
-                match supported {
-                    None => HandlerStatus::Handled,
-                    Some(Err(e)) => {
-                        Err(e).handle_error()?;
-                        HandlerStatus::Handled
-                    }
-                    Some(Ok(true)) => HandlerStatus::NeedsOK,
-                    Some(Ok(false)) => return Err(Error::NonFatalError(22)),
-                }
             }
             Base::p(p) => {
                 let mut dst = [0u8; 32]; // enough for 256-bit registers

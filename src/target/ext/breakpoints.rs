@@ -14,7 +14,27 @@ pub enum WatchKind {
     ReadWrite,
 }
 
-/// Target Extension - Set/remove Software Breakpoints.
+/// Target Extension - Set/Remove Breakpoints.
+pub trait Breakpoints: Target {
+    /// Set/Remote software breakpoints.
+    fn sw_breakpoint(&mut self) -> Option<SwBreakpointOps<Self>> {
+        None
+    }
+
+    /// Set/Remote hardware breakpoints.
+    fn hw_breakpoint(&mut self) -> Option<HwBreakpointOps<Self>> {
+        None
+    }
+
+    /// Set/Remote hardware watchpoints.
+    fn hw_watchpoint(&mut self) -> Option<HwWatchpointOps<Self>> {
+        None
+    }
+}
+
+define_ext!(BreakpointsOps, Breakpoints);
+
+/// Nested Target Extension - Set/Remove Software Breakpoints.
 ///
 /// See [this stackoverflow discussion](https://stackoverflow.com/questions/8878716/what-is-the-difference-between-hardware-and-software-breakpoints)
 /// about the differences between hardware and software breakpoints.
@@ -23,7 +43,7 @@ pub enum WatchKind {
 /// using an _interpreted_ CPU (as opposed to a JIT), the simplest way to
 /// implement "software" breakpoints would be to check the `PC` value after each
 /// CPU cycle.
-pub trait SwBreakpoint: Target {
+pub trait SwBreakpoint: Target + Breakpoints {
     /// Add a new software breakpoint.
     /// Return `Ok(false)` if the operation could not be completed.
     fn add_sw_breakpoint(&mut self, addr: <Self::Arch as Arch>::Usize) -> TargetResult<bool, Self>;
@@ -38,7 +58,7 @@ pub trait SwBreakpoint: Target {
 
 define_ext!(SwBreakpointOps, SwBreakpoint);
 
-/// Target Extension - Set/remove Hardware Breakpoints.
+/// Nested Target Extension - Set/Remove Hardware Breakpoints.
 ///
 /// See [this stackoverflow discussion](https://stackoverflow.com/questions/8878716/what-is-the-difference-between-hardware-and-software-breakpoints)
 /// about the differences between hardware and software breakpoints.
@@ -47,7 +67,7 @@ define_ext!(SwBreakpointOps, SwBreakpoint);
 /// using an _interpreted_ CPU (as opposed to a JIT), there shouldn't be any
 /// reason to implement this extension (as software breakpoints are likely to be
 /// just-as-fast).
-pub trait HwBreakpoint: Target {
+pub trait HwBreakpoint: Target + Breakpoints {
     /// Add a new hardware breakpoint.
     /// Return `Ok(false)` if the operation could not be completed.
     fn add_hw_breakpoint(&mut self, addr: <Self::Arch as Arch>::Usize) -> TargetResult<bool, Self>;
@@ -62,7 +82,7 @@ pub trait HwBreakpoint: Target {
 
 define_ext!(HwBreakpointOps, HwBreakpoint);
 
-/// Target Extension - Set/remove Hardware Watchpoints.
+/// Nested Target Extension - Set/Remove Hardware Watchpoints.
 ///
 /// See the [GDB documentation](https://sourceware.org/gdb/current/onlinedocs/gdb/Set-Watchpoints.html)
 /// regarding watchpoints for how they're supposed to work.
@@ -71,7 +91,7 @@ define_ext!(HwBreakpointOps, HwBreakpoint);
 /// _software watchpoints_, which tend to be excruciatingly slow (as
 /// they are implemented by single-stepping the system, and reading the
 /// watched memory location after each step).
-pub trait HwWatchpoint: Target {
+pub trait HwWatchpoint: Target + Breakpoints {
     /// Add a new hardware watchpoint.
     /// Return `Ok(false)` if the operation could not be completed.
     fn add_hw_watchpoint(

@@ -52,11 +52,7 @@ impl Target for Emu {
         target::ext::base::BaseOps::MultiThread(self)
     }
 
-    fn sw_breakpoint(&mut self) -> Option<target::ext::breakpoints::SwBreakpointOps<Self>> {
-        Some(self)
-    }
-
-    fn hw_watchpoint(&mut self) -> Option<target::ext::breakpoints::HwWatchpointOps<Self>> {
+    fn breakpoints(&mut self) -> Option<target::ext::breakpoints::BreakpointsOps<Self>> {
         Some(self)
     }
 }
@@ -179,6 +175,16 @@ impl MultiThreadOps for Emu {
         register_thread(cpuid_to_tid(CpuId::Cpu));
         register_thread(cpuid_to_tid(CpuId::Cop));
         Ok(())
+    }
+}
+
+impl target::ext::breakpoints::Breakpoints for Emu {
+    fn sw_breakpoint(&mut self) -> Option<target::ext::breakpoints::SwBreakpointOps<Self>> {
+        Some(self)
+    }
+
+    fn hw_watchpoint(&mut self) -> Option<target::ext::breakpoints::HwWatchpointOps<Self>> {
+        Some(self)
     }
 }
 
