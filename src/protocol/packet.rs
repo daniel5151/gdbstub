@@ -30,20 +30,24 @@ impl<'a> PacketBuf<'a> {
     /// Validate the contents of the raw packet buffer, checking for checksum
     /// consistency, structural correctness, and ASCII validation.
     pub fn new(pkt_buf: &'a mut [u8]) -> Result<PacketBuf<'a>, PacketParseError> {
-        // validate the packet is valid ASCII
-        if !pkt_buf.is_ascii() {
-            return Err(PacketParseError::NotASCII);
+        if pkt_buf.is_empty() {
+            return Err(PacketParseError::EmptyBuf);
         }
 
-        let end_of_body = pkt_buf
-            .iter()
-            .position(|b| *b == b'#')
-            .ok_or(PacketParseError::MissingChecksum)?;
-
         // split buffer into body and checksum components
-        let (body, checksum) = pkt_buf.split_at_mut(end_of_body);
-        let body = &mut body[1..]; // skip the '$'
-        let checksum = &mut checksum[1..][..2]; // skip the '#'
+        let mut parts = pkt_buf[1..].split(|b| *b == b'#');
+
+        let body = parts.next().unwrap(); // spit iter always returns at least one elem
+        let checksum = parts
+            .next()
+            .ok_or(PacketParseError::MissingChecksum)?
+            .get(..2)
+            .ok_or(PacketParseError::MalformedChecksum)?;
+
+        // validate that the body is valid ASCII
+        if !body.is_ascii() {
+            return Err(PacketParseError::NotASCII);
+        }
 
         // validate the checksum
         let checksum = decode_hex(checksum).map_err(|_| PacketParseError::MalformedChecksum)?;
@@ -60,6 +64,8 @@ impl<'a> PacketBuf<'a> {
             let body = unsafe { core::str::from_utf8_unchecked(body) };
             trace!("<-- ${}#{:02x?}", body, checksum);
         }
+
+        let end_of_body = 1 + body.len();
 
         Ok(PacketBuf {
             buf: pkt_buf,
@@ -111,6 +117,14 @@ impl<'a> PacketBuf<'a> {
     #[allow(dead_code)]
     pub fn into_raw_buf(self) -> (&'a mut [u8], core::ops::Range<usize>) {
         (self.buf, self.body_range)
+    }
+
+    /// Returns the length of the _entire_ underlying packet buffer - not just
+    /// the length of the current range.
+    ///
+    /// This method is used when handing the `qSupported` packet.
+    pub fn full_len(&self) -> usize {
+        self.buf.len()
     }
 }
 

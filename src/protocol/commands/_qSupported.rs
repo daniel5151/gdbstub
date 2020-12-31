@@ -2,17 +2,21 @@ use super::prelude::*;
 
 #[derive(Debug)]
 pub struct qSupported<'a> {
+    pub packet_buffer_len: usize,
     pub features: Features<'a>,
 }
 
 impl<'a> ParseCommand<'a> for qSupported<'a> {
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
+        let packet_buffer_len = buf.full_len();
+
         let body = buf.into_body();
         if body.is_empty() {
             return None;
         }
 
         Some(qSupported {
+            packet_buffer_len,
             features: Features(body),
         })
     }

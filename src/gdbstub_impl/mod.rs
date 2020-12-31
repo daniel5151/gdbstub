@@ -74,7 +74,6 @@ struct GdbStubImpl<T: Target, C: Connection> {
     _target: PhantomData<T>,
     _connection: PhantomData<C>,
 
-    packet_buffer_len: usize,
     current_mem_tid: Tid,
     current_resume_tid: TidSelector,
     no_ack_mode: bool,
@@ -95,12 +94,11 @@ enum HandlerStatus {
 }
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
-    fn new(packet_buffer_len: usize) -> GdbStubImpl<T, C> {
+    fn new() -> GdbStubImpl<T, C> {
         GdbStubImpl {
             _target: PhantomData,
             _connection: PhantomData,
 
-            packet_buffer_len,
             // HACK: current_mem_tid is immediately updated with valid value once `run` is called.
             // While the more idiomatic way to handle this would be to use an Option, given that
             // it's only ever unset prior to the start of `run`, it's probably okay leaving it as-is
@@ -223,10 +221,9 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             buf.push(conn.read().map_err(Error::ConnectionRead)?)?;
         }
 
-        match Packet::from_buf(target, pkt_buf.as_mut()) {
-            Ok(packet) => Ok(packet),
-            Err(e) => Err(Error::PacketParse(e)),
-        }
+        drop(buf);
+
+        Packet::from_buf(target, pkt_buf.as_mut()).map_err(Error::PacketParse)
     }
 
     fn handle_command(

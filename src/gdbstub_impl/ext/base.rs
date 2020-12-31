@@ -22,7 +22,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 let _features = cmd.features.into_iter();
 
                 res.write_str("PacketSize=")?;
-                res.write_num(self.packet_buffer_len)?;
+                res.write_num(cmd.packet_buffer_len)?;
 
                 res.write_str(";vContSupported+")?;
                 res.write_str(";multiprocess+")?;
