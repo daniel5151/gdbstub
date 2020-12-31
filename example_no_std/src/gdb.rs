@@ -105,12 +105,20 @@ impl target::ext::breakpoints::Breakpoints for DummyTarget {
 
 impl target::ext::breakpoints::SwBreakpoint for DummyTarget {
     #[inline(never)]
-    fn add_sw_breakpoint(&mut self, _addr: u32) -> TargetResult<bool, Self> {
+    fn add_sw_breakpoint(
+        &mut self,
+        _addr: u32,
+        _kind: arch::arm::ArmBreakpointKind,
+    ) -> TargetResult<bool, Self> {
         Ok(true)
     }
 
     #[inline(never)]
-    fn remove_sw_breakpoint(&mut self, _addr: u32) -> TargetResult<bool, Self> {
+    fn remove_sw_breakpoint(
+        &mut self,
+        _addr: u32,
+        _kind: arch::arm::ArmBreakpointKind,
+    ) -> TargetResult<bool, Self> {
         Ok(true)
     }
 }

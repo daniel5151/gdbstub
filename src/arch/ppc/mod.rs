@@ -18,6 +18,7 @@ impl<RegIdImpl: RegId> Arch for PowerPcAltivec32<RegIdImpl> {
     type Usize = u32;
     type Registers = reg::PowerPcCommonRegs;
     type RegId = RegIdImpl;
+    type BreakpointKind = usize;
 
     fn target_description_xml() -> Option<&'static str> {
         Some(

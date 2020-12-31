@@ -5,7 +5,7 @@ pub struct Z<'a> {
     pub type_: u8,
     pub addr: &'a [u8],
     /// architecture dependent
-    pub kind: u8,
+    pub kind: usize,
     // TODO: Add support for breakpoint 'conds', 'persist', and 'cmds' feature
 }
 

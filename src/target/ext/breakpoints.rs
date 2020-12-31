@@ -42,17 +42,22 @@ define_ext!(BreakpointsOps, Breakpoints);
 /// _Recommendation:_ If you're implementing `Target` for an emulator that's
 /// using an _interpreted_ CPU (as opposed to a JIT), the simplest way to
 /// implement "software" breakpoints would be to check the `PC` value after each
-/// CPU cycle.
+/// CPU cycle, ignoring the specified breakpoint `kind` entirely.
 pub trait SwBreakpoint: Target + Breakpoints {
     /// Add a new software breakpoint.
     /// Return `Ok(false)` if the operation could not be completed.
-    fn add_sw_breakpoint(&mut self, addr: <Self::Arch as Arch>::Usize) -> TargetResult<bool, Self>;
+    fn add_sw_breakpoint(
+        &mut self,
+        addr: <Self::Arch as Arch>::Usize,
+        kind: <Self::Arch as Arch>::BreakpointKind,
+    ) -> TargetResult<bool, Self>;
 
     /// Remove an existing software breakpoint.
     /// Return `Ok(false)` if the operation could not be completed.
     fn remove_sw_breakpoint(
         &mut self,
         addr: <Self::Arch as Arch>::Usize,
+        kind: <Self::Arch as Arch>::BreakpointKind,
     ) -> TargetResult<bool, Self>;
 }
 
@@ -70,13 +75,18 @@ define_ext!(SwBreakpointOps, SwBreakpoint);
 pub trait HwBreakpoint: Target + Breakpoints {
     /// Add a new hardware breakpoint.
     /// Return `Ok(false)` if the operation could not be completed.
-    fn add_hw_breakpoint(&mut self, addr: <Self::Arch as Arch>::Usize) -> TargetResult<bool, Self>;
+    fn add_hw_breakpoint(
+        &mut self,
+        addr: <Self::Arch as Arch>::Usize,
+        kind: <Self::Arch as Arch>::BreakpointKind,
+    ) -> TargetResult<bool, Self>;
 
     /// Remove an existing hardware breakpoint.
     /// Return `Ok(false)` if the operation could not be completed.
     fn remove_hw_breakpoint(
         &mut self,
         addr: <Self::Arch as Arch>::Usize,
+        kind: <Self::Arch as Arch>::BreakpointKind,
     ) -> TargetResult<bool, Self>;
 }
 

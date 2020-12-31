@@ -19,6 +19,7 @@ impl<RegIdImpl: RegId> Arch for X86_64_SSE<RegIdImpl> {
     type Usize = u64;
     type Registers = reg::X86_64CoreRegs;
     type RegId = RegIdImpl;
+    type BreakpointKind = usize;
 
     fn target_description_xml() -> Option<&'static str> {
         Some(
@@ -41,6 +42,7 @@ impl<RegIdImpl: RegId> Arch for X86_SSE<RegIdImpl> {
     type Usize = u32;
     type Registers = reg::X86CoreRegs;
     type RegId = RegIdImpl;
+    type BreakpointKind = usize;
 
     fn target_description_xml() -> Option<&'static str> {
         Some(

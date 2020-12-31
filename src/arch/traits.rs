@@ -40,6 +40,42 @@ pub trait Registers: Default + Debug + Clone + PartialEq {
     fn gdb_deserialize(&mut self, bytes: &[u8]) -> Result<(), ()>;
 }
 
+/// Breakpoint kind for specific architectures.
+///
+/// This trait corresponds to the _kind_ field of the "z" and "Z" breakpoint
+/// packets.
+///
+/// A breakpoint _kind_ is architecture-specific and typically indicates the
+/// size of the breakpoint in bytes that should be inserted. As such, most
+/// architectures will set `BreakpointKind = usize`.
+///
+/// Some architectures, such as ARM and MIPS, have additional meanings for
+/// _kind_. See the [Architecture-Specific Protocol Details](https://sourceware.org/gdb/current/onlinedocs/gdb/Architecture_002dSpecific-Protocol-Details.html#Architecture_002dSpecific-Protocol-Details)
+/// section of the GBD documentation for more details.
+///
+/// If no architecture-specific value is being used, _kind_ should be set to
+/// '0', and the `BreakpointKind` associated type should be `()`.
+pub trait BreakpointKind: Sized + Debug {
+    /// Parse `Self` from a raw usize.
+    fn from_usize(kind: usize) -> Option<Self>;
+}
+
+impl BreakpointKind for () {
+    fn from_usize(kind: usize) -> Option<Self> {
+        if kind != 0 {
+            None
+        } else {
+            Some(())
+        }
+    }
+}
+
+impl BreakpointKind for usize {
+    fn from_usize(kind: usize) -> Option<Self> {
+        Some(kind)
+    }
+}
+
 /// Encodes architecture-specific information, such as pointer size, register
 /// layout, etc...
 ///
@@ -53,6 +89,10 @@ pub trait Arch {
 
     /// The architecture's register file.
     type Registers: Registers;
+
+    /// The architecture's breakpoint kind, used to determine the "size"
+    /// of breakpoint to set. See [`BreakpointKind`] for more details.
+    type BreakpointKind: BreakpointKind;
 
     /// Register identifier enum/struct.
     ///

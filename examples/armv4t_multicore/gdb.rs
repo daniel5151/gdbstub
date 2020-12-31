@@ -189,12 +189,20 @@ impl target::ext::breakpoints::Breakpoints for Emu {
 }
 
 impl target::ext::breakpoints::SwBreakpoint for Emu {
-    fn add_sw_breakpoint(&mut self, addr: u32) -> TargetResult<bool, Self> {
+    fn add_sw_breakpoint(
+        &mut self,
+        addr: u32,
+        _kind: arch::arm::ArmBreakpointKind,
+    ) -> TargetResult<bool, Self> {
         self.breakpoints.push(addr);
         Ok(true)
     }
 
-    fn remove_sw_breakpoint(&mut self, addr: u32) -> TargetResult<bool, Self> {
+    fn remove_sw_breakpoint(
+        &mut self,
+        addr: u32,
+        _kind: arch::arm::ArmBreakpointKind,
+    ) -> TargetResult<bool, Self> {
         match self.breakpoints.iter().position(|x| *x == addr) {
             None => return Ok(false),
             Some(pos) => self.breakpoints.remove(pos),

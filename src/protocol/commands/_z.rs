@@ -4,7 +4,7 @@ use super::prelude::*;
 pub struct z<'a> {
     pub type_: u8,
     pub addr: &'a [u8],
-    pub kind: u8,
+    pub kind: usize,
 }
 
 impl<'a> ParseCommand<'a> for z<'a> {

@@ -1,7 +1,7 @@
 use super::prelude::*;
 use crate::protocol::commands::ext::Breakpoints;
 
-use crate::arch::Arch;
+use crate::arch::{Arch, BreakpointKind};
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     pub(crate) fn handle_breakpoints<'a>(
@@ -19,11 +19,13 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             Breakpoints::Z(cmd) => {
                 let addr = <T::Arch as Arch>::Usize::from_be_bytes(cmd.addr)
                     .ok_or(Error::TargetMismatch)?;
+                let kind = <T::Arch as Arch>::BreakpointKind::from_usize(cmd.kind)
+                    .ok_or(Error::TargetMismatch)?;
 
                 use crate::target::ext::breakpoints::WatchKind::*;
                 let supported = match cmd.type_ {
-                    0 => (ops.sw_breakpoint()).map(|op| op.add_sw_breakpoint(addr)),
-                    1 => (ops.hw_breakpoint()).map(|op| op.add_hw_breakpoint(addr)),
+                    0 => (ops.sw_breakpoint()).map(|op| op.add_sw_breakpoint(addr, kind)),
+                    1 => (ops.hw_breakpoint()).map(|op| op.add_hw_breakpoint(addr, kind)),
                     2 => (ops.hw_watchpoint()).map(|op| op.add_hw_watchpoint(addr, Write)),
                     3 => (ops.hw_watchpoint()).map(|op| op.add_hw_watchpoint(addr, Read)),
                     4 => (ops.hw_watchpoint()).map(|op| op.add_hw_watchpoint(addr, ReadWrite)),
@@ -44,11 +46,13 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             Breakpoints::z(cmd) => {
                 let addr = <T::Arch as Arch>::Usize::from_be_bytes(cmd.addr)
                     .ok_or(Error::TargetMismatch)?;
+                let kind = <T::Arch as Arch>::BreakpointKind::from_usize(cmd.kind)
+                    .ok_or(Error::TargetMismatch)?;
 
                 use crate::target::ext::breakpoints::WatchKind::*;
                 let supported = match cmd.type_ {
-                    0 => (ops.sw_breakpoint()).map(|op| op.remove_sw_breakpoint(addr)),
-                    1 => (ops.hw_breakpoint()).map(|op| op.remove_hw_breakpoint(addr)),
+                    0 => (ops.sw_breakpoint()).map(|op| op.remove_sw_breakpoint(addr, kind)),
+                    1 => (ops.hw_breakpoint()).map(|op| op.remove_hw_breakpoint(addr, kind)),
                     2 => (ops.hw_watchpoint()).map(|op| op.remove_hw_watchpoint(addr, Write)),
                     3 => (ops.hw_watchpoint()).map(|op| op.remove_hw_watchpoint(addr, Read)),
                     4 => (ops.hw_watchpoint()).map(|op| op.remove_hw_watchpoint(addr, ReadWrite)),
