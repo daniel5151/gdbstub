@@ -43,7 +43,7 @@ macro_rules! commands {
             $(
                 [<$ext:camel>](ext::[<$ext:camel>]$(<$lt>)?),
             )*
-            Unknown(&'a str),
+            Unknown(&'a [u8]),
         }
 
         impl<'a> Command<'a> {
@@ -86,7 +86,7 @@ macro_rules! commands {
                 }
                 )*
 
-                Ok(Command::Unknown(buf.into_body_str()))
+                Ok(Command::Unknown(buf.into_body()))
             }
         }
     }};

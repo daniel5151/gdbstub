@@ -59,12 +59,6 @@ impl<'a> PacketBuf<'a> {
             });
         }
 
-        if log_enabled!(log::Level::Trace) {
-            // SAFETY: body confirmed to be `is_ascii()`
-            let body = unsafe { core::str::from_utf8_unchecked(body) };
-            trace!("<-- ${}#{:02x?}", body, checksum);
-        }
-
         let end_of_body = 1 + body.len();
 
         Ok(PacketBuf {
@@ -104,12 +98,6 @@ impl<'a> PacketBuf<'a> {
     /// the current body.
     pub fn into_body(self) -> &'a mut [u8] {
         &mut self.buf[self.body_range]
-    }
-
-    pub fn into_body_str(self) -> &'a str {
-        // SAFETY: buffer confirmed to be `is_ascii()` in `new`, and no other PacketBuf
-        // member allow arbitrary modification of `self.buf`.
-        unsafe { core::str::from_utf8_unchecked(&self.buf[self.body_range]) }
     }
 
     /// Return a mut reference to the _entire_ underlying packet buffer, and the

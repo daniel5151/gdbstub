@@ -133,14 +133,12 @@ If you happen to stumble across this crate and end up using it to debug some bar
 
 ## `unsafe` in `gdbstub`
 
-`gdbstub` "core" only has 2 instances of unsafe code:
+`gdbstub` limits the use of `unsafe` to a bare minimum. All uses of `unsafe` are required to have a corresponding `// SAFETY` comment, and are exhaustively documented in the list below.
 
--   A few trivially safe calls to `NonZeroUsize::new_unchecked()` when defining internal constants.
--   A call to `str::from_utf8_unchecked()` when working with incoming GDB packets (the underlying `&[u8]` buffer is checked with `is_ascii()` prior to the call).
-
-With the `std` feature enabled, there is one additional instance of `unsafe` code:
-
--   `gdbstub` includes an implementation of `UnixStream::peek` which uses `libc::recv`. This will be removed once [rust-lang/rust#73761](https://github.com/rust-lang/rust/pull/73761) is merged and stabilized.
+-   When no features are enabled:
+    -   A few trivially safe calls to `NonZeroUsize::new_unchecked()` when defining internal constants.
+-   When the `std` feature is enabled:
+    -   An implementation of `UnixStream::peek` which uses `libc::recv`. This will be removed once [rust-lang/rust#73761](https://github.com/rust-lang/rust/pull/73761) is merged and stabilized.
 
 ## Future Plans + Roadmap to `1.0.0`
 

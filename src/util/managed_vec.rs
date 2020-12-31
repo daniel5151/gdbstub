@@ -38,4 +38,8 @@ impl<'a, 'b, T> ManagedVec<'a, 'b, T> {
             }
         }
     }
+
+    pub fn as_slice<'c: 'b>(&'c self) -> &'b [T] {
+        &self.buf[..self.len]
+    }
 }
