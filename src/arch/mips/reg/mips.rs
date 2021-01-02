@@ -22,6 +22,8 @@ pub struct MipsCoreRegs<U> {
     pub cp0: MipsCp0Regs<U>,
     /// FPU registers
     pub fpu: MipsFpuRegs<U>,
+    /// DSP registers
+    pub dsp: MipsDspRegs<U>,
 }
 
 /// MIPS CP0 (coprocessor 0) registers.
@@ -48,6 +50,29 @@ pub struct MipsFpuRegs<U> {
     pub fcsr: U,
     /// Floating-point Implementation Register
     pub fir: U,
+}
+
+/// MIPS DSP registers.
+///
+/// Source: https://github.com/bminor/binutils-gdb/blob/master/gdb/features/mips-dsp.xml
+#[derive(Debug, Default, Clone, Eq, PartialEq)]
+pub struct MipsDspRegs<U> {
+    /// High 1 register (regnum 72)
+    pub hi1: U,
+    /// Low 1 register (regnum 73)
+    pub lo1: U,
+    /// High 2 register (regnum 74)
+    pub hi2: U,
+    /// Low 2 register (regnum 75)
+    pub lo2: U,
+    /// High 3 register (regnum 76)
+    pub hi3: U,
+    /// Low 3 register (regnum 77)
+    pub lo3: U,
+    /// DSP Control register (regnum 78)
+    pub dspctl: U,
+    /// Restart register (regnum 79)
+    pub restart: U,
 }
 
 impl<U> Registers for MipsCoreRegs<U>
@@ -94,6 +119,16 @@ where
         // Write FCSR and FIR registers
         write_le_bytes!(&self.fpu.fcsr);
         write_le_bytes!(&self.fpu.fir);
+
+        // Write DSP registers
+        write_le_bytes!(&self.dsp.hi1);
+        write_le_bytes!(&self.dsp.lo1);
+        write_le_bytes!(&self.dsp.hi2);
+        write_le_bytes!(&self.dsp.lo2);
+        write_le_bytes!(&self.dsp.hi3);
+        write_le_bytes!(&self.dsp.lo3);
+        write_le_bytes!(&self.dsp.dspctl);
+        write_le_bytes!(&self.dsp.restart);
     }
 
     fn gdb_deserialize(&mut self, bytes: &[u8]) -> Result<(), ()> {
@@ -135,6 +170,16 @@ where
         // Read FCSR and FIR registers
         self.fpu.fcsr = regs.next().ok_or(())?;
         self.fpu.fir = regs.next().ok_or(())?;
+
+        // Read DSP registers
+        self.dsp.hi1 = regs.next().ok_or(())?;
+        self.dsp.lo1 = regs.next().ok_or(())?;
+        self.dsp.hi2 = regs.next().ok_or(())?;
+        self.dsp.lo2 = regs.next().ok_or(())?;
+        self.dsp.hi3 = regs.next().ok_or(())?;
+        self.dsp.lo3 = regs.next().ok_or(())?;
+        self.dsp.dspctl = regs.next().ok_or(())?;
+        self.dsp.restart = regs.next().ok_or(())?;
 
         if regs.next().is_some() {
             return Err(());
