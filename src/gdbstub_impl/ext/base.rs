@@ -48,6 +48,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     }
                 }
 
+                if target.agent().is_some() {
+                    res.write_str(";QAgent+")?;
+                }
+
                 if let Some(ops) = target.breakpoints() {
                     if ops.sw_breakpoint().is_some() {
                         res.write_str(";swbreak+")?;
@@ -56,10 +60,12 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     if ops.hw_breakpoint().is_some() || ops.hw_watchpoint().is_some() {
                         res.write_str(";hwbreak+")?;
                     }
-                }
 
-                // TODO: implement conditional breakpoint support (since that's kool).
-                // res.write_str("ConditionalBreakpoints+;")?;
+                    if ops.breakpoint_agent().is_some() {
+                        res.write_str(";BreakpointCommands+")?;
+                        res.write_str(";ConditionalBreakpoints+")?;
+                    }
+                }
 
                 if T::Arch::target_description_xml().is_some() {
                     res.write_str(";qXfer:features:read+")?;
@@ -471,7 +477,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
         err?;
 
-        self.finish_vcont(stop_reason, res)
+        self.finish_vcont(stop_reason, target, res)
     }
 
     // DEVNOTE: `do_vcont` and `finish_vcont` could be merged into a single
@@ -482,6 +488,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     fn finish_vcont(
         &mut self,
         stop_reason: ThreadStopReason<<T::Arch as Arch>::Usize>,
+        target: &mut T,
         res: &mut ResponseWriter<C>,
     ) -> Result<Option<DisconnectReason>, Error<T::Error, C::Error>> {
         match stop_reason {
@@ -503,6 +510,16 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             | ThreadStopReason::Watch { tid, .. } => {
                 self.current_mem_tid = tid;
                 self.current_resume_tid = TidSelector::WithID(tid);
+
+                if let Some(agent_ops) = target
+                    .breakpoints()
+                    .and_then(|bp_ops| bp_ops.breakpoint_agent())
+                {
+                    // use crate::target::ext::breakpoints::BreakpointBytecodeKind;
+                    if agent_ops.breakpoint_bytecode_executor().is_gdbstub() {
+                        // TODO: evaluate the conditions and commands
+                    }
+                }
 
                 res.write_str("T05")?;
 

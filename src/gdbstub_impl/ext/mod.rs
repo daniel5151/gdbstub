@@ -11,6 +11,7 @@ mod prelude {
     pub(super) use super::super::{DisconnectReason, GdbStubImpl, HandlerStatus};
 }
 
+mod agent;
 mod base;
 mod breakpoints;
 mod extended_mode;

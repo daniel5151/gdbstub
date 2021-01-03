@@ -16,6 +16,13 @@ pub trait ParseCommand<'a>: Sized {
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self>;
 }
 
+// Breakpoint packets are special-cased, as the "Z" packet is parsed differently
+// depending on whether or not the target implements the `Agent` extension.
+//
+// While it's entirely possible to eagerly parse the "Z" packet for bytecode,
+// doing so would unnecessary bloat implementations that do not support
+// evaluating agent expressions.
+
 macro_rules! commands {
     (
         $(
@@ -28,6 +35,7 @@ macro_rules! commands {
             #[allow(non_snake_case, non_camel_case_types)]
             pub mod $mod;
         )*)*
+        pub mod breakpoint;
 
         pub mod ext {
             $(
@@ -36,6 +44,15 @@ macro_rules! commands {
                     $($command(super::$mod::$command<$($lifetime)?>),)*
                 }
             )*
+
+            use super::breakpoint::{BasicBreakpoint, BytecodeBreakpoint};
+            #[allow(non_camel_case_types)]
+            pub enum Breakpoints<'a> {
+                z(BasicBreakpoint<'a>),
+                Z(BasicBreakpoint<'a>),
+                ZWithBytecode(BytecodeBreakpoint<'a>),
+            }
+
         }
 
         /// GDB commands
@@ -43,61 +60,65 @@ macro_rules! commands {
             $(
                 [<$ext:camel>](ext::[<$ext:camel>]$(<$lt>)?),
             )*
+            Breakpoints(ext::Breakpoints<'a>),
             Unknown(&'a [u8]),
         }
 
         impl<'a> Command<'a> {
             pub fn from_packet(
                 target: &mut impl Target,
-                buf: PacketBuf<'a>
-            ) -> Result<Command<'a>, CommandParseError<'a>> {
-                if buf.as_body().is_empty() {
-                    return Err(CommandParseError::Empty);
-                }
-
-                let body = buf.as_body();
-
-                // This scoped extension trait enables using `base` as an
-                // `$ext`, even through the `base` method on `Target` doesn't
-                // return an Option.
+                mut buf: PacketBuf<'a>
+            ) -> Option<Command<'a>> {
+                // This locally-scoped trait enables using `base` as an `$ext`,
+                // even through the `base` method on `Target` doesn't return an
+                // Option.
                 trait Hack { fn base(&mut self) -> Option<()> { Some(()) } }
                 impl<T: Target> Hack for T {}
 
+                // TODO?: use tries for more efficient longest prefix matching
+
                 $(
+                #[allow(clippy::string_lit_as_bytes)]
                 if target.$ext().is_some() {
-                    // TODO?: use tries for more efficient longest prefix matching
-                    #[allow(clippy::string_lit_as_bytes)]
-                    match body {
-                        $(_ if body.starts_with($name.as_bytes()) => {
-                            crate::__dead_code_marker!($name, "prefix_match");
+                    $(
+                    if buf.strip_prefix($name.as_bytes()) {
+                        crate::__dead_code_marker!($name, "prefix_match");
 
-                            let buf = buf.trim_start_body_bytes($name.len());
-                            let cmd = $mod::$command::from_packet(buf)
-                                .ok_or(CommandParseError::MalformedCommand($name))?;
+                        let cmd = $mod::$command::from_packet(buf)?;
 
-                            return Ok(
-                                Command::[<$ext:camel>](
-                                    ext::[<$ext:camel>]::$command(cmd)
-                                )
+                        return Some(
+                            Command::[<$ext:camel>](
+                                ext::[<$ext:camel>]::$command(cmd)
                             )
-                        })*
-                        _ => {},
+                        )
                     }
+                    )*
                 }
                 )*
 
-                Ok(Command::Unknown(buf.into_body()))
+                if let Some(breakpoint_ops) = target.breakpoints() {
+                    use breakpoint::{BasicBreakpoint, BytecodeBreakpoint};
+
+                    if buf.strip_prefix(b"z") {
+                        let cmd = BasicBreakpoint::from_slice(buf.into_body())?;
+                        return Some(Command::Breakpoints(ext::Breakpoints::z(cmd)))
+                    }
+
+                    if buf.strip_prefix(b"Z") {
+                        if breakpoint_ops.breakpoint_agent().is_none() {
+                            let cmd = BasicBreakpoint::from_slice(buf.into_body())?;
+                            return Some(Command::Breakpoints(ext::Breakpoints::Z(cmd)))
+                        } else {
+                            let cmd = BytecodeBreakpoint::from_slice(buf.into_body())?;
+                            return Some(Command::Breakpoints(ext::Breakpoints::ZWithBytecode(cmd)))
+                        }
+                    }
+                }
+
+                Some(Command::Unknown(buf.into_body()))
             }
         }
     }};
-}
-
-/// Command parse error
-// TODO?: add more granular errors to command parsing code
-pub enum CommandParseError<'a> {
-    Empty,
-    /// catch-all
-    MalformedCommand(&'a str),
 }
 
 commands! {
@@ -125,11 +146,6 @@ commands! {
         "vKill" => _vKill::vKill,
     }
 
-    breakpoints use 'a {
-        "z" => _z::z<'a>,
-        "Z" => _z_upcase::Z<'a>,
-    }
-
     extended_mode use 'a {
         "!" => exclamation_mark::ExclamationMark,
         "QDisableRandomization" => _QDisableRandomization::QDisableRandomization,
@@ -149,5 +165,9 @@ commands! {
 
     section_offsets {
         "qOffsets" => _qOffsets::qOffsets,
+    }
+
+    agent {
+        "QAgent" => _QAgent::QAgent,
     }
 }

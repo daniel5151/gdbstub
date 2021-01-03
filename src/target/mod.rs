@@ -119,7 +119,7 @@ pub mod ext;
 pub enum TargetError<E> {
     /// A non-specific, non-fatal error has occurred.
     NonFatal,
-    /// I/O Error.
+    /// I/O Error. Only available when the `std` feature is enabled.
     ///
     /// At the moment, this is just shorthand for
     /// `TargetError::NonFatal(e.raw_os_err().unwrap_or(121))`. Error code `121`
@@ -129,8 +129,6 @@ pub enum TargetError<E> {
     /// LLDB protocol extension, which would allow sending additional error
     /// context (in the form of an ASCII string) when an I/O error occurs. If
     /// this is something you're interested in, consider opening a PR!
-    ///
-    /// Only available when the `std` feature is enabled.
     #[cfg(feature = "std")]
     Io(std::io::Error),
     /// An operation-specific non-fatal error code.
@@ -139,6 +137,7 @@ pub enum TargetError<E> {
     ///
     /// **WARNING:** Returning this error will immediately halt the target's
     /// execution and return a `GdbStubError::TargetError` from `GdbStub::run`!
+    ///
     /// Note that the debugging session will will _not_ be terminated, and can
     /// be resumed by calling `GdbStub::run` after resolving the error and/or
     /// setting up a post-mortem debugging environment.
@@ -228,6 +227,11 @@ pub trait Target {
     fn section_offsets(&mut self) -> Option<ext::section_offsets::SectionOffsetsOps<Self>> {
         None
     }
+
+    /// TODO: more docs
+    fn agent(&mut self) -> Option<ext::agent::AgentOps<Self>> {
+        None
+    }
 }
 
 macro_rules! impl_dyn_target {
@@ -258,6 +262,10 @@ macro_rules! impl_dyn_target {
 
             fn section_offsets(&mut self) -> Option<ext::section_offsets::SectionOffsetsOps<Self>> {
                 (**self).section_offsets()
+            }
+
+            fn agent(&mut self) -> Option<ext::agent::AgentOps<Self>> {
+                (**self).agent()
             }
         }
     };

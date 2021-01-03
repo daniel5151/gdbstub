@@ -83,15 +83,13 @@ impl<'a> PacketBuf<'a> {
         })
     }
 
-    pub fn trim_start_body_bytes(self, n: usize) -> Self {
-        PacketBuf {
-            buf: self.buf,
-            body_range: (self.body_range.start + n)..self.body_range.end,
+    pub fn strip_prefix(&mut self, prefix: &[u8]) -> bool {
+        if self.buf[self.body_range.clone()].starts_with(prefix) {
+            self.body_range = (self.body_range.start + prefix.len())..self.body_range.end;
+            true
+        } else {
+            false
         }
-    }
-
-    pub fn as_body(&'a self) -> &'a [u8] {
-        &self.buf[self.body_range.clone()]
     }
 
     /// Return a mut reference to slice of the packet buffer corresponding to
@@ -129,8 +127,7 @@ impl<'a> Packet<'a> {
         match buf[0] {
             b'$' => Ok(Packet::Command(
                 Command::from_packet(target, PacketBuf::new(buf)?)
-                    // TODO?: preserve command parse error context
-                    .map_err(|_| PacketParseError::MalformedCommand)?,
+                    .ok_or(PacketParseError::MalformedCommand)?,
             )),
             b'+' => Ok(Packet::Ack),
             b'-' => Ok(Packet::Nack),

@@ -54,8 +54,11 @@ mod tests {
     macro_rules! test_buf {
         ($bufname:ident, $body:literal) => {
             let mut test = $body.to_vec();
-            let buf = PacketBuf::new_with_raw_body(&mut test).unwrap();
-            let $bufname = buf.trim_start_body_bytes(b"vRun".len());
+            let mut buf = PacketBuf::new_with_raw_body(&mut test).unwrap();
+            if !buf.strip_prefix(b"vRun") {
+                panic!("invalid test");
+            }
+            let $bufname = buf;
         };
     }
 

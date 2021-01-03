@@ -1,4 +1,7 @@
+use std::collections::HashMap;
+
 use armv4t_emu::{reg, Cpu, ExampleMem, Memory, Mode};
+use gdbstub::target::ext::agent::BytecodeId;
 
 use crate::mem_sniffer::{AccessKind, MemSniffer};
 use crate::DynResult;
@@ -13,6 +16,25 @@ pub enum Event {
     WatchRead(u32),
 }
 
+#[derive(Default, Debug, Clone)]
+pub(crate) struct GdbAgent {
+    pub bytecode_id_counter: usize,
+    pub agent_bytecode: HashMap<BytecodeId, Vec<u8>>,
+    pub breakpoint_conditions: HashMap<u32, Vec<BytecodeId>>,
+    pub breakpoint_commands: HashMap<u32, Vec<BytecodeId>>,
+}
+
+impl GdbAgent {
+    pub fn new() -> GdbAgent {
+        GdbAgent {
+            bytecode_id_counter: 0,
+            agent_bytecode: HashMap::new(),
+            breakpoint_conditions: HashMap::new(),
+            breakpoint_commands: HashMap::new(),
+        }
+    }
+}
+
 /// incredibly barebones armv4t-based emulator
 pub struct Emu {
     start_addr: u32,
@@ -22,6 +44,8 @@ pub struct Emu {
 
     pub(crate) watchpoints: Vec<u32>,
     pub(crate) breakpoints: Vec<u32>,
+
+    pub(crate) agent: Option<Box<GdbAgent>>,
 }
 
 impl Emu {
@@ -63,8 +87,11 @@ impl Emu {
             start_addr: elf_header.entry as u32,
             cpu,
             mem,
+
             watchpoints: Vec::new(),
             breakpoints: Vec::new(),
+
+            agent: Some(Box::new(GdbAgent::new())),
         })
     }
 
