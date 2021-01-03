@@ -1,23 +1,16 @@
 //! Implementations for various PowerPC architectures.
 
 use crate::arch::Arch;
-use crate::arch::RegId;
 
 pub mod reg;
 
 /// Implements `Arch` for 32-bit PowerPC + AltiVec SIMD.
-///
-/// Check out the [module level docs](../index.html#whats-with-regidimpl) for
-/// more info about the `RegIdImpl` type parameter.
-pub enum PowerPcAltivec32<RegIdImpl: RegId> {
-    #[doc(hidden)]
-    _Marker(core::marker::PhantomData<RegIdImpl>),
-}
+pub enum PowerPcAltivec32 {}
 
-impl<RegIdImpl: RegId> Arch for PowerPcAltivec32<RegIdImpl> {
+impl Arch for PowerPcAltivec32 {
     type Usize = u32;
     type Registers = reg::PowerPcCommonRegs;
-    type RegId = RegIdImpl;
+    type RegId = reg::id::PowerPc32RegId;
 
     fn target_description_xml() -> Option<&'static str> {
         Some(
