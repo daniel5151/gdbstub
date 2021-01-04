@@ -54,11 +54,13 @@ impl RegId for PowerPc32RegId {
 
 #[cfg(test)]
 mod tests {
+    use crate::arch::ppc::reg;
     use crate::arch::traits::RegId;
     use crate::arch::traits::Registers;
 
     fn test<Rs: Registers, RId: RegId>() {
-        // Obtain the data length written by `gdb_serialize` by passing a custom closure.
+        // Obtain the data length written by `gdb_serialize` by passing a custom
+        // closure.
         let mut serialized_data_len = 0;
         let counter = |b: Option<u8>| {
             if b.is_some() {
@@ -80,6 +82,6 @@ mod tests {
 
     #[test]
     fn test_powerpc() {
-        test::<crate::arch::ppc::reg::PowerPcCommonRegs, crate::arch::ppc::reg::id::PowerPc32RegId>()
+        test::<reg::PowerPcCommonRegs, reg::id::PowerPc32RegId>()
     }
 }
