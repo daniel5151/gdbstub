@@ -87,6 +87,7 @@ impl Arch for MipsWithDsp {
     type Usize = u32;
     type Registers = reg::MipsCoreRegsWithDsp<u32>;
     type RegId = reg::id::MipsRegId<u32>;
+    type BreakpointKind = MipsBreakpointKind;
 
     fn target_description_xml() -> Option<&'static str> {
         Some(
@@ -99,6 +100,7 @@ impl Arch for Mips64WithDsp {
     type Usize = u64;
     type Registers = reg::MipsCoreRegsWithDsp<u64>;
     type RegId = reg::id::MipsRegId<u64>;
+    type BreakpointKind = MipsBreakpointKind;
 
     fn target_description_xml() -> Option<&'static str> {
         Some(

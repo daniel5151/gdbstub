@@ -38,6 +38,14 @@ pub struct X87FpuInternalRegs {
 }
 
 impl Registers for X87FpuInternalRegs {
+    type ProgramCounter = u32;
+
+    // HACK: this struct is never used as an architecture's main register file, so
+    // using a dummy value here is fine.
+    fn pc(&self) -> Self::ProgramCounter {
+        0
+    }
+
     fn gdb_serialize(&self, mut write_byte: impl FnMut(Option<u8>)) {
         macro_rules! write_bytes {
             ($bytes:expr) => {

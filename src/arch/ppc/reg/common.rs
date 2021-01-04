@@ -39,6 +39,12 @@ pub struct PowerPcCommonRegs {
 }
 
 impl Registers for PowerPcCommonRegs {
+    type ProgramCounter = u32;
+
+    fn pc(&self) -> Self::ProgramCounter {
+        self.pc
+    }
+
     fn gdb_serialize(&self, mut write_byte: impl FnMut(Option<u8>)) {
         macro_rules! write_bytes {
             ($bytes:expr) => {

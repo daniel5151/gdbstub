@@ -92,6 +92,12 @@ impl<U> Registers for MipsCoreRegs<U>
 where
     U: PrimInt + LeBytes + Default + core::fmt::Debug,
 {
+    type ProgramCounter = U;
+
+    fn pc(&self) -> Self::ProgramCounter {
+        self.pc
+    }
+
     fn gdb_serialize(&self, mut write_byte: impl FnMut(Option<u8>)) {
         macro_rules! write_le_bytes {
             ($value:expr) => {
@@ -183,6 +189,12 @@ impl<U> Registers for MipsCoreRegsWithDsp<U>
 where
     U: PrimInt + LeBytes + Default + core::fmt::Debug,
 {
+    type ProgramCounter = U;
+
+    fn pc(&self) -> Self::ProgramCounter {
+        self.core.pc
+    }
+
     fn gdb_serialize(&self, mut write_byte: impl FnMut(Option<u8>)) {
         macro_rules! write_le_bytes {
             ($value:expr) => {

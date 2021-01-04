@@ -28,6 +28,12 @@ pub struct X86_64CoreRegs {
 }
 
 impl Registers for X86_64CoreRegs {
+    type ProgramCounter = u64;
+
+    fn pc(&self) -> Self::ProgramCounter {
+        self.rip
+    }
+
     fn gdb_serialize(&self, mut write_byte: impl FnMut(Option<u8>)) {
         macro_rules! write_bytes {
             ($bytes:expr) => {

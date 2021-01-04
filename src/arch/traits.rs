@@ -30,6 +30,13 @@ impl RegId for () {
 /// github.com/bminor/binutils-gdb/blob/master/gdb/features/arm/arm-core.xml
 // TODO: add way to de/serialize arbitrary "missing"/"uncollected" registers.
 pub trait Registers: Default + Debug + Clone + PartialEq {
+    /// The type of the architecture's program counter / instruction pointer.
+    /// Must match with the corresponding `Arch::Usize`.
+    type ProgramCounter: Copy;
+
+    /// Return the value of the program counter / instruction pointer.
+    fn pc(&self) -> Self::ProgramCounter;
+
     /// Serialize `self` into a GDB register bytestream.
     ///
     /// Missing registers are serialized by passing `None` to write_byte.
@@ -88,7 +95,7 @@ pub trait Arch {
     type Usize: PrimInt + Unsigned + BeBytes + LeBytes;
 
     /// The architecture's register file.
-    type Registers: Registers;
+    type Registers: Registers<ProgramCounter = Self::Usize>;
 
     /// The architecture's breakpoint kind, used to determine the "size"
     /// of breakpoint to set. See [`BreakpointKind`] for more details.

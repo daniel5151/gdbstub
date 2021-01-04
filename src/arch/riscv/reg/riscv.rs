@@ -22,6 +22,12 @@ impl<U> Registers for RiscvCoreRegs<U>
 where
     U: PrimInt + LeBytes + Default + core::fmt::Debug,
 {
+    type ProgramCounter = U;
+
+    fn pc(&self) -> Self::ProgramCounter {
+        self.pc
+    }
+
     fn gdb_serialize(&self, mut write_byte: impl FnMut(Option<u8>)) {
         macro_rules! write_le_bytes {
             ($value:expr) => {
