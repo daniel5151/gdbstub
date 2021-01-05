@@ -117,12 +117,17 @@ impl target::ext::breakpoints::BreakpointAgent for Emu {
         &mut self,
         kind: BreakpointBytecodeKind,
         addr: u32,
-        callback: &mut dyn FnMut(BreakpointAgentOps<Self>, BytecodeId) -> TargetResult<(), Self>,
-    ) -> TargetResult<(), Self> {
-        // see the method's documentation for more info why this rigamarole is required.
+        callback: &mut dyn FnMut(BreakpointAgentOps<Self>, BytecodeId) -> Result<(), Self::Error>,
+    ) -> Result<(), Self::Error> {
+        log::warn!(
+            "Iterating over all {:?} bytecode expressions at {:#010x?}",
+            kind,
+            addr
+        );
 
-        // temporarily take ownership of the agent data.
-        let mut agent = self.agent.take().unwrap();
+        // FIXME: this clone is bad, and the API should be re-written to avoid this.
+        // e.g: by decoupling the lifetime of the agent from the target.
+        let mut agent = self.agent.clone().unwrap();
 
         let ids = match kind {
             BreakpointBytecodeKind::Command => &mut agent.breakpoint_commands,

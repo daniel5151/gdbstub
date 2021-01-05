@@ -15,19 +15,51 @@ impl<'a> ParseCommand<'a> for vCont<'a> {
         let body = buf.into_body();
         match body as &[u8] {
             b"?" => Some(vCont::Query),
-            _ => Some(vCont::Actions(Actions(body))),
+            _ => Some(vCont::Actions(Actions::new_from_buf(body))),
         }
     }
 }
 
-/// A lazily evaluated iterator over the actions specified in a vCont packet.
 #[derive(Debug)]
-pub struct Actions<'a>(&'a mut [u8]);
+pub enum Actions<'a> {
+    Buf(ActionsBuf<'a>),
+    Fixed(ActionsFixed),
+}
 
 impl<'a> Actions<'a> {
-    pub fn into_iter(self) -> impl Iterator<Item = Option<VContAction<'a>>> + 'a {
-        self.0.split_mut(|b| *b == b';').skip(1).map(|act| {
-            let mut s = act.split_mut(|b| *b == b':');
+    fn new_from_buf(buf: &'a [u8]) -> Actions<'a> {
+        Actions::Buf(ActionsBuf(buf))
+    }
+
+    pub fn new_step(tid: ThreadId) -> Actions<'a> {
+        Actions::Fixed(ActionsFixed(VContAction {
+            kind: VContKind::from_bytes(b"s").unwrap(),
+            thread: Some(tid),
+        }))
+    }
+
+    pub fn new_continue(tid: ThreadId) -> Actions<'a> {
+        Actions::Fixed(ActionsFixed(VContAction {
+            kind: VContKind::from_bytes(b"c").unwrap(),
+            thread: Some(tid),
+        }))
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = Option<VContAction>> + 'a {
+        match self {
+            Actions::Fixed(x) => EitherIter::Left(x.iter()),
+            Actions::Buf(x) => EitherIter::Right(x.iter()),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct ActionsBuf<'a>(&'a [u8]);
+
+impl<'a> ActionsBuf<'a> {
+    fn iter(&self) -> impl Iterator<Item = Option<VContAction>> + 'a {
+        self.0.split(|b| *b == b';').skip(1).map(|act| {
+            let mut s = act.split(|b| *b == b':');
             let kind = s.next()?;
             let thread = match s.next() {
                 Some(s) => Some(s.try_into().ok()?),
@@ -43,23 +75,32 @@ impl<'a> Actions<'a> {
 }
 
 #[derive(Debug)]
-pub struct VContAction<'a> {
-    pub kind: VContKind<'a>,
+pub struct ActionsFixed(VContAction);
+
+impl ActionsFixed {
+    fn iter(&self) -> impl Iterator<Item = Option<VContAction>> {
+        Some(Some(self.0)).into_iter()
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct VContAction {
+    pub kind: VContKind,
     pub thread: Option<ThreadId>,
 }
 
-#[derive(Debug)]
-pub enum VContKind<'a> {
+#[derive(Debug, Copy, Clone)]
+pub enum VContKind {
     Continue,
     ContinueWithSig(u8),
-    RangeStep(&'a [u8], &'a [u8]),
+    // RangeStep(&'a [u8], &'a [u8]),
     Step,
     StepWithSig(u8),
     Stop,
 }
 
-impl<'a> VContKind<'a> {
-    fn from_bytes(s: &mut [u8]) -> Option<VContKind> {
+impl VContKind {
+    fn from_bytes(s: &[u8]) -> Option<VContKind> {
         use self::VContKind::*;
 
         let res = match s {
@@ -68,15 +109,36 @@ impl<'a> VContKind<'a> {
             [b't'] => Stop,
             [b'C', sig @ ..] => ContinueWithSig(decode_hex(sig).ok()?),
             [b'S', sig @ ..] => StepWithSig(decode_hex(sig).ok()?),
-            [b'r', range @ ..] => {
-                let mut range = range.split_mut(|b| *b == b',');
-                let start = decode_hex_buf(range.next()?).ok()?;
-                let end = decode_hex_buf(range.next()?).ok()?;
-                RangeStep(start, end)
-            }
+            // [b'r', range @ ..] => {
+            //     let mut range = range.split_mut(|b| *b == b',');
+            //     let start = decode_hex_buf(range.next()?).ok()?;
+            //     let end = decode_hex_buf(range.next()?).ok()?;
+            //     RangeStep(start, end)
+            // }
             _ => return None,
         };
 
         Some(res)
+    }
+}
+
+/// Helper type to unify iterators that output the same type. Returned as an
+/// opaque type from `Actions::iter()`.
+enum EitherIter<A, B> {
+    Left(A),
+    Right(B),
+}
+
+impl<A, B, T> Iterator for EitherIter<A, B>
+where
+    A: Iterator<Item = T>,
+    B: Iterator<Item = T>,
+{
+    type Item = T;
+    fn next(&mut self) -> Option<T> {
+        match self {
+            EitherIter::Left(a) => a.next(),
+            EitherIter::Right(b) => b.next(),
+        }
     }
 }

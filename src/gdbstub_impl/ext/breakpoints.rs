@@ -10,6 +10,7 @@ enum CmdKind {
 }
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
+    #[inline(always)]
     fn handle_breakpoint_common(
         &mut self,
         ops: crate::target::ext::breakpoints::BreakpointsOps<T>,

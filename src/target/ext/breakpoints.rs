@@ -223,60 +223,13 @@ pub trait BreakpointAgent: Target + Breakpoints + Agent {
     /// breakpoint at `addr`, calling `callback(self, id)` for each
     /// `BytecodeId`.
     ///
-    /// # Borrow-Checker Pitfalls
-    ///
-    /// Since the `callback` accepts a `&mut self`, you may encounter
-    /// borrow-checker errors if the data structure used to track registered
-    /// breakpoint bytecodes is owned by `self`.
-    ///
-    /// e.g: consider an implementation where `self` as a
-    /// `commands: HashMap<usize, HashSet<BytecodeId>>` field, and
-    /// tries to iterate over it as follows:
-    ///
-    /// ```compile_fail
-    /// for id in self.commands.get(&addr).unwrap() {
-    ///     callback(self, *id)?
-    /// }
-    /// ```
-    ///
-    /// Alas, this will fail to compile, as there's no way to guarantee that the
-    /// callback doesn't attempt to modify `self.commands`.
-    ///
-    /// The simplest fix would be to simply clone the field prior to iterating
-    /// over it. This works... though it may result in degraded performance
-    /// when a breakpoint is being hit in a hot loop.
-    ///
-    /// Instead, a better approach might be to wrap the data structure in an
-    /// `Option`, temporarily taking ownership of the data prior to iterating
-    /// over it using [`Option::take`].
-    ///
-    /// The code would look something like this:
-    ///
-    /// ```ignored
-    /// let cmds = self.commands.take().unwrap();
-    /// let mut res = Ok(());
-    /// for id in self.commands.get(&addr).unwrap() {
-    ///     res = callback(self, *id)
-    ///     if res.is_err() {
-    ///         break;
-    ///     }
-    /// }
-    /// self.commands = Some(cmds); // don't forget!
-    /// res
-    /// ```
-    ///
-    /// While this approach is certainly more unwieldy that calling `.clone()`,
-    /// it has a bounded runtime, and is guaranteed to never heap-allocate.
-    ///
-    /// Protip: if the data structure is relatively heavy to memcpy (e.g: using
-    /// a fixed-length array), wrapping the field in a `Box<...>` (or `&mut ...`
-    /// on `no_std`) makes `Option::take` significantly cheaper.
+    /// If no breakpoint is registered at `addr`, this method should be a no-op.
     fn get_breakpoint_bytecode(
         &mut self,
         kind: BreakpointBytecodeKind,
         addr: <Self::Arch as Arch>::Usize,
-        callback: &mut dyn FnMut(BreakpointAgentOps<Self>, BytecodeId) -> TargetResult<(), Self>,
-    ) -> TargetResult<(), Self>;
+        callback: &mut dyn FnMut(BreakpointAgentOps<Self>, BytecodeId) -> Result<(), Self::Error>,
+    ) -> Result<(), Self::Error>;
 }
 
 define_ext!(BreakpointAgentOps, BreakpointAgent);

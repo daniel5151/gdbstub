@@ -275,89 +275,63 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 HandlerStatus::NeedsOK
             }
             Base::vCont(cmd) => {
-                use crate::protocol::commands::_vCont::{vCont, VContKind};
-
-                let actions = match cmd {
+                use crate::protocol::commands::_vCont::vCont;
+                match cmd {
                     vCont::Query => {
                         res.write_str("vCont;c;C;s;S")?;
-                        return Ok(HandlerStatus::Handled);
+                        HandlerStatus::Handled
                     }
-                    vCont::Actions(actions) => actions,
-                };
-
-                // map raw vCont action iterator to a format the `Target` expects
-                let mut err = Ok(());
-                let mut actions = actions.into_iter().filter_map(|action| {
-                    let action = match action {
-                        Some(action) => action,
-                        None => {
-                            err = Err(Error::PacketParse(
-                                crate::protocol::PacketParseError::MalformedCommand,
-                            ));
-                            return None;
-                        }
-                    };
-
-                    let resume_action = match action.kind {
-                        VContKind::Step => ResumeAction::Step,
-                        VContKind::Continue => ResumeAction::Continue,
-                        _ => {
-                            // there seems to be a GDB bug where it doesn't use `vCont` unless
-                            // `vCont?` returns support for resuming with a signal.
-                            //
-                            // This error case can be removed once "Resume with Signal" is
-                            // implemented
-                            err = Err(Error::ResumeWithSignalUnimplemented);
-                            return None;
-                        }
-                    };
-
-                    let tid = match action.thread {
-                        Some(thread) => match thread.tid {
-                            IdKind::Any => {
-                                err = Err(Error::PacketUnexpected);
-                                return None;
-                            }
-                            IdKind::All => TidSelector::All,
-                            IdKind::WithID(tid) => TidSelector::WithID(tid),
-                        },
-                        // An action with no thread-id matches all threads
-                        None => TidSelector::All,
-                    };
-
-                    Some((tid, resume_action))
-                });
-
-                let ret = match self.do_vcont(res, target, &mut actions) {
-                    Ok(None) => HandlerStatus::Handled,
-                    Ok(Some(dc)) => HandlerStatus::Disconnect(dc),
-                    Err(e) => return Err(e),
-                };
-                err?;
-                ret
+                    vCont::Actions(actions) => self.do_vcont(res, target, actions)?,
+                }
             }
             // TODO?: support custom resume addr in 'c' and 's'
+            //
+            // unfortunately, this wouldn't be a particularly easy thing to implement, since the
+            // vCont packet doesn't natively support custom resume addresses. This leaves a few
+            // options for the implementation:
+            //
+            // 1. Adding new ResumeActions (i.e: ContinueWithAddr(U) and StepWithAddr(U))
+            // 2. Automatically calling `read_registers`, updating the `pc`, and calling
+            //    `write_registers` prior to resuming.
+            //    - will require adding some sort of `get_pc_mut` method to the `Registers` trait.
+            //
+            // Option 1 is easier to implement, but puts more burden on the implementor. Option 2
+            // will require more effort to implement (and will be less performant), but it will hide
+            // this protocol wart from the end user.
+            //
+            // Oh, one more thought - there's a subtle pitfall to watch out for if implementing
+            // Option 1: if the target is using conditional breakpoints, `do_vcont` has to be
+            // modified to only pass the resume with address variants on the _first_ iteration
+            // through the loop.
             Base::c(_) => {
-                match self.do_vcont(
+                use crate::protocol::commands::_vCont::Actions;
+
+                self.do_vcont(
                     res,
                     target,
-                    &mut core::iter::once((self.current_resume_tid, ResumeAction::Continue)),
-                ) {
-                    Ok(None) => HandlerStatus::Handled,
-                    Ok(Some(dc)) => HandlerStatus::Disconnect(dc),
-                    Err(e) => return Err(e),
-                }
+                    Actions::new_continue(ThreadId {
+                        pid: None,
+                        tid: match self.current_resume_tid {
+                            TidSelector::WithID(id) => IdKind::WithID(id),
+                            TidSelector::All => IdKind::All,
+                        },
+                    }),
+                )?
             }
             Base::s(_) => {
-                match self.do_vcont(
+                use crate::protocol::commands::_vCont::Actions;
+
+                self.do_vcont(
                     res,
                     target,
-                    &mut core::iter::once((self.current_resume_tid, ResumeAction::Step)),
-                ) {
-                    Ok(None) => HandlerStatus::Handled,
-                    Ok(Some(dc)) => HandlerStatus::Disconnect(dc),
-                    Err(e) => return Err(e),
-                }
+                    Actions::new_step(ThreadId {
+                        pid: None,
+                        tid: match self.current_resume_tid {
+                            TidSelector::WithID(id) => IdKind::WithID(id),
+                            TidSelector::All => IdKind::All,
+                        },
+                    }),
+                )?
             }
 
             // ------------------- Multi-threading Support ------------------ //
@@ -446,110 +420,250 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         &mut self,
         res: &mut ResponseWriter<C>,
         target: &mut T,
-        actions: &mut dyn Iterator<Item = (TidSelector, ResumeAction)>,
-    ) -> Result<Option<DisconnectReason>, Error<T::Error, C::Error>> {
-        let mut err = Ok(());
+        base_actions: crate::protocol::commands::_vCont::Actions,
+    ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
+        loop {
+            let mut err = Ok(());
 
-        let mut check_gdb_interrupt = || match res.as_conn().peek() {
-            Ok(Some(0x03)) => true, // 0x03 is the interrupt byte
-            Ok(Some(_)) => false,   // it's nothing that can't wait...
-            Ok(None) => false,
-            Err(e) => {
-                err = Err(Error::ConnectionRead(e));
-                true // break ASAP if a connection error occurred
-            }
-        };
+            let mut actions = base_actions.iter().filter_map(|action| {
+                use crate::protocol::commands::_vCont::VContKind;
 
-        let stop_reason = match target.base_ops() {
-            BaseOps::SingleThread(ops) => ops
-                .resume(
-                    // TODO?: add a more descriptive error if vcont has multiple threads in
-                    // single-threaded mode?
-                    actions.next().ok_or(Error::PacketUnexpected)?.1,
-                    &mut check_gdb_interrupt,
-                )
-                .map_err(Error::TargetError)?
-                .into(),
-            BaseOps::MultiThread(ops) => ops
-                .resume(Actions::new(actions), &mut check_gdb_interrupt)
-                .map_err(Error::TargetError)?,
-        };
-
-        err?;
-
-        self.finish_vcont(stop_reason, target, res)
-    }
-
-    // DEVNOTE: `do_vcont` and `finish_vcont` could be merged into a single
-    // function, at the expense of slightly larger code. In the future, if the
-    // `vCont` machinery is re-written, there's no reason why the two functions
-    // couldn't be re-merged.
-
-    fn finish_vcont(
-        &mut self,
-        stop_reason: ThreadStopReason<<T::Arch as Arch>::Usize>,
-        target: &mut T,
-        res: &mut ResponseWriter<C>,
-    ) -> Result<Option<DisconnectReason>, Error<T::Error, C::Error>> {
-        match stop_reason {
-            ThreadStopReason::DoneStep | ThreadStopReason::GdbInterrupt => {
-                res.write_str("S05")?;
-                Ok(None)
-            }
-            ThreadStopReason::Signal(code) => {
-                res.write_str("S")?;
-                res.write_num(code)?;
-                Ok(None)
-            }
-            ThreadStopReason::Halted => {
-                res.write_str("W19")?; // SIGSTOP
-                Ok(Some(DisconnectReason::TargetHalted))
-            }
-            ThreadStopReason::SwBreak(tid)
-            | ThreadStopReason::HwBreak(tid)
-            | ThreadStopReason::Watch { tid, .. } => {
-                self.current_mem_tid = tid;
-                self.current_resume_tid = TidSelector::WithID(tid);
-
-                if let Some(agent_ops) = target
-                    .breakpoints()
-                    .and_then(|bp_ops| bp_ops.breakpoint_agent())
-                {
-                    // use crate::target::ext::breakpoints::BreakpointBytecodeKind;
-                    if agent_ops.breakpoint_bytecode_executor().is_gdbstub() {
-                        // TODO: evaluate the conditions and commands
+                let action = match action {
+                    Some(action) => action,
+                    None => {
+                        err = Err(Error::PacketParse(
+                            crate::protocol::PacketParseError::MalformedCommand,
+                        ));
+                        return None;
                     }
-                }
-
-                res.write_str("T05")?;
-
-                res.write_str("thread:")?;
-                res.write_thread_id(ThreadId {
-                    pid: Some(IdKind::WithID(FAKE_PID)),
-                    tid: IdKind::WithID(tid),
-                })?;
-                res.write_str(";")?;
-
-                match stop_reason {
-                    // don't include addr on sw/hw break
-                    ThreadStopReason::SwBreak(_) => res.write_str("swbreak:")?,
-                    ThreadStopReason::HwBreak(_) => res.write_str("hwbreak:")?,
-                    ThreadStopReason::Watch { kind, addr, .. } => {
-                        use crate::target::ext::breakpoints::WatchKind;
-                        match kind {
-                            WatchKind::Write => res.write_str("watch:")?,
-                            WatchKind::Read => res.write_str("rwatch:")?,
-                            WatchKind::ReadWrite => res.write_str("awatch:")?,
-                        }
-                        res.write_num(addr)?;
-                    }
-                    _ => unreachable!(),
                 };
 
-                res.write_str(";")?;
-                Ok(None)
+                let resume_action = match action.kind {
+                    VContKind::Step => ResumeAction::Step,
+                    VContKind::Continue => ResumeAction::Continue,
+                    _ => {
+                        // there seems to be a GDB bug where it doesn't use `vCont` unless
+                        // `vCont?` returns support for resuming with a signal.
+                        //
+                        // This error case can be removed once "Resume with Signal" is
+                        // implemented
+                        err = Err(Error::ResumeWithSignalUnimplemented);
+                        return None;
+                    }
+                };
+
+                // FIXME: this error handling could be removed by tweaking the `vCont` packet to
+                // parse `TidSelector` directly, thereby handing the `IdKind::Any` up the chain.
+                let tid = match action.thread {
+                    Some(thread) => match thread.tid {
+                        IdKind::Any => {
+                            err = Err(Error::PacketUnexpected);
+                            return None;
+                        }
+                        IdKind::All => TidSelector::All,
+                        IdKind::WithID(tid) => TidSelector::WithID(tid),
+                    },
+                    // An action with no thread-id matches all threads
+                    None => TidSelector::All,
+                };
+
+                Some((tid, resume_action))
+            });
+
+            let mut err2 = Ok(());
+
+            let mut check_gdb_interrupt = || match res.as_conn().peek() {
+                Ok(Some(0x03)) => true, // 0x03 is the interrupt byte
+                Ok(Some(_)) => false,   // it's nothing that can't wait...
+                Ok(None) => false,
+                Err(e) => {
+                    err2 = Err(Error::ConnectionRead(e));
+                    true // break ASAP if a connection error occurred
+                }
+            };
+
+            let stop_reason = match target.base_ops() {
+                BaseOps::SingleThread(ops) => ops
+                    .resume(
+                        // TODO?: add a more descriptive error if vcont has multiple threads in
+                        // single-threaded mode?
+                        actions.next().ok_or(Error::PacketUnexpected)?.1,
+                        &mut check_gdb_interrupt,
+                    )
+                    .map_err(Error::TargetError)?
+                    .into(),
+                BaseOps::MultiThread(ops) => ops
+                    .resume(Actions::new(&mut actions), &mut check_gdb_interrupt)
+                    .map_err(Error::TargetError)?,
+            };
+
+            err?;
+            err2?;
+
+            break match stop_reason {
+                ThreadStopReason::DoneStep | ThreadStopReason::GdbInterrupt => {
+                    res.write_str("S05")?;
+                    Ok(HandlerStatus::Handled)
+                }
+                ThreadStopReason::Signal(code) => {
+                    res.write_str("S")?;
+                    res.write_num(code)?;
+                    Ok(HandlerStatus::Handled)
+                }
+                ThreadStopReason::Halted => {
+                    res.write_str("W19")?; // SIGSTOP
+                    Ok(HandlerStatus::Disconnect(DisconnectReason::TargetHalted))
+                }
+                ThreadStopReason::SwBreak(tid)
+                | ThreadStopReason::HwBreak(tid)
+                | ThreadStopReason::Watch { tid, .. } => {
+                    self.current_mem_tid = tid;
+                    self.current_resume_tid = TidSelector::WithID(tid);
+
+                    if let Some(agent_ops) = target
+                        .breakpoints()
+                        .and_then(|bp_ops| bp_ops.breakpoint_agent())
+                    {
+                        if agent_ops.breakpoint_bytecode_executor().is_gdbstub()
+                            && !self.eval_breakpoint_bytecode(agent_ops, res)?
+                        {
+                            // condition didn't evaluate to true - resume the target
+                            continue;
+                        }
+                    }
+
+                    res.write_str("T05")?;
+
+                    res.write_str("thread:")?;
+                    res.write_thread_id(ThreadId {
+                        pid: Some(IdKind::WithID(FAKE_PID)),
+                        tid: IdKind::WithID(tid),
+                    })?;
+                    res.write_str(";")?;
+
+                    match stop_reason {
+                        // don't include addr on sw/hw break
+                        ThreadStopReason::SwBreak(_) => res.write_str("swbreak:")?,
+                        ThreadStopReason::HwBreak(_) => res.write_str("hwbreak:")?,
+                        ThreadStopReason::Watch { kind, addr, .. } => {
+                            use crate::target::ext::breakpoints::WatchKind;
+                            match kind {
+                                WatchKind::Write => res.write_str("watch:")?,
+                                WatchKind::Read => res.write_str("rwatch:")?,
+                                WatchKind::ReadWrite => res.write_str("awatch:")?,
+                            }
+                            res.write_num(addr)?;
+                        }
+                        _ => unreachable!(),
+                    };
+
+                    res.write_str(";")?;
+                    Ok(HandlerStatus::Handled)
+                }
+            };
+        }
+    }
+
+    // evaluate any bytecode associated with the current breakpoint, returning a
+    // boolean indicating whether or not to report the breakpoint hit back to the
+    // client.
+    fn eval_breakpoint_bytecode(
+        &mut self,
+        target: crate::target::ext::breakpoints::BreakpointAgentOps<T>,
+        res: &mut ResponseWriter<C>,
+    ) -> Result<bool, Error<T::Error, C::Error>> {
+        use crate::target::ext::breakpoints::{BreakpointAgentOps, BreakpointBytecodeKind};
+
+        let mut regs: <T::Arch as Arch>::Registers = Default::default();
+        let err = match target.base_ops() {
+            BaseOps::SingleThread(ops) => ops.read_registers(&mut regs),
+            BaseOps::MultiThread(ops) => ops.read_registers(&mut regs, self.current_mem_tid),
+        };
+
+        if let Err(err) = err {
+            if let crate::target::TargetError::Fatal(e) = err {
+                return Err(Error::TargetError(e));
+            } else {
+                // a non-fatal error occurred. it's a bit arbitrary what the behavior in this
+                // case should be, so lets just assume that the best course of action is to
+                // notify GDB of the breakpoint hit.
+                return Ok(true);
             }
         }
+
+        let addr = regs.pc();
+
+        // TODO: instead of hardcoding error messages, pass a `ConsoleOutput` to the
+        // Agent implementation and allow them to dump debug output.
+        let mut err: Result<(), Error<T::Error, C::Error>> = Ok(());
+
+        let mut condition = None;
+        let mut eval_condition = |target: BreakpointAgentOps<T>, id| {
+            use num_traits::*;
+
+            match target.evaluate(id) {
+                Ok(val) => condition = Some(!val.is_zero() || condition.unwrap_or(false)),
+                Err(crate::target::TargetError::Fatal(e)) => err = Err(Error::TargetError(e)),
+                // non-fatal error during bytecode evaluation.
+                Err(_) => {
+                    // TODO: replace with a try block once stabilized
+                    let e = (|| {
+                        let mut res = ResponseWriter::new(res.as_conn());
+                        res.write_str("O")?;
+                        res.write_hex_buf(b"error while evaluating breakpoint ")?;
+                        res.write_hex_buf(b"condition\n")?;
+                        res.flush()?;
+                        Ok(())
+                    })();
+
+                    if let Err(e) = e {
+                        err = Err(e)
+                    }
+                }
+            }
+            Ok(())
+        };
+
+        // ****************** FIXME *********************** //
+        // rewrite API to not require this sort of iteration - if end users use the
+        // whole "Option::take" approach to avoiding copies, then bad things can happen.
+
+        target
+            .get_breakpoint_bytecode(BreakpointBytecodeKind::Condition, addr, &mut eval_condition)
+            .map_err(Error::TargetError)?;
+
+        let condition = condition.unwrap_or(true);
+        if condition {
+            let mut eval_command = |target: BreakpointAgentOps<T>, id| {
+                match target.evaluate(id) {
+                    Ok(_) => {} // result is ignored when evaluating commands
+                    Err(crate::target::TargetError::Fatal(e)) => return Err(e),
+                    // non-fatal error during bytecode evaluation.
+                    Err(_) => {
+                        // TODO: replace with a try block once stabilized
+                        let e = (|| {
+                            let mut res = ResponseWriter::new(res.as_conn());
+                            res.write_str("O")?;
+                            res.write_hex_buf(b"error while evaluating breakpoint ")?;
+                            res.write_hex_buf(b"command\n")?;
+                            res.flush()?;
+                            Ok(())
+                        })();
+
+                        if let Err(e) = e {
+                            err = Err(e)
+                        }
+                    }
+                }
+                Ok(())
+            };
+
+            target
+                .get_breakpoint_bytecode(BreakpointBytecodeKind::Command, addr, &mut eval_command)
+                .map_err(Error::TargetError)?;
+        }
+
+        Ok(condition)
     }
 }
 
