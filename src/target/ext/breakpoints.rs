@@ -133,7 +133,7 @@ define_ext!(HwWatchpointOps, HwWatchpoint);
 
 /// Determines when and where breakpoint bytecode are evaluated.
 ///
-/// See [`BreakpointAgent::condition_executor`] for more details.
+/// See [`BreakpointAgent::breakpoint_bytecode_executor`] for more details.
 #[derive(Debug)]
 pub enum BytecodeExecutor {
     /// Automatically, within the `gdbstub`
@@ -224,6 +224,76 @@ pub trait BreakpointAgent: Target + Breakpoints + Agent {
     /// `BytecodeId`.
     ///
     /// If no breakpoint is registered at `addr`, this method should be a no-op.
+    ///
+    /// # Borrow-Checker Pitfalls
+    ///
+    /// Since the `callback` requires passing `&mut self`, you may encounter
+    /// some borrow-checker errors depending on where you've chosen to store the
+    /// data structure which tracks registered breakpoint bytecodes.
+    ///
+    /// e.g: consider an implementation where `self` (i.e: the Target itself)
+    /// has a `commands: HashMap<usize, HashSet<BytecodeId>>` field, and
+    /// tries to iterate over it as follows:
+    ///
+    /// ```compile_fail
+    /// for id in self.commands.get(&addr).unwrap() {
+    ///     callback(self, *id)?
+    /// }
+    /// ```
+    ///
+    /// Alas, this will fail to compile, as there's no way to guarantee that the
+    /// callback won't attempt to modify `self.commands`. In a less safe
+    /// language, this could result have resulted in iterator invalidation.
+    ///
+    /// So, what's the solution?
+    ///
+    /// Well, the simplest fix would be to simply clone the field prior to
+    /// iterating over it. This works... though it may result in degraded
+    /// performance when a breakpoint is being hit in a hot loop.
+    ///
+    /// Instead, a better approach might be to wrap the data structure in an
+    /// `Option`, temporarily taking ownership of the data prior to iterating
+    /// over it using [`Option::take`].
+    ///
+    /// The code would look something like this:
+    ///
+    /// ```ignored
+    /// let cmds = self.commands.take().unwrap();
+    /// let mut res = Ok(());
+    /// for id in self.commands.get(&addr).unwrap() {
+    ///     res = callback(self, *id)
+    ///     if res.is_err() {
+    ///         break;
+    ///     }
+    /// }
+    /// self.commands = Some(cmds); // don't forget!
+    /// res
+    /// ```
+    ///
+    /// While this approach is certainly more unwieldy that calling `.clone()` -
+    /// requiring other methods to use something like `.as_mut().unwrap()` to
+    /// access the field - using `Option::take` is significantly faster than
+    /// calling `.clone()`, and guarantees a constant runtime + no unnecessary
+    /// heap-allocations.
+    ///
+    /// Protip: if the data structure is relatively heavy to memcpy (e.g: using
+    /// a fixed-length array), wrapping the field in a `Box<...>` (or `&mut ...`
+    /// on `no_std`) makes `Option::take` significantly cheaper.
+    ///
+    /// ## Caveats with `Option::take`
+    ///
+    /// Unfortunately, this workaround is more of a "hack" than an elegant
+    /// solution, and doesn't have the same strong correctness guarantees as the
+    /// `.clone()` method.
+    ///
+    /// For example, while `gdbstub` never actually calls any methods that
+    /// modify the breakpoint list as part of the `callback` method, the
+    /// compiler doesn't actually enforce that fact, and an errant
+    /// implementation in `gdbstub` could break that invariant, resulting in a
+    /// panic when calling `.as_mut().unwrap()` elsewhere in the code.
+    ///
+    /// **TODO:** Explore an alternative `Agent` API that decouples the agent's
+    /// lifetime from the target lifetime.
     fn get_breakpoint_bytecode(
         &mut self,
         kind: BreakpointBytecodeKind,

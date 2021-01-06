@@ -16,12 +16,14 @@ pub enum Event {
     WatchRead(u32),
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug)]
 pub(crate) struct GdbAgent {
     pub bytecode_id_counter: usize,
     pub agent_bytecode: HashMap<BytecodeId, Vec<u8>>,
-    pub breakpoint_conditions: HashMap<u32, Vec<BytecodeId>>,
-    pub breakpoint_commands: HashMap<u32, Vec<BytecodeId>>,
+    // see implementation of `BreakpointAgent::get_breakpoint_bytecode`
+    // for an explanation of why these HashMaps are wrapped with `Option`.
+    pub breakpoint_conditions: Option<HashMap<u32, Vec<BytecodeId>>>,
+    pub breakpoint_commands: Option<HashMap<u32, Vec<BytecodeId>>>,
 }
 
 impl GdbAgent {
@@ -29,8 +31,8 @@ impl GdbAgent {
         GdbAgent {
             bytecode_id_counter: 0,
             agent_bytecode: HashMap::new(),
-            breakpoint_conditions: HashMap::new(),
-            breakpoint_commands: HashMap::new(),
+            breakpoint_conditions: Some(HashMap::new()),
+            breakpoint_commands: Some(HashMap::new()),
         }
     }
 }
@@ -45,7 +47,7 @@ pub struct Emu {
     pub(crate) watchpoints: Vec<u32>,
     pub(crate) breakpoints: Vec<u32>,
 
-    pub(crate) agent: Option<Box<GdbAgent>>,
+    pub(crate) agent: GdbAgent,
 }
 
 impl Emu {
@@ -91,7 +93,7 @@ impl Emu {
             watchpoints: Vec::new(),
             breakpoints: Vec::new(),
 
-            agent: Some(Box::new(GdbAgent::new())),
+            agent: GdbAgent::new(),
         })
     }
 

@@ -81,11 +81,12 @@ impl target::ext::breakpoints::BreakpointAgent for Emu {
     ) -> TargetResult<(), Self> {
         log::warn!("Registered {:?} {:#010x?}:{:?}", kind, addr, id);
 
-        let agent = self.agent.as_mut().unwrap();
         match kind {
-            BreakpointBytecodeKind::Command => &mut agent.breakpoint_commands,
-            BreakpointBytecodeKind::Condition => &mut agent.breakpoint_conditions,
+            BreakpointBytecodeKind::Command => &mut self.agent.breakpoint_commands,
+            BreakpointBytecodeKind::Condition => &mut self.agent.breakpoint_conditions,
         }
+        .as_mut()
+        .unwrap()
         .entry(addr)
         .or_default()
         .push(id);
@@ -100,11 +101,12 @@ impl target::ext::breakpoints::BreakpointAgent for Emu {
     ) -> TargetResult<(), Self> {
         log::warn!("Unregistered all {:?} from {:#010x?}", kind, addr);
 
-        let agent = self.agent.as_mut().unwrap();
         if let Some(s) = match kind {
-            BreakpointBytecodeKind::Command => &mut agent.breakpoint_commands,
-            BreakpointBytecodeKind::Condition => &mut agent.breakpoint_conditions,
+            BreakpointBytecodeKind::Command => &mut self.agent.breakpoint_commands,
+            BreakpointBytecodeKind::Condition => &mut self.agent.breakpoint_conditions,
         }
+        .as_mut()
+        .unwrap()
         .get_mut(&addr)
         {
             s.clear()
@@ -125,16 +127,17 @@ impl target::ext::breakpoints::BreakpointAgent for Emu {
             addr
         );
 
-        // FIXME: this clone is bad, and the API should be re-written to avoid this.
-        // e.g: by decoupling the lifetime of the agent from the target.
-        let mut agent = self.agent.clone().unwrap();
+        // See this method's documentation for why this additional `Option::take`
+        // rigamarole is required
 
-        let ids = match kind {
-            BreakpointBytecodeKind::Command => &mut agent.breakpoint_commands,
-            BreakpointBytecodeKind::Condition => &mut agent.breakpoint_conditions,
+        let mut cmds = match kind {
+            BreakpointBytecodeKind::Command => &mut self.agent.breakpoint_commands,
+            BreakpointBytecodeKind::Condition => &mut self.agent.breakpoint_conditions,
         }
-        .entry(addr)
-        .or_default();
+        .take()
+        .unwrap();
+
+        let ids = cmds.entry(addr).or_default();
 
         let mut res = Ok(());
         for id in ids.iter() {
@@ -144,7 +147,10 @@ impl target::ext::breakpoints::BreakpointAgent for Emu {
             }
         }
 
-        self.agent = Some(agent);
+        match kind {
+            BreakpointBytecodeKind::Command => self.agent.breakpoint_commands = Some(cmds),
+            BreakpointBytecodeKind::Condition => self.agent.breakpoint_conditions = Some(cmds),
+        };
 
         res
     }

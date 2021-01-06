@@ -13,19 +13,15 @@ impl target::ext::agent::Agent for Emu {
     }
 
     fn register_bytecode(&mut self, bytecode: &[u8]) -> TargetResult<BytecodeId, Self> {
-        let agent = self.agent.as_mut().unwrap();
-
-        agent.bytecode_id_counter += 1;
-        let id = BytecodeId::new(agent.bytecode_id_counter).unwrap();
-        agent.agent_bytecode.insert(id, bytecode.to_vec());
+        self.agent.bytecode_id_counter += 1;
+        let id = BytecodeId::new(self.agent.bytecode_id_counter).unwrap();
+        self.agent.agent_bytecode.insert(id, bytecode.to_vec());
         log::warn!("Registered {:?}", id);
         Ok(id)
     }
 
     fn unregister_bytecode(&mut self, id: BytecodeId) -> TargetResult<(), Self> {
-        let agent = self.agent.as_mut().unwrap();
-
-        agent.agent_bytecode.remove(&id);
+        self.agent.agent_bytecode.remove(&id);
         log::warn!("Unregistered {:?}", id);
         Ok(())
     }
@@ -35,14 +31,7 @@ impl target::ext::agent::Agent for Emu {
 
         // FIXME: this clone is bad, and the API should be re-written to avoid this.
         // e.g: by decoupling the lifetime of the agent from the target.
-        let code = self
-            .agent
-            .as_ref()
-            .unwrap()
-            .agent_bytecode
-            .get(&id)
-            .unwrap()
-            .clone();
+        let code = self.agent.agent_bytecode.get(&id).unwrap();
 
         let mut result = gdb_agent::evaluate(&code).unwrap();
         let res = loop {
