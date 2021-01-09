@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+# 0.4.3
+
+#### New Arch Implementations
+
+-   Implement `RegId` for Mips/Mips64 [\#38](https://github.com/daniel5151/gdbstub/pull/38) ([starfleetcadet75](https://github.com/starfleetcadet75))
+-   Implement `RegId` for MSP430 [\#38](https://github.com/daniel5151/gdbstub/pull/38) ([starfleetcadet75](https://github.com/starfleetcadet75))
+
 # 0.4.2
 
 #### Packaging
