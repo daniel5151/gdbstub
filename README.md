@@ -3,6 +3,8 @@
 [![](http://meritbadge.herokuapp.com/gdbstub)](https://crates.io/crates/gdbstub)
 [![](https://docs.rs/gdbstub/badge.svg)](https://docs.rs/gdbstub)
 
+> **DISCLAIMER:** This is my personal dev branch of `gdbstub`, and includes features which may or may not be released in future version of `gdbstub`.
+
 An ergonomic and easy-to-integrate implementation of the [GDB Remote Serial Protocol](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Protocol.html#Remote-Protocol) in Rust, with full `#![no_std]` support.
 
 Why `gdbstub`?
