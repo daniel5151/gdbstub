@@ -1,8 +1,9 @@
-use crate::arch::Registers;
-use crate::internal::LeBytes;
 use core::convert::TryInto;
 
 use num_traits::PrimInt;
+
+use crate::arch::Registers;
+use crate::internal::LeBytes;
 
 /// MIPS registers.
 ///

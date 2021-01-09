@@ -15,22 +15,19 @@ pub enum Mips<RegIdImpl: RegId = reg::id::MipsRegId<u32>> {
 }
 
 /// Implements `Arch` for 64-bit MIPS.
+///
+/// Check out the [module level docs](../index.html#whats-with-regidimpl) for
+/// more info about the `RegIdImpl` type parameter.
 pub enum Mips64<RegIdImpl: RegId = reg::id::MipsRegId<u64>> {
     #[doc(hidden)]
     _Marker(core::marker::PhantomData<RegIdImpl>),
 }
 
 /// Implements `Arch` for 32-bit MIPS with the DSP feature enabled.
-pub enum MipsWithDsp<RegIdImpl: RegId = reg::id::MipsRegId<u32>> {
-    #[doc(hidden)]
-    _Marker(core::marker::PhantomData<RegIdImpl>),
-}
+pub enum MipsWithDsp {}
 
 /// Implements `Arch` for 64-bit MIPS with the DSP feature enabled.
-pub enum Mips64WithDsp<RegIdImpl: RegId = reg::id::MipsRegId<u64>> {
-    #[doc(hidden)]
-    _Marker(core::marker::PhantomData<RegIdImpl>),
-}
+pub enum Mips64WithDsp {}
 
 impl<RegIdImpl: RegId> Arch for Mips<RegIdImpl> {
     type Usize = u32;
@@ -52,10 +49,10 @@ impl<RegIdImpl: RegId> Arch for Mips64<RegIdImpl> {
     }
 }
 
-impl<RegIdImpl: RegId> Arch for MipsWithDsp<RegIdImpl> {
+impl Arch for MipsWithDsp {
     type Usize = u32;
     type Registers = reg::MipsCoreRegsWithDsp<u32>;
-    type RegId = RegIdImpl;
+    type RegId = reg::id::MipsRegId<u32>;
 
     fn target_description_xml() -> Option<&'static str> {
         Some(
@@ -64,10 +61,10 @@ impl<RegIdImpl: RegId> Arch for MipsWithDsp<RegIdImpl> {
     }
 }
 
-impl<RegIdImpl: RegId> Arch for Mips64WithDsp<RegIdImpl> {
+impl Arch for Mips64WithDsp {
     type Usize = u64;
     type Registers = reg::MipsCoreRegsWithDsp<u64>;
-    type RegId = RegIdImpl;
+    type RegId = reg::id::MipsRegId<u64>;
 
     fn target_description_xml() -> Option<&'static str> {
         Some(
