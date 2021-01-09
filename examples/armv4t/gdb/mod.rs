@@ -129,8 +129,31 @@ impl SingleThreadOps for Emu {
         Ok(())
     }
 
+    fn read_addrs(&mut self, start_addr: u32, data: &mut [u8]) -> TargetResult<(), Self> {
+        for (addr, val) in (start_addr..).zip(data.iter_mut()) {
+            *val = self.mem.r8(addr)
+        }
+        Ok(())
+    }
+
+    fn write_addrs(&mut self, start_addr: u32, data: &[u8]) -> TargetResult<(), Self> {
+        for (addr, val) in (start_addr..).zip(data.iter().copied()) {
+            self.mem.w8(addr, val)
+        }
+        Ok(())
+    }
+
+    fn single_register_access(
+        &mut self,
+    ) -> Option<target::ext::base::SingleRegisterAccessOps<(), Self>> {
+        Some(self)
+    }
+}
+
+impl target::ext::base::SingleRegisterAccess<()> for Emu {
     fn read_register(
         &mut self,
+        _tid: (),
         reg_id: arch::arm::reg::id::ArmCoreRegId,
         dst: &mut [u8],
     ) -> TargetResult<(), Self> {
@@ -145,6 +168,7 @@ impl SingleThreadOps for Emu {
 
     fn write_register(
         &mut self,
+        _tid: (),
         reg_id: arch::arm::reg::id::ArmCoreRegId,
         val: &[u8],
     ) -> TargetResult<(), Self> {
@@ -158,19 +182,5 @@ impl SingleThreadOps for Emu {
         } else {
             Err(().into())
         }
-    }
-
-    fn read_addrs(&mut self, start_addr: u32, data: &mut [u8]) -> TargetResult<(), Self> {
-        for (addr, val) in (start_addr..).zip(data.iter_mut()) {
-            *val = self.mem.r8(addr)
-        }
-        Ok(())
-    }
-
-    fn write_addrs(&mut self, start_addr: u32, data: &[u8]) -> TargetResult<(), Self> {
-        for (addr, val) in (start_addr..).zip(data.iter().copied()) {
-            self.mem.w8(addr, val)
-        }
-        Ok(())
     }
 }

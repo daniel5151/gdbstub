@@ -17,3 +17,4 @@ mod breakpoints;
 mod extended_mode;
 mod monitor_cmd;
 mod section_offsets;
+mod single_register_access;

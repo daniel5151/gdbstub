@@ -5,6 +5,8 @@ use crate::common::*;
 use crate::target::ext::breakpoints::WatchKind;
 use crate::target::{Target, TargetResult};
 
+use super::SingleRegisterAccessOps;
+
 // Convenient re-exports
 pub use super::ResumeAction;
 
@@ -96,7 +98,7 @@ pub trait MultiThreadOps: Target {
     /// [`support_range_step()`]: Self::support_range_step
     fn set_resume_action(&mut self, tid: Tid, action: ResumeAction) -> Result<(), Self::Error>;
 
-    /// Optional support for the optimized [range stepping] resume action.
+    /// Support for the optimized [range stepping] resume action.
     ///
     /// [range stepping]: https://sourceware.org/gdb/current/onlinedocs/gdb/Continuing-and-Stepping.html#range-stepping
     fn support_range_step(&mut self) -> Option<MultiThreadRangeSteppingOps<Self>> {
@@ -123,49 +125,15 @@ pub trait MultiThreadOps: Target {
         tid: Tid,
     ) -> TargetResult<(), Self>;
 
-    /// Read to a single register on the target.
+    /// Support for single-register access.
+    /// See [`SingleRegisterAccess`](super::SingleRegisterAccess) for more
+    /// details.
     ///
-    /// Implementations should write the value of the register using target's
-    /// native byte order in the buffer `dst`.
-    ///
-    /// If the requested register could not be accessed, an appropriate
-    /// non-fatal error should be returned.
-    ///
-    /// _Note:_ This method includes a stubbed default implementation which
-    /// simply returns `Ok(())`. This is due to the fact that several built-in
-    /// `arch` implementations haven't been updated with proper `RegId`
-    /// implementations.
-    fn read_register(
-        &mut self,
-        reg_id: <Self::Arch as Arch>::RegId,
-        dst: &mut [u8],
-        tid: Tid,
-    ) -> TargetResult<(), Self> {
-        let _ = (reg_id, dst, tid);
-        Ok(())
-    }
-
-    /// Write from a single register on the target.
-    ///
-    /// The `val` buffer contains the new value of the register in the target's
-    /// native byte order. It is guaranteed to be the exact length as the target
-    /// register.
-    ///
-    /// If the requested register could not be accessed, an appropriate
-    /// non-fatal error should be returned.
-    ///
-    /// _Note:_ This method includes a stubbed default implementation which
-    /// simply returns `Ok(())`. This is due to the fact that several built-in
-    /// `arch` implementations haven't been updated with proper `RegId`
-    /// implementations.
-    fn write_register(
-        &mut self,
-        reg_id: <Self::Arch as Arch>::RegId,
-        val: &[u8],
-        tid: Tid,
-    ) -> TargetResult<(), Self> {
-        let _ = (reg_id, val, tid);
-        Ok(())
+    /// While this is an optional feature, it is **highly recommended** to
+    /// implement it when possible, as it can significantly improve performance
+    /// on certain architectures.
+    fn single_register_access(&mut self) -> Option<SingleRegisterAccessOps<Tid, Self>> {
+        None
     }
 
     /// Read bytes from the specified address range.

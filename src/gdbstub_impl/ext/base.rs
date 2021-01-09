@@ -1,7 +1,7 @@
 use super::prelude::*;
 use crate::protocol::commands::ext::Base;
 
-use crate::arch::{Arch, RegId, Registers};
+use crate::arch::{Arch, Registers};
 use crate::protocol::{IdKind, SpecificIdKind, SpecificThreadId};
 use crate::target::ext::base::multithread::ThreadStopReason;
 use crate::target::ext::base::{BaseOps, ResumeAction};
@@ -240,40 +240,6 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 // TODO: plumb-through Pid when exposing full multiprocess + extended mode
                 res.write_str("OK")?; // manually write OK, since we need to return a DisconnectReason
                 HandlerStatus::Disconnect(DisconnectReason::Disconnect)
-            }
-            Base::p(p) => {
-                let mut dst = [0u8; 32]; // enough for 256-bit registers
-                let reg = <T::Arch as Arch>::RegId::from_raw_id(p.reg_id);
-                let (reg_id, reg_size) = match reg {
-                    Some(v) => v,
-                    // empty packet indicates unrecognized query
-                    None => return Ok(HandlerStatus::Handled),
-                };
-                let dst = &mut dst[0..reg_size];
-                match target.base_ops() {
-                    BaseOps::SingleThread(ops) => ops.read_register(reg_id, dst),
-                    BaseOps::MultiThread(ops) => {
-                        ops.read_register(reg_id, dst, self.current_mem_tid)
-                    }
-                }
-                .handle_error()?;
-
-                res.write_hex_buf(dst)?;
-                HandlerStatus::Handled
-            }
-            Base::P(p) => {
-                let reg = <T::Arch as Arch>::RegId::from_raw_id(p.reg_id);
-                match reg {
-                    None => return Err(Error::NonFatalError(22)),
-                    Some((reg_id, _)) => match target.base_ops() {
-                        BaseOps::SingleThread(ops) => ops.write_register(reg_id, p.val),
-                        BaseOps::MultiThread(ops) => {
-                            ops.write_register(reg_id, p.val, self.current_mem_tid)
-                        }
-                    }
-                    .handle_error()?,
-                }
-                HandlerStatus::NeedsOK
             }
             Base::vCont(cmd) => {
                 use crate::protocol::commands::_vCont::vCont;

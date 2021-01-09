@@ -73,11 +73,27 @@ macro_rules! commands {
                 target: &mut impl Target,
                 mut buf: PacketBuf<'a>
             ) -> Option<Command<'a>> {
-                // This locally-scoped trait enables using `base` as an `$ext`,
-                // even through the `base` method on `Target` doesn't return an
-                // Option.
-                trait Hack { fn base(&mut self) -> Option<()> { Some(()) } }
-                impl<T: Target> Hack for T {}
+                // HACK: this locally-scoped trait enables using identifiers
+                // that aren't top-level `Target` IDETs to split-up the packet
+                // parsing code.
+                trait Hack {
+                    fn base(&mut self) -> Option<()>;
+                    fn single_register_access(&mut self) -> Option<()>;
+                }
+
+                impl<T: Target> Hack for T {
+                    fn base(&mut self) -> Option<()> {
+                        Some(())
+                    }
+
+                    fn single_register_access(&mut self) -> Option<()> {
+                        use crate::target::ext::base::BaseOps;
+                        match self.base_ops() {
+                            BaseOps::SingleThread(ops) => ops.single_register_access().map(drop),
+                            BaseOps::MultiThread(ops) => ops.single_register_access().map(drop),
+                        }
+                    }
+                }
 
                 // TODO?: use tries for more efficient longest prefix matching
 
@@ -136,8 +152,6 @@ commands! {
         "k" => _k::k,
         "m" => _m::m<'a>,
         "M" => _m_upcase::M<'a>,
-        "p" => _p::p,
-        "P" => _p_upcase::P<'a>,
         "qAttached" => _qAttached::qAttached,
         "qfThreadInfo" => _qfThreadInfo::qfThreadInfo,
         "QStartNoAckMode" => _QStartNoAckMode::QStartNoAckMode,
@@ -148,6 +162,11 @@ commands! {
         "T" => _t_upcase::T,
         "vCont" => _vCont::vCont<'a>,
         "vKill" => _vKill::vKill,
+    }
+
+    single_register_access use 'a {
+        "p" => _p::p,
+        "P" => _p_upcase::P<'a>,
     }
 
     extended_mode use 'a {
