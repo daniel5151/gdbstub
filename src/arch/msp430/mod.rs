@@ -9,7 +9,7 @@ pub mod reg;
 ///
 /// Check out the [module level docs](../index.html#whats-with-regidimpl) for
 /// more info about the `RegIdImpl` type parameter.
-pub enum Msp430<RegIdImpl: RegId> {
+pub enum Msp430<RegIdImpl: RegId = reg::id::Msp430RegId> {
     #[doc(hidden)]
     _Marker(core::marker::PhantomData<RegIdImpl>),
 }
