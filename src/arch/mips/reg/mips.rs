@@ -1,6 +1,6 @@
 use crate::arch::Registers;
 use crate::internal::LeBytes;
-use std::convert::TryInto;
+use core::convert::TryInto;
 
 use num_traits::PrimInt;
 
