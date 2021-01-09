@@ -7,9 +7,7 @@ use managed::ManagedSlice;
 
 use crate::common::*;
 use crate::connection::Connection;
-use crate::protocol::{commands::Command, Packet, ResponseWriter};
-use crate::target::ext::base::multithread::TidSelector;
-use crate::target::ext::base::BaseOps;
+use crate::protocol::{commands::Command, Packet, ResponseWriter, SpecificIdKind};
 use crate::target::Target;
 use crate::util::managed_vec::ManagedVec;
 use crate::SINGLE_THREAD_TID;
@@ -75,7 +73,7 @@ struct GdbStubImpl<T: Target, C: Connection> {
     _connection: PhantomData<C>,
 
     current_mem_tid: Tid,
-    current_resume_tid: TidSelector,
+    current_resume_tid: SpecificIdKind,
     no_ack_mode: bool,
 
     // Used to track which Pids were attached to / spawned when running in extended mode.
@@ -99,12 +97,13 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             _target: PhantomData,
             _connection: PhantomData,
 
-            // HACK: current_mem_tid is immediately updated with valid value once `run` is called.
-            // While the more idiomatic way to handle this would be to use an Option, given that
-            // it's only ever unset prior to the start of `run`, it's probably okay leaving it as-is
-            // for code-clarity purposes.
+            // NOTE: current_mem_tid is never queried prior to being set by the GDB client (via the
+            // 'H' packet), so it's fine to use a dummy value here.
+            //
+            // Even if the GDB client is acting strangely and doesn't overwrite it, the target will
+            // simply return a non-fatal error, which is totally fine.
             current_mem_tid: SINGLE_THREAD_TID,
-            current_resume_tid: TidSelector::All,
+            current_resume_tid: SpecificIdKind::All,
             no_ack_mode: false,
 
             #[cfg(feature = "alloc")]
@@ -119,24 +118,6 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         packet_buffer: &mut ManagedSlice<u8>,
     ) -> Result<DisconnectReason, Error<T::Error, C::Error>> {
         conn.on_session_start().map_err(Error::ConnectionRead)?;
-
-        // before even accepting packets, we query the target to get a sane value for
-        // `self.current_mem_tid`.
-        // NOTE: this will break if extended mode is ever implemented...
-
-        self.current_mem_tid = match target.base_ops() {
-            BaseOps::SingleThread(_) => SINGLE_THREAD_TID,
-            BaseOps::MultiThread(ops) => {
-                let mut first_tid = None;
-                ops.list_active_threads(&mut |tid| {
-                    if first_tid.is_none() {
-                        first_tid = Some(tid);
-                    }
-                })
-                .map_err(Error::TargetError)?;
-                first_tid.ok_or(Error::NoActiveThreads)?
-            }
-        };
 
         loop {
             match Self::recv_packet(conn, target, packet_buffer)? {
