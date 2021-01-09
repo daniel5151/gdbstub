@@ -1,5 +1,5 @@
 pub use crate::common::*;
-pub use crate::protocol::common::*;
+pub use crate::protocol::common::hex::{decode_hex, decode_hex_buf};
 pub use crate::protocol::packet::PacketBuf;
 pub use core::convert::{TryFrom, TryInto};
 

@@ -1,7 +1,7 @@
 //! Base operations required to debug any target (read/write memory/registers,
 //! step/resume, etc...)
 //!
-//! While not strictly required, it's recommended that single threaded targets
+//! While not strictly required, it is recommended that single threaded targets
 //! implement the simplified `singlethread` API.
 
 pub mod multithread;
@@ -16,14 +16,24 @@ pub enum BaseOps<'a, A, E> {
 }
 
 /// Describes how the target should be resumed.
+///
+/// Due to a quirk / bug in the mainline GDB client, targets are required to
+/// handle the `WithSignal` variants of `Step` and `Continue` regardless of
+/// whether or not they have a concept of "signals".
+///
+/// If your target does not support signals (e.g: the target is a bare-metal
+/// microcontroller / emulator), the recommended behavior is to either return a
+/// target-specific fatal error, or to handle `{Step,Continue}WithSignal` the
+/// same way as their non-`WithSignal` variants.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ResumeAction {
-    /// Continue execution (until the next event occurs).
+    /// Continue execution, stopping once a
+    /// [`StopReason`](singlethread::StopReason) occurs.
     Continue,
-    /// Step forward a single instruction.
+    /// Step execution.
     Step,
-    /* ContinueWithSignal(u8),
-     * StepWithSignal(u8),
-     * Stop, // NOTE: won't be relevant until `gdbstub` supports non-stop mode
-     * StepInRange(core::ops::Range<U>), */
+    /// Continue with signal.
+    ContinueWithSignal(u8),
+    /// Step with signal.
+    StepWithSignal(u8),
 }

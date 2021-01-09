@@ -38,6 +38,9 @@ pub struct Emu {
     pub(crate) cop: Cpu,
     pub(crate) mem: ExampleMem,
 
+    // FIXME: properly handle multiple actions
+    pub(crate) resume_action_is_step: Option<bool>,
+
     pub(crate) watchpoints: Vec<u32>,
     /// (read, write)
     pub(crate) watchpoint_kind: HashMap<u32, (bool, bool)>,
@@ -88,9 +91,13 @@ impl Emu {
             cpu,
             cop,
             mem,
+
+            resume_action_is_step: None,
+
             watchpoints: Vec::new(),
             watchpoint_kind: HashMap::new(),
             breakpoints: Vec::new(),
+
             stall_cop_cycles: 24,
         })
     }

@@ -1,8 +1,5 @@
-mod hex;
-mod thread_id;
-
-pub use hex::*;
-pub use thread_id::*;
+pub mod hex;
+pub mod thread_id;
 
 /// Lightweight wrapper around `&[u8]` which denotes that the contained data is
 /// a ASCII string.

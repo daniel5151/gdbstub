@@ -30,8 +30,6 @@ pub enum GdbStubError<T, C> {
     TargetError(T),
     /// Target didn't report any active threads.
     NoActiveThreads,
-    /// Resuming with a signal is not implemented yet. Consider opening a PR?
-    ResumeWithSignalUnimplemented,
     /// Internal - A non-fatal error occurred (with errno-style error code)
     #[doc(hidden)]
     NonFatalError(u8),
@@ -67,7 +65,6 @@ where
             TargetMismatch => write!(f, "GDB client sent a packet with too much data for the given target."),
             TargetError(e) => write!(f, "Target threw a fatal error: {:?}", e),
             NoActiveThreads => write!(f, "Target didn't report any active threads."),
-            ResumeWithSignalUnimplemented => write!(f, "Resuming with a signal is not implemented yet. Consider opening a PR?"),
             NonFatalError(_) => write!(f, "Internal - A non-fatal error occurred (with errno-style error code)"),
         }
     }

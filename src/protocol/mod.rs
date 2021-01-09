@@ -5,7 +5,7 @@ mod response_writer;
 
 pub(crate) mod commands;
 
-pub(crate) use common::{IdKind, ThreadId};
+pub(crate) use common::thread_id::{IdKind, SpecificIdKind, SpecificThreadId};
 pub(crate) use packet::Packet;
 pub(crate) use response_writer::{Error as ResponseWriterError, ResponseWriter};
 

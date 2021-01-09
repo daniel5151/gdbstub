@@ -12,8 +12,8 @@ pub use super::ResumeAction;
 pub trait SingleThreadOps: Target {
     /// Resume execution on the target.
     ///
-    /// `action` specifies how the target should be resumed (i.e:
-    /// single-step vs. full continue).
+    /// `action` specifies how the target should be resumed (i.e: step or
+    /// continue).
     ///
     /// The `check_gdb_interrupt` callback can be invoked to check if GDB sent
     /// an Interrupt packet (i.e: the user pressed Ctrl-C). It's recommended to
@@ -44,6 +44,13 @@ pub trait SingleThreadOps: Target {
         action: ResumeAction,
         check_gdb_interrupt: &mut dyn FnMut() -> bool,
     ) -> Result<StopReason<<Self::Arch as Arch>::Usize>, Self::Error>;
+
+    /// Optional support for the optimized [range stepping] resume action.
+    ///
+    /// [range stepping]: https://sourceware.org/gdb/current/onlinedocs/gdb/Continuing-and-Stepping.html#range-stepping
+    fn support_resume_range_step(&mut self) -> Option<SingleThreadRangeSteppingOps<Self>> {
+        None
+    }
 
     /// Read the target's registers.
     fn read_registers(
@@ -120,6 +127,35 @@ pub trait SingleThreadOps: Target {
         data: &[u8],
     ) -> TargetResult<(), Self>;
 }
+
+/// Target Extension - Optimized [range stepping] for single threaded targets.
+/// See [`SingleThreadOps::support_resume_range_step`].
+///
+/// Range Stepping will step the target once, and keep stepping the target as
+/// long as execution remains between the specified start (inclusive) and end
+/// (exclusive) addresses, or another stop condition is met (e.g: a breakpoint
+/// it hit).
+///
+/// If the range is empty (`start` == `end`), then the action becomes
+/// equivalent to the ‘s’ action. In other words, single-step once, and
+/// report the stop (even if the stepped instruction jumps to start).
+///
+/// _Note:_ A stop reply may be sent at any point even if the PC is still
+/// within the stepping range; for example, it is valid to implement range
+/// stepping in a degenerate way as a single instruction step operation.
+///
+/// [range stepping]: https://sourceware.org/gdb/current/onlinedocs/gdb/Continuing-and-Stepping.html#range-stepping
+pub trait SingleThreadRangeStepping: Target + SingleThreadOps {
+    /// See [`SingleThreadOps::resume`].
+    fn resume_range_step(
+        &mut self,
+        start: <Self::Arch as Arch>::Usize,
+        end: <Self::Arch as Arch>::Usize,
+        check_gdb_interrupt: &mut dyn FnMut() -> bool,
+    ) -> Result<StopReason<<Self::Arch as Arch>::Usize>, Self::Error>;
+}
+
+define_ext!(SingleThreadRangeSteppingOps, SingleThreadRangeStepping);
 
 /// Describes why the target stopped.
 // NOTE: This is a simplified version of `multithread::ThreadStopReason` that omits any references

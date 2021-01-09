@@ -1,7 +1,7 @@
 use num_traits::PrimInt;
 
 use crate::internal::BeBytes;
-use crate::protocol::{IdKind, ThreadId};
+use crate::protocol::{SpecificIdKind, SpecificThreadId};
 use crate::Connection;
 
 /// Newtype around a Connection error. Having a newtype allows implementing a
@@ -197,22 +197,24 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
         Ok(())
     }
 
-    fn write_id_kind(&mut self, tid: IdKind) -> Result<(), Error<C::Error>> {
+    fn write_specific_id_kind(&mut self, tid: SpecificIdKind) -> Result<(), Error<C::Error>> {
         match tid {
-            IdKind::All => self.write_str("-1")?,
-            IdKind::Any => self.write_str("0")?,
-            IdKind::WithID(id) => self.write_num(id.get())?,
+            SpecificIdKind::All => self.write_str("-1")?,
+            SpecificIdKind::WithID(id) => self.write_num(id.get())?,
         };
         Ok(())
     }
 
-    pub fn write_thread_id(&mut self, tid: ThreadId) -> Result<(), Error<C::Error>> {
+    pub fn write_specific_thread_id(
+        &mut self,
+        tid: SpecificThreadId,
+    ) -> Result<(), Error<C::Error>> {
         if let Some(pid) = tid.pid {
             self.write_str("p")?;
-            self.write_id_kind(pid)?;
+            self.write_specific_id_kind(pid)?;
             self.write_str(".")?;
         }
-        self.write_id_kind(tid.tid)?;
+        self.write_specific_id_kind(tid.tid)?;
         Ok(())
     }
 }

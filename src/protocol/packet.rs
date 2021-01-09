@@ -1,4 +1,5 @@
-use crate::protocol::{commands::Command, common::decode_hex};
+use crate::protocol::commands::Command;
+use crate::protocol::common::hex::decode_hex;
 use crate::target::Target;
 
 /// Packet parse error.

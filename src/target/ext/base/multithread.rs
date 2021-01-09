@@ -8,29 +8,19 @@ use crate::target::{Target, TargetResult};
 // Convenient re-exports
 pub use super::ResumeAction;
 
-/// Selects a thread corresponding to a ResumeAction.
-// NOTE: this is a subset of the internal `IdKind` type, albeit without an `Any` variant. Selecting
-// `Any` thread is something that's handled by `gdbstub` internally, and shouldn't be exposed to the
-// end user.
-#[derive(PartialEq, Eq, Debug, Clone, Copy)]
-pub enum TidSelector {
-    /// Thread with a specific ID.
-    WithID(Tid),
-    /// All (other) threads.
-    All,
-}
-
 /// Base debugging operations for multi threaded targets.
 #[allow(clippy::type_complexity)]
 pub trait MultiThreadOps: Target {
     /// Resume execution on the target.
     ///
-    /// `actions` is an iterator over `(TidSelector, ResumeAction)` pairs which
-    /// specify how various threads should be resumed (i.e: single-step vs.
-    /// resume). It is _guaranteed_ to contain at least one action. It is not
-    /// guaranteed to be exhaustive over all live threads, and any threads
-    /// without a corresponding `TidSelector` should be left in the same state
-    /// (if possible).
+    /// Prior to calling `resume`, `gdbstub` will call `clear_resume_actions`,
+    /// followed by zero or more calls to `set_resume_action`, specifying any
+    /// thread-specific resume actions.
+    ///
+    /// The `default_action` parameter specifies the "fallback" resume action
+    /// for any threads that did not have a specific resume action set via
+    /// `set_resume_action`. The GDB client typically sets this to
+    /// `ResumeAction::Continue`, though this is not guaranteed.
     ///
     /// The `check_gdb_interrupt` callback can be invoked to check if GDB sent
     /// an Interrupt packet (i.e: the user pressed Ctrl-C). It's recommended to
@@ -55,16 +45,9 @@ pub trait MultiThreadOps: Target {
     /// > address.
     ///
     /// Omitting PC adjustment may result in unexpected execution flow and/or
-    /// breakpoints not appearing to work correctly.
+    /// breakpoints not working correctly.
     ///
     /// # Additional Considerations
-    ///
-    /// ### "Non-stop" mode
-    ///
-    /// At the moment, `gdbstub` only supports GDB's
-    /// ["All-Stop" mode](https://sourceware.org/gdb/current/onlinedocs/gdb/All_002dStop-Mode.html),
-    /// whereby _all_ threads should be stopped when returning from `resume`
-    /// (not just the thread associated with the `ThreadStopReason`).
     ///
     /// ### Bare-Metal Targets
     ///
@@ -75,11 +58,50 @@ pub trait MultiThreadOps: Target {
     ///
     /// In this case, the `Tid` argument of `read/write_addrs` becomes quite
     /// relevant, as different cores may have different memory maps.
+    ///
+    /// ### Running in "Non-stop" mode
+    ///
+    /// At the moment, `gdbstub` only supports GDB's
+    /// ["All-Stop" mode](https://sourceware.org/gdb/current/onlinedocs/gdb/All_002dStop-Mode.html),
+    /// whereby _all_ threads must be stopped when returning from `resume`
+    /// (not just the thread associated with the `ThreadStopReason`).
     fn resume(
         &mut self,
-        actions: Actions<'_>,
+        default_resume_action: ResumeAction,
         check_gdb_interrupt: &mut dyn FnMut() -> bool,
     ) -> Result<ThreadStopReason<<Self::Arch as Arch>::Usize>, Self::Error>;
+
+    /// Clear all previously set resume actions.
+    fn clear_resume_actions(&mut self) -> Result<(), Self::Error>;
+
+    /// Specify what action each thread should take when
+    /// [`resume`](Self::resume) is called.
+    ///
+    /// A simple implementation of this method would simply update an internal
+    /// `HashMap<Tid, ResumeAction>`.
+    ///
+    /// Aside from the four "base" resume actions handled by this method (i.e:
+    /// `Step`, `Continue`, `StepWithSignal`, and `ContinueWithSignal`),
+    /// there are also two additional resume actions which are only set if the
+    /// target implements their corresponding protocol extension:
+    ///
+    /// Action                     | Protocol Extension
+    /// ---------------------------|---------------------------
+    /// Optimized [Range Stepping] | See [`support_range_step()`]
+    /// "Stop"                     | Used in "Non-Stop" mode \*
+    ///
+    /// \* "Non-Stop" mode is currently unimplemented
+    ///
+    /// [Range Stepping]: https://sourceware.org/gdb/current/onlinedocs/gdb/Continuing-and-Stepping.html#range-stepping
+    /// [`support_range_step()`]: Self::support_range_step
+    fn set_resume_action(&mut self, tid: Tid, action: ResumeAction) -> Result<(), Self::Error>;
+
+    /// Optional support for the optimized [range stepping] resume action.
+    ///
+    /// [range stepping]: https://sourceware.org/gdb/current/onlinedocs/gdb/Continuing-and-Stepping.html#range-stepping
+    fn support_range_step(&mut self) -> Option<MultiThreadRangeSteppingOps<Self>> {
+        None
+    }
 
     /// Read the target's registers.
     ///
@@ -196,6 +218,35 @@ pub trait MultiThreadOps: Target {
     }
 }
 
+/// Target Extension - Optimized [range stepping] for multi threaded targets.
+/// See [`MultiThreadOps::support_range_step`].
+///
+/// Range Stepping will step the target once, and keep stepping the target as
+/// long as execution remains between the specified start (inclusive) and end
+/// (exclusive) addresses, or another stop condition is met (e.g: a breakpoint
+/// it hit).
+///
+/// If the range is empty (`start` == `end`), then the action becomes
+/// equivalent to the ‘s’ action. In other words, single-step once, and
+/// report the stop (even if the stepped instruction jumps to start).
+///
+/// _Note:_ A stop reply may be sent at any point even if the PC is still
+/// within the stepping range; for example, it is valid to implement range
+/// stepping in a degenerate way as a single instruction step operation.
+///
+/// [range stepping]: https://sourceware.org/gdb/current/onlinedocs/gdb/Continuing-and-Stepping.html#range-stepping
+pub trait MultiThreadRangeStepping: Target + MultiThreadOps {
+    /// See [`MultiThreadOps::set_resume_action`].
+    fn set_resume_action_range_step(
+        &mut self,
+        tid: Tid,
+        start: <Self::Arch as Arch>::Usize,
+        end: <Self::Arch as Arch>::Usize,
+    ) -> Result<(), Self::Error>;
+}
+
+define_ext!(MultiThreadRangeSteppingOps, MultiThreadRangeStepping);
+
 /// Describes why a thread stopped.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -224,33 +275,4 @@ pub enum ThreadStopReason<U> {
     },
     /// The program received a signal
     Signal(u8),
-}
-
-/// An iterator of `(TidSelector, ResumeAction)` used to specify how threads
-/// should be resumed when running in multi threaded mode. It is _guaranteed_ to
-/// contain at least one action.
-///
-/// See the documentation for
-/// [`Target::resume`](trait.Target.html#tymethod.resume) for more details.
-pub struct Actions<'a> {
-    inner: &'a mut dyn Iterator<Item = (TidSelector, ResumeAction)>,
-}
-
-impl core::fmt::Debug for Actions<'_> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "Actions {{ .. }}")
-    }
-}
-
-impl Actions<'_> {
-    pub(crate) fn new(iter: &mut dyn Iterator<Item = (TidSelector, ResumeAction)>) -> Actions<'_> {
-        Actions { inner: iter }
-    }
-}
-
-impl Iterator for Actions<'_> {
-    type Item = (TidSelector, ResumeAction);
-    fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next()
-    }
 }

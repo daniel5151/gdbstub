@@ -3,9 +3,7 @@ use armv4t_emu::{reg, Memory};
 use gdbstub::arch;
 use gdbstub::common::Tid;
 use gdbstub::target;
-use gdbstub::target::ext::base::multithread::{
-    Actions, MultiThreadOps, ResumeAction, ThreadStopReason,
-};
+use gdbstub::target::ext::base::multithread::{MultiThreadOps, ResumeAction, ThreadStopReason};
 use gdbstub::target::ext::breakpoints::WatchKind;
 use gdbstub::target::{Target, TargetError, TargetResult};
 
@@ -60,28 +58,29 @@ impl Target for Emu {
 impl MultiThreadOps for Emu {
     fn resume(
         &mut self,
-        actions: Actions,
+        default_resume_action: ResumeAction,
         check_gdb_interrupt: &mut dyn FnMut() -> bool,
     ) -> Result<ThreadStopReason<u32>, Self::Error> {
-        // in this emulator, each core runs in lock-step, so we can ignore the
-        // TidSelector associated with each action, and only care if GDB
-        // requests execution to start / stop.
-        //
         // In general, the behavior of multi-threaded systems during debugging is
         // determined by the system scheduler. On certain systems, this behavior can be
         // configured using the GDB command `set scheduler-locking _mode_`, but at the
         // moment, `gdbstub` doesn't plumb-through that configuration command.
 
-        // FIXME: properly handle multiple actions...
-        let actions = actions.collect::<Vec<_>>();
-        let (_, action) = actions[0];
+        let default_resume_action_is_step = match default_resume_action {
+            ResumeAction::Step => true,
+            ResumeAction::Continue => false,
+            _ => return Err("no support for resuming with signal"),
+        };
 
-        match action {
-            ResumeAction::Step => match self.step() {
+        match self
+            .resume_action_is_step
+            .unwrap_or(default_resume_action_is_step)
+        {
+            true => match self.step() {
                 Some((event, id)) => Ok(event_to_stopreason(event, id)),
                 None => Ok(ThreadStopReason::DoneStep),
             },
-            ResumeAction::Continue => {
+            false => {
                 let mut cycles: usize = 0;
                 loop {
                     // check for GDB interrupt every 1024 instructions
@@ -96,6 +95,30 @@ impl MultiThreadOps for Emu {
                 }
             }
         }
+    }
+
+    // FIXME: properly handle multiple actions
+    fn clear_resume_actions(&mut self) -> Result<(), Self::Error> {
+        self.resume_action_is_step = None;
+        Ok(())
+    }
+
+    // FIXME: properly handle multiple actions
+    fn set_resume_action(&mut self, _tid: Tid, action: ResumeAction) -> Result<(), Self::Error> {
+        // in this emulator, each core runs in lock-step, so we don't actually care
+        // about the specific tid. In real integrations, you very much should!
+
+        if self.resume_action_is_step.is_some() {
+            return Ok(());
+        }
+
+        self.resume_action_is_step = match action {
+            ResumeAction::Step => Some(true),
+            ResumeAction::Continue => Some(false),
+            _ => return Err("no support for resuming with signal"),
+        };
+
+        Ok(())
     }
 
     fn read_registers(

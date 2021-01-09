@@ -2,9 +2,9 @@ use super::prelude::*;
 use crate::protocol::commands::ext::Base;
 
 use crate::arch::{Arch, RegId, Registers};
-use crate::protocol::{IdKind, ThreadId};
-use crate::target::ext::base::multithread::{Actions, ResumeAction, ThreadStopReason, TidSelector};
-use crate::target::ext::base::BaseOps;
+use crate::protocol::{IdKind, SpecificIdKind, SpecificThreadId};
+use crate::target::ext::base::multithread::ThreadStopReason;
+use crate::target::ext::base::{BaseOps, ResumeAction};
 use crate::{FAKE_PID, SINGLE_THREAD_TID};
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
@@ -104,6 +104,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
             // -------------------- "Core" Functionality -------------------- //
             // TODO: Improve the '?' response based on last-sent stop reason.
+            // this will be particularly relevant when working on non-stop mode.
             Base::QuestionMark(_) => {
                 res.write_str("S05")?;
                 HandlerStatus::Handled
@@ -309,12 +310,9 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 self.do_vcont(
                     res,
                     target,
-                    Actions::new_continue(ThreadId {
+                    Actions::new_continue(SpecificThreadId {
                         pid: None,
-                        tid: match self.current_resume_tid {
-                            TidSelector::WithID(id) => IdKind::WithID(id),
-                            TidSelector::All => IdKind::All,
-                        },
+                        tid: self.current_resume_tid,
                     }),
                 )?
             }
@@ -324,12 +322,9 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 self.do_vcont(
                     res,
                     target,
-                    Actions::new_step(ThreadId {
+                    Actions::new_step(SpecificThreadId {
                         pid: None,
-                        tid: match self.current_resume_tid {
-                            TidSelector::WithID(id) => IdKind::WithID(id),
-                            TidSelector::All => IdKind::All,
-                        },
+                        tid: self.current_resume_tid,
                     }),
                 )?
             }
@@ -347,8 +342,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     // technically, this variant is deprecated in favor of vCont...
                     Op::StepContinue => match cmd.thread.tid {
                         IdKind::Any => {} // reuse old tid
-                        IdKind::All => self.current_resume_tid = TidSelector::All,
-                        IdKind::WithID(tid) => self.current_resume_tid = TidSelector::WithID(tid),
+                        IdKind::All => self.current_resume_tid = SpecificIdKind::All,
+                        IdKind::WithID(tid) => {
+                            self.current_resume_tid = SpecificIdKind::WithID(tid)
+                        }
                     },
                 }
                 HandlerStatus::NeedsOK
@@ -357,9 +354,9 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 res.write_str("m")?;
 
                 match target.base_ops() {
-                    BaseOps::SingleThread(_) => res.write_thread_id(ThreadId {
-                        pid: Some(IdKind::WithID(FAKE_PID)),
-                        tid: IdKind::WithID(SINGLE_THREAD_TID),
+                    BaseOps::SingleThread(_) => res.write_specific_thread_id(SpecificThreadId {
+                        pid: Some(SpecificIdKind::WithID(FAKE_PID)),
+                        tid: SpecificIdKind::WithID(SINGLE_THREAD_TID),
                     })?,
                     BaseOps::MultiThread(ops) => {
                         let mut err: Result<_, Error<T::Error, C::Error>> = Ok(());
@@ -371,9 +368,9 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                                     res.write_str(",")?
                                 }
                                 first = false;
-                                res.write_thread_id(ThreadId {
-                                    pid: Some(IdKind::WithID(FAKE_PID)),
-                                    tid: IdKind::WithID(tid),
+                                res.write_specific_thread_id(SpecificThreadId {
+                                    pid: Some(SpecificIdKind::WithID(FAKE_PID)),
+                                    tid: SpecificIdKind::WithID(tid),
                                 })?;
                                 Ok(())
                             })();
@@ -416,152 +413,207 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         Ok(handler_status)
     }
 
+    #[allow(clippy::type_complexity)]
+    fn do_vcont_single_thread(
+        ops: &mut dyn crate::target::ext::base::singlethread::SingleThreadOps<
+            Arch = T::Arch,
+            Error = T::Error,
+        >,
+        res: &mut ResponseWriter<C>,
+        actions: &crate::protocol::commands::_vCont::Actions,
+    ) -> Result<ThreadStopReason<<T::Arch as Arch>::Usize>, Error<T::Error, C::Error>> {
+        use crate::protocol::commands::_vCont::VContKind;
+
+        let action = actions
+            .iter()
+            .next()
+            // TODO?: use a more descriptive error if vcont has multiple actions in
+            // single-threaded mode?
+            .ok_or(Error::PacketUnexpected)?
+            .ok_or(Error::PacketParse(
+                crate::protocol::PacketParseError::MalformedCommand,
+            ))?;
+
+        let action = match action.kind {
+            VContKind::Step => ResumeAction::Step,
+            VContKind::Continue => ResumeAction::Continue,
+            VContKind::StepWithSig(sig) => ResumeAction::StepWithSignal(sig),
+            VContKind::ContinueWithSig(sig) => ResumeAction::ContinueWithSignal(sig),
+            // TODO: update this case when non-stop mode is implemented
+            VContKind::Stop => return Err(Error::PacketUnexpected),
+        };
+
+        let mut err = Ok(());
+        let mut check_gdb_interrupt = || match res.as_conn().peek() {
+            Ok(Some(0x03)) => true, // 0x03 is the interrupt byte
+            Ok(Some(_)) => false,   // it's nothing that can't wait...
+            Ok(None) => false,
+            Err(e) => {
+                err = Err(Error::ConnectionRead(e));
+                true // break ASAP if a connection error occurred
+            }
+        };
+
+        let ret = ops
+            .resume(action, &mut check_gdb_interrupt)
+            .map_err(Error::TargetError)?
+            .into();
+
+        err?;
+
+        Ok(ret)
+    }
+
+    #[allow(clippy::type_complexity)]
+    fn do_vcont_multi_thread(
+        ops: &mut dyn crate::target::ext::base::multithread::MultiThreadOps<
+            Arch = T::Arch,
+            Error = T::Error,
+        >,
+        res: &mut ResponseWriter<C>,
+        actions: &crate::protocol::commands::_vCont::Actions,
+    ) -> Result<ThreadStopReason<<T::Arch as Arch>::Usize>, Error<T::Error, C::Error>> {
+        // this is a pretty arbitrary choice, but it seems reasonable for most cases.
+        let mut default_resume_action = ResumeAction::Continue;
+
+        ops.clear_resume_actions().map_err(Error::TargetError)?;
+
+        for action in actions.iter() {
+            use crate::protocol::commands::_vCont::VContKind;
+
+            let action = action.ok_or(Error::PacketParse(
+                crate::protocol::PacketParseError::MalformedCommand,
+            ))?;
+
+            let resume_action = match action.kind {
+                VContKind::Step => ResumeAction::Step,
+                VContKind::Continue => ResumeAction::Continue,
+                // there seems to be a GDB bug where it doesn't use `vCont` unless
+                // `vCont?` returns support for resuming with a signal.
+                VContKind::StepWithSig(sig) => ResumeAction::StepWithSignal(sig),
+                VContKind::ContinueWithSig(sig) => ResumeAction::ContinueWithSignal(sig),
+                // TODO: update this case when non-stop mode is implemented
+                VContKind::Stop => return Err(Error::PacketUnexpected),
+            };
+
+            match action.thread.map(|thread| thread.tid) {
+                // An action with no thread-id matches all threads
+                None | Some(SpecificIdKind::All) => default_resume_action = resume_action,
+                Some(SpecificIdKind::WithID(tid)) => ops
+                    .set_resume_action(tid, resume_action)
+                    .map_err(Error::TargetError)?,
+            };
+        }
+
+        let mut err = Ok(());
+        let mut check_gdb_interrupt = || match res.as_conn().peek() {
+            Ok(Some(0x03)) => true, // 0x03 is the interrupt byte
+            Ok(Some(_)) => false,   // it's nothing that can't wait...
+            Ok(None) => false,
+            Err(e) => {
+                err = Err(Error::ConnectionRead(e));
+                true // break ASAP if a connection error occurred
+            }
+        };
+
+        let ret = ops
+            .resume(default_resume_action, &mut check_gdb_interrupt)
+            .map_err(Error::TargetError)?;
+
+        err?;
+
+        Ok(ret)
+    }
+
     fn do_vcont(
         &mut self,
         res: &mut ResponseWriter<C>,
         target: &mut T,
-        base_actions: crate::protocol::commands::_vCont::Actions,
+        actions: crate::protocol::commands::_vCont::Actions,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
         loop {
-            let mut err = Ok(());
-
-            let mut actions = base_actions.iter().filter_map(|action| {
-                use crate::protocol::commands::_vCont::VContKind;
-
-                let action = match action {
-                    Some(action) => action,
-                    None => {
-                        err = Err(Error::PacketParse(
-                            crate::protocol::PacketParseError::MalformedCommand,
-                        ));
-                        return None;
-                    }
-                };
-
-                let resume_action = match action.kind {
-                    VContKind::Step => ResumeAction::Step,
-                    VContKind::Continue => ResumeAction::Continue,
-                    _ => {
-                        // there seems to be a GDB bug where it doesn't use `vCont` unless
-                        // `vCont?` returns support for resuming with a signal.
-                        //
-                        // This error case can be removed once "Resume with Signal" is
-                        // implemented
-                        err = Err(Error::ResumeWithSignalUnimplemented);
-                        return None;
-                    }
-                };
-
-                // FIXME: this error handling could be removed by tweaking the `vCont` packet to
-                // parse `TidSelector` directly, thereby handing the `IdKind::Any` up the chain.
-                let tid = match action.thread {
-                    Some(thread) => match thread.tid {
-                        IdKind::Any => {
-                            err = Err(Error::PacketUnexpected);
-                            return None;
-                        }
-                        IdKind::All => TidSelector::All,
-                        IdKind::WithID(tid) => TidSelector::WithID(tid),
-                    },
-                    // An action with no thread-id matches all threads
-                    None => TidSelector::All,
-                };
-
-                Some((tid, resume_action))
-            });
-
-            let mut err2 = Ok(());
-
-            let mut check_gdb_interrupt = || match res.as_conn().peek() {
-                Ok(Some(0x03)) => true, // 0x03 is the interrupt byte
-                Ok(Some(_)) => false,   // it's nothing that can't wait...
-                Ok(None) => false,
-                Err(e) => {
-                    err2 = Err(Error::ConnectionRead(e));
-                    true // break ASAP if a connection error occurred
-                }
-            };
-
             let stop_reason = match target.base_ops() {
-                BaseOps::SingleThread(ops) => ops
-                    .resume(
-                        // TODO?: add a more descriptive error if vcont has multiple threads in
-                        // single-threaded mode?
-                        actions.next().ok_or(Error::PacketUnexpected)?.1,
-                        &mut check_gdb_interrupt,
-                    )
-                    .map_err(Error::TargetError)?
-                    .into(),
-                BaseOps::MultiThread(ops) => ops
-                    .resume(Actions::new(&mut actions), &mut check_gdb_interrupt)
-                    .map_err(Error::TargetError)?,
+                BaseOps::SingleThread(ops) => Self::do_vcont_single_thread(ops, res, &actions)?,
+                BaseOps::MultiThread(ops) => Self::do_vcont_multi_thread(ops, res, &actions)?,
             };
 
-            err?;
-            err2?;
-
-            break match stop_reason {
-                ThreadStopReason::DoneStep | ThreadStopReason::GdbInterrupt => {
-                    res.write_str("S05")?;
-                    Ok(HandlerStatus::Handled)
-                }
-                ThreadStopReason::Signal(code) => {
-                    res.write_str("S")?;
-                    res.write_num(code)?;
-                    Ok(HandlerStatus::Handled)
-                }
-                ThreadStopReason::Halted => {
-                    res.write_str("W19")?; // SIGSTOP
-                    Ok(HandlerStatus::Disconnect(DisconnectReason::TargetHalted))
-                }
-                ThreadStopReason::SwBreak(tid)
-                | ThreadStopReason::HwBreak(tid)
-                | ThreadStopReason::Watch { tid, .. } => {
-                    self.current_mem_tid = tid;
-                    self.current_resume_tid = TidSelector::WithID(tid);
-
-                    if let Some(agent_ops) = target
-                        .breakpoints()
-                        .and_then(|bp_ops| bp_ops.breakpoint_agent())
-                    {
-                        if agent_ops.breakpoint_bytecode_executor().is_gdbstub()
-                            && !self.eval_breakpoint_bytecode(agent_ops, res)?
-                        {
-                            // condition didn't evaluate to true - resume the target
-                            continue;
-                        }
-                    }
-
-                    res.write_str("T05")?;
-
-                    res.write_str("thread:")?;
-                    res.write_thread_id(ThreadId {
-                        pid: Some(IdKind::WithID(FAKE_PID)),
-                        tid: IdKind::WithID(tid),
-                    })?;
-                    res.write_str(";")?;
-
-                    match stop_reason {
-                        // don't include addr on sw/hw break
-                        ThreadStopReason::SwBreak(_) => res.write_str("swbreak:")?,
-                        ThreadStopReason::HwBreak(_) => res.write_str("hwbreak:")?,
-                        ThreadStopReason::Watch { kind, addr, .. } => {
-                            use crate::target::ext::breakpoints::WatchKind;
-                            match kind {
-                                WatchKind::Write => res.write_str("watch:")?,
-                                WatchKind::Read => res.write_str("rwatch:")?,
-                                WatchKind::ReadWrite => res.write_str("awatch:")?,
-                            }
-                            res.write_num(addr)?;
-                        }
-                        _ => unreachable!(),
-                    };
-
-                    res.write_str(";")?;
-                    Ok(HandlerStatus::Handled)
-                }
-            };
+            match self.finish_vcont(res, target, stop_reason)? {
+                Some(status) => break Ok(status),
+                None => continue,
+            }
         }
+    }
+
+    #[inline(always)]
+    fn finish_vcont(
+        &mut self,
+        res: &mut ResponseWriter<C>,
+        target: &mut T,
+        stop_reason: ThreadStopReason<<T::Arch as Arch>::Usize>,
+    ) -> Result<Option<HandlerStatus>, Error<T::Error, C::Error>> {
+        let status = match stop_reason {
+            ThreadStopReason::DoneStep | ThreadStopReason::GdbInterrupt => {
+                res.write_str("S05")?;
+                HandlerStatus::Handled
+            }
+            ThreadStopReason::Signal(code) => {
+                res.write_str("S")?;
+                res.write_num(code)?;
+                HandlerStatus::Handled
+            }
+            ThreadStopReason::Halted => {
+                res.write_str("W19")?; // SIGSTOP
+                HandlerStatus::Disconnect(DisconnectReason::TargetHalted)
+            }
+            ThreadStopReason::SwBreak(tid)
+            | ThreadStopReason::HwBreak(tid)
+            | ThreadStopReason::Watch { tid, .. } => {
+                self.current_mem_tid = tid;
+                self.current_resume_tid = SpecificIdKind::WithID(tid);
+
+                if let Some(agent_ops) = target
+                    .breakpoints()
+                    .and_then(|bp_ops| bp_ops.breakpoint_agent())
+                {
+                    if agent_ops.breakpoint_bytecode_executor().is_gdbstub()
+                        && !self.eval_breakpoint_bytecode(agent_ops, res)?
+                    {
+                        // condition didn't evaluate to true - resume the target
+                        return Ok(None);
+                    }
+                }
+
+                res.write_str("T05")?;
+
+                res.write_str("thread:")?;
+                res.write_specific_thread_id(SpecificThreadId {
+                    pid: Some(SpecificIdKind::WithID(FAKE_PID)),
+                    tid: SpecificIdKind::WithID(tid),
+                })?;
+                res.write_str(";")?;
+
+                match stop_reason {
+                    // don't include addr on sw/hw break
+                    ThreadStopReason::SwBreak(_) => res.write_str("swbreak:")?,
+                    ThreadStopReason::HwBreak(_) => res.write_str("hwbreak:")?,
+                    ThreadStopReason::Watch { kind, addr, .. } => {
+                        use crate::target::ext::breakpoints::WatchKind;
+                        match kind {
+                            WatchKind::Write => res.write_str("watch:")?,
+                            WatchKind::Read => res.write_str("rwatch:")?,
+                            WatchKind::ReadWrite => res.write_str("awatch:")?,
+                        }
+                        res.write_num(addr)?;
+                    }
+                    _ => unreachable!(),
+                };
+
+                res.write_str(";")?;
+                HandlerStatus::Handled
+            }
+        };
+
+        Ok(Some(status))
     }
 
     // evaluate any bytecode associated with the current breakpoint, returning a

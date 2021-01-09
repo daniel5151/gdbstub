@@ -31,14 +31,14 @@ impl<'a> Actions<'a> {
         Actions::Buf(ActionsBuf(buf))
     }
 
-    pub fn new_step(tid: ThreadId) -> Actions<'a> {
+    pub fn new_step(tid: SpecificThreadId) -> Actions<'a> {
         Actions::Fixed(ActionsFixed(VContAction {
             kind: VContKind::from_bytes(b"s").unwrap(),
             thread: Some(tid),
         }))
     }
 
-    pub fn new_continue(tid: ThreadId) -> Actions<'a> {
+    pub fn new_continue(tid: SpecificThreadId) -> Actions<'a> {
         Actions::Fixed(ActionsFixed(VContAction {
             kind: VContKind::from_bytes(b"c").unwrap(),
             thread: Some(tid),
@@ -62,7 +62,7 @@ impl<'a> ActionsBuf<'a> {
             let mut s = act.split(|b| *b == b':');
             let kind = s.next()?;
             let thread = match s.next() {
-                Some(s) => Some(s.try_into().ok()?),
+                Some(s) => Some(SpecificThreadId::try_from(ThreadId::try_from(s).ok()?).ok()?),
                 None => None,
             };
 
@@ -86,7 +86,7 @@ impl ActionsFixed {
 #[derive(Debug, Copy, Clone)]
 pub struct VContAction {
     pub kind: VContKind,
-    pub thread: Option<ThreadId>,
+    pub thread: Option<SpecificThreadId>,
 }
 
 #[derive(Debug, Copy, Clone)]

@@ -84,6 +84,7 @@ impl SingleThreadOps for Emu {
                     }
                 }
             }
+            _ => return Err("cannot resume with signal"),
         };
 
         Ok(match event {
