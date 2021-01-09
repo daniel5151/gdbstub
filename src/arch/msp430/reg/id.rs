@@ -1,6 +1,9 @@
 use crate::arch::RegId;
 
 /// TI-MSP430 register identifier.
+///
+/// GDB does not provide a XML file for the MSP430.
+/// The best file to reference is [msp430-tdep.c](https://github.com/bminor/binutils-gdb/blob/master/gdb/msp430-tdep.c).
 #[derive(Debug, Clone, Copy)]
 #[non_exhaustive]
 pub enum Msp430RegId {
@@ -23,7 +26,7 @@ impl RegId for Msp430RegId {
             1 => Self::Sp,
             2 => Self::Sr,
             3 => Self::Cg,
-            4..=15 => Self::Gpr(id as u8),
+            4..=15 => Self::Gpr((id as u8) - 4),
             _ => return None,
         };
         Some((reg, 2))

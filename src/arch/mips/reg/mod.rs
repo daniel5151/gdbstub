@@ -6,3 +6,4 @@ pub mod id;
 mod mips;
 
 pub use mips::MipsCoreRegs;
+pub use mips::MipsCoreRegsWithDsp;
