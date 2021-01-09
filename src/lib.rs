@@ -140,7 +140,6 @@ mod util;
 #[doc(hidden)]
 pub mod internal;
 
-pub mod agent;
 pub mod arch;
 pub mod common;
 pub mod target;
