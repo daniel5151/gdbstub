@@ -41,7 +41,7 @@
 //! it's not too tricky to get a working implementation up and running, and
 //! makes it possible to safely and efficiently implement the
 //! `Target::read/write_register` API. As an example, check out
-//! [`ArmCoreRegId`](arm/reg/id/enum.ArmCoreRegId.html#impl-RegId).
+//! [`ArmCoreRegId`](arm::reg::id::ArmCoreRegId#impl-RegId).
 //!
 //! Whenever a `RegId` enum is upstreamed, the associated `Arch`'s `RegIdImpl`
 //! parameter will be defaulted to the newly added enum. This will simplify the

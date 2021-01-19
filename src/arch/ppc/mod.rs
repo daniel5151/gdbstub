@@ -7,7 +7,7 @@ pub mod reg;
 
 /// Implements `Arch` for 32-bit PowerPC + AltiVec SIMD.
 ///
-/// Check out the [module level docs](../index.html#whats-with-regidimpl) for
+/// Check out the [module level docs](crate::arch#whats-with-regidimpl) for
 /// more info about the `RegIdImpl` type parameter.
 pub enum PowerPcAltivec32<RegIdImpl: RegId> {
     #[doc(hidden)]

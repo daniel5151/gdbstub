@@ -6,7 +6,7 @@ use alloc::vec::Vec;
 /// Helper struct to send console output to GDB.
 ///
 /// The recommended way to interact with `ConsoleOutput` is through the provided
-/// [`output!`](macro.output.html) / [`outputln!`](macro.outputln.html) macros.
+/// [`output!`] and [`outputln!`] macros.
 ///
 /// On resource constrained systems which might want to avoid using Rust's
 /// [fairly "heavy" formatting machinery](https://jamesmunns.com/blog/fmt-unreasonably-expensive/),
@@ -70,7 +70,7 @@ impl Drop for ConsoleOutput<'_> {
 
 /// Send formatted data to the GDB client console.
 ///
-/// The first argument must be a [`ConsoleWriter`](struct.ConsoleWriter.html).
+/// The first argument must be a [`ConsoleOutput`].
 #[macro_export]
 macro_rules! output {
     ($console_output:expr, $($args:tt)*) => {{
@@ -81,7 +81,7 @@ macro_rules! output {
 
 /// Send formatted data to the GDB client console, with a newline appended.
 ///
-/// The first argument must be a [`ConsoleWriter`](struct.ConsoleWriter.html).
+/// The first argument must be a [`ConsoleOutput`].
 #[macro_export]
 macro_rules! outputln {
     ($console_output:expr) => {{

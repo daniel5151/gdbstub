@@ -7,7 +7,7 @@ pub mod reg;
 
 /// Implements `Arch` for standard 16-bit TI-MSP430 MCUs.
 ///
-/// Check out the [module level docs](../index.html#whats-with-regidimpl) for
+/// Check out the [module level docs](crate::arch#whats-with-regidimpl) for
 /// more info about the `RegIdImpl` type parameter.
 pub enum Msp430<RegIdImpl: RegId = reg::id::Msp430RegId> {
     #[doc(hidden)]

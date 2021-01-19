@@ -39,7 +39,7 @@ impl crate::arch::BreakpointKind for MipsBreakpointKind {
 
 /// Implements `Arch` for 32-bit MIPS.
 ///
-/// Check out the [module level docs](../index.html#whats-with-regidimpl) for
+/// Check out the [module level docs](crate::arch#whats-with-regidimpl) for
 /// more info about the `RegIdImpl` type parameter.
 pub enum Mips<RegIdImpl: RegId = reg::id::MipsRegId<u32>> {
     #[doc(hidden)]
@@ -48,7 +48,7 @@ pub enum Mips<RegIdImpl: RegId = reg::id::MipsRegId<u32>> {
 
 /// Implements `Arch` for 64-bit MIPS.
 ///
-/// Check out the [module level docs](../index.html#whats-with-regidimpl) for
+/// Check out the [module level docs](crate::arch#whats-with-regidimpl) for
 /// more info about the `RegIdImpl` type parameter.
 pub enum Mips64<RegIdImpl: RegId = reg::id::MipsRegId<u64>> {
     #[doc(hidden)]

@@ -7,7 +7,7 @@ pub mod reg;
 
 /// Implements `Arch` for 64-bit x86 + SSE Extensions.
 ///
-/// Check out the [module level docs](../index.html#whats-with-regidimpl) for
+/// Check out the [module level docs](crate::arch#whats-with-regidimpl) for
 /// more info about the `RegIdImpl` type parameter.
 #[allow(non_camel_case_types)]
 pub enum X86_64_SSE<RegIdImpl: RegId = reg::id::X86_64CoreRegId> {
@@ -30,7 +30,7 @@ impl<RegIdImpl: RegId> Arch for X86_64_SSE<RegIdImpl> {
 
 /// Implements `Arch` for 32-bit x86 + SSE Extensions.
 ///
-/// Check out the [module level docs](../index.html#whats-with-regidimpl) for
+/// Check out the [module level docs](crate::arch#whats-with-regidimpl) for
 /// more info about the `RegIdImpl` type parameter.
 #[allow(non_camel_case_types)]
 pub enum X86_SSE<RegIdImpl: RegId = reg::id::X86CoreRegId> {
