@@ -75,7 +75,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             }
             Base::QStartNoAckMode(_) => {
                 self.no_ack_mode = true;
-                HandlerStatus::NeedsOK
+                HandlerStatus::NeedsOk
             }
             Base::qXferFeaturesRead(cmd) => {
                 match T::Arch::target_description_xml() {
@@ -167,7 +167,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 }
                 .handle_error()?;
 
-                HandlerStatus::NeedsOK
+                HandlerStatus::NeedsOk
             }
             Base::m(cmd) => {
                 let buf = cmd.buf;
@@ -210,7 +210,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 }
                 .handle_error()?;
 
-                HandlerStatus::NeedsOK
+                HandlerStatus::NeedsOk
             }
             Base::k(_) | Base::vKill(_) => {
                 match target.extended_mode() {
@@ -231,7 +231,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                             res.write_str("OK")?;
                             HandlerStatus::Disconnect(DisconnectReason::Kill)
                         } else {
-                            HandlerStatus::NeedsOK
+                            HandlerStatus::NeedsOk
                         }
                     }
                 }
@@ -303,26 +303,26 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         IdKind::Any => {} // reuse old tid
                         // "All" threads doesn't make sense for memory accesses
                         IdKind::All => return Err(Error::PacketUnexpected),
-                        IdKind::WithID(tid) => self.current_mem_tid = tid,
+                        IdKind::WithId(tid) => self.current_mem_tid = tid,
                     },
                     // technically, this variant is deprecated in favor of vCont...
                     Op::StepContinue => match cmd.thread.tid {
                         IdKind::Any => {} // reuse old tid
                         IdKind::All => self.current_resume_tid = SpecificIdKind::All,
-                        IdKind::WithID(tid) => {
-                            self.current_resume_tid = SpecificIdKind::WithID(tid)
+                        IdKind::WithId(tid) => {
+                            self.current_resume_tid = SpecificIdKind::WithId(tid)
                         }
                     },
                 }
-                HandlerStatus::NeedsOK
+                HandlerStatus::NeedsOk
             }
             Base::qfThreadInfo(_) => {
                 res.write_str("m")?;
 
                 match target.base_ops() {
                     BaseOps::SingleThread(_) => res.write_specific_thread_id(SpecificThreadId {
-                        pid: Some(SpecificIdKind::WithID(FAKE_PID)),
-                        tid: SpecificIdKind::WithID(SINGLE_THREAD_TID),
+                        pid: Some(SpecificIdKind::WithId(FAKE_PID)),
+                        tid: SpecificIdKind::WithId(SINGLE_THREAD_TID),
                     })?,
                     BaseOps::MultiThread(ops) => {
                         let mut err: Result<_, Error<T::Error, C::Error>> = Ok(());
@@ -335,8 +335,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                                 }
                                 first = false;
                                 res.write_specific_thread_id(SpecificThreadId {
-                                    pid: Some(SpecificIdKind::WithID(FAKE_PID)),
-                                    tid: SpecificIdKind::WithID(tid),
+                                    pid: Some(SpecificIdKind::WithId(FAKE_PID)),
+                                    tid: SpecificIdKind::WithId(tid),
                                 })?;
                                 Ok(())
                             })();
@@ -358,7 +358,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             }
             Base::T(cmd) => {
                 let alive = match cmd.thread.tid {
-                    IdKind::WithID(tid) => match target.base_ops() {
+                    IdKind::WithId(tid) => match target.base_ops() {
                         BaseOps::SingleThread(_) => tid == SINGLE_THREAD_TID,
                         BaseOps::MultiThread(ops) => {
                             ops.is_thread_alive(tid).map_err(Error::TargetError)?
@@ -369,7 +369,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     _ => return Err(Error::PacketUnexpected),
                 };
                 if alive {
-                    HandlerStatus::NeedsOK
+                    HandlerStatus::NeedsOk
                 } else {
                     // any error code will do
                     return Err(Error::NonFatalError(1));
@@ -465,7 +465,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             match action.thread.map(|thread| thread.tid) {
                 // An action with no thread-id matches all threads
                 None | Some(SpecificIdKind::All) => default_resume_action = resume_action,
-                Some(SpecificIdKind::WithID(tid)) => ops
+                Some(SpecificIdKind::WithId(tid)) => ops
                     .set_resume_action(tid, resume_action)
                     .map_err(Error::TargetError)?,
             };
@@ -535,7 +535,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             | ThreadStopReason::HwBreak(tid)
             | ThreadStopReason::Watch { tid, .. } => {
                 self.current_mem_tid = tid;
-                self.current_resume_tid = SpecificIdKind::WithID(tid);
+                self.current_resume_tid = SpecificIdKind::WithId(tid);
 
                 if let Some(agent_ops) = target
                     .breakpoints()
@@ -553,8 +553,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                 res.write_str("thread:")?;
                 res.write_specific_thread_id(SpecificThreadId {
-                    pid: Some(SpecificIdKind::WithID(FAKE_PID)),
-                    tid: SpecificIdKind::WithID(tid),
+                    pid: Some(SpecificIdKind::WithId(FAKE_PID)),
+                    tid: SpecificIdKind::WithId(tid),
                 })?;
                 res.write_str(";")?;
 

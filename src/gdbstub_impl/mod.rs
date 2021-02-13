@@ -87,7 +87,7 @@ struct GdbStubImpl<T: Target, C: Connection> {
 
 enum HandlerStatus {
     Handled,
-    NeedsOK,
+    NeedsOk,
     Disconnect(DisconnectReason),
 }
 
@@ -138,7 +138,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     let mut res = ResponseWriter::new(conn);
                     let disconnect = match self.handle_command(&mut res, target, command) {
                         Ok(HandlerStatus::Handled) => None,
-                        Ok(HandlerStatus::NeedsOK) => {
+                        Ok(HandlerStatus::NeedsOk) => {
                             res.write_str("OK")?;
                             None
                         }

@@ -10,7 +10,7 @@ pub enum PacketParseError {
     MissingChecksum,
     MalformedChecksum,
     MalformedCommand,
-    NotASCII,
+    NotAscii,
     UnexpectedHeader(u8),
 }
 
@@ -47,7 +47,7 @@ impl<'a> PacketBuf<'a> {
 
         // validate that the body is valid ASCII
         if !body.is_ascii() {
-            return Err(PacketParseError::NotASCII);
+            return Err(PacketParseError::NotAscii);
         }
 
         // validate the checksum
@@ -74,7 +74,7 @@ impl<'a> PacketBuf<'a> {
     pub fn new_with_raw_body(body: &'a mut [u8]) -> Result<PacketBuf<'a>, PacketParseError> {
         // validate the packet is valid ASCII
         if !body.is_ascii() {
-            return Err(PacketParseError::NotASCII);
+            return Err(PacketParseError::NotAscii);
         }
 
         let len = body.len();

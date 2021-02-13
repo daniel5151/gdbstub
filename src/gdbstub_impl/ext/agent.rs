@@ -16,7 +16,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         let handler_status = match command {
             Agent::QAgent(cmd) => {
                 ops.enabled(cmd.value).map_err(Error::TargetError)?;
-                HandlerStatus::NeedsOK
+                HandlerStatus::NeedsOk
             }
         };
 

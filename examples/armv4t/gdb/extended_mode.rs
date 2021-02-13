@@ -61,7 +61,7 @@ impl target::ext::extended_mode::ExtendedMode for Emu {
         Ok(Pid::new(1337).unwrap())
     }
 
-    fn configure_aslr(&mut self) -> Option<target::ext::extended_mode::ConfigureASLROps<Self>> {
+    fn configure_aslr(&mut self) -> Option<target::ext::extended_mode::ConfigureAslrOps<Self>> {
         Some(self)
     }
 
@@ -82,7 +82,7 @@ impl target::ext::extended_mode::ExtendedMode for Emu {
     }
 }
 
-impl target::ext::extended_mode::ConfigureASLR for Emu {
+impl target::ext::extended_mode::ConfigureAslr for Emu {
     fn cfg_aslr(&mut self, enabled: bool) -> TargetResult<(), Self> {
         eprintln!("GDB {} ASLR", if enabled { "enabled" } else { "disabled" });
         Ok(())

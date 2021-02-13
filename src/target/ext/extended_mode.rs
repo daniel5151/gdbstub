@@ -146,7 +146,7 @@ pub trait ExtendedMode: Target {
     }
 
     /// Enable/Disable ASLR for spawned processes.
-    fn configure_aslr(&mut self) -> Option<ConfigureASLROps<Self>> {
+    fn configure_aslr(&mut self) -> Option<ConfigureAslrOps<Self>> {
         None
     }
 
@@ -198,12 +198,12 @@ impl<'args> Iterator for Args<'_, 'args> {
 /// more consistent debugging experience).
 ///
 /// Corresponds to GDB's [`set disable-randomization`](https://sourceware.org/gdb/onlinedocs/gdb/Starting.html) command.
-pub trait ConfigureASLR: ExtendedMode {
+pub trait ConfigureAslr: ExtendedMode {
     /// Enable/Disable ASLR for spawned processes.
     fn cfg_aslr(&mut self, enabled: bool) -> TargetResult<(), Self>;
 }
 
-define_ext!(ConfigureASLROps, ConfigureASLR);
+define_ext!(ConfigureAslrOps, ConfigureAslr);
 
 /// Nested Target Extension - Set/Remove/Reset the Environment variables for
 /// spawned processes.

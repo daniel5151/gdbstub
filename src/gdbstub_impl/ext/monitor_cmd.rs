@@ -39,7 +39,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     .map_err(Error::TargetError)?;
                 err?;
 
-                HandlerStatus::NeedsOK
+                HandlerStatus::NeedsOk
             }
         };
 

@@ -200,7 +200,7 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
     fn write_specific_id_kind(&mut self, tid: SpecificIdKind) -> Result<(), Error<C::Error>> {
         match tid {
             SpecificIdKind::All => self.write_str("-1")?,
-            SpecificIdKind::WithID(id) => self.write_num(id.get())?,
+            SpecificIdKind::WithId(id) => self.write_num(id.get())?,
         };
         Ok(())
     }

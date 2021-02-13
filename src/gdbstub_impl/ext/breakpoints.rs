@@ -41,7 +41,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         Err(e).handle_error()?;
                         HandlerStatus::Handled
                     }
-                    Some(Ok(true)) => HandlerStatus::NeedsOK,
+                    Some(Ok(true)) => HandlerStatus::NeedsOk,
                     Some(Ok(false)) => return Err(Error::NonFatalError(22)),
                 }
             }
@@ -63,7 +63,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         Err(e).handle_error()?;
                         HandlerStatus::Handled
                     }
-                    Some(Ok(true)) => HandlerStatus::NeedsOK,
+                    Some(Ok(true)) => HandlerStatus::NeedsOk,
                     Some(Ok(false)) => return Err(Error::NonFatalError(22)),
                 }
             }

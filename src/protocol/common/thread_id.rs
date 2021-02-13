@@ -11,7 +11,7 @@ pub enum IdKind {
     /// Any thread (0)
     Any,
     /// Thread with specific ID (id > 0)
-    WithID(NonZeroUsize),
+    WithId(NonZeroUsize),
 }
 
 /// Unique Thread ID.
@@ -59,7 +59,7 @@ impl TryFrom<&[u8]> for IdKind {
         Ok(match s {
             b"-1" => IdKind::All,
             b"0" => IdKind::Any,
-            id => IdKind::WithID(NonZeroUsize::new(decode_hex(id).map_err(drop)?).ok_or(())?),
+            id => IdKind::WithId(NonZeroUsize::new(decode_hex(id).map_err(drop)?).ok_or(())?),
         })
     }
 }
@@ -85,7 +85,7 @@ impl TryFrom<&mut [u8]> for IdKind {
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum SpecificIdKind {
     /// Thread with specific ID (id > 0)
-    WithID(core::num::NonZeroUsize),
+    WithId(core::num::NonZeroUsize),
     /// All threads (-1)
     All,
 }
@@ -106,7 +106,7 @@ impl TryFrom<IdKind> for SpecificIdKind {
     fn try_from(id: IdKind) -> Result<SpecificIdKind, ()> {
         Ok(match id {
             IdKind::All => SpecificIdKind::All,
-            IdKind::WithID(id) => SpecificIdKind::WithID(id),
+            IdKind::WithId(id) => SpecificIdKind::WithId(id),
             IdKind::Any => return Err(()),
         })
     }

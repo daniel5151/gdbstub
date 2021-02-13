@@ -33,7 +33,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     None => return Ok(HandlerStatus::Handled),
                     Some((reg_id, _)) => ops.write_register(id, reg_id, p.val).handle_error()?,
                 }
-                HandlerStatus::NeedsOK
+                HandlerStatus::NeedsOk
             }
         };
 
