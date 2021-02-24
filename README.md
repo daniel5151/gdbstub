@@ -3,7 +3,11 @@
 [![](http://meritbadge.herokuapp.com/gdbstub)](https://crates.io/crates/gdbstub)
 [![](https://docs.rs/gdbstub/badge.svg)](https://docs.rs/gdbstub)
 
-> **DISCLAIMER:** This is my personal dev branch of `gdbstub`, and includes features which may or may not be released in future version of `gdbstub`.
+> **DISCLAIMER:** This branch is a `feature-draft/` branch, and includes some code that _mostly works_, but isn't quite good enough to ship yet.
+>
+> This particular branch (`feature-draft/agent`) includes an implementation of the [GDB Agent Expression](https://sourceware.org/gdb/current/onlinedocs/gdb/Agent-Expressions.html#Agent-Expressions) protocol, which enables the GDB client to run simple bytecode on a target in response to certain events (e.g: when a breakpoint is hit, to conduct traces, etc...). This implementation does indeed _work_, but the API has a fatal flaw that makes me hesitant to ship it: the lifetime of the GDB agent executor is directly tied to the target itself. This is pretty bad, as the whole idea behind the GDB Agent is that it sits "above" the Target and executes commands onto it (i.e: read/write memory and registers), and means that it's impossible to execute the bytecode expression(s) while simultaneously modifying the target. This is better explained in the docs of the [BreakpointAgent::get_breakpoint_bytecode](https://github.com/daniel5151/gdbstub/blob/feature-draft/agent/src/target/ext/breakpoints.rs#L222-L303) method.
+>
+> In addition, this implementation introduces a layer of indirection not present in the base GDB protocol, namely, the notion of `BytecodeId`s which correspond to each bytecode expression. I'm not entirely convinced this extra indirection is required, and it would be nice to avoid it if possible.
 
 An ergonomic and easy-to-integrate implementation of the [GDB Remote Serial Protocol](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Protocol.html#Remote-Protocol) in Rust, with full `#![no_std]` support.
 
