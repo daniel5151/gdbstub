@@ -2,7 +2,6 @@ use super::prelude::*;
 use crate::protocol::commands::ext::Breakpoints;
 
 use crate::arch::{Arch, BreakpointKind};
-use crate::target::ext::breakpoints::BreakpointBytecodeKind;
 
 enum CmdKind {
     Add,
@@ -84,73 +83,12 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         };
 
         let handler_status = match command {
-            Breakpoints::z(cmd) => {
-                let addr = <T::Arch as Arch>::Usize::from_be_bytes(cmd.addr)
-                    .ok_or(Error::TargetMismatch)?;
-
-                let status = self.handle_breakpoint_common(ops, cmd, CmdKind::Remove)?;
-
-                if let Some(agent_ops) = ops.breakpoint_agent() {
-                    agent_ops
-                        .clear_breakpoint_bytecode(BreakpointBytecodeKind::Command, addr)
-                        .handle_error()?;
-                    agent_ops
-                        .clear_breakpoint_bytecode(BreakpointBytecodeKind::Condition, addr)
-                        .handle_error()?;
-                }
-
-                status
-            }
+            Breakpoints::z(cmd) => self.handle_breakpoint_common(ops, cmd, CmdKind::Remove)?,
             Breakpoints::Z(cmd) => self.handle_breakpoint_common(ops, cmd, CmdKind::Add)?,
-
-            Breakpoints::ZWithBytecode(cmd) if ops.breakpoint_agent().is_some() => {
-                let addr = <T::Arch as Arch>::Usize::from_be_bytes(cmd.base.addr)
-                    .ok_or(Error::TargetMismatch)?;
-
-                let status = self.handle_breakpoint_common(ops, cmd.base, CmdKind::Add)?;
-                let agent_ops = ops.breakpoint_agent().unwrap();
-
-                if let Some(conds) = cmd.conds {
-                    for bytecode in conds.into_iter() {
-                        let bytecode = bytecode.ok_or(Error::PacketParse(
-                            crate::protocol::PacketParseError::MalformedCommand,
-                        ))?;
-
-                        let id = agent_ops.register_bytecode(bytecode).handle_error()?;
-                        agent_ops
-                            .add_breakpoint_bytecode(
-                                BreakpointBytecodeKind::Condition,
-                                addr,
-                                id,
-                                false, // dummy value
-                            )
-                            .handle_error()?;
-                    }
-                }
-
-                if let Some((cmds, persist)) = cmd.cmds_persist {
-                    for bytecode in cmds.into_iter() {
-                        let bytecode = bytecode.ok_or(Error::PacketParse(
-                            crate::protocol::PacketParseError::MalformedCommand,
-                        ))?;
-
-                        let id = agent_ops.register_bytecode(bytecode).handle_error()?;
-                        agent_ops
-                            .add_breakpoint_bytecode(
-                                BreakpointBytecodeKind::Command,
-                                addr,
-                                id,
-                                persist,
-                            )
-                            .handle_error()?;
-                    }
-                }
-
-                status
+            Breakpoints::ZWithBytecode(cmd) => {
+                warn!("Client sent breakpoint packet with bytecode even though target didn't support agent expressions");
+                self.handle_breakpoint_common(ops, cmd.base, CmdKind::Add)?
             }
-            // The client sent a packet with bytecode even though the client never reported
-            // implementing the `Agent` feature. This should never happen.
-            _ => return Err(Error::PacketUnexpected),
         };
         Ok(handler_status)
     }
