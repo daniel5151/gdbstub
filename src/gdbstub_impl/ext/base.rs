@@ -48,6 +48,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     }
                 }
 
+                if target.agent().is_some() {
+                    res.write_str(";QAgent+")?;
+                }
+
                 if let Some(ops) = target.breakpoints() {
                     if ops.sw_breakpoint().is_some() {
                         res.write_str(";swbreak+")?;
@@ -55,6 +59,11 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                     if ops.hw_breakpoint().is_some() || ops.hw_watchpoint().is_some() {
                         res.write_str(";hwbreak+")?;
+                    }
+
+                    if ops.breakpoint_agent().is_some() {
+                        res.write_str(";BreakpointCommands+")?;
+                        res.write_str(";ConditionalBreakpoints+")?;
                     }
                 }
 
@@ -505,7 +514,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     fn finish_vcont(
         &mut self,
         res: &mut ResponseWriter<C>,
-        _target: &mut T,
+        target: &mut T,
         stop_reason: ThreadStopReason<<T::Arch as Arch>::Usize>,
     ) -> Result<Option<HandlerStatus>, Error<T::Error, C::Error>> {
         let status = match stop_reason {
@@ -527,6 +536,18 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             | ThreadStopReason::Watch { tid, .. } => {
                 self.current_mem_tid = tid;
                 self.current_resume_tid = SpecificIdKind::WithId(tid);
+
+                if let Some(agent_ops) = target
+                    .breakpoints()
+                    .and_then(|bp_ops| bp_ops.breakpoint_agent())
+                {
+                    if agent_ops.breakpoint_bytecode_executor().is_gdbstub()
+                        && !self.eval_breakpoint_bytecode(agent_ops, res)?
+                    {
+                        // condition didn't evaluate to true - resume the target
+                        return Ok(None);
+                    }
+                }
 
                 res.write_str("T05")?;
 
@@ -559,6 +580,108 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         };
 
         Ok(Some(status))
+    }
+
+    // evaluate any bytecode associated with the current breakpoint, returning a
+    // boolean indicating whether or not to report the breakpoint hit back to the
+    // client.
+    fn eval_breakpoint_bytecode(
+        &mut self,
+        target: crate::target::ext::breakpoints::BreakpointAgentOps<T>,
+        res: &mut ResponseWriter<C>,
+    ) -> Result<bool, Error<T::Error, C::Error>> {
+        use crate::target::ext::breakpoints::{BreakpointAgentOps, BreakpointBytecodeKind};
+
+        let mut regs: <T::Arch as Arch>::Registers = Default::default();
+        let err = match target.base_ops() {
+            BaseOps::SingleThread(ops) => ops.read_registers(&mut regs),
+            BaseOps::MultiThread(ops) => ops.read_registers(&mut regs, self.current_mem_tid),
+        };
+
+        if let Err(err) = err {
+            if let crate::target::TargetError::Fatal(e) = err {
+                return Err(Error::TargetError(e));
+            } else {
+                // a non-fatal error occurred. it's a bit arbitrary what the behavior in this
+                // case should be, so lets just assume that the best course of action is to
+                // notify GDB of the breakpoint hit.
+                return Ok(true);
+            }
+        }
+
+        let addr = regs.pc();
+
+        // TODO: instead of hardcoding error messages, pass a `ConsoleOutput` to the
+        // Agent implementation and allow them to dump debug output.
+        let mut err: Result<(), Error<T::Error, C::Error>> = Ok(());
+
+        let mut condition = None;
+        let mut eval_condition = |target: BreakpointAgentOps<T>, id| {
+            use num_traits::*;
+
+            match target.evaluate(id) {
+                Ok(val) => condition = Some(!val.is_zero() || condition.unwrap_or(false)),
+                Err(crate::target::TargetError::Fatal(e)) => err = Err(Error::TargetError(e)),
+                // non-fatal error during bytecode evaluation.
+                Err(_) => {
+                    // TODO: replace with a try block once stabilized
+                    let e = (|| {
+                        let mut res = ResponseWriter::new(res.as_conn());
+                        res.write_str("O")?;
+                        res.write_hex_buf(b"error while evaluating breakpoint ")?;
+                        res.write_hex_buf(b"condition\n")?;
+                        res.flush()?;
+                        Ok(())
+                    })();
+
+                    if let Err(e) = e {
+                        err = Err(e)
+                    }
+                }
+            }
+            Ok(())
+        };
+
+        // ****************** FIXME *********************** //
+        // rewrite API to not require this sort of iteration - if end users use the
+        // whole "Option::take" approach to avoiding copies, then bad things can happen.
+
+        target
+            .get_breakpoint_bytecode(BreakpointBytecodeKind::Condition, addr, &mut eval_condition)
+            .map_err(Error::TargetError)?;
+
+        let condition = condition.unwrap_or(true);
+        if condition {
+            let mut eval_command = |target: BreakpointAgentOps<T>, id| {
+                match target.evaluate(id) {
+                    Ok(_) => {} // result is ignored when evaluating commands
+                    Err(crate::target::TargetError::Fatal(e)) => return Err(e),
+                    // non-fatal error during bytecode evaluation.
+                    Err(_) => {
+                        // TODO: replace with a try block once stabilized
+                        let e = (|| {
+                            let mut res = ResponseWriter::new(res.as_conn());
+                            res.write_str("O")?;
+                            res.write_hex_buf(b"error while evaluating breakpoint ")?;
+                            res.write_hex_buf(b"command\n")?;
+                            res.flush()?;
+                            Ok(())
+                        })();
+
+                        if let Err(e) = e {
+                            err = Err(e)
+                        }
+                    }
+                }
+                Ok(())
+            };
+
+            target
+                .get_breakpoint_bytecode(BreakpointBytecodeKind::Command, addr, &mut eval_command)
+                .map_err(Error::TargetError)?;
+        }
+
+        Ok(condition)
     }
 }
 

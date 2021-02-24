@@ -12,6 +12,7 @@ use crate::emu::{Emu, Event};
 
 // Additional GDB extensions
 
+mod agent;
 mod breakpoints;
 mod extended_mode;
 mod monitor_cmd;
@@ -50,6 +51,10 @@ impl Target for Emu {
     }
 
     fn section_offsets(&mut self) -> Option<target::ext::section_offsets::SectionOffsetsOps<Self>> {
+        Some(self)
+    }
+
+    fn agent(&mut self) -> Option<target::ext::agent::AgentOps<Self>> {
         Some(self)
     }
 }

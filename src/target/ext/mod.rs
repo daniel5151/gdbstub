@@ -245,6 +245,7 @@ macro_rules! define_ext {
     };
 }
 
+pub mod agent;
 pub mod base;
 pub mod breakpoints;
 pub mod extended_mode;

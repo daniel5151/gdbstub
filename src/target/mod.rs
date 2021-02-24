@@ -227,6 +227,11 @@ pub trait Target {
     fn section_offsets(&mut self) -> Option<ext::section_offsets::SectionOffsetsOps<Self>> {
         None
     }
+
+    /// TODO: more docs
+    fn agent(&mut self) -> Option<ext::agent::AgentOps<Self>> {
+        None
+    }
 }
 
 macro_rules! impl_dyn_target {
@@ -257,6 +262,10 @@ macro_rules! impl_dyn_target {
 
             fn section_offsets(&mut self) -> Option<ext::section_offsets::SectionOffsetsOps<Self>> {
                 (**self).section_offsets()
+            }
+
+            fn agent(&mut self) -> Option<ext::agent::AgentOps<Self>> {
+                (**self).agent()
             }
         }
     };
