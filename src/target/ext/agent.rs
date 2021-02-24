@@ -19,9 +19,15 @@ impl BytecodeId {
 
 /// TODO: More docs
 pub trait Agent: Target {
-    /// Turn on or off the agent as a helper to perform some debugging
-    /// operations delegated from GDB.
-    fn enabled(&mut self, enabled: bool) -> Result<(), Self::Error>;
+    /// Toggle whether or not the target should use the agent.
+    ///
+    /// _Note:_ The default implementation of this method is a no-op. Empirical
+    /// evidence suggests that if the GDB client doesn't wish to use the agent,
+    /// it will simply stop sending agent bytecode to the target.
+    fn enabled(&mut self, enabled: bool) -> Result<(), Self::Error> {
+        let _ = enabled;
+        Ok(())
+    }
 
     /// Register a bytecode expression with the agent.
     ///

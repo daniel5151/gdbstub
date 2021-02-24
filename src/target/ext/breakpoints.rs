@@ -170,7 +170,7 @@ pub trait BreakpointAgent: Target + Breakpoints + Agent {
     /// where and when breakpoint bytecode should be executed.
     ///
     /// - `BytecodeExecutor::GdbStub` is the simpler option, and is enabled by
-    ///   defualt. Bytecode is automatically executed by `gdbstub` after the
+    ///   default. Bytecode is automatically executed by `gdbstub` after the
     ///   target returns a `SwBreak` or `HwBreak` stop-reason from `resume()`.
     ///
     /// - `BytecodeExecutor::Target` is the more advanced option - bytecode must
