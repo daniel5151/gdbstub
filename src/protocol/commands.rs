@@ -116,7 +116,7 @@ macro_rules! commands {
                 }
                 )*
 
-                if let Some(breakpoint_ops) = target.breakpoints() {
+                if let Some(_breakpoint_ops) = target.breakpoints() {
                     use breakpoint::{BasicBreakpoint, BytecodeBreakpoint};
 
                     if buf.strip_prefix(b"z") {
@@ -125,8 +125,9 @@ macro_rules! commands {
                     }
 
                     if buf.strip_prefix(b"Z") {
-                        if breakpoint_ops.breakpoint_agent().is_none() {
-                            let cmd = BasicBreakpoint::from_slice(buf.into_body())?;
+                        // TODO: agent bytecode currently unimplemented
+                        if true {
+                           let cmd = BasicBreakpoint::from_slice(buf.into_body())?;
                             return Some(Command::Breakpoints(ext::Breakpoints::Z(cmd)))
                         } else {
                             let cmd = BytecodeBreakpoint::from_slice(buf.into_body())?;
@@ -188,9 +189,5 @@ commands! {
 
     section_offsets {
         "qOffsets" => _qOffsets::qOffsets,
-    }
-
-    agent {
-        "QAgent" => _QAgent::QAgent,
     }
 }

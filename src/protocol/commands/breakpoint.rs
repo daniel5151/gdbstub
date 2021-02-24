@@ -105,6 +105,7 @@ where
 pub struct BytecodeList<'a>(&'a mut [u8]);
 
 impl<'a> BytecodeList<'a> {
+    #[allow(dead_code)]
     pub fn into_iter(self) -> impl Iterator<Item = Option<&'a [u8]>> + 'a {
         self.0.split_mut(|b| *b == b'X').skip(1).map(|s| {
             let mut s = s.split_mut(|b| *b == b',');
