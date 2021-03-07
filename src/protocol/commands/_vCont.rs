@@ -15,7 +15,18 @@ impl<'a> ParseCommand<'a> for vCont<'a> {
         let body = buf.into_body();
         match body as &[u8] {
             b"?" => Some(vCont::Query),
-            _ => Some(vCont::Actions(Actions::new_from_buf(body))),
+            _ => {
+                for range in body
+                    .split_mut(|b| *b == b'r')
+                    .skip(1)
+                    .flat_map(|s| s.split_mut(|b| *b == b':').take(1))
+                {
+                    let mut range = range.split_mut(|b| *b == b',');
+                    let _ = decode_hex_buf(range.next()?).ok()?;
+                    let _ = decode_hex_buf(range.next()?).ok()?;
+                }
+                Some(vCont::Actions(Actions::new_from_buf(body)))
+            }
         }
     }
 }
@@ -23,7 +34,8 @@ impl<'a> ParseCommand<'a> for vCont<'a> {
 #[derive(Debug)]
 pub enum Actions<'a> {
     Buf(ActionsBuf<'a>),
-    Fixed(ActionsFixed),
+    FixedStep(SpecificThreadId),
+    FixedCont(SpecificThreadId),
 }
 
 impl<'a> Actions<'a> {
@@ -32,23 +44,30 @@ impl<'a> Actions<'a> {
     }
 
     pub fn new_step(tid: SpecificThreadId) -> Actions<'a> {
-        Actions::Fixed(ActionsFixed(VContAction {
-            kind: VContKind::from_bytes(b"s").unwrap(),
-            thread: Some(tid),
-        }))
+        Actions::FixedStep(tid)
     }
 
     pub fn new_continue(tid: SpecificThreadId) -> Actions<'a> {
-        Actions::Fixed(ActionsFixed(VContAction {
-            kind: VContKind::from_bytes(b"c").unwrap(),
-            thread: Some(tid),
-        }))
+        Actions::FixedCont(tid)
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = Option<VContAction>> + 'a {
+    pub fn iter(&self) -> impl Iterator<Item = Option<VContAction<'a>>> + '_ {
         match self {
-            Actions::Fixed(x) => EitherIter::Left(x.iter()),
-            Actions::Buf(x) => EitherIter::Right(x.iter()),
+            Actions::Buf(x) => EitherIter::A(x.iter()),
+            Actions::FixedStep(x) => EitherIter::B(
+                Some(Some(VContAction {
+                    kind: VContKind::Step,
+                    thread: Some(*x),
+                }))
+                .into_iter(),
+            ),
+            Actions::FixedCont(x) => EitherIter::C(
+                Some(Some(VContAction {
+                    kind: VContKind::Continue,
+                    thread: Some(*x),
+                }))
+                .into_iter(),
+            ),
         }
     }
 }
@@ -57,7 +76,7 @@ impl<'a> Actions<'a> {
 pub struct ActionsBuf<'a>(&'a [u8]);
 
 impl<'a> ActionsBuf<'a> {
-    fn iter(&self) -> impl Iterator<Item = Option<VContAction>> + 'a {
+    fn iter(&self) -> impl Iterator<Item = Option<VContAction<'a>>> + '_ {
         self.0.split(|b| *b == b';').skip(1).map(|act| {
             let mut s = act.split(|b| *b == b':');
             let kind = s.next()?;
@@ -74,32 +93,23 @@ impl<'a> ActionsBuf<'a> {
     }
 }
 
-#[derive(Debug)]
-pub struct ActionsFixed(VContAction);
-
-impl ActionsFixed {
-    fn iter(&self) -> impl Iterator<Item = Option<VContAction>> {
-        Some(Some(self.0)).into_iter()
-    }
-}
-
 #[derive(Debug, Copy, Clone)]
-pub struct VContAction {
-    pub kind: VContKind,
+pub struct VContAction<'a> {
+    pub kind: VContKind<'a>,
     pub thread: Option<SpecificThreadId>,
 }
 
 #[derive(Debug, Copy, Clone)]
-pub enum VContKind {
+pub enum VContKind<'a> {
     Continue,
     ContinueWithSig(u8),
-    // RangeStep(&'a [u8], &'a [u8]),
+    RangeStep(&'a [u8], &'a [u8]),
     Step,
     StepWithSig(u8),
     Stop,
 }
 
-impl VContKind {
+impl<'a> VContKind<'a> {
     fn from_bytes(s: &[u8]) -> Option<VContKind> {
         use self::VContKind::*;
 
@@ -109,12 +119,20 @@ impl VContKind {
             [b't'] => Stop,
             [b'C', sig @ ..] => ContinueWithSig(decode_hex(sig).ok()?),
             [b'S', sig @ ..] => StepWithSig(decode_hex(sig).ok()?),
-            // [b'r', range @ ..] => {
-            //     let mut range = range.split_mut(|b| *b == b',');
-            //     let start = decode_hex_buf(range.next()?).ok()?;
-            //     let end = decode_hex_buf(range.next()?).ok()?;
-            //     RangeStep(start, end)
-            // }
+            [b'r', range @ ..] => {
+                // relies on the fact that start and end were decoded as part of
+                // the initial packet parse.
+                let mut range = range.split(|b| *b == b',');
+                let start = {
+                    let s = range.next()?;
+                    &s[..(s.len() / 2)]
+                };
+                let end = {
+                    let s = range.next()?;
+                    &s[..(s.len() / 2)]
+                };
+                RangeStep(start, end)
+            }
             _ => return None,
         };
 
@@ -124,21 +142,24 @@ impl VContKind {
 
 /// Helper type to unify iterators that output the same type. Returned as an
 /// opaque type from `Actions::iter()`.
-enum EitherIter<A, B> {
-    Left(A),
-    Right(B),
+enum EitherIter<A, B, C> {
+    A(A),
+    B(B),
+    C(C),
 }
 
-impl<A, B, T> Iterator for EitherIter<A, B>
+impl<A, B, C, T> Iterator for EitherIter<A, B, C>
 where
     A: Iterator<Item = T>,
     B: Iterator<Item = T>,
+    C: Iterator<Item = T>,
 {
     type Item = T;
     fn next(&mut self) -> Option<T> {
         match self {
-            EitherIter::Left(a) => a.next(),
-            EitherIter::Right(b) => b.next(),
+            EitherIter::A(a) => a.next(),
+            EitherIter::B(b) => b.next(),
+            EitherIter::C(b) => b.next(),
         }
     }
 }

@@ -143,6 +143,12 @@ impl SingleThreadOps for Emu {
     ) -> Option<target::ext::base::SingleRegisterAccessOps<(), Self>> {
         Some(self)
     }
+
+    fn support_resume_range_step(
+        &mut self,
+    ) -> Option<target::ext::base::singlethread::SingleThreadRangeSteppingOps<Self>> {
+        Some(self)
+    }
 }
 
 impl target::ext::base::SingleRegisterAccess<()> for Emu {
@@ -176,6 +182,26 @@ impl target::ext::base::SingleRegisterAccess<()> for Emu {
             Ok(())
         } else {
             Err(().into())
+        }
+    }
+}
+
+impl target::ext::base::singlethread::SingleThreadRangeStepping for Emu {
+    fn resume_range_step(
+        &mut self,
+        start: u32,
+        end: u32,
+        check_gdb_interrupt: &mut dyn std::ops::FnMut() -> bool,
+    ) -> Result<StopReason<u32>, Self::Error> {
+        loop {
+            match self.resume(ResumeAction::Step, check_gdb_interrupt)? {
+                StopReason::DoneStep => {}
+                stop_reason => return Ok(stop_reason),
+            }
+
+            if !(start..end).contains(&self.cpu.reg_get(self.cpu.mode(), reg::PC)) {
+                return Ok(StopReason::DoneStep);
+            }
         }
     }
 }

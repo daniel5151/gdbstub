@@ -237,6 +237,12 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 match cmd {
                     vCont::Query => {
                         res.write_str("vCont;c;C;s;S")?;
+                        if match target.base_ops() {
+                            BaseOps::SingleThread(ops) => ops.support_resume_range_step().is_some(),
+                            BaseOps::MultiThread(ops) => ops.support_range_step().is_some(),
+                        } {
+                            res.write_str(";r")?;
+                        }
                         HandlerStatus::Handled
                     }
                     vCont::Actions(actions) => self.do_vcont(res, target, actions)?,
@@ -381,25 +387,6 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     ) -> Result<ThreadStopReason<<T::Arch as Arch>::Usize>, Error<T::Error, C::Error>> {
         use crate::protocol::commands::_vCont::VContKind;
 
-        let action = actions
-            .iter()
-            .next()
-            // TODO?: use a more descriptive error if vcont has multiple actions in
-            // single-threaded mode?
-            .ok_or(Error::PacketUnexpected)?
-            .ok_or(Error::PacketParse(
-                crate::protocol::PacketParseError::MalformedCommand,
-            ))?;
-
-        let action = match action.kind {
-            VContKind::Step => ResumeAction::Step,
-            VContKind::Continue => ResumeAction::Continue,
-            VContKind::StepWithSig(sig) => ResumeAction::StepWithSignal(sig),
-            VContKind::ContinueWithSig(sig) => ResumeAction::ContinueWithSignal(sig),
-            // TODO: update this case when non-stop mode is implemented
-            VContKind::Stop => return Err(Error::PacketUnexpected),
-        };
-
         let mut err = Ok(());
         let mut check_gdb_interrupt = || match res.as_conn().peek() {
             Ok(Some(0x03)) => true, // 0x03 is the interrupt byte
@@ -409,6 +396,58 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 err = Err(Error::ConnectionRead(e));
                 true // break ASAP if a connection error occurred
             }
+        };
+
+        let mut actions = actions.iter();
+        let first_action = actions
+            .next()
+            .ok_or(Error::PacketParse(
+                crate::protocol::PacketParseError::MalformedCommand,
+            ))?
+            .ok_or(Error::PacketParse(
+                crate::protocol::PacketParseError::MalformedCommand,
+            ))?;
+
+        let invalid_second_action = match actions.next() {
+            None => false,
+            Some(act) => match act {
+                None => {
+                    return Err(Error::PacketParse(
+                        crate::protocol::PacketParseError::MalformedCommand,
+                    ))
+                }
+                Some(act) => !matches!(act.kind, VContKind::Continue),
+            },
+        };
+
+        if invalid_second_action || actions.next().is_some() {
+            return Err(Error::PacketUnexpected);
+        }
+
+        let action = match first_action.kind {
+            VContKind::Step => ResumeAction::Step,
+            VContKind::Continue => ResumeAction::Continue,
+            VContKind::StepWithSig(sig) => ResumeAction::StepWithSignal(sig),
+            VContKind::ContinueWithSig(sig) => ResumeAction::ContinueWithSignal(sig),
+            VContKind::RangeStep(start, end) => {
+                let start =
+                    <T::Arch as Arch>::Usize::from_be_bytes(start).ok_or(Error::TargetMismatch)?;
+                let end =
+                    <T::Arch as Arch>::Usize::from_be_bytes(end).ok_or(Error::TargetMismatch)?;
+
+                if let Some(ops) = ops.support_resume_range_step() {
+                    let ret = ops
+                        .resume_range_step(start, end, &mut check_gdb_interrupt)
+                        .map_err(Error::TargetError)?
+                        .into();
+                    err?;
+                    return Ok(ret);
+                } else {
+                    return Err(Error::PacketUnexpected);
+                }
+            }
+            // TODO: update this case when non-stop mode is implemented
+            VContKind::Stop => return Err(Error::PacketUnexpected),
         };
 
         let ret = ops
@@ -449,6 +488,28 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 // `vCont?` returns support for resuming with a signal.
                 VContKind::StepWithSig(sig) => ResumeAction::StepWithSignal(sig),
                 VContKind::ContinueWithSig(sig) => ResumeAction::ContinueWithSignal(sig),
+                VContKind::RangeStep(start, end) => {
+                    let start = <T::Arch as Arch>::Usize::from_be_bytes(start)
+                        .ok_or(Error::TargetMismatch)?;
+                    let end = <T::Arch as Arch>::Usize::from_be_bytes(end)
+                        .ok_or(Error::TargetMismatch)?;
+
+                    if let Some(ops) = ops.support_range_step() {
+                        match action.thread.map(|thread| thread.tid) {
+                            // An action with no thread-id matches all threads
+                            None | Some(SpecificIdKind::All) => {
+                                return Err(Error::PacketUnexpected)
+                            }
+                            Some(SpecificIdKind::WithId(tid)) => {
+                                ops.set_resume_action_range_step(tid, start, end)
+                                    .map_err(Error::TargetError)?;
+                                continue;
+                            }
+                        };
+                    } else {
+                        return Err(Error::PacketUnexpected);
+                    }
+                }
                 // TODO: update this case when non-stop mode is implemented
                 VContKind::Stop => return Err(Error::PacketUnexpected),
             };
