@@ -75,7 +75,7 @@ impl Drop for ConsoleOutput<'_> {
 macro_rules! output {
     ($console_output:expr, $($args:tt)*) => {{
         use std::fmt::Write;
-        let _ = writeln!($console_output, $($args)*);
+        let _ = write!($console_output, $($args)*);
     }};
 }
 
