@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+# 0.4.4
+
+#### Bugfixes
+
+-   use `write!` instead of `writeln!` in `output!` macro [\#41](https://github.com/daniel5151/gdbstub/issues/41)
+
 # 0.4.3
 
 #### New Arch Implementations
