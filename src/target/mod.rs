@@ -239,6 +239,11 @@ pub trait Target {
     fn section_offsets(&mut self) -> Option<ext::section_offsets::SectionOffsetsOps<Self>> {
         None
     }
+
+    /// Handle requests for the target's XML description for GDB.
+    fn target_description(&mut self) -> Option<ext::base::TargetDescriptionOps<Self>> {
+        None
+    }
 }
 
 macro_rules! impl_dyn_target {

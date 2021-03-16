@@ -303,7 +303,9 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 // TODO: implement conditional breakpoint support (since that's kool).
                 // res.write_str("ConditionalBreakpoints+;")?;
 
-                if T::Arch::target_description_xml().is_some() {
+                if target.target_description().is_some()
+                    || <T::Arch as Arch>::target_description_xml().is_some()
+                {
                     res.write_str(";qXfer:features:read+")?;
                 }
 
@@ -314,7 +316,17 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 HandlerStatus::NeedsOK
             }
             ext::Base::qXferFeaturesRead(cmd) => {
-                match T::Arch::target_description_xml() {
+                // Query the target description ops for the target's description.
+                let xml = {
+                    // Target gets the first chance to override the XML description.
+                    target
+                        .target_description()
+                        .map_or(<T::Arch as Arch>::target_description_xml(), |v| {
+                            Some(v.target_description_xml())
+                        })
+                };
+
+                match xml {
                     Some(xml) => {
                         let xml = xml.trim();
                         if cmd.offset >= xml.len() {
@@ -331,10 +343,11 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         }
                     }
                     // If the target hasn't provided their own XML, then the initial response to
-                    // "qSupported" wouldn't have included  "qXfer:features:read", and gdb wouldn't
-                    // send this packet unless it was explicitly marked as supported.
+                    // "qSupported" wouldn't have included  "qXfer:features:read", and gdb
+                    // wouldn't send this packet unless it was explicitly marked as supported.
                     None => return Err(Error::PacketUnexpected),
                 }
+
                 HandlerStatus::Handled
             }
 

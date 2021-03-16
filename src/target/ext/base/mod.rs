@@ -7,6 +7,11 @@
 pub mod multithread;
 pub mod singlethread;
 
+mod description;
+
+pub use description::TargetDescription;
+pub use description::TargetDescriptionOps;
+
 /// Base operations for single/multi threaded targets.
 pub enum BaseOps<'a, A, E> {
     /// Single-threaded target
