@@ -10,19 +10,9 @@ use crate::target::Target;
 pub trait TargetDescriptionXmlOverride: Target {
     /// Return the target's description XML file (`target.xml`).
     ///
-    /// Implementing this method enables GDB to automatically detect the
-    /// target's architecture, saving the hassle of having to run `set
-    /// architecture <arch>` when starting a debugging session.
-    ///
-    /// These descriptions can be quite succinct. For example, the target
-    /// description for an `armv4t` target can be as simple as:
-    ///
-    /// ```
-    /// r#"<target version="1.0"><architecture>armv4t</architecture></target>"#;
-    /// ```
-    ///
-    /// See the [GDB docs](https://sourceware.org/gdb/current/onlinedocs/gdb/Target-Description-Format.html)
-    /// for details on the target description XML format.
+    /// Refer to the
+    /// [target_description_xml](crate::arch::Arch::target_description_xml)
+    /// docs for more info.
     fn target_description_xml(&self) -> &str;
 }
 
