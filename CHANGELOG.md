@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+# 0.4.5
+
+#### New Protocol Extensions
+
+- `TargetDescriptionXmlOverride` - Allow targets to override the target description XML file (`target.xml`) specified by `Target::Arch::target_description_xml`. This is useful in cases where a `Target` is expected to be generic over multiple architectures. [\#43](https://github.com/daniel5151/gdbstub/pull/43) (with help from [DrChat](https://github.com/DrChat))
+
 # 0.4.4
 
 #### Bugfixes
