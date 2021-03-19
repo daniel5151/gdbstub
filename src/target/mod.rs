@@ -239,6 +239,13 @@ pub trait Target {
     fn section_offsets(&mut self) -> Option<ext::section_offsets::SectionOffsetsOps<Self>> {
         None
     }
+
+    /// Override the target description XML specified by `Target::Arch`.
+    fn target_xml_override(
+        &mut self,
+    ) -> Option<ext::target_description_xml_override::TargetDescriptionXmlOverrideOps<Self>> {
+        None
+    }
 }
 
 macro_rules! impl_dyn_target {
@@ -277,6 +284,13 @@ macro_rules! impl_dyn_target {
 
             fn section_offsets(&mut self) -> Option<ext::section_offsets::SectionOffsetsOps<Self>> {
                 (**self).section_offsets()
+            }
+
+            fn target_xml_override(
+                &mut self,
+            ) -> Option<ext::target_description_xml_override::TargetDescriptionXmlOverrideOps<Self>>
+            {
+                (**self).target_xml_override()
             }
         }
     };

@@ -303,7 +303,9 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 // TODO: implement conditional breakpoint support (since that's kool).
                 // res.write_str("ConditionalBreakpoints+;")?;
 
-                if T::Arch::target_description_xml().is_some() {
+                if T::Arch::target_description_xml().is_some()
+                    || target.target_xml_override().is_some()
+                {
                     res.write_str(";qXfer:features:read+")?;
                 }
 
@@ -314,7 +316,13 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 HandlerStatus::NeedsOK
             }
             ext::Base::qXferFeaturesRead(cmd) => {
-                match T::Arch::target_description_xml() {
+                #[allow(clippy::redundant_closure)]
+                let xml = target
+                    .target_xml_override()
+                    .map(|ops| ops.target_description_xml())
+                    .or_else(|| T::Arch::target_description_xml());
+
+                match xml {
                     Some(xml) => {
                         let xml = xml.trim();
                         if cmd.offset >= xml.len() {
