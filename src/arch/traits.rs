@@ -63,18 +63,17 @@ pub trait Arch {
     /// separate from the main `Registers` structure.
     type RegId: RegId;
 
-    /// (optional) Return the platform's `features.xml` file.
+    /// (optional) Return the target's description XML file (`target.xml`).
     ///
-    /// Implementing this method enables `gdb` to automatically detect the
+    /// Implementing this method enables GDB to automatically detect the
     /// target's architecture, saving the hassle of having to run `set
     /// architecture <arch>` when starting a debugging session.
     ///
     /// These descriptions can be quite succinct. For example, the target
-    /// description for an `armv4t` platform can be as simple as:
+    /// description for an `armv4t` target can be as simple as:
     ///
     /// ```
-    /// r#"<target version="1.0"><architecture>armv4t</architecture></target>"#
-    /// # ;
+    /// r#"<target version="1.0"><architecture>armv4t</architecture></target>"#;
     /// ```
     ///
     /// See the [GDB docs](https://sourceware.org/gdb/current/onlinedocs/gdb/Target-Description-Format.html)
