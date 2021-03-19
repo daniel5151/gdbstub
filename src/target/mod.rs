@@ -241,7 +241,7 @@ pub trait Target {
     }
 
     /// Override the target description XML specified by `Target::Arch`.
-    fn target_xml_override(
+    fn target_description_xml_override(
         &mut self,
     ) -> Option<ext::target_description_xml_override::TargetDescriptionXmlOverrideOps<Self>> {
         None
@@ -286,11 +286,11 @@ macro_rules! impl_dyn_target {
                 (**self).section_offsets()
             }
 
-            fn target_xml_override(
+            fn target_description_xml_override(
                 &mut self,
             ) -> Option<ext::target_description_xml_override::TargetDescriptionXmlOverrideOps<Self>>
             {
-                (**self).target_xml_override()
+                (**self).target_description_xml_override()
             }
         }
     };

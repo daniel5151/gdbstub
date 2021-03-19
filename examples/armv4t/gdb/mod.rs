@@ -57,7 +57,7 @@ impl Target for Emu {
         Some(self)
     }
 
-    fn target_xml_override(
+    fn target_description_xml_override(
         &mut self,
     ) -> Option<target::ext::target_description_xml_override::TargetDescriptionXmlOverrideOps<Self>>
     {

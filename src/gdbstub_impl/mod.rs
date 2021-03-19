@@ -304,7 +304,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 // res.write_str("ConditionalBreakpoints+;")?;
 
                 if T::Arch::target_description_xml().is_some()
-                    || target.target_xml_override().is_some()
+                    || target.target_description_xml_override().is_some()
                 {
                     res.write_str(";qXfer:features:read+")?;
                 }
@@ -318,7 +318,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             ext::Base::qXferFeaturesRead(cmd) => {
                 #[allow(clippy::redundant_closure)]
                 let xml = target
-                    .target_xml_override()
+                    .target_description_xml_override()
                     .map(|ops| ops.target_description_xml())
                     .or_else(|| T::Arch::target_description_xml());
 
