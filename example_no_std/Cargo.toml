@@ -15,6 +15,6 @@ panic = "abort"
 
 [profile.release]
 panic = "abort"
-opt-level = 'z'  # Optimize for size.
+opt-level = 's'  # Optimize for size.
 lto = true
 codegen-units = 1

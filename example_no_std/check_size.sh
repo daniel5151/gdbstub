@@ -2,7 +2,7 @@
 
 cargo build --release
 
-cargo bloat --release --split-std -n 100 --filter=gdbstub
+cargo bloat --release --split-std -n 100
 
 strip target/release/gdbstub-nostd
 size -A -t target/release/gdbstub-nostd
