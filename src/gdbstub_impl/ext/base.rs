@@ -430,12 +430,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             VContKind::StepWithSig(sig) => ResumeAction::StepWithSignal(sig),
             VContKind::ContinueWithSig(sig) => ResumeAction::ContinueWithSignal(sig),
             VContKind::RangeStep(start, end) => {
-                let start =
-                    <T::Arch as Arch>::Usize::from_be_bytes(start).ok_or(Error::TargetMismatch)?;
-                let end =
-                    <T::Arch as Arch>::Usize::from_be_bytes(end).ok_or(Error::TargetMismatch)?;
-
                 if let Some(ops) = ops.support_resume_range_step() {
+                    let start = start.decode().map_err(|_| Error::TargetMismatch)?;
+                    let end = end.decode().map_err(|_| Error::TargetMismatch)?;
+
                     let ret = ops
                         .resume_range_step(start, end, &mut check_gdb_interrupt)
                         .map_err(Error::TargetError)?
@@ -454,9 +452,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             .resume(action, &mut check_gdb_interrupt)
             .map_err(Error::TargetError)?
             .into();
-
         err?;
-
         Ok(ret)
     }
 
@@ -489,11 +485,6 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 VContKind::StepWithSig(sig) => ResumeAction::StepWithSignal(sig),
                 VContKind::ContinueWithSig(sig) => ResumeAction::ContinueWithSignal(sig),
                 VContKind::RangeStep(start, end) => {
-                    let start = <T::Arch as Arch>::Usize::from_be_bytes(start)
-                        .ok_or(Error::TargetMismatch)?;
-                    let end = <T::Arch as Arch>::Usize::from_be_bytes(end)
-                        .ok_or(Error::TargetMismatch)?;
-
                     if let Some(ops) = ops.support_range_step() {
                         match action.thread.map(|thread| thread.tid) {
                             // An action with no thread-id matches all threads
@@ -501,6 +492,9 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                                 return Err(Error::PacketUnexpected)
                             }
                             Some(SpecificIdKind::WithId(tid)) => {
+                                let start = start.decode().map_err(|_| Error::TargetMismatch)?;
+                                let end = end.decode().map_err(|_| Error::TargetMismatch)?;
+
                                 ops.set_resume_action_range_step(tid, start, end)
                                     .map_err(Error::TargetError)?;
                                 continue;

@@ -35,6 +35,20 @@ where
     Ok(result)
 }
 
+/// Wrapper around a raw hex string. Enabled "late" calls to `decode` from
+/// outside the `crate::protocol` module.
+#[derive(Debug, Clone, Copy)]
+pub struct HexString<'a>(pub &'a [u8]);
+
+impl HexString<'_> {
+    pub fn decode<I>(&self) -> Result<I, DecodeHexError>
+    where
+        I: FromPrimitive + Zero + CheckedAdd + CheckedMul,
+    {
+        decode_hex(self.0)
+    }
+}
+
 #[derive(Debug)]
 pub enum DecodeHexBufError {
     NotAscii,

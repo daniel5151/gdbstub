@@ -19,8 +19,7 @@ Check out [`transition_guide.md`](./docs/transition_guide.md) for guidance on up
 - Add target-specific `kind: Arch::BreakpointKind` parameters to the Breakpoint API
     - _While emulated systems typically implement breakpoints by pausing execution once the PC hits a certain value, "real" systems typically need to patch the instruction stream with a breakpoint instruction. On systems with variable-sized instructions, this `kind` parameter specifies the size of the instruction that should be injected._
 - Support for `ResumeAction::{Step,Continue}WithSignal`
-- Added API for optimized Range Stepping - **Not yet wired-up on the back-end**
-    - _At the moment, the underlying `gbstub` implementation never actually report support for range stepping back to the GDB client, so the optimized code-path won't actually get hit. At some point in the future, a non-breaking `gdbstub` update can quietly add support for this "back-end wiring", and range stepping should just "magically" get faster._
+- Added APIs for implementing optimized Range Stepping
 
 #### Breaking API Changes
 
@@ -33,6 +32,7 @@ Check out [`transition_guide.md`](./docs/transition_guide.md) for guidance on up
 - Added `{Step,Continue}WithSignal` variants to `target::ext::base::ResumeAction`
 - Trait Changes
     - `arch::Arch`: Added `type BreakpointKind`. Required to support arch-specific breakpoint kinds
+    - `arch::Arch`: (very minor) Added [`num_traits::FromPrimitive`](https://docs.rs/num/0.4.0/num/traits/trait.FromPrimitive.html) bound to `Arch::Usize`
     - `arch::Registers`: Added `type ProgramCounter` and associated `fn pc(&self) -> Self::ProgramCounter` method. Added preemptively in anticipation of future GDB Agent support
 
 #### Internal Improvements
