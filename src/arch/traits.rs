@@ -78,6 +78,7 @@ impl BreakpointKind for () {
 }
 
 impl BreakpointKind for usize {
+    #[allow(clippy::wrong_self_convention)]
     fn from_usize(kind: usize) -> Option<Self> {
         Some(kind)
     }
