@@ -16,6 +16,7 @@ mod breakpoints;
 mod extended_mode;
 mod monitor_cmd;
 mod section_offsets;
+mod target_description_xml_override;
 
 /// Turn a `ArmCoreRegId` into an internal register number of `armv4t_emu`.
 fn cpu_reg_id(id: ArmCoreRegId) -> Option<u8> {
@@ -50,6 +51,13 @@ impl Target for Emu {
     }
 
     fn section_offsets(&mut self) -> Option<target::ext::section_offsets::SectionOffsetsOps<Self>> {
+        Some(self)
+    }
+
+    fn target_description_xml_override(
+        &mut self,
+    ) -> Option<target::ext::target_description_xml_override::TargetDescriptionXmlOverrideOps<Self>>
+    {
         Some(self)
     }
 }

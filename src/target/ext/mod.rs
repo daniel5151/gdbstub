@@ -101,7 +101,7 @@
 //!
 //! - (library) Define a `trait OptExt: Target { ... }` with all the optional
 //!   methods:
-//!    - Making `OptExt` a supertrait of `Target` enables using `Target`'s
+//!    - Making `OptExt` a subtrait of `Target` enables using `Target`'s
 //!      associated types.
 //!
 //! ```rust,ignore
@@ -250,3 +250,4 @@ pub mod breakpoints;
 pub mod extended_mode;
 pub mod monitor_cmd;
 pub mod section_offsets;
+pub mod target_description_xml_override;

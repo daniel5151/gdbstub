@@ -58,7 +58,9 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     }
                 }
 
-                if T::Arch::target_description_xml().is_some() {
+                if T::Arch::target_description_xml().is_some()
+                    || target.target_description_xml_override().is_some()
+                {
                     res.write_str(";qXfer:features:read+")?;
                 }
 
@@ -69,7 +71,13 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 HandlerStatus::NeedsOk
             }
             Base::qXferFeaturesRead(cmd) => {
-                match T::Arch::target_description_xml() {
+                #[allow(clippy::redundant_closure)]
+                let xml = target
+                    .target_description_xml_override()
+                    .map(|ops| ops.target_description_xml())
+                    .or_else(|| T::Arch::target_description_xml());
+
+                match xml {
                     Some(xml) => {
                         let xml = xml.trim();
                         if cmd.offset >= xml.len() {
