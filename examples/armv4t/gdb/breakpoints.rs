@@ -1,4 +1,3 @@
-use gdbstub::arch;
 use gdbstub::target;
 use gdbstub::target::ext::breakpoints::WatchKind;
 use gdbstub::target::TargetResult;
@@ -19,7 +18,7 @@ impl target::ext::breakpoints::SwBreakpoint for Emu {
     fn add_sw_breakpoint(
         &mut self,
         addr: u32,
-        _kind: arch::arm::ArmBreakpointKind,
+        _kind: gdbstub_arch::arm::ArmBreakpointKind,
     ) -> TargetResult<bool, Self> {
         self.breakpoints.push(addr);
         Ok(true)
@@ -28,7 +27,7 @@ impl target::ext::breakpoints::SwBreakpoint for Emu {
     fn remove_sw_breakpoint(
         &mut self,
         addr: u32,
-        _kind: arch::arm::ArmBreakpointKind,
+        _kind: gdbstub_arch::arm::ArmBreakpointKind,
     ) -> TargetResult<bool, Self> {
         match self.breakpoints.iter().position(|x| *x == addr) {
             None => return Ok(false),

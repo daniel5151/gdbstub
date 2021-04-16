@@ -1,6 +1,5 @@
 use armv4t_emu::{reg, Memory};
 
-use gdbstub::arch;
 use gdbstub::common::Tid;
 use gdbstub::target;
 use gdbstub::target::ext::base::multithread::{MultiThreadOps, ResumeAction, ThreadStopReason};
@@ -43,7 +42,7 @@ fn tid_to_cpuid(tid: Tid) -> Result<CpuId, &'static str> {
 }
 
 impl Target for Emu {
-    type Arch = arch::arm::Armv4t;
+    type Arch = gdbstub_arch::arm::Armv4t;
     type Error = &'static str;
 
     fn base_ops(&mut self) -> target::ext::base::BaseOps<Self::Arch, Self::Error> {
@@ -123,7 +122,7 @@ impl MultiThreadOps for Emu {
 
     fn read_registers(
         &mut self,
-        regs: &mut arch::arm::reg::ArmCoreRegs,
+        regs: &mut gdbstub_arch::arm::reg::ArmCoreRegs,
         tid: Tid,
     ) -> TargetResult<(), Self> {
         let cpu = match tid_to_cpuid(tid).map_err(TargetError::Fatal)? {
@@ -146,7 +145,7 @@ impl MultiThreadOps for Emu {
 
     fn write_registers(
         &mut self,
-        regs: &arch::arm::reg::ArmCoreRegs,
+        regs: &gdbstub_arch::arm::reg::ArmCoreRegs,
         tid: Tid,
     ) -> TargetResult<(), Self> {
         let cpu = match tid_to_cpuid(tid).map_err(TargetError::Fatal)? {
@@ -215,7 +214,7 @@ impl target::ext::breakpoints::SwBreakpoint for Emu {
     fn add_sw_breakpoint(
         &mut self,
         addr: u32,
-        _kind: arch::arm::ArmBreakpointKind,
+        _kind: gdbstub_arch::arm::ArmBreakpointKind,
     ) -> TargetResult<bool, Self> {
         self.breakpoints.push(addr);
         Ok(true)
@@ -224,7 +223,7 @@ impl target::ext::breakpoints::SwBreakpoint for Emu {
     fn remove_sw_breakpoint(
         &mut self,
         addr: u32,
-        _kind: arch::arm::ArmBreakpointKind,
+        _kind: gdbstub_arch::arm::ArmBreakpointKind,
     ) -> TargetResult<bool, Self> {
         match self.breakpoints.iter().position(|x| *x == addr) {
             None => return Ok(false),

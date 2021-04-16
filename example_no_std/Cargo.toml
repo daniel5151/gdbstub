@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 gdbstub = { path = "../", default-features = false }
+gdbstub_arch = { path = "../gdbstub_arch", default-features = false }
 
 libc = { version = "0.2", default-features = false }
 log = { version = "0.4", features = ["release_max_level_off"] }

@@ -21,6 +21,8 @@ num-traits = { version = "0.2", default-features = false }
 paste = "1.0"
 
 [dev-dependencies]
+gdbstub_arch = { path = "./gdbstub_arch/" }
+
 armv4t_emu = "0.1"
 pretty_env_logger = "0.4"
 goblin = "0.2"
@@ -41,3 +43,7 @@ required-features = ["std"]
 [[example]]
 name = "armv4t_multicore"
 required-features = ["std"]
+
+[workspace]
+members = ["gdbstub_arch"]
+exclude = ["example_no_std"]

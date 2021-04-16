@@ -14,8 +14,7 @@ use crate::target::{Target, TargetResult};
 /// Moreover, certain architectures have registers that are not accessible as
 /// part of the default default register file used by the `read/write_registers`
 /// methods, and can only be accessed via this extension (e.g: the RISC-V
-/// [Control and Status](crate::arch::riscv::reg::id::RiscvRegId::Csr)
-/// registers).
+/// Control and Status registers).
 pub trait SingleRegisterAccess<Id>: Target {
     /// Read to a single register on the target.
     ///

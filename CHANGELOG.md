@@ -23,6 +23,8 @@ Check out [`transition_guide.md`](./docs/transition_guide.md) for guidance on up
 
 #### Breaking API Changes
 
+- **`gdbstub::arch` has been moved into a separate `gdbstub_arch` crate**
+  - _See [\#45](https://github.com/daniel5151/gdbstub/issues/45) for details on why this was done._
 - Protocol Extension Refactors
   - Extracted base protocol single-register access methods (`{read,write}_register`) into separate `SingleRegisterAccess` trait
     - _These are optional GDB protocol methods, and as such, should be modeled as IDETs_

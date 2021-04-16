@@ -1,12 +1,11 @@
 use core::convert::TryInto;
 
 use armv4t_emu::{reg, Memory};
-use gdbstub::arch;
-use gdbstub::arch::arm::reg::id::ArmCoreRegId;
 use gdbstub::target;
 use gdbstub::target::ext::base::singlethread::{ResumeAction, SingleThreadOps, StopReason};
 use gdbstub::target::ext::breakpoints::WatchKind;
 use gdbstub::target::{Target, TargetError, TargetResult};
+use gdbstub_arch::arm::reg::id::ArmCoreRegId;
 
 use crate::emu::{Emu, Event};
 
@@ -31,7 +30,7 @@ fn cpu_reg_id(id: ArmCoreRegId) -> Option<u8> {
 }
 
 impl Target for Emu {
-    type Arch = arch::arm::Armv4t;
+    type Arch = gdbstub_arch::arm::Armv4t;
     type Error = &'static str;
 
     fn base_ops(&mut self) -> target::ext::base::BaseOps<Self::Arch, Self::Error> {
@@ -104,7 +103,10 @@ impl SingleThreadOps for Emu {
         })
     }
 
-    fn read_registers(&mut self, regs: &mut arch::arm::reg::ArmCoreRegs) -> TargetResult<(), Self> {
+    fn read_registers(
+        &mut self,
+        regs: &mut gdbstub_arch::arm::reg::ArmCoreRegs,
+    ) -> TargetResult<(), Self> {
         let mode = self.cpu.mode();
 
         for i in 0..13 {
@@ -118,7 +120,10 @@ impl SingleThreadOps for Emu {
         Ok(())
     }
 
-    fn write_registers(&mut self, regs: &arch::arm::reg::ArmCoreRegs) -> TargetResult<(), Self> {
+    fn write_registers(
+        &mut self,
+        regs: &gdbstub_arch::arm::reg::ArmCoreRegs,
+    ) -> TargetResult<(), Self> {
         let mode = self.cpu.mode();
 
         for i in 0..13 {
@@ -163,7 +168,7 @@ impl target::ext::base::SingleRegisterAccess<()> for Emu {
     fn read_register(
         &mut self,
         _tid: (),
-        reg_id: arch::arm::reg::id::ArmCoreRegId,
+        reg_id: gdbstub_arch::arm::reg::id::ArmCoreRegId,
         dst: &mut [u8],
     ) -> TargetResult<(), Self> {
         if let Some(i) = cpu_reg_id(reg_id) {
@@ -178,7 +183,7 @@ impl target::ext::base::SingleRegisterAccess<()> for Emu {
     fn write_register(
         &mut self,
         _tid: (),
-        reg_id: arch::arm::reg::id::ArmCoreRegId,
+        reg_id: gdbstub_arch::arm::reg::id::ArmCoreRegId,
         val: &[u8],
     ) -> TargetResult<(), Self> {
         let w = u32::from_le_bytes(
