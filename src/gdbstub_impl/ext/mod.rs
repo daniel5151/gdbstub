@@ -15,5 +15,6 @@ mod base;
 mod breakpoints;
 mod extended_mode;
 mod monitor_cmd;
+mod reverse_exec;
 mod section_offsets;
 mod single_register_access;

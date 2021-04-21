@@ -4,7 +4,7 @@ use crate::arch::Arch;
 use crate::target::ext::breakpoints::WatchKind;
 use crate::target::{Target, TargetResult};
 
-use super::SingleRegisterAccessOps;
+use super::{ReplayLogPosition, SingleRegisterAccessOps};
 
 // Convenient re-exports
 pub use super::ResumeAction;
@@ -54,6 +54,20 @@ pub trait SingleThreadOps: Target {
         None
     }
 
+    /// Support for [reverse stepping] a target.
+    ///
+    /// [reverse stepping]: https://sourceware.org/gdb/current/onlinedocs/gdb/Reverse-Execution.html
+    fn support_reverse_step(&mut self) -> Option<SingleThreadReverseStepOps<Self>> {
+        None
+    }
+
+    /// Support for [reverse continuing] a target.
+    ///
+    /// [reverse continuing]: https://sourceware.org/gdb/current/onlinedocs/gdb/Reverse-Execution.html
+    fn support_reverse_cont(&mut self) -> Option<SingleThreadReverseContOps<Self>> {
+        None
+    }
+
     /// Read the target's registers.
     fn read_registers(
         &mut self,
@@ -97,6 +111,37 @@ pub trait SingleThreadOps: Target {
         data: &[u8],
     ) -> TargetResult<(), Self>;
 }
+
+/// Target Extension - [Reverse continue] for single threaded targets.
+///
+/// Reverse continue allows the target to run backwards until it reaches the end
+/// of the replay log.
+///
+/// [Reverse continue]: https://sourceware.org/gdb/current/onlinedocs/gdb/Reverse-Execution.html
+pub trait SingleThreadReverseCont: Target + SingleThreadOps {
+    /// Reverse-continue the target.
+    fn reverse_cont(
+        &mut self,
+        check_gdb_interrupt: &mut dyn FnMut() -> bool,
+    ) -> Result<StopReason<<Self::Arch as Arch>::Usize>, Self::Error>;
+}
+
+define_ext!(SingleThreadReverseContOps, SingleThreadReverseCont);
+
+/// Target Extension - [Reverse stepping] for single threaded targets.
+///
+/// Reverse stepping allows the target to run backwards by one step.
+///
+/// [Reverse stepping]: https://sourceware.org/gdb/current/onlinedocs/gdb/Reverse-Execution.html
+pub trait SingleThreadReverseStep: Target + SingleThreadOps {
+    /// Reverse-step the specified [`Tid`].
+    fn reverse_step(
+        &mut self,
+        check_gdb_interrupt: &mut dyn FnMut() -> bool,
+    ) -> Result<StopReason<<Self::Arch as Arch>::Usize>, Self::Error>;
+}
+
+define_ext!(SingleThreadReverseStepOps, SingleThreadReverseStep);
 
 /// Target Extension - Optimized [range stepping] for single threaded targets.
 /// See [`SingleThreadOps::support_resume_range_step`].
@@ -155,4 +200,11 @@ pub enum StopReason<U> {
     },
     /// The program received a signal
     Signal(u8),
+    /// The program has reached the end of the logged replay events
+    ///
+    /// This is used for GDB's reverse execution. When playing back a recording,
+    /// you may hit the end of the buffer of recorded events, and as such no
+    /// further execution can be done. This stop reason tells GDB that this has
+    /// occurred.
+    ReplayLog(ReplayLogPosition),
 }

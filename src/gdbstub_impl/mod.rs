@@ -234,6 +234,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             Command::ExtendedMode(cmd) => self.handle_extended_mode(res, target, cmd),
             Command::MonitorCmd(cmd) => self.handle_monitor_cmd(res, target, cmd),
             Command::SectionOffsets(cmd) => self.handle_section_offsets(res, target, cmd),
+            Command::ReverseCont(cmd) => self.handle_reverse_cont(res, target, cmd),
+            Command::ReverseStep(cmd) => self.handle_reverse_step(res, target, cmd),
         }
     }
 }

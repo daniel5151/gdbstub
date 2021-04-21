@@ -41,3 +41,13 @@ pub enum ResumeAction {
     /// Step with signal.
     StepWithSignal(u8),
 }
+
+/// Describes the point reached in a replay log for the corresponding stop
+/// reason.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ReplayLogPosition {
+    /// Reached the beginning of the replay log.
+    Begin,
+    /// Reached the end of the replay log.
+    End,
+}
