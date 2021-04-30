@@ -2,7 +2,10 @@ use core::convert::TryInto;
 
 use armv4t_emu::{reg, Memory};
 use gdbstub::target;
-use gdbstub::target::ext::base::singlethread::{ResumeAction, SingleThreadOps, StopReason};
+use gdbstub::target::ext::base::singlethread::{
+    ResumeAction, SingleThreadOps, SingleThreadReverseContOps, SingleThreadReverseStepOps,
+    StopReason,
+};
 use gdbstub::target::ext::breakpoints::WatchKind;
 use gdbstub::target::{Target, TargetError, TargetResult};
 use gdbstub_arch::arm::reg::id::ArmCoreRegId;
@@ -157,6 +160,14 @@ impl SingleThreadOps for Emu {
         Some(self)
     }
 
+    fn support_reverse_cont(&mut self) -> Option<SingleThreadReverseContOps<Self>> {
+        Some(self)
+    }
+
+    fn support_reverse_step(&mut self) -> Option<SingleThreadReverseStepOps<Self>> {
+        Some(self)
+    }
+
     fn support_resume_range_step(
         &mut self,
     ) -> Option<target::ext::base::singlethread::SingleThreadRangeSteppingOps<Self>> {
@@ -196,6 +207,32 @@ impl target::ext::base::SingleRegisterAccess<()> for Emu {
         } else {
             Err(().into())
         }
+    }
+}
+
+impl target::ext::base::singlethread::SingleThreadReverseCont for Emu {
+    fn reverse_cont(
+        &mut self,
+        check_gdb_interrupt: &mut dyn FnMut() -> bool,
+    ) -> Result<StopReason<u32>, Self::Error> {
+        // FIXME: actually implement reverse step
+        eprintln!(
+            "FIXME: Not actually reverse-continuing. Performing forwards continue instead..."
+        );
+        self.resume(ResumeAction::Continue, check_gdb_interrupt)
+    }
+}
+
+impl target::ext::base::singlethread::SingleThreadReverseStep for Emu {
+    fn reverse_step(
+        &mut self,
+        check_gdb_interrupt: &mut dyn FnMut() -> bool,
+    ) -> Result<StopReason<u32>, Self::Error> {
+        // FIXME: actually implement reverse step
+        eprintln!(
+            "FIXME: Not actually reverse-stepping. Performing single forwards step instead..."
+        );
+        self.resume(ResumeAction::Step, check_gdb_interrupt)
     }
 }
 

@@ -4,7 +4,7 @@ use crate::protocol::commands::ext::Base;
 use crate::arch::{Arch, Registers};
 use crate::protocol::{IdKind, SpecificIdKind, SpecificThreadId};
 use crate::target::ext::base::multithread::ThreadStopReason;
-use crate::target::ext::base::{BaseOps, ResumeAction};
+use crate::target::ext::base::{BaseOps, ReplayLogPosition, ResumeAction};
 use crate::{FAKE_PID, SINGLE_THREAD_TID};
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
@@ -27,6 +27,25 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 res.write_str(";vContSupported+")?;
                 res.write_str(";multiprocess+")?;
                 res.write_str(";QStartNoAckMode+")?;
+
+                let (reverse_cont, reverse_step) = match target.base_ops() {
+                    BaseOps::MultiThread(ops) => (
+                        ops.support_reverse_cont().is_some(),
+                        ops.support_reverse_step().is_some(),
+                    ),
+                    BaseOps::SingleThread(ops) => (
+                        ops.support_reverse_cont().is_some(),
+                        ops.support_reverse_step().is_some(),
+                    ),
+                };
+
+                if reverse_cont {
+                    res.write_str(";ReverseCont+")?;
+                }
+
+                if reverse_step {
+                    res.write_str(";ReverseStep+")?;
+                }
 
                 if let Some(ops) = target.extended_mode() {
                     if ops.configure_aslr().is_some() {
@@ -557,7 +576,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 BaseOps::MultiThread(ops) => Self::do_vcont_multi_thread(ops, res, &actions)?,
             };
 
-            match self.finish_vcont(res, target, stop_reason)? {
+            match self.finish_exec(res, target, stop_reason)? {
                 Some(status) => break Ok(status),
                 None => continue,
             }
@@ -565,7 +584,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     }
 
     #[inline(always)]
-    fn finish_vcont(
+    pub(super) fn finish_exec(
         &mut self,
         res: &mut ResponseWriter<C>,
         _target: &mut T,
@@ -619,6 +638,17 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 res.write_str(";")?;
                 HandlerStatus::Handled
             }
+            ThreadStopReason::ReplayLog(pos) => {
+                res.write_str("T05")?;
+
+                res.write_str("replaylog:")?;
+                res.write_str(match pos {
+                    ReplayLogPosition::Begin => "begin",
+                    ReplayLogPosition::End => "end",
+                })?;
+
+                HandlerStatus::Handled
+            }
         };
 
         Ok(Some(status))
@@ -640,6 +670,7 @@ impl<U> From<StopReason<U>> for ThreadStopReason<U> {
                 addr,
             },
             StopReason::Signal(sig) => ThreadStopReason::Signal(sig),
+            StopReason::ReplayLog(pos) => ThreadStopReason::ReplayLog(pos),
         }
     }
 }

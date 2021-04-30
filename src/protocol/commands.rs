@@ -79,6 +79,8 @@ macro_rules! commands {
                 trait Hack {
                     fn base(&mut self) -> Option<()>;
                     fn single_register_access(&mut self) -> Option<()>;
+                    fn reverse_step(&mut self) -> Option<()>;
+                    fn reverse_cont(&mut self) -> Option<()>;
                 }
 
                 impl<T: Target> Hack for T {
@@ -91,6 +93,22 @@ macro_rules! commands {
                         match self.base_ops() {
                             BaseOps::SingleThread(ops) => ops.single_register_access().map(drop),
                             BaseOps::MultiThread(ops) => ops.single_register_access().map(drop),
+                        }
+                    }
+
+                    fn reverse_step(&mut self) -> Option<()> {
+                        use crate::target::ext::base::BaseOps;
+                        match self.base_ops() {
+                            BaseOps::SingleThread(ops) => ops.support_reverse_step().map(drop),
+                            BaseOps::MultiThread(ops) => ops.support_reverse_step().map(drop),
+                        }
+                    }
+
+                    fn reverse_cont(&mut self) -> Option<()> {
+                        use crate::target::ext::base::BaseOps;
+                        match self.base_ops() {
+                            BaseOps::SingleThread(ops) => ops.support_reverse_cont().map(drop),
+                            BaseOps::MultiThread(ops) => ops.support_reverse_cont().map(drop),
                         }
                     }
                 }
@@ -189,5 +207,13 @@ commands! {
 
     section_offsets {
         "qOffsets" => _qOffsets::qOffsets,
+    }
+
+    reverse_cont {
+        "bc" => _bc::bc,
+    }
+
+    reverse_step {
+        "bs" => _bs::bs,
     }
 }
