@@ -40,7 +40,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 };
 
                 if reverse_cont {
-                    res.write_str(";ReverseCont+")?;
+                    res.write_str(";ReverseContinue+")?;
                 }
 
                 if reverse_step {
