@@ -1,8 +1,5 @@
 use super::prelude::*;
 use crate::protocol::commands::ext::ExtendedMode;
-use crate::target::ext::base::BaseOps;
-
-use crate::FAKE_PID;
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     pub(crate) fn handle_extended_mode<'a>(
@@ -28,28 +25,15 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             ExtendedMode::vAttach(cmd) => {
                 ops.attach(cmd.pid).handle_error()?;
 
-                #[cfg(feature = "alloc")]
-                self.attached_pids.insert(cmd.pid, true);
-
                 // TODO: sends OK when running in Non-Stop mode
                 HandlerStatus::Handled
             }
             ExtendedMode::vRun(cmd) => {
                 use crate::target::ext::extended_mode::Args;
 
-                let mut pid = ops
+                let _pid = ops
                     .run(cmd.filename, Args::new(&mut cmd.args.into_iter()))
                     .handle_error()?;
-
-                // on single-threaded systems, we'll ignore the provided PID and keep
-                // using the FAKE_PID.
-                if let BaseOps::SingleThread(_) = target.base_ops() {
-                    pid = FAKE_PID;
-                }
-
-                let _ = pid; // squelch warning on no_std targets
-                #[cfg(feature = "alloc")]
-                self.attached_pids.insert(pid, false);
 
                 // TODO: send a more descriptive stop packet?
                 res.write_str("S05")?;

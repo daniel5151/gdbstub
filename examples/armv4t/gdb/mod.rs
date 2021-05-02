@@ -93,7 +93,7 @@ impl SingleThreadOps for Emu {
         };
 
         Ok(match event {
-            Event::Halted => StopReason::Halted,
+            Event::Halted => StopReason::Terminated(19), // SIGSTOP
             Event::Break => StopReason::SwBreak,
             Event::WatchWrite(addr) => StopReason::Watch {
                 kind: WatchKind::Write,

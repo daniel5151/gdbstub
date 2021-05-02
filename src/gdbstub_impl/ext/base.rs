@@ -8,6 +8,30 @@ use crate::target::ext::base::{BaseOps, ReplayLogPosition, ResumeAction};
 use crate::{FAKE_PID, SINGLE_THREAD_TID};
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
+    #[inline(always)]
+    fn get_sane_any_tid(&mut self, target: &mut T) -> Result<Tid, Error<T::Error, C::Error>> {
+        let tid = match target.base_ops() {
+            BaseOps::SingleThread(_) => SINGLE_THREAD_TID,
+            BaseOps::MultiThread(ops) => {
+                let mut first_tid = None;
+                ops.list_active_threads(&mut |tid| {
+                    if first_tid.is_none() {
+                        first_tid = Some(tid);
+                    }
+                })
+                .map_err(Error::TargetError)?;
+                // Note that `Error::NoActiveThreads` shouldn't ever occur, since this method is
+                // called from the `H` packet handler, which AFAIK is only sent after the GDB
+                // client has confirmed that a thread / process exists.
+                //
+                // If it does, that really sucks, and will require rethinking how to handle "any
+                // thread" messages.
+                first_tid.ok_or(Error::NoActiveThreads)?
+            }
+        };
+        Ok(tid)
+    }
+
     pub(crate) fn handle_base<'a>(
         &mut self,
         res: &mut ResponseWriter<C>,
@@ -135,17 +159,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     // When running in extended mode, we must defer to the target
                     Some(ops) => {
                         let pid: Pid = cmd.pid.ok_or(Error::PacketUnexpected)?;
-
-                        #[cfg(feature = "alloc")]
-                        {
-                            let _ = ops; // doesn't actually query the target
-                            *self.attached_pids.get(&pid).unwrap_or(&true)
-                        }
-
-                        #[cfg(not(feature = "alloc"))]
-                        {
-                            ops.query_if_attached(pid).handle_error()?.was_attached()
-                        }
+                        ops.query_if_attached(pid).handle_error()?.was_attached()
                     }
                 };
                 res.write_str(if is_attached { "1" } else { "0" })?;
@@ -244,7 +258,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         };
 
                         let should_terminate = ops.kill(pid).handle_error()?;
-                        if should_terminate.into() {
+                        if should_terminate.into_bool() {
                             // manually write OK, since we need to return a DisconnectReason
                             res.write_str("OK")?;
                             HandlerStatus::Disconnect(DisconnectReason::Kill)
@@ -324,14 +338,17 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 use crate::protocol::commands::_h_upcase::Op;
                 match cmd.kind {
                     Op::Other => match cmd.thread.tid {
-                        IdKind::Any => {} // reuse old tid
+                        IdKind::Any => self.current_mem_tid = self.get_sane_any_tid(target)?,
                         // "All" threads doesn't make sense for memory accesses
                         IdKind::All => return Err(Error::PacketUnexpected),
                         IdKind::WithId(tid) => self.current_mem_tid = tid,
                     },
                     // technically, this variant is deprecated in favor of vCont...
                     Op::StepContinue => match cmd.thread.tid {
-                        IdKind::Any => {} // reuse old tid
+                        IdKind::Any => {
+                            self.current_resume_tid =
+                                SpecificIdKind::WithId(self.get_sane_any_tid(target)?)
+                        }
                         IdKind::All => self.current_resume_tid = SpecificIdKind::All,
                         IdKind::WithId(tid) => {
                             self.current_resume_tid = SpecificIdKind::WithId(tid)
@@ -595,13 +612,19 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 res.write_str("S05")?;
                 HandlerStatus::Handled
             }
-            ThreadStopReason::Signal(code) => {
+            ThreadStopReason::Signal(sig) => {
                 res.write_str("S")?;
-                res.write_num(code)?;
+                res.write_num(sig)?;
                 HandlerStatus::Handled
             }
-            ThreadStopReason::Halted => {
-                res.write_str("W19")?; // SIGSTOP
+            ThreadStopReason::Exited(code) => {
+                res.write_str("W")?;
+                res.write_num(code)?;
+                HandlerStatus::Disconnect(DisconnectReason::TargetHalted)
+            }
+            ThreadStopReason::Terminated(sig) => {
+                res.write_str("X")?;
+                res.write_num(sig)?;
                 HandlerStatus::Disconnect(DisconnectReason::TargetHalted)
             }
             ThreadStopReason::SwBreak(tid)
@@ -661,7 +684,8 @@ impl<U> From<StopReason<U>> for ThreadStopReason<U> {
         match st_stop_reason {
             StopReason::DoneStep => ThreadStopReason::DoneStep,
             StopReason::GdbInterrupt => ThreadStopReason::GdbInterrupt,
-            StopReason::Halted => ThreadStopReason::Halted,
+            StopReason::Exited(code) => ThreadStopReason::Exited(code),
+            StopReason::Terminated(sig) => ThreadStopReason::Terminated(sig),
             StopReason::SwBreak => ThreadStopReason::SwBreak(SINGLE_THREAD_TID),
             StopReason::HwBreak => ThreadStopReason::HwBreak(SINGLE_THREAD_TID),
             StopReason::Watch { kind, addr } => ThreadStopReason::Watch {

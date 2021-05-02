@@ -30,9 +30,11 @@ pub enum ShouldTerminate {
     No,
 }
 
-impl From<ShouldTerminate> for bool {
-    fn from(st: ShouldTerminate) -> bool {
-        match st {
+impl ShouldTerminate {
+    /// Convert `ShouldTerminate::Yes` into `true`, and `ShouldTerminate::No`
+    /// into `false`
+    pub fn into_bool(self) -> bool {
+        match self {
             ShouldTerminate::Yes => true,
             ShouldTerminate::No => false,
         }
@@ -40,7 +42,6 @@ impl From<ShouldTerminate> for bool {
 }
 
 /// Describes how the target attached to a process.
-#[cfg(not(feature = "alloc"))]
 pub enum AttachKind {
     /// It attached to an existing process.
     Attach,
@@ -48,7 +49,6 @@ pub enum AttachKind {
     Run,
 }
 
-#[cfg(not(feature = "alloc"))]
 impl AttachKind {
     pub(crate) fn was_attached(self) -> bool {
         match self {
@@ -100,13 +100,14 @@ pub trait ExtendedMode: Target {
     /// Query if specified PID was spawned by the target (via `run`), or if the
     /// target attached to an existing process (via `attach`).
     ///
-    /// This method is only required when the `alloc`/`std` features are
-    /// disabled. If `alloc` is available, `gdbstub` will automatically track
-    /// this property using a heap-allocated data structure.
-    #[cfg(not(feature = "alloc"))]
+    /// If the PID doesn't correspond to a process the target has run or
+    /// attached to, a non fatal error should be returned.
     fn query_if_attached(&mut self, pid: Pid) -> TargetResult<AttachKind, Self>;
 
     /// Called when the GDB client sends a Kill request.
+    ///
+    /// If the PID doesn't correspond to a process the target has run or
+    /// attached to, a non fatal error should be returned.
     ///
     /// GDB may or may not specify a specific PID to kill. When no PID is
     /// specified, the target is free to decide what to do (e.g: kill the

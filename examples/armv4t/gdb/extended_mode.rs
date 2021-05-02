@@ -1,6 +1,6 @@
 use gdbstub::common::Pid;
 use gdbstub::target;
-use gdbstub::target::ext::extended_mode::{Args, ShouldTerminate};
+use gdbstub::target::ext::extended_mode::{Args, AttachKind, ShouldTerminate};
 use gdbstub::target::TargetResult;
 
 use crate::emu::Emu;
@@ -59,6 +59,14 @@ impl target::ext::extended_mode::ExtendedMode for Emu {
 
         // when running in single-threaded mode, this PID can be anything
         Ok(Pid::new(1337).unwrap())
+    }
+
+    fn query_if_attached(&mut self, pid: Pid) -> TargetResult<AttachKind, Self> {
+        eprintln!(
+            "GDB queried if it was attached to a process with PID {}",
+            pid
+        );
+        Ok(AttachKind::Attach)
     }
 
     fn configure_aslr(&mut self) -> Option<target::ext::extended_mode::ConfigureAslrOps<Self>> {

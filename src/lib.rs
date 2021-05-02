@@ -18,8 +18,6 @@
 //!           provided via `GdbStubBuilder::with_packet_buffer`).
 //!         - (Monitor Command) Use a heap-allocated output buffer in
 //!           `ConsoleOutput`.
-//!         - (Extended Mode) Automatically track Attached/Spawned PIDs without
-//!           implementing `ExtendedMode::query_if_attached`.
 //! - `std` (implies `alloc`)
 //!     - Implement `Connection` for [`TcpStream`](std::net::TcpStream) and
 //!       [`UnixStream`](std::os::unix::net::UnixStream).

@@ -180,10 +180,12 @@ define_ext!(SingleThreadRangeSteppingOps, SingleThreadRangeStepping);
 pub enum StopReason<U> {
     /// Completed the single-step request.
     DoneStep,
-    /// `check_gdb_interrupt` returned `true`
+    /// `check_gdb_interrupt` returned `true`.
     GdbInterrupt,
-    /// Halted
-    Halted,
+    /// The process exited with the specified exit status.
+    Exited(u8),
+    /// The process terminated with the specified signal number.
+    Terminated(u8),
     /// Hit a software breakpoint (e.g. due to a trap instruction).
     ///
     /// NOTE: This does not necessarily have to be a breakpoint configured by
@@ -198,9 +200,9 @@ pub enum StopReason<U> {
         /// Address of watched memory
         addr: U,
     },
-    /// The program received a signal
+    /// The program received a signal.
     Signal(u8),
-    /// The program has reached the end of the logged replay events
+    /// The program has reached the end of the logged replay events.
     ///
     /// This is used for GDB's reverse execution. When playing back a recording,
     /// you may hit the end of the buffer of recorded events, and as such no

@@ -87,7 +87,6 @@ When using `gdbstub` in `#![no_std]` contexts, make sure to set `default-feature
     -   Provide built-in implementations for certain protocol features:
         -   Use a heap-allocated packet buffer in `GdbStub` (if none is provided via `GdbStubBuilder::with_packet_buffer`).
         -   (Monitor Command) Use a heap-allocated output buffer in `ConsoleOutput`.
-        -   (Extended Mode) Automatically track Attached/Spawned PIDs without implementing `ExtendedMode::query_if_attached`.
 -   `std` (implies `alloc`)
     -   Implement `Connection` for [`TcpStream`](https://doc.rust-lang.org/std/net/struct.TcpStream.html) and [`UnixStream`](https://doc.rust-lang.org/std/os/unix/net/struct.UnixStream.html).
     -   Implement [`std::error::Error`](https://doc.rust-lang.org/std/error/trait.Error.html) for `gdbstub::Error`.

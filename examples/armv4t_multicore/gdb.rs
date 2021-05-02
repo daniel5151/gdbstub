@@ -11,7 +11,7 @@ use crate::emu::{CpuId, Emu, Event};
 fn event_to_stopreason(e: Event, id: CpuId) -> ThreadStopReason<u32> {
     let tid = cpuid_to_tid(id);
     match e {
-        Event::Halted => ThreadStopReason::Halted,
+        Event::Halted => ThreadStopReason::Terminated(19), // SIGSTOP
         Event::Break => ThreadStopReason::SwBreak(tid),
         Event::WatchWrite(addr) => ThreadStopReason::Watch {
             tid,

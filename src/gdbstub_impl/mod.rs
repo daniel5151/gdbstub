@@ -1,8 +1,5 @@
 use core::marker::PhantomData;
 
-#[cfg(feature = "alloc")]
-use alloc::collections::BTreeMap;
-
 use managed::ManagedSlice;
 
 use crate::common::*;
@@ -75,14 +72,6 @@ struct GdbStubImpl<T: Target, C: Connection> {
     current_mem_tid: Tid,
     current_resume_tid: SpecificIdKind,
     no_ack_mode: bool,
-
-    // Used to track which Pids were attached to / spawned when running in extended mode.
-    //
-    // An empty `BTreeMap<Pid, bool>` is only 24 bytes (on 64-bit systems), and doesn't allocate
-    // until the first element is inserted, so it should be fine to include it as part of the main
-    // state structure whether or not extended mode is actually being used.
-    #[cfg(feature = "alloc")]
-    attached_pids: BTreeMap<Pid, bool>,
 }
 
 enum HandlerStatus {
@@ -97,17 +86,17 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             _target: PhantomData,
             _connection: PhantomData,
 
-            // NOTE: current_mem_tid is never queried prior to being set by the GDB client (via the
-            // 'H' packet), so it's fine to use a dummy value here.
+            // NOTE: `current_mem_tid` and `current_resume_tid` are never queried prior to being set
+            // by the GDB client (via the 'H' packet), so it's fine to use dummy values here.
             //
-            // Even if the GDB client is acting strangely and doesn't overwrite it, the target will
-            // simply return a non-fatal error, which is totally fine.
+            // The alternative would be to use `Option`, and while this would be more "correct", it
+            // would introduce a _lot_ of noisy and heavy error handling logic all over the place.
+            //
+            // Plus, even if the GDB client is acting strangely and doesn't overwrite these values,
+            // the target will simply return a non-fatal error, which is totally fine.
             current_mem_tid: SINGLE_THREAD_TID,
-            current_resume_tid: SpecificIdKind::All,
+            current_resume_tid: SpecificIdKind::WithId(SINGLE_THREAD_TID),
             no_ack_mode: false,
-
-            #[cfg(feature = "alloc")]
-            attached_pids: BTreeMap::new(),
         }
     }
 
