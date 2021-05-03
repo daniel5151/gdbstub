@@ -2,7 +2,7 @@ use core::convert::TryInto;
 
 use gdbstub::arch::Registers;
 
-use super::{X87FpuInternalRegs, F80};
+use super::{X86SegmentRegs, X87FpuInternalRegs, F80};
 
 /// 64-bit x86 core registers (+ SSE extensions).
 ///
@@ -17,7 +17,7 @@ pub struct X86_64CoreRegs {
     /// Instruction pointer
     pub rip: u64,
     /// Segment registers: CS, SS, DS, ES, FS, GS
-    pub segments: [u32; 6],
+    pub segments: X86SegmentRegs,
     /// FPU registers: ST0 through ST7
     pub st: [F80; 8],
     /// FPU internal registers
@@ -55,10 +55,7 @@ impl Registers for X86_64CoreRegs {
         // eflags
         write_bytes!(&self.eflags.to_le_bytes());
 
-        // cs, ss, ds, es, fs, gs
-        for seg in &self.segments {
-            write_bytes!(&seg.to_le_bytes());
-        }
+        self.segments.gdb_serialize(&mut write_byte);
 
         // st0 to st7
         for st_reg in &self.st {
@@ -97,13 +94,7 @@ impl Registers for X86_64CoreRegs {
         self.rip = u64::from_le_bytes(bytes[0x80..0x88].try_into().unwrap());
         self.eflags = u32::from_le_bytes(bytes[0x88..0x8C].try_into().unwrap());
 
-        let mut segments = bytes[0x8C..0xA4]
-            .chunks_exact(4)
-            .map(|x| u32::from_le_bytes(x.try_into().unwrap()));
-
-        for seg in self.segments.iter_mut() {
-            *seg = segments.next().ok_or(())?;
-        }
+        self.segments.gdb_deserialize(&bytes[0x8C..0xA4])?;
 
         let mut regs = bytes[0xA4..0xF4].chunks_exact(10).map(TryInto::try_into);
 

@@ -2,7 +2,7 @@ use core::convert::TryInto;
 
 use gdbstub::arch::Registers;
 
-use super::{X87FpuInternalRegs, F80};
+use super::{X86SegmentRegs, X87FpuInternalRegs, F80};
 
 /// 32-bit x86 core registers (+ SSE extensions).
 ///
@@ -31,7 +31,7 @@ pub struct X86CoreRegs {
     /// Status register
     pub eflags: u32,
     /// Segment registers: CS, SS, DS, ES, FS, GS
-    pub segments: [u32; 6],
+    pub segments: X86SegmentRegs,
     /// FPU registers: ST0 through ST7
     pub st: [F80; 8],
     /// FPU internal registers
@@ -68,10 +68,7 @@ impl Registers for X86CoreRegs {
 
         write_regs!(eax, ecx, edx, ebx, esp, ebp, esi, edi, eip, eflags);
 
-        // cs, ss, ds, es, fs, gs
-        for seg in &self.segments {
-            write_bytes!(&seg.to_le_bytes());
-        }
+        self.segments.gdb_serialize(&mut write_byte);
 
         // st0 to st7
         for st_reg in &self.st {
@@ -110,13 +107,7 @@ impl Registers for X86CoreRegs {
 
         parse_regs!(eax, ecx, edx, ebx, esp, ebp, esi, edi, eip, eflags);
 
-        let mut segments = bytes[0x28..0x40]
-            .chunks_exact(4)
-            .map(|x| u32::from_le_bytes(x.try_into().unwrap()));
-
-        for seg in self.segments.iter_mut() {
-            *seg = segments.next().ok_or(())?;
-        }
+        self.segments.gdb_deserialize(&bytes[0x28..0x40])?;
 
         let mut regs = bytes[0x40..0x90].chunks_exact(10).map(TryInto::try_into);
 
@@ -137,5 +128,58 @@ impl Registers for X86CoreRegs {
         self.mxcsr = u32::from_le_bytes(bytes[0x130..0x134].try_into().unwrap());
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn x86_core_round_trip() {
+        let regs_before = X86CoreRegs {
+            eax: 1,
+            ecx: 2,
+            edx: 3,
+            ebx: 4,
+            esp: 5,
+            ebp: 6,
+            esi: 7,
+            edi: 8,
+            eip: 9,
+            eflags: 10,
+            segments: X86SegmentRegs {
+                cs: 11,
+                ss: 12,
+                ds: 13,
+                es: 14,
+                fs: 15,
+                gs: 16,
+            },
+            st: Default::default(),
+            fpu: X87FpuInternalRegs {
+                fctrl: 17,
+                fstat: 18,
+                ftag: 19,
+                fiseg: 20,
+                fioff: 21,
+                foseg: 22,
+                fooff: 23,
+                fop: 24,
+            },
+            xmm: Default::default(),
+            mxcsr: 99,
+        };
+
+        let mut data = vec![];
+
+        regs_before.gdb_serialize(|x| {
+            data.push(x.unwrap_or(b'x'));
+        });
+
+        let mut regs_after = X86CoreRegs::default();
+        regs_after.gdb_deserialize(&data).unwrap();
+
+        assert_eq!(regs_before, regs_after);
     }
 }

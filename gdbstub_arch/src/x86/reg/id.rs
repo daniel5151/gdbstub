@@ -11,7 +11,7 @@ pub enum X87FpuInternalRegId {
     Ftag,
     /// FPU instruction pointer segment
     Fiseg,
-    /// FPU intstruction pointer offset
+    /// FPU instruction pointer offset
     Fioff,
     /// FPU operand segment
     Foseg,
@@ -34,6 +34,41 @@ impl X87FpuInternalRegId {
             5 => Foseg,
             6 => Fooff,
             7 => Fop,
+            _ => return None,
+        };
+        Some(r)
+    }
+}
+
+/// Segment register identifier.
+#[derive(Debug, Clone, Copy)]
+#[allow(clippy::upper_case_acronyms)]
+pub enum X86SegmentRegId {
+    /// Code Segment
+    CS,
+    /// Stack Segment
+    SS,
+    /// Data Segment
+    DS,
+    /// Extra Segment
+    ES,
+    /// General Purpose Segment
+    FS,
+    /// General Purpose Segment
+    GS,
+}
+
+impl X86SegmentRegId {
+    fn from_u8(val: u8) -> Option<Self> {
+        use self::X86SegmentRegId::*;
+
+        let r = match val {
+            0 => CS,
+            1 => SS,
+            2 => DS,
+            3 => ES,
+            4 => FS,
+            5 => GS,
             _ => return None,
         };
         Some(r)
@@ -67,8 +102,8 @@ pub enum X86CoreRegId {
     Eip,
     /// Status register
     Eflags,
-    /// Segment registers: CS, SS, DS, ES, FS, GS
-    Segment(u8),
+    /// Segment registers
+    Segment(X86SegmentRegId),
     /// FPU registers: ST0 through ST7
     St(u8),
     /// FPU internal registers
@@ -94,12 +129,9 @@ impl RegId for X86CoreRegId {
             7 => (Edi, 4),
             8 => (Eip, 4),
             9 => (Eflags, 4),
-            10..=15 => (Segment(id as u8 - 10), 4),
+            10..=15 => (Segment(X86SegmentRegId::from_u8(id as u8 - 10)?), 4),
             16..=23 => (St(id as u8 - 16), 10),
-            24..=31 => match X87FpuInternalRegId::from_u8(id as u8 - 24) {
-                Some(r) => (Fpu(r), 4),
-                None => unreachable!(),
-            },
+            24..=31 => (Fpu(X87FpuInternalRegId::from_u8(id as u8 - 24)?), 4),
             32..=39 => (Xmm(id as u8 - 32), 16),
             40 => (Mxcsr, 4),
             _ => return None,
@@ -122,8 +154,8 @@ pub enum X86_64CoreRegId {
     Rip,
     /// Status register
     Eflags,
-    /// Segment registers: CS, SS, DS, ES, FS, GS
-    Segment(u8),
+    /// Segment registers
+    Segment(X86SegmentRegId),
     /// FPU registers: ST0 through ST7
     St(u8),
     /// FPU internal registers
@@ -142,12 +174,9 @@ impl RegId for X86_64CoreRegId {
             0..=15 => (Gpr(id as u8), 8),
             16 => (Rip, 4),
             17 => (Eflags, 8),
-            18..=23 => (Segment(id as u8 - 18), 4),
+            18..=23 => (Segment(X86SegmentRegId::from_u8(id as u8 - 18)?), 4),
             24..=31 => (St(id as u8 - 24), 10),
-            32..=39 => match X87FpuInternalRegId::from_u8(id as u8 - 32) {
-                Some(r) => (Fpu(r), 4),
-                None => unreachable!(),
-            },
+            32..=39 => (Fpu(X87FpuInternalRegId::from_u8(id as u8 - 32)?), 4),
             40..=55 => (Xmm(id as u8 - 40), 16),
             56 => (Mxcsr, 4),
             _ => return None,
