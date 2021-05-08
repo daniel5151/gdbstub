@@ -147,21 +147,25 @@ pub trait ExtendedMode: Target {
     }
 
     /// Enable/Disable ASLR for spawned processes.
+    #[inline(always)]
     fn configure_aslr(&mut self) -> Option<ConfigureAslrOps<Self>> {
         None
     }
 
     /// Set/Remove/Reset Environment variables for spawned processes.
+    #[inline(always)]
     fn configure_env(&mut self) -> Option<ConfigureEnvOps<Self>> {
         None
     }
 
     /// Configure if spawned processes should be spawned using a shell.
+    #[inline(always)]
     fn configure_startup_shell(&mut self) -> Option<ConfigureStartupShellOps<Self>> {
         None
     }
 
     /// Configure the working directory for spawned processes.
+    #[inline(always)]
     fn configure_working_dir(&mut self) -> Option<ConfigureWorkingDirOps<Self>> {
         None
     }

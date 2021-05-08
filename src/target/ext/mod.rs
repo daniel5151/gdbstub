@@ -120,6 +120,7 @@
 //! ```rust,ignore
 //! trait Target {
 //!     // Optional extension
+//!     #[inline(always)]
 //!     fn ext_optfeat(&mut self) -> Option<OptExtOps<Self>> {
 //!         // disabled by default
 //!         None
@@ -154,15 +155,22 @@
 //! ```rust,ignore
 //! impl Target for MyTarget {
 //!     // Optional extension - Always enabled
+//!     #[inline(always)]
 //!     fn ext_optfeat(&mut self) -> Option<OptExtOps<Self>> {
 //!         Some(self) // will not compile unless `MyTarget` also implements `OptExt`
 //!     }
 //!     // Mutually-exclusive extensions
+//!     #[inline(always)]
 //!     fn ext_a_or_b(&mut self) -> EitherOrExt<Self::Arch, Self::Error> {
 //!         EitherOrExt::OptExtA(self)
 //!     }
 //! }
 //! ```
+//!
+//! > Please note the use of `#[inline(always)]` when enabling IDET methods.
+//! While LLVM is usually smart enough to inline single-level IDETs (such as in
+//! the example above), nested IDETs will often require a bit of "help" from the
+//! `inline` directive to be correctly optimized.
 //!
 //! If the user didn't implement `OptExt`, but tried to return `Some(self)`,
 //! they'll get an error similar to:

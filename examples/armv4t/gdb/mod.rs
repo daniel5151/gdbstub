@@ -36,26 +36,37 @@ impl Target for Emu {
     type Arch = gdbstub_arch::arm::Armv4t;
     type Error = &'static str;
 
+    // --------------- IMPORTANT NOTE ---------------
+    // Always remember to annotate IDET enable methods with `inline(always)`!
+    // Without this annotation, LLVM might fail to dead-code-eliminate nested IDET
+    // implementations, resulting in unnecessary binary bloat.
+
+    #[inline(always)]
     fn base_ops(&mut self) -> target::ext::base::BaseOps<Self::Arch, Self::Error> {
         target::ext::base::BaseOps::SingleThread(self)
     }
 
+    #[inline(always)]
     fn breakpoints(&mut self) -> Option<target::ext::breakpoints::BreakpointsOps<Self>> {
         Some(self)
     }
 
+    #[inline(always)]
     fn extended_mode(&mut self) -> Option<target::ext::extended_mode::ExtendedModeOps<Self>> {
         Some(self)
     }
 
+    #[inline(always)]
     fn monitor_cmd(&mut self) -> Option<target::ext::monitor_cmd::MonitorCmdOps<Self>> {
         Some(self)
     }
 
+    #[inline(always)]
     fn section_offsets(&mut self) -> Option<target::ext::section_offsets::SectionOffsetsOps<Self>> {
         Some(self)
     }
 
+    #[inline(always)]
     fn target_description_xml_override(
         &mut self,
     ) -> Option<target::ext::target_description_xml_override::TargetDescriptionXmlOverrideOps<Self>>
@@ -154,20 +165,24 @@ impl SingleThreadOps for Emu {
         Ok(())
     }
 
+    #[inline(always)]
     fn single_register_access(
         &mut self,
     ) -> Option<target::ext::base::SingleRegisterAccessOps<(), Self>> {
         Some(self)
     }
 
+    #[inline(always)]
     fn support_reverse_cont(&mut self) -> Option<SingleThreadReverseContOps<Self>> {
         Some(self)
     }
 
+    #[inline(always)]
     fn support_reverse_step(&mut self) -> Option<SingleThreadReverseStepOps<Self>> {
         Some(self)
     }
 
+    #[inline(always)]
     fn support_resume_range_step(
         &mut self,
     ) -> Option<target::ext::base::singlethread::SingleThreadRangeSteppingOps<Self>> {

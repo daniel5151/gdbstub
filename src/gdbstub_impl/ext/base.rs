@@ -669,16 +669,22 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 HandlerStatus::Disconnect(DisconnectReason::TargetHalted)
             }
             ThreadStopReason::SwBreak(tid) if guard_break!(sw_breakpoint) => {
+                crate::__dead_code_marker!("sw_breakpoint", "stop_reason");
+
                 self.write_break_common(res, tid)?;
                 res.write_str("swbreak:;")?;
                 HandlerStatus::Handled
             }
             ThreadStopReason::HwBreak(tid) if guard_break!(hw_breakpoint) => {
+                crate::__dead_code_marker!("hw_breakpoint", "stop_reason");
+
                 self.write_break_common(res, tid)?;
                 res.write_str("hwbreak:;")?;
                 HandlerStatus::Handled
             }
             ThreadStopReason::Watch { tid, kind, addr } if guard_break!(hw_watchpoint) => {
+                crate::__dead_code_marker!("hw_watchpoint", "stop_reason");
+
                 self.write_break_common(res, tid)?;
 
                 use crate::target::ext::breakpoints::WatchKind;
@@ -692,6 +698,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 HandlerStatus::Handled
             }
             ThreadStopReason::ReplayLog(pos) if guard_reverse_exec!() => {
+                crate::__dead_code_marker!("reverse_exec", "stop_reason");
+
                 res.write_str("T05")?;
 
                 res.write_str("replaylog:")?;

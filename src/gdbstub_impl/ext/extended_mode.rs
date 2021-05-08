@@ -13,6 +13,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             None => return Ok(HandlerStatus::Handled),
         };
 
+        crate::__dead_code_marker!("extended_mode", "impl");
+
         let handler_status = match command {
             ExtendedMode::ExclamationMark(_cmd) => {
                 ops.on_start().map_err(Error::TargetError)?;

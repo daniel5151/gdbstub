@@ -29,6 +29,8 @@ Why use `gdbstub`?
 
 `gdbstub` is particularly well suited for _emulation_, making it easy to add powerful, non-intrusive debugging support to an emulated system. Just provide an implementation of the [`Target`](https://docs.rs/gdbstub/latest/gdbstub/target/trait.Target.html) trait for your target platform, and you're ready to start debugging!
 
+**If you're looking for a quick snippet of example code, check out [examples/armv4t/gdb/mod.rs](https://github.com/daniel5151/gdbstub/blob/dev/0.5/examples/armv4t/gdb/mod.rs)**
+
 -   [Documentation](https://docs.rs/gdbstub)
 
 ### Can I Use `gdsbtub` in Production?

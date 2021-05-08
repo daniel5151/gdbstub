@@ -5,10 +5,12 @@ use gdbstub::target::TargetResult;
 use crate::emu::Emu;
 
 impl target::ext::breakpoints::Breakpoints for Emu {
+    #[inline(always)]
     fn sw_breakpoint(&mut self) -> Option<target::ext::breakpoints::SwBreakpointOps<Self>> {
         Some(self)
     }
 
+    #[inline(always)]
     fn hw_watchpoint(&mut self) -> Option<target::ext::breakpoints::HwWatchpointOps<Self>> {
         Some(self)
     }

@@ -101,6 +101,7 @@ pub trait MultiThreadOps: Target {
     /// Support for the optimized [range stepping] resume action.
     ///
     /// [range stepping]: https://sourceware.org/gdb/current/onlinedocs/gdb/Continuing-and-Stepping.html#range-stepping
+    #[inline(always)]
     fn support_range_step(&mut self) -> Option<MultiThreadRangeSteppingOps<Self>> {
         None
     }
@@ -108,6 +109,7 @@ pub trait MultiThreadOps: Target {
     /// Support for [reverse stepping] a target.
     ///
     /// [reverse stepping]: https://sourceware.org/gdb/current/onlinedocs/gdb/Reverse-Execution.html
+    #[inline(always)]
     fn support_reverse_step(&mut self) -> Option<MultiThreadReverseStepOps<Self>> {
         None
     }
@@ -115,6 +117,7 @@ pub trait MultiThreadOps: Target {
     /// Support for [reverse continuing] a target.
     ///
     /// [reverse continuing]: https://sourceware.org/gdb/current/onlinedocs/gdb/Reverse-Execution.html
+    #[inline(always)]
     fn support_reverse_cont(&mut self) -> Option<MultiThreadReverseContOps<Self>> {
         None
     }
@@ -146,6 +149,7 @@ pub trait MultiThreadOps: Target {
     /// While this is an optional feature, it is **highly recommended** to
     /// implement it when possible, as it can significantly improve performance
     /// on certain architectures.
+    #[inline(always)]
     fn single_register_access(&mut self) -> Option<SingleRegisterAccessOps<Tid, Self>> {
         None
     }

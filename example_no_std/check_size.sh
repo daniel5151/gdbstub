@@ -1,3 +1,6 @@
+#!/bin/bash
+set -e
+
 # checks the size of the resulting --release level binary (that's been stripped)
 
 cargo build --release

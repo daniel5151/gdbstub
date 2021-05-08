@@ -15,10 +15,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             None => return Ok(HandlerStatus::Handled),
         };
 
+        crate::__dead_code_marker!("monitor_cmd", "impl");
+
         let handler_status = match command {
             MonitorCmd::qRcmd(cmd) => {
-                crate::__dead_code_marker!("qRcmd", "impl");
-
                 let mut err: Result<_, Error<T::Error, C::Error>> = Ok(());
                 let mut callback = |msg: &[u8]| {
                     // TODO: replace this with a try block (once stabilized)

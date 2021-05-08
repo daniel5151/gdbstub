@@ -13,11 +13,11 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             None => return Ok(HandlerStatus::Handled),
         };
 
+        crate::__dead_code_marker!("section_offsets", "impl");
+
         let handler_status = match command {
             SectionOffsets::qOffsets(_cmd) => {
                 use crate::target::ext::section_offsets::Offsets;
-
-                crate::__dead_code_marker!("qOffsets", "impl");
 
                 match ops.get_section_offsets().map_err(Error::TargetError)? {
                     Offsets::Sections { text, data, bss } => {

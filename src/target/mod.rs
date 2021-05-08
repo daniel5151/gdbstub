@@ -208,27 +208,32 @@ pub trait Target {
     fn base_ops(&mut self) -> ext::base::BaseOps<Self::Arch, Self::Error>;
 
     /// Set/Remove software breakpoints.
+    #[inline(always)]
     fn breakpoints(&mut self) -> Option<ext::breakpoints::BreakpointsOps<Self>> {
         None
     }
 
     /// Handle custom GDB `monitor` commands.
+    #[inline(always)]
     fn monitor_cmd(&mut self) -> Option<ext::monitor_cmd::MonitorCmdOps<Self>> {
         None
     }
 
     /// Support for Extended Mode operations.
+    #[inline(always)]
     fn extended_mode(&mut self) -> Option<ext::extended_mode::ExtendedModeOps<Self>> {
         None
     }
 
     /// Handle requests to get the target's current section (or segment)
     /// offsets.
+    #[inline(always)]
     fn section_offsets(&mut self) -> Option<ext::section_offsets::SectionOffsetsOps<Self>> {
         None
     }
 
     /// Override the target description XML specified by `Target::Arch`.
+    #[inline(always)]
     fn target_description_xml_override(
         &mut self,
     ) -> Option<ext::target_description_xml_override::TargetDescriptionXmlOverrideOps<Self>> {
@@ -246,26 +251,32 @@ macro_rules! impl_dyn_target {
             type Arch = A;
             type Error = E;
 
+            #[inline(always)]
             fn base_ops(&mut self) -> ext::base::BaseOps<Self::Arch, Self::Error> {
                 (**self).base_ops()
             }
 
+            #[inline(always)]
             fn breakpoints(&mut self) -> Option<ext::breakpoints::BreakpointsOps<Self>> {
                 (**self).breakpoints()
             }
 
+            #[inline(always)]
             fn monitor_cmd(&mut self) -> Option<ext::monitor_cmd::MonitorCmdOps<Self>> {
                 (**self).monitor_cmd()
             }
 
+            #[inline(always)]
             fn extended_mode(&mut self) -> Option<ext::extended_mode::ExtendedModeOps<Self>> {
                 (**self).extended_mode()
             }
 
+            #[inline(always)]
             fn section_offsets(&mut self) -> Option<ext::section_offsets::SectionOffsetsOps<Self>> {
                 (**self).section_offsets()
             }
 
+            #[inline(always)]
             fn target_description_xml_override(
                 &mut self,
             ) -> Option<ext::target_description_xml_override::TargetDescriptionXmlOverrideOps<Self>>

@@ -37,11 +37,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             },
         };
 
+        crate::__dead_code_marker!("reverse_cont", "impl");
+
         let handler_status = match command {
             ReverseCont::bc(_) => {
-                // FIXME: look into why this isn't being optimized out.
-                crate::__dead_code_marker!("bc", "impl");
-
                 // FIXME: This block is duplicated from the vCont code.
                 let mut err = Ok(());
                 let mut check_gdb_interrupt = || match res.as_conn().peek() {
@@ -95,11 +94,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             },
         };
 
+        crate::__dead_code_marker!("reverse_step", "impl");
+
         let handler_status = match command {
             ReverseStep::bs(_) => {
-                // FIXME: look into why this isn't being optimized out.
-                crate::__dead_code_marker!("bs", "impl");
-
                 let tid = match self.current_resume_tid {
                     // NOTE: Can't single-step all cores.
                     SpecificIdKind::All => return Err(Error::PacketUnexpected),

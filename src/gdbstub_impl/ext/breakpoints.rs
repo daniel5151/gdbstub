@@ -82,6 +82,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             None => return Ok(HandlerStatus::Handled),
         };
 
+        crate::__dead_code_marker!("breakpoints", "impl");
+
         let handler_status = match command {
             Breakpoints::z(cmd) => self.handle_breakpoint_common(ops, cmd, CmdKind::Remove)?,
             Breakpoints::Z(cmd) => self.handle_breakpoint_common(ops, cmd, CmdKind::Add)?,

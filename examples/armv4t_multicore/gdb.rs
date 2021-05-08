@@ -45,10 +45,12 @@ impl Target for Emu {
     type Arch = gdbstub_arch::arm::Armv4t;
     type Error = &'static str;
 
+    #[inline(always)]
     fn base_ops(&mut self) -> target::ext::base::BaseOps<Self::Arch, Self::Error> {
         target::ext::base::BaseOps::MultiThread(self)
     }
 
+    #[inline(always)]
     fn breakpoints(&mut self) -> Option<target::ext::breakpoints::BreakpointsOps<Self>> {
         Some(self)
     }

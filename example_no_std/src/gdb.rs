@@ -17,10 +17,12 @@ impl Target for DummyTarget {
     type Arch = gdbstub_arch::arm::Armv4t;
     type Error = &'static str;
 
+    #[inline(always)]
     fn base_ops(&mut self) -> target::ext::base::BaseOps<Self::Arch, Self::Error> {
         target::ext::base::BaseOps::MultiThread(self)
     }
 
+    #[inline(always)]
     fn breakpoints(&mut self) -> Option<target::ext::breakpoints::BreakpointsOps<Self>> {
         Some(self)
     }
@@ -109,6 +111,7 @@ impl MultiThreadOps for DummyTarget {
 }
 
 impl target::ext::breakpoints::Breakpoints for DummyTarget {
+    #[inline(always)]
     fn sw_breakpoint(&mut self) -> Option<target::ext::breakpoints::SwBreakpointOps<Self>> {
         Some(self)
     }
