@@ -8,7 +8,7 @@ use crate::target::{Target, TargetResult};
 use super::{ReplayLogPosition, SingleRegisterAccessOps};
 
 // Convenient re-exports
-pub use super::ResumeAction;
+pub use super::{GdbInterrupt, ResumeAction};
 
 /// Base debugging operations for multi threaded targets.
 #[allow(clippy::type_complexity)]
@@ -70,7 +70,7 @@ pub trait MultiThreadOps: Target {
     fn resume(
         &mut self,
         default_resume_action: ResumeAction,
-        check_gdb_interrupt: &mut dyn FnMut() -> bool,
+        gdb_interrupt: GdbInterrupt<'_>,
     ) -> Result<ThreadStopReason<<Self::Arch as Arch>::Usize>, Self::Error>;
 
     /// Clear all previously set resume actions.
@@ -214,7 +214,7 @@ pub trait MultiThreadReverseCont: Target + MultiThreadOps {
     /// Reverse-continue the target.
     fn reverse_cont(
         &mut self,
-        check_gdb_interrupt: &mut dyn FnMut() -> bool,
+        gdb_interrupt: GdbInterrupt<'_>,
     ) -> Result<ThreadStopReason<<Self::Arch as Arch>::Usize>, Self::Error>;
 }
 
@@ -230,7 +230,7 @@ pub trait MultiThreadReverseStep: Target + MultiThreadOps {
     fn reverse_step(
         &mut self,
         tid: Tid,
-        check_gdb_interrupt: &mut dyn FnMut() -> bool,
+        gdb_interrupt: GdbInterrupt<'_>,
     ) -> Result<ThreadStopReason<<Self::Arch as Arch>::Usize>, Self::Error>;
 }
 

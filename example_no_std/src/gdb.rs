@@ -1,6 +1,8 @@
 use gdbstub::common::Tid;
 use gdbstub::target;
-use gdbstub::target::ext::base::multithread::{MultiThreadOps, ResumeAction, ThreadStopReason};
+use gdbstub::target::ext::base::multithread::{
+    GdbInterrupt, MultiThreadOps, ResumeAction, ThreadStopReason,
+};
 use gdbstub::target::{Target, TargetResult};
 
 use crate::print_str::print_str;
@@ -37,7 +39,7 @@ impl MultiThreadOps for DummyTarget {
     fn resume(
         &mut self,
         _default_resume_action: ResumeAction,
-        _check_gdb_interrupt: &mut dyn FnMut() -> bool,
+        _check_gdb_interrupt: GdbInterrupt<'_>,
     ) -> Result<ThreadStopReason<u32>, Self::Error> {
         print_str("> resume");
         Ok(ThreadStopReason::DoneStep)

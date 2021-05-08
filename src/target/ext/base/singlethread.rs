@@ -7,7 +7,7 @@ use crate::target::{Target, TargetResult};
 use super::{ReplayLogPosition, SingleRegisterAccessOps};
 
 // Convenient re-exports
-pub use super::ResumeAction;
+pub use super::{GdbInterrupt, ResumeAction};
 
 /// Base debugging operations for single threaded targets.
 #[allow(clippy::type_complexity)]
@@ -44,7 +44,7 @@ pub trait SingleThreadOps: Target {
     fn resume(
         &mut self,
         action: ResumeAction,
-        check_gdb_interrupt: &mut dyn FnMut() -> bool,
+        gdb_interrupt: GdbInterrupt<'_>,
     ) -> Result<StopReason<<Self::Arch as Arch>::Usize>, Self::Error>;
 
     /// Support for the optimized [range stepping] resume action.
@@ -126,7 +126,7 @@ pub trait SingleThreadReverseCont: Target + SingleThreadOps {
     /// Reverse-continue the target.
     fn reverse_cont(
         &mut self,
-        check_gdb_interrupt: &mut dyn FnMut() -> bool,
+        gdb_interrupt: GdbInterrupt<'_>,
     ) -> Result<StopReason<<Self::Arch as Arch>::Usize>, Self::Error>;
 }
 
@@ -141,7 +141,7 @@ pub trait SingleThreadReverseStep: Target + SingleThreadOps {
     /// Reverse-step the target.
     fn reverse_step(
         &mut self,
-        check_gdb_interrupt: &mut dyn FnMut() -> bool,
+        gdb_interrupt: GdbInterrupt<'_>,
     ) -> Result<StopReason<<Self::Arch as Arch>::Usize>, Self::Error>;
 }
 
@@ -170,7 +170,7 @@ pub trait SingleThreadRangeStepping: Target + SingleThreadOps {
         &mut self,
         start: <Self::Arch as Arch>::Usize,
         end: <Self::Arch as Arch>::Usize,
-        check_gdb_interrupt: &mut dyn FnMut() -> bool,
+        gdb_interrupt: GdbInterrupt<'_>,
     ) -> Result<StopReason<<Self::Arch as Arch>::Usize>, Self::Error>;
 }
 

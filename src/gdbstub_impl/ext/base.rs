@@ -4,7 +4,7 @@ use crate::protocol::commands::ext::Base;
 use crate::arch::{Arch, Registers};
 use crate::protocol::{IdKind, SpecificIdKind, SpecificThreadId};
 use crate::target::ext::base::multithread::ThreadStopReason;
-use crate::target::ext::base::{BaseOps, ReplayLogPosition, ResumeAction};
+use crate::target::ext::base::{BaseOps, GdbInterrupt, ReplayLogPosition, ResumeAction};
 use crate::{FAKE_PID, SINGLE_THREAD_TID};
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
@@ -479,7 +479,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     let end = end.decode().map_err(|_| Error::TargetMismatch)?;
 
                     let ret = ops
-                        .resume_range_step(start, end, &mut check_gdb_interrupt)
+                        .resume_range_step(start, end, GdbInterrupt::new(&mut check_gdb_interrupt))
                         .map_err(Error::TargetError)?
                         .into();
                     err?;
@@ -493,7 +493,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         };
 
         let ret = ops
-            .resume(action, &mut check_gdb_interrupt)
+            .resume(action, GdbInterrupt::new(&mut check_gdb_interrupt))
             .map_err(Error::TargetError)?
             .into();
         err?;
@@ -573,7 +573,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         };
 
         let ret = ops
-            .resume(default_resume_action, &mut check_gdb_interrupt)
+            .resume(
+                default_resume_action,
+                GdbInterrupt::new(&mut check_gdb_interrupt),
+            )
             .map_err(Error::TargetError)?;
 
         err?;

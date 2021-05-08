@@ -5,7 +5,7 @@ use crate::arch::Arch;
 use crate::protocol::SpecificIdKind;
 use crate::target::ext::base::multithread::{MultiThreadReverseCont, MultiThreadReverseStep};
 use crate::target::ext::base::singlethread::{SingleThreadReverseCont, SingleThreadReverseStep};
-use crate::target::ext::base::BaseOps;
+use crate::target::ext::base::{BaseOps, GdbInterrupt};
 
 enum ReverseContOps<'a, A: Arch, E> {
     SingleThread(&'a mut dyn SingleThreadReverseCont<Arch = A, Error = E>),
@@ -55,10 +55,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                 let stop_reason = match ops {
                     ReverseContOps::MultiThread(ops) => ops
-                        .reverse_cont(&mut check_gdb_interrupt)
+                        .reverse_cont(GdbInterrupt::new(&mut check_gdb_interrupt))
                         .map_err(Error::TargetError)?,
                     ReverseContOps::SingleThread(ops) => ops
-                        .reverse_cont(&mut check_gdb_interrupt)
+                        .reverse_cont(GdbInterrupt::new(&mut check_gdb_interrupt))
                         .map_err(Error::TargetError)?
                         .into(),
                 };
@@ -118,10 +118,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                 let stop_reason = match ops {
                     ReverseStepOps::MultiThread(ops) => ops
-                        .reverse_step(tid, &mut check_gdb_interrupt)
+                        .reverse_step(tid, GdbInterrupt::new(&mut check_gdb_interrupt))
                         .map_err(Error::TargetError)?,
                     ReverseStepOps::SingleThread(ops) => ops
-                        .reverse_step(&mut check_gdb_interrupt)
+                        .reverse_step(GdbInterrupt::new(&mut check_gdb_interrupt))
                         .map_err(Error::TargetError)?
                         .into(),
                 };

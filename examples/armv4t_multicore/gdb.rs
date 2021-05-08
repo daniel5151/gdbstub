@@ -2,7 +2,9 @@ use armv4t_emu::{reg, Memory};
 
 use gdbstub::common::Tid;
 use gdbstub::target;
-use gdbstub::target::ext::base::multithread::{MultiThreadOps, ResumeAction, ThreadStopReason};
+use gdbstub::target::ext::base::multithread::{
+    GdbInterrupt, MultiThreadOps, ResumeAction, ThreadStopReason,
+};
 use gdbstub::target::ext::breakpoints::WatchKind;
 use gdbstub::target::{Target, TargetError, TargetResult};
 
@@ -60,7 +62,7 @@ impl MultiThreadOps for Emu {
     fn resume(
         &mut self,
         default_resume_action: ResumeAction,
-        check_gdb_interrupt: &mut dyn FnMut() -> bool,
+        gdb_interrupt: GdbInterrupt<'_>,
     ) -> Result<ThreadStopReason<u32>, Self::Error> {
         // In general, the behavior of multi-threaded systems during debugging is
         // determined by the system scheduler. On certain systems, this behavior can be
@@ -82,10 +84,11 @@ impl MultiThreadOps for Emu {
                 None => Ok(ThreadStopReason::DoneStep),
             },
             false => {
+                let mut gdb_interrupt = gdb_interrupt.no_async();
                 let mut cycles: usize = 0;
                 loop {
                     // check for GDB interrupt every 1024 instructions
-                    if cycles % 1024 == 0 && check_gdb_interrupt() {
+                    if cycles % 1024 == 0 && gdb_interrupt.pending() {
                         return Ok(ThreadStopReason::GdbInterrupt);
                     }
                     cycles += 1;
