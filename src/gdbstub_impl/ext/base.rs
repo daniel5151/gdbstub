@@ -600,13 +600,54 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         }
     }
 
-    #[inline(always)]
+    fn write_break_common(
+        &mut self,
+        res: &mut ResponseWriter<C>,
+        tid: Tid,
+    ) -> Result<(), Error<T::Error, C::Error>> {
+        self.current_mem_tid = tid;
+        self.current_resume_tid = SpecificIdKind::WithId(tid);
+
+        res.write_str("T05")?;
+
+        res.write_str("thread:")?;
+        res.write_specific_thread_id(SpecificThreadId {
+            pid: Some(SpecificIdKind::WithId(FAKE_PID)),
+            tid: SpecificIdKind::WithId(tid),
+        })?;
+        res.write_str(";")?;
+
+        Ok(())
+    }
+
     pub(super) fn finish_exec(
         &mut self,
         res: &mut ResponseWriter<C>,
-        _target: &mut T,
+        target: &mut T,
         stop_reason: ThreadStopReason<<T::Arch as Arch>::Usize>,
     ) -> Result<Option<HandlerStatus>, Error<T::Error, C::Error>> {
+        macro_rules! guard_reverse_exec {
+            () => {{
+                let (reverse_cont, reverse_step) = match target.base_ops() {
+                    BaseOps::MultiThread(ops) => (
+                        ops.support_reverse_cont().is_some(),
+                        ops.support_reverse_step().is_some(),
+                    ),
+                    BaseOps::SingleThread(ops) => (
+                        ops.support_reverse_cont().is_some(),
+                        ops.support_reverse_step().is_some(),
+                    ),
+                };
+                reverse_cont || reverse_step
+            }};
+        }
+
+        macro_rules! guard_break {
+            ($op:ident) => {
+                target.breakpoints().and_then(|ops| ops.$op()).is_some()
+            };
+        }
+
         let status = match stop_reason {
             ThreadStopReason::DoneStep | ThreadStopReason::GdbInterrupt => {
                 res.write_str("S05")?;
@@ -627,41 +668,30 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 res.write_num(sig)?;
                 HandlerStatus::Disconnect(DisconnectReason::TargetHalted)
             }
-            ThreadStopReason::SwBreak(tid)
-            | ThreadStopReason::HwBreak(tid)
-            | ThreadStopReason::Watch { tid, .. } => {
-                self.current_mem_tid = tid;
-                self.current_resume_tid = SpecificIdKind::WithId(tid);
+            ThreadStopReason::SwBreak(tid) if guard_break!(sw_breakpoint) => {
+                self.write_break_common(res, tid)?;
+                res.write_str("swbreak:;")?;
+                HandlerStatus::Handled
+            }
+            ThreadStopReason::HwBreak(tid) if guard_break!(hw_breakpoint) => {
+                self.write_break_common(res, tid)?;
+                res.write_str("hwbreak:;")?;
+                HandlerStatus::Handled
+            }
+            ThreadStopReason::Watch { tid, kind, addr } if guard_break!(hw_watchpoint) => {
+                self.write_break_common(res, tid)?;
 
-                res.write_str("T05")?;
-
-                res.write_str("thread:")?;
-                res.write_specific_thread_id(SpecificThreadId {
-                    pid: Some(SpecificIdKind::WithId(FAKE_PID)),
-                    tid: SpecificIdKind::WithId(tid),
-                })?;
-                res.write_str(";")?;
-
-                match stop_reason {
-                    // don't include addr on sw/hw break
-                    ThreadStopReason::SwBreak(_) => res.write_str("swbreak:")?,
-                    ThreadStopReason::HwBreak(_) => res.write_str("hwbreak:")?,
-                    ThreadStopReason::Watch { kind, addr, .. } => {
-                        use crate::target::ext::breakpoints::WatchKind;
-                        match kind {
-                            WatchKind::Write => res.write_str("watch:")?,
-                            WatchKind::Read => res.write_str("rwatch:")?,
-                            WatchKind::ReadWrite => res.write_str("awatch:")?,
-                        }
-                        res.write_num(addr)?;
-                    }
-                    _ => unreachable!(),
-                };
-
+                use crate::target::ext::breakpoints::WatchKind;
+                match kind {
+                    WatchKind::Write => res.write_str("watch:")?,
+                    WatchKind::Read => res.write_str("rwatch:")?,
+                    WatchKind::ReadWrite => res.write_str("awatch:")?,
+                }
+                res.write_num(addr)?;
                 res.write_str(";")?;
                 HandlerStatus::Handled
             }
-            ThreadStopReason::ReplayLog(pos) => {
+            ThreadStopReason::ReplayLog(pos) if guard_reverse_exec!() => {
                 res.write_str("T05")?;
 
                 res.write_str("replaylog:")?;
@@ -672,6 +702,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                 HandlerStatus::Handled
             }
+            _ => return Err(Error::UnsupportedStopReason),
         };
 
         Ok(Some(status))

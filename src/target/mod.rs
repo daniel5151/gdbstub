@@ -176,7 +176,7 @@ pub type TargetResult<T, Tgt> = Result<T, TargetError<<Tgt as Target>::Error>>;
 /// **`Target` is the most important trait in `gdbstub`, and must be implemented
 /// by anyone who uses the library!**
 ///
-/// Please refer to the the documentation in the [`target` module](index.html)
+/// Please refer to the the documentation in the [`target` module](self)
 /// for more information on how to implement and work with `Target` and it's
 /// various extension traits.
 pub trait Target {

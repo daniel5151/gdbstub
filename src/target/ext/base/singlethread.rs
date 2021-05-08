@@ -134,7 +134,7 @@ define_ext!(SingleThreadReverseContOps, SingleThreadReverseCont);
 ///
 /// [Reverse stepping]: https://sourceware.org/gdb/current/onlinedocs/gdb/Reverse-Execution.html
 pub trait SingleThreadReverseStep: Target + SingleThreadOps {
-    /// Reverse-step the specified [`Tid`].
+    /// Reverse-step the target.
     fn reverse_step(
         &mut self,
         check_gdb_interrupt: &mut dyn FnMut() -> bool,
@@ -173,6 +173,15 @@ pub trait SingleThreadRangeStepping: Target + SingleThreadOps {
 define_ext!(SingleThreadRangeSteppingOps, SingleThreadRangeStepping);
 
 /// Describes why the target stopped.
+///
+/// Targets MUST only respond with stop reasons that correspond to IDETs that
+/// target has implemented.
+///
+/// e.g: A target which has not implemented the [`HwBreakpoint`] IDET must not
+/// return a `HwBreak` stop reason. While this is not enforced at compile time,
+/// doing so will result in a runtime `UnsupportedStopReason` error.
+///
+/// [`HwBreakpoint`]: crate::target::ext::breakpoints::HwBreakpoint
 // NOTE: This is a simplified version of `multithread::ThreadStopReason` that omits any references
 // to Tid or threads. Internally, it is converted into multithread::ThreadStopReason.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -186,23 +195,37 @@ pub enum StopReason<U> {
     Exited(u8),
     /// The process terminated with the specified signal number.
     Terminated(u8),
+    /// The program received a signal.
+    Signal(u8),
     /// Hit a software breakpoint (e.g. due to a trap instruction).
+    ///
+    /// Requires: [`SwBreakpoint`].
     ///
     /// NOTE: This does not necessarily have to be a breakpoint configured by
     /// the client/user of the current GDB session.
+    ///
+    /// [`SwBreakpoint`]: crate::target::ext::breakpoints::SwBreakpoint
     SwBreak,
     /// Hit a hardware breakpoint.
+    ///
+    /// Requires: [`HwBreakpoint`].
+    ///
+    /// [`HwBreakpoint`]: crate::target::ext::breakpoints::HwBreakpoint
     HwBreak,
     /// Hit a watchpoint.
+    ///
+    /// Requires: [`HwWatchpoint`].
+    ///
+    /// [`HwWatchpoint`]: crate::target::ext::breakpoints::HwWatchpoint
     Watch {
         /// Kind of watchpoint that was hit
         kind: WatchKind,
         /// Address of watched memory
         addr: U,
     },
-    /// The program received a signal.
-    Signal(u8),
     /// The program has reached the end of the logged replay events.
+    ///
+    /// Requires: [`SingleThreadReverseCont`] or [`SingleThreadReverseStep`].
     ///
     /// This is used for GDB's reverse execution. When playing back a recording,
     /// you may hit the end of the buffer of recorded events, and as such no

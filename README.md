@@ -6,7 +6,7 @@
 An ergonomic and easy-to-integrate implementation of the [GDB Remote Serial Protocol](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Protocol.html#Remote-Protocol) in Rust, with full `#![no_std]` support.
 
 > _Note:_ [`gdbstub:master`](https://github.com/daniel5151/gdbstub/tree/master) only contains code that is semver-compatible with the latest released version of `gdbstub` (currently `0.4.x`). All breaking changes and \*major\* new features are staged in [`gdbstub:dev/0.5`](https://github.com/daniel5151/gdbstub/blob/dev/0.5/CHANGELOG.md#050-dev).
-> 
+>
 > I am expecting to cut a `0.5` release quite soon (hopefully before the end of May 2021), so if you're starting a `gdbstub` integration from scratch, I would highly recommend working off the `dev/0.5` branch directly, thereby saving yourself the effort of having to update from `0.4` to `0.5`.
 
 Why use `gdbstub`?
