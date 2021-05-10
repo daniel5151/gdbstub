@@ -710,6 +710,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     ReplayLogPosition::Begin => "begin",
                     ReplayLogPosition::End => "end",
                 })?;
+                res.write_str(";")?;
 
                 HandlerStatus::Handled
             }
