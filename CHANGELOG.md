@@ -18,36 +18,58 @@ Check out [`transition_guide.md`](./docs/transition_guide.md) for guidance on up
   - _This significantly cuts down on the data being transferred over the wire when reading from registers/memory_
 - Add target-specific `kind: Arch::BreakpointKind` parameters to the Breakpoint API
   - _While emulated systems typically implement breakpoints by pausing execution once the PC hits a certain value, "real" systems typically need to patch the instruction stream with a breakpoint instruction. On systems with variable-sized instructions, this `kind` parameter specifies the size of the instruction that should be injected._
-- Support for `ResumeAction::{Step,Continue}WithSignal`
-- Added APIs for implementing optimized Range Stepping
+- Implement `ResumeAction::{Step,Continue}WithSignal`
+- Added the `Exited(u8)`, `Terminated(u8)`, and `ReplayLog("begin"|"end")` stop reasons.
+- Reworked the `MultiThreadOps::resume` API to be significantly more egonomic and efficient
+  - See the [transition guide](https://github.com/daniel5151/gdbstub/blob/dev/0.5/docs/transition_guide.md#new-multithreadopsresume-api) for more details.
 
-#### Breaking API Changes
+#### New Protocol Extensions
+
+- `{Single,Multi}ThreadReverse{Step,Continue}` - Support for reverse-step and reverse-continue. [\#48](https://github.com/daniel5151/gdbstub/pull/48 ) ([DrChat](https://github.com/DrChat))
+- `{Single,Multi}ThreadRangeStepping` - Optional optimized [range stepping](https://sourceware.org/gdb/current/onlinedocs/gdb/Continuing-and-Stepping.html#range-stepping) support.
+
+#### Breaking Arch Changes
 
 - **`gdbstub::arch` has been moved into a separate `gdbstub_arch` crate**
   - _See [\#45](https://github.com/daniel5151/gdbstub/issues/45) for details on why this was done._
-- Protocol Extension Refactors
+- (x86) Break GPRs & SRs into individual fields/variants [\#34](https://github.com/daniel5151/gdbstub/issues/34)
+
+#### Breaking API Changes
+
+- Base Protocol Refactors
+  - Reworked the `MultiThreadOps::resume` API
+  - Added a wrapper around the raw `check_gdb_interrupt` callback, hiding the underlying implementation details
   - Extracted base protocol single-register access methods (`{read,write}_register`) into separate `SingleRegisterAccess` trait
     - _These are optional GDB protocol methods, and as such, should be modeled as IDETs_
+- Protocol Extension Refactors
   - Consolidated the `{Hw,Sw}Breakpoints/Watchpoints` IDETs under a single `Breakpoints` IDET + sub-IDETs
   - Added new arch-specific `kind: Arch::BreakpointKind` parameter to `add_{hw,sw}_breakpoint` methods
-  - Renamed `target::ext::extended_mod::ConfigureASLR{Ops}` to `ConfigureAslr{Ops}`
+  - Renamed `target::ext::extended_mod::ConfigureASLR{Ops}` to `ConfigureAslr{Ops}` (clippy::upper_case_acronyms)
 - Added `{Step,Continue}WithSignal` variants to `target::ext::base::ResumeAction`
 - Trait Changes
   - `arch::Arch`: Added `type BreakpointKind`. Required to support arch-specific breakpoint kinds
   - `arch::Arch`: (very minor) Added [`num_traits::FromPrimitive`](https://docs.rs/num/0.4.0/num/traits/trait.FromPrimitive.html) bound to `Arch::Usize`
   - `arch::Registers`: Added `type ProgramCounter` and associated `fn pc(&self) -> Self::ProgramCounter` method. Added preemptively in anticipation of future GDB Agent support
+- Removed the `Halted` stop reason (more accurate to simply return `{Exited|Terminated}(SIGSTOP)` instead).
+- Removed the implicit `ExtendedMode` attached PID tracking when `alloc` was available. See [`23b56038`](https://github.com/daniel5151/gdbstub/commit/23b56038) rationale behind this change.
+
 
 #### Internal Improvements
 
 - Split monolithic `GdbStubImpl` implementation into separate files (by protocol extension)
 - Finally rewrite + optimize `GdbStubImpl::do_vcont`, along with streamlining its interactions with the legacy `s` and `c` packets
-- Remove `self.current_mem_tid` hack
+- Sprinkle more IDET-based dead code elimination hints (notably wrt. stop reasons)
+- Remove the default `self.current_mem_tid` hack, replacing it with a much more elegant solution
 - Packet Parser improvements
   - Remove last remaining bit of UTF-8 related code
   - Eliminate as much panicking bounds-checking code as possible
   - support efficient parsing of packets that are parsed differently depending on active protocol extension (namely, the breakpoint packets)
   - (currently unused) Zero-cost support for parsing `Z` and `z` packets with embedded agent bytecode expressions
 - Use intra-doc links whenever possible
+
+#### Bugfixes
+
+- Fix `RiscvRegId` for `arch::riscv::Riscv64` [\#46](https://github.com/daniel5151/gdbstub/issues/46) ([fzyz999](https://github.com/fzyz999))
 
 # 0.4.5
 
