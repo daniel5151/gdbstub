@@ -16,6 +16,7 @@ use crate::emu::{Emu, Event};
 
 mod breakpoints;
 mod extended_mode;
+mod memory_map;
 mod monitor_cmd;
 mod section_offsets;
 mod target_description_xml_override;
@@ -71,6 +72,11 @@ impl Target for Emu {
         &mut self,
     ) -> Option<target::ext::target_description_xml_override::TargetDescriptionXmlOverrideOps<Self>>
     {
+        Some(self)
+    }
+
+    #[inline(always)]
+    fn memory_map(&mut self) -> Option<target::ext::memory_map::MemoryMapOps<Self>> {
         Some(self)
     }
 }
