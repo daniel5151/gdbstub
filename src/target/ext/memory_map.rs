@@ -8,7 +8,7 @@ pub trait MemoryMap: Target {
     /// See the [GDB Documentation] for a description of the format.
     ///
     /// [GDB Documentation]: https://sourceware.org/gdb/onlinedocs/gdb/Memory-Map-Format.html
-    fn memory_map_xml(&self) -> String;
+    fn memory_map_xml(&self) -> &str;
 }
 
 define_ext!(MemoryMapOps, MemoryMap);

@@ -14,6 +14,7 @@ mod prelude {
 mod base;
 mod breakpoints;
 mod extended_mode;
+mod memory_map;
 mod monitor_cmd;
 mod reverse_exec;
 mod section_offsets;

@@ -177,7 +177,6 @@ commands! {
         "qsThreadInfo" => _qsThreadInfo::qsThreadInfo,
         "qSupported" => _qSupported::qSupported<'a>,
         "qXfer:features:read" => _qXfer_features_read::qXferFeaturesRead,
-        "qXfer:memory-map:read" => _qXfer_memory_map::qXferMemoryMapRead,
         "s" => _s::s<'a>,
         "T" => _t_upcase::T,
         "vCont" => _vCont::vCont<'a>,
@@ -216,5 +215,9 @@ commands! {
 
     reverse_step {
         "bs" => _bs::bs,
+    }
+
+    memory_map {
+        "qXfer:memory-map:read" => _qXfer_memory_map::qXferMemoryMapRead,
     }
 }
