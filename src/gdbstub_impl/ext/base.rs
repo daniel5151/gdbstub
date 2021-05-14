@@ -107,6 +107,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     res.write_str(";qXfer:features:read+")?;
                 }
 
+                if target.memory_map().is_some() {
+                    res.write_str(";qXfer:memory-map:read+")?;
+                }
+
                 HandlerStatus::Handled
             }
             Base::QStartNoAckMode(_) => {
@@ -141,6 +145,30 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     // send this packet unless it was explicitly marked as supported.
                     None => return Err(Error::PacketUnexpected),
                 }
+                HandlerStatus::Handled
+            }
+            Base::qXferMemoryMapRead(cmd) => {
+                match target.memory_map().map(|ops| ops.memory_map_xml()) {
+                    Some(xml) => {
+                        let xml = xml.trim();
+                        if cmd.offset >= xml.len() {
+                            // no more data
+                            res.write_str("l")?;
+                        } else if cmd.offset + cmd.len >= xml.len() {
+                            // last little bit of data
+                            res.write_str("l")?;
+                            res.write_binary(&xml.as_bytes()[cmd.offset..])?
+                        } else {
+                            // still more data
+                            res.write_str("m")?;
+                            res.write_binary(&xml.as_bytes()[cmd.offset..(cmd.offset + cmd.len)])?
+                        }
+                    }
+                    None => return Err(Error::PacketUnexpected),
+                }
+                // If the target hasn't provided a memory map, then the initial response to
+                // "qSupported" wouldn't have included  "qXfer:features:memory-map", and gdb wouldn't
+                // send this packet unless it was explicitly marked as supported.
                 HandlerStatus::Handled
             }
 

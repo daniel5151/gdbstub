@@ -239,6 +239,12 @@ pub trait Target {
     ) -> Option<ext::target_description_xml_override::TargetDescriptionXmlOverrideOps<Self>> {
         None
     }
+
+    /// Prove a target memory map.
+    #[inline(always)]
+    fn memory_map(&mut self) -> Option<ext::memory_map::MemoryMapOps<Self>> {
+        None
+    }
 }
 
 macro_rules! impl_dyn_target {

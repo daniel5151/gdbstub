@@ -256,6 +256,7 @@ macro_rules! define_ext {
 pub mod base;
 pub mod breakpoints;
 pub mod extended_mode;
+pub mod memory_map;
 pub mod monitor_cmd;
 pub mod section_offsets;
 pub mod target_description_xml_override;
