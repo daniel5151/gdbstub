@@ -240,7 +240,7 @@ pub trait Target {
         None
     }
 
-    /// Prove a target memory map.
+    /// Provide a target memory map.
     #[inline(always)]
     fn memory_map(&mut self) -> Option<ext::memory_map::MemoryMapOps<Self>> {
         None
