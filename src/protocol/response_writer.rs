@@ -8,7 +8,7 @@ use crate::Connection;
 /// `From<ResponseWriterError<C>> for crate::Error<T, C>`, which greatly
 /// simplifies some of the error handling in the main gdbstub.
 #[derive(Debug, Clone)]
-pub struct Error<C>(C);
+pub struct Error<C>(pub C);
 
 /// A wrapper around [`Connection`] that computes the single-byte checksum of
 /// incoming / outgoing data.

@@ -10,15 +10,12 @@ pub enum GdbStubError<T, C> {
     /// Connection Error while reading request.
     ConnectionRead(C),
     /// Connection Error while writing response.
-    ConnectionWrite(ResponseWriterError<C>),
+    ConnectionWrite(C),
     /// Client nack'd the last packet, but `gdbstub` doesn't implement
     /// re-transmission.
     ClientSentNack,
-    /// GdbStub was not provided with a packet buffer in `no_std` mode
-    /// (missing call to `with_packet_buffer`)
-    MissingPacketBuffer,
     /// Packet cannot fit in the provided packet buffer.
-    PacketBufferOverlow,
+    PacketBufferOverflow,
     /// Could not parse the packet into a valid command.
     PacketParse(PacketParseError),
     /// GDB client sent an unexpected packet. This should never happen!
@@ -26,7 +23,7 @@ pub enum GdbStubError<T, C> {
     PacketUnexpected,
     /// GDB client sent a packet with too much data for the given target.
     TargetMismatch,
-    /// Target threw a fatal error.
+    /// Target encountered a fatal error.
     TargetError(T),
     /// Target responded with an unsupported stop reason.
     ///
@@ -39,19 +36,23 @@ pub enum GdbStubError<T, C> {
     /// least one running.
     NoActiveThreads,
     /// Internal - A non-fatal error occurred (with errno-style error code)
+    ///
+    /// This "dummy" error is required as part of the internal
+    /// `TargetResultExt::handle_error()` machinery, and will never be
+    /// propagated up to the end user.
     #[doc(hidden)]
     NonFatalError(u8),
 }
 
 impl<T, C> From<ResponseWriterError<C>> for GdbStubError<T, C> {
     fn from(e: ResponseWriterError<C>) -> Self {
-        GdbStubError::ConnectionWrite(e)
+        GdbStubError::ConnectionWrite(e.0)
     }
 }
 
 impl<A, T, C> From<CapacityError<A>> for GdbStubError<T, C> {
     fn from(_: CapacityError<A>) -> Self {
-        GdbStubError::PacketBufferOverlow
+        GdbStubError::PacketBufferOverflow
     }
 }
 
@@ -66,8 +67,7 @@ where
             ConnectionRead(e) => write!(f, "Connection Error while reading request: {:?}", e),
             ConnectionWrite(e) => write!(f, "Connection Error while writing response: {:?}", e),
             ClientSentNack => write!(f, "Client nack'd the last packet, but `gdbstub` doesn't implement re-transmission."),
-            MissingPacketBuffer => write!(f, "GdbStub was not provided with a packet buffer in `no_std` mode (missing call to `with_packet_buffer`)"),
-            PacketBufferOverlow => write!(f, "Packet too big for provided buffer!"),
+            PacketBufferOverflow => write!(f, "Packet too big for provided buffer!"),
             PacketParse(e) => write!(f, "Could not parse the packet into a valid command: {:?}", e),
             PacketUnexpected => write!(f, "Client sent an unexpected packet. This should never happen! Please file an issue at https://github.com/daniel5151/gdbstub/issues"),
             TargetMismatch => write!(f, "GDB client sent a packet with too much data for the given target."),
