@@ -664,12 +664,12 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             ThreadStopReason::Exited(code) => {
                 res.write_str("W")?;
                 res.write_num(code)?;
-                HandlerStatus::Disconnect(DisconnectReason::TargetHalted)
+                HandlerStatus::Disconnect(DisconnectReason::TargetExited(code))
             }
             ThreadStopReason::Terminated(sig) => {
                 res.write_str("X")?;
                 res.write_num(sig)?;
-                HandlerStatus::Disconnect(DisconnectReason::TargetHalted)
+                HandlerStatus::Disconnect(DisconnectReason::TargetTerminated(sig))
             }
             ThreadStopReason::SwBreak(tid) if guard_break!(sw_breakpoint) => {
                 crate::__dead_code_marker!("sw_breakpoint", "stop_reason");

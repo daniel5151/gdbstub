@@ -41,7 +41,8 @@ fn rust_main() -> Result<(), i32> {
     match gdb.run(&mut target) {
         Ok(disconnect_reason) => match disconnect_reason {
             DisconnectReason::Disconnect => print_str("GDB Disconnected"),
-            DisconnectReason::TargetHalted => print_str("Target halted"),
+            DisconnectReason::TargetExited(_) => print_str("Target exited"),
+            DisconnectReason::TargetTerminated(_) => print_str("Target halted"),
             DisconnectReason::Kill => print_str("GDB sent a kill command"),
         },
         Err(GdbStubError::TargetError(_e)) => {

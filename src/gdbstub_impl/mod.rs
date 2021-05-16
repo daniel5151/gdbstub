@@ -22,8 +22,10 @@ use GdbStubError as Error;
 /// Describes why the GDB session ended.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DisconnectReason {
-    /// Target Halted
-    TargetHalted,
+    /// Target exited with given status code
+    TargetExited(u8),
+    /// Target terminated with given signal
+    TargetTerminated(u8),
     /// GDB issued a disconnect command
     Disconnect,
     /// GDB issued a kill command

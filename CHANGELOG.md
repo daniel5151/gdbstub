@@ -20,6 +20,7 @@ Check out [`transition_guide.md`](./docs/transition_guide.md) for guidance on up
   - _While emulated systems typically implement breakpoints by pausing execution once the PC hits a certain value, "real" systems typically need to patch the instruction stream with a breakpoint instruction. On systems with variable-sized instructions, this `kind` parameter specifies the size of the instruction that should be injected._
 - Implement `ResumeAction::{Step,Continue}WithSignal`
 - Added the `Exited(u8)`, `Terminated(u8)`, and `ReplayLog("begin"|"end")` stop reasons.
+- Added `DisconnectReason::Exited(u8)` and `DisconnectReason::Terminated(u8)`.
 - Reworked the `MultiThreadOps::resume` API to be significantly more egonomic and efficient
   - See the [transition guide](https://github.com/daniel5151/gdbstub/blob/dev/0.5/docs/transition_guide.md#new-multithreadopsresume-api) for more details.
 
@@ -51,6 +52,7 @@ Check out [`transition_guide.md`](./docs/transition_guide.md) for guidance on up
   - `arch::Arch`: (very minor) Added [`num_traits::FromPrimitive`](https://docs.rs/num/0.4.0/num/traits/trait.FromPrimitive.html) bound to `Arch::Usize`
   - `arch::Registers`: Added `type ProgramCounter` and associated `fn pc(&self) -> Self::ProgramCounter` method. Added preemptively in anticipation of future GDB Agent support
 - Removed the `Halted` stop reason (more accurate to simply return `{Exited|Terminated}(SIGSTOP)` instead).
+- Removed the `Halted` disconnect reason (replaced with the `Exited` and `Terminated` stop reasons instead).
 - Removed the implicit `ExtendedMode` attached PID tracking when `alloc` was available. See [`23b56038`](https://github.com/daniel5151/gdbstub/commit/23b56038) rationale behind this change.
 
 
