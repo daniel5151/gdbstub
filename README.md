@@ -5,6 +5,15 @@
 
 An ergonomic and easy-to-integrate implementation of the [GDB Remote Serial Protocol](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Protocol.html#Remote-Protocol) in Rust, with full `#![no_std]` support.
 
+ `gdbstub`  makes it easy to integrate powerful guest debugging support to your emulator/hypervisor/debugger/embedded project. By implementing just a few basic methods of the [`gdbstub::Target`](https://docs.rs/gdbstub/latest/gdbstub/target/ext/base/singlethread/trait.SingleThreadOps.html) trait, you can have a rich GDB debugging session up-and-running in no time!
+
+**If you're looking for a quick snippet of example code to see what a typical `gdbstub` integration might look like, check out [examples/armv4t/gdb/mod.rs](https://github.com/daniel5151/gdbstub/blob/dev/0.5/examples/armv4t/gdb/mod.rs)**
+
+-   [Documentation (gdbstub)](https://docs.rs/gdbstub)
+-   [Documentation (gdbstub_arch)](https://docs.rs/gdbstub_arch)
+-   [Changelog](CHANGELOG.md)
+-   [0.4 to 0.5 Transition Guide](docs/transition_guide.md)
+
 > _Note:_ [`gdbstub:master`](https://github.com/daniel5151/gdbstub/tree/master) only contains code that is semver-compatible with the latest released version of `gdbstub` (currently `0.4.x`). All breaking changes and \*major\* new features are staged in [`gdbstub:dev/0.5`](https://github.com/daniel5151/gdbstub/blob/dev/0.5/CHANGELOG.md#050-dev).
 >
 > I am expecting to cut a `0.5` release quite soon (hopefully before the end of May 2021), so if you're starting a `gdbstub` integration from scratch, I would highly recommend working off the `dev/0.5` branch directly, thereby saving yourself the effort of having to update from `0.4` to `0.5`.
@@ -12,34 +21,30 @@ An ergonomic and easy-to-integrate implementation of the [GDB Remote Serial Prot
 Why use `gdbstub`?
 
 -   **Excellent Ergonomics**
-    -   Unlike other GDB stub libraries, which simply expose the underlying GDB protocol "warts and all", `gdbstub` tries to abstract as much of the raw GDB protocol details from the user.
-        -   For example, instead of having to dig through some [obscure XML files deep the GDB codebase](https://github.com/bminor/binutils-gdb/tree/master/gdb/features) just to read/write from CPU registers, `gdbstub` comes with [built-in register definitions](https://docs.rs/gdbstub/*/gdbstub/arch/index.html) for most common architectures!
+    -   Instead of simply exposing the underlying GDB protocol "warts and all", `gdbstub` tries to abstract as much of the raw GDB protocol details from the user. For example:
+        -   Instead of having to dig through [obscure XML files deep the GDB codebase](https://github.com/bminor/binutils-gdb/tree/master/gdb/features) just to read/write from CPU/architecture registers, `gdbstub` comes with a community-curated collection of [built-in architecture definitions](https://docs.rs/gdbstub_arch) for most popular platforms!
+        -   Organizes GDB's countless optional protocol extensions into a coherent, understandable, and type-safe hierarchy of traits.
+        -   Automatically handles client/server protocol feature negotiation, without needing to micro-manage the specific [`qSupported` packet](https://sourceware.org/gdb/onlinedocs/gdb/General-Query-Packets.html#qSupported) response.
     -   `gdbstub` makes _extensive_ use of Rust's powerful type system + generics to enforce protocol invariants at compile time, minimizing the number of tricky protocol details end users have to worry about.
+    -   Using a novel technique called [**Inlineable Dyn Extension Traits**](#zero-overhead-protocol-extensions) (IDETs), `gdbstub` enables fine-grained control over active protocol extensions _without_ relying on clunky `cargo` features.
 -   **Easy to Integrate**
     -   `gdbstub`'s API is designed to be as unobtrusive as possible, and shouldn't require any large refactoring effort to integrate into an existing project. It doesn't require taking direct ownership of any key data structures, and aims to be a "drop in" solution when you need to add debugging to a project.
 -   **`#![no_std]` Ready & Size Optimized**
-    -   Can be configured to use fixed-size, pre-allocated buffers. **`gdbstub` does _not_ depend on `alloc`.**
+    -   `gdbstub` is a **`no_std` first** library, whereby all protocol features are required to be `no_std` compatible.
+    -   `gdbstub` does not require _any_ dynamic memory allocation, and can be configured to use fixed-size, pre-allocated buffers. This enables `gdbstub` to be used on even the most resource constrained, no-[`alloc`](https://doc.rust-lang.org/alloc/) platforms.
     -   `gdbstub` is transport-layer agnostic, and uses a basic [`Connection`](https://docs.rs/gdbstub/latest/gdbstub/trait.Connection.html) interface to communicate with the GDB server. As long as target has some method of performing in-order, serial, byte-wise I/O (e.g: putchar/getchar over UART), it's possible to run `gdbstub` on it.
-    -   "You don't pay for what you don't use": If you don't implement a particular protocol extension, the resulting binary won't include _any_ code related to parsing/handling that extension's packets! See the [Zero-overhead Protocol Extensions](#zero-overhead-protocol-extensions) section below for more details.
-    -   A lot of work has gone into reducing `gdbstub`'s binary and RAM footprints.
-        -   In release builds, using all the tricks outlined in [`min-sized-rust`](https://github.com/johnthagen/min-sized-rust), a baseline `gdbstub` implementation weighs in at roughly **_10kb of `.text` and negligible `.rodata`!_** \*
-        -   This is already pretty good, and I suspect that there are still lots of low-hanging optimizations which can reduce the size even further.
+    -   "You don't pay for what you don't use": All code related to parsing/handling protocol extensions is guaranteed to be dead-code-eliminated from an optimized binary if left unimplmeneted! See the [Zero-overhead Protocol Extensions](#zero-overhead-protocol-extensions) section below for more details.
+    -   `gdbstub` tries to keep the binary and RAM footprint of its minimal configuration to a bare minimum, enabling it to be used on even the most resource-constrained microcontrollers.
+        -   When compiled in release mode, using all the tricks outlined in [`min-sized-rust`](https://github.com/johnthagen/min-sized-rust), a baseline `gdbstub` implementation weighs in at **_roughly 10kb of `.text` and negligible `.rodata`!_** \*
+        - \* Exact numbers vary by target platform, compiler version, and `gdbstub` revision. Data was collected using the included `example_no_std` project compiled on x86_64.
 
-\* Exact numbers vary by target platform, compiler version, and `gdbstub` revision. Data was collected using the included `example_no_std` project compiled on x86_64.
-
-`gdbstub` is particularly well suited for _emulation_, making it easy to add powerful, non-intrusive debugging support to an emulated system. Just provide an implementation of the [`Target`](https://docs.rs/gdbstub/latest/gdbstub/target/trait.Target.html) trait for your target platform, and you're ready to start debugging!
-
-**If you're looking for a quick snippet of example code, check out [examples/armv4t/gdb/mod.rs](https://github.com/daniel5151/gdbstub/blob/dev/0.5/examples/armv4t/gdb/mod.rs)**
-
--   [Documentation](https://docs.rs/gdbstub)
-
-### Can I Use `gdsbtub` in Production?
+### Can I Use `gdbstub` in Production?
 
 **Yes, as long as you don't mind some API churn until `1.0.0` is released.**
 
-`gdbstub` has been integrated into [many projects](#real-world-examples) since its initial `0.1.0` release, and thusfar, no _major_ bugs have been reported. Reported issues have typically been the result of faulty `Target` implementations (e.g: forgetting to adjust the PC after a breakpoint is hit), or were related to certain unimplemented GDB protocol features.
+Due to `gdbstub`'s heavy use of Rust's type system in enforcing GDB protocol invariants at compile time, it's often been the case that implementing new GDB protocol features has required making some breaking Trait/Type changes. While these changes are typically quite minor, they are nonetheless semver-breaking, and may require a code-change when moving between versions. Any particularly involved changes will typically be documented in a dedicated [transition guide](docs/transition_guide.md) document.
 
-That being said, due to `gdbstub`'s heavy use of Rust's type system in enforcing GDB protocol invariants at compile time, it's often been the case that implementing new GDB protocol features has required making some breaking Trait/Type changes (e.g: adding the `RegId` associated type to `Arch` to support addressing individual registers). While these changes are typically quite minor, they are nonetheless breaking, and may require a code-change when moving between versions.
+That being said, `gdbstub` has already been integrated into [many real-world projects](#real-world-examples) since its initial `0.1` release, and empirical evidence suggests that it seems to be doing its job quite well! Thusfar, there haven't been any reported issues related to core GDB debugging functionality, with most issues being caused by faulty `Target` and/or `Arch` implementations.
 
 See the [Future Plans + Roadmap to `1.0.0`](#future-plans--roadmap-to-100) for more information on what features `gdbstub` still needs to implement before committing to API stability with version `1.0.0`.
 
@@ -51,15 +56,19 @@ The GDB Remote Serial Protocol is surprisingly complex, supporting advanced feat
     -   Step + Continue
     -   Read/Write memory
     -   Read/Write registers
-    -   (optional) Multithreading support
+    -   Enumerating threads
+        -   Only required in multithreaded targets
 
 Of course, most use-cases will want to support additional debugging features as well. At the moment, `gdbstub` implements the following GDB protocol extensions:
 
--   Automatic architecture + feature detection (automatically implemented)
+-   Automatic target architecture + feature reporting
 -   Breakpoints
     -   Software Breakpoints
     -   Hardware Breakpoints
     -   Read/Write/Access Watchpoints (i.e: value breakpoints)
+-   Advanced step/continue
+    -   Reverse execution (reverse-step, reverse-continue)
+    -   Range-stepping
 -   Extended Mode
     -   Run/Attach/Kill Processes
     -   Pass environment variables / args to spawned processes
@@ -69,7 +78,9 @@ Of course, most use-cases will want to support additional debugging features as 
 -   Custom `monitor` Commands
     -   Extend the GDB protocol with custom debug commands using GDB's `monitor` command
 
-_Note:_ Which GDB features are implemented are decided on an as-needed basis by `gdbstub`'s contributors. If there's a missing GDB feature that you'd like `gdbstub` to implement, please file an issue / open a PR! Check out the [GDB Remote Configuration Docs](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Configuration.html) for a table of GDB commands + their corresponding Remote Serial Protocol packets.
+_Note:_ GDB features are implemented on an as-needed basis by `gdbstub`'s contributors. If there's a missing GDB feature that you'd like `gdbstub` to implement, please file an issue and/or open a PR!
+
+For a full list of GDB remote features, check out the [GDB Remote Configuration Docs](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Configuration.html) for a table of GDB commands + their corresponding Remote Serial Protocol packets.
 
 ### Zero-overhead Protocol Extensions
 
@@ -101,19 +112,20 @@ When using `gdbstub` in `#![no_std]` contexts, make sure to set `default-feature
 ### Real-World Examples
 
 -   Virtual Machine Monitors (VMMs)
-    -   [crosvm](https://chromium.googlesource.com/chromiumos/platform/crosvm/+/refs/heads/main#gdb-support) - The Chrome OS Virtual Machine Monitor
+    -   [crosvm](https://chromium.googlesource.com/chromiumos/platform/crosvm/+/refs/heads/main#gdb-support) - The Chrome OS Virtual Machine Monitor (x64)
     -   [Firecracker](https://firecracker-microvm.github.io/) - A lightweight VMM developed by AWS - feature is in [PR](https://github.com/firecracker-microvm/firecracker/pull/2168)
--   Emulators
+-   Emulators (x64)
     -   [clicky](https://github.com/daniel5151/clicky/) - An emulator for classic clickwheel iPods (dual-core ARMv4T SoC)
-    -   [rustyboyadvance-ng](https://github.com/michelhe/rustboyadvance-ng/) - Nintendo GameBoy Advance emulator and debugger
+    -   [rustyboyadvance-ng](https://github.com/michelhe/rustboyadvance-ng/) - Nintendo GameBoy Advance emulator and debugger (ARMv4T)
+    -   [vaporstation](https://github.com/Colin-Suckow/vaporstation) - A Playstation One emulator (MIPS)
     -   [ts7200](https://github.com/daniel5151/ts7200/) - An emulator for the TS-7200, a somewhat bespoke embedded ARMv4t platform
     -   [microcorruption-emu](https://github.com/sapir/microcorruption-emu) - msp430 emulator for the microcorruption.com ctf
 -   Other
-    -   [memflow](https://github.com/memflow/memflow) - A physical memory introspection framework (part of `memflow-cli`)
+    -   [memflow](https://github.com/memflow/memflow-cli) - A physical memory introspection framework (part of `memflow-cli`) (64)
 
 While some of these projects may use older versions of `gdbstub`, they can nonetheless serve as useful examples of what a typical `gdbstub` integration might look like.
 
-If you end up using `gdbstub` in your project, consider opening a PR and add it to this list!
+If you end up using `gdbstub` in your project, consider opening a PR and adding it to this list!
 
 ### In-tree "Toy" Examples
 
@@ -121,14 +133,14 @@ These examples are built as part of the CI, and are guaranteed to be kept up to 
 
 - `armv4t` - `./examples/armv4t/`
     - An incredibly simple ARMv4T-based system emulator with `gdbstub` support.
-    - Unlike all other examples, `armv4t` **implements (almost) all available `target::ext` features.**
+    - **Implements (almost) all available `target::ext` features.** This makes it a great resource when first implementing a new protocol extension!
 - `armv4t_multicore` - `./examples/armv4t_multicore/`
     - A dual-core variation of the `armv4t` example.
     - Implements the core of `gdbstub`'s multithread extensions API, but not much else.
 - `example_no_std` - `./example_no_std`
-    - An _extremely_ minimal example of how `gdbstub` can be used in a `#![no_std]` project.
-    - Unlike the `armv4t/armv4t_multicore` examples, this project does _not_ include a working emulator, and stubs-out all `gdbstub` functions.
-    - Tracks `gdbstub`'s approximate binary footprint (via the `check_size.sh` script)
+    - An _extremely_ minimal example which shows off how `gdbstub` can be used in a `#![no_std]` project.
+    - Unlike the `armv4t/armv4t_multicore` examples, this project does _not_ include a working emulator, and simply stubs all `gdbstub` functions.
+    - Doubles as a test-bed for tracking `gdbstub`'s approximate binary footprint (via the `check_size.sh` script), and validating certain dead-code-elimination optimizations.
 
 ## Using `gdbstub` on bare-metal hardware
 
@@ -138,20 +150,18 @@ If you happen to stumble across this crate and end up using it to debug some bar
 
 ## `unsafe` in `gdbstub`
 
-`gdbstub` limits the use of `unsafe` to a bare minimum. All uses of `unsafe` are required to have a corresponding `// SAFETY` comment, and are exhaustively documented in the list below.
+`gdbstub` limits its use of `unsafe` to a bare minimum, with all uses of `unsafe` required to have a corresponding `// SAFETY` comment as justification. The following list exhaustively documents all uses of `unsafe` in `gdbstub`.
 
--   When no features are enabled:
+-   When no cargo features are enabled:
     -   A few trivially safe calls to `NonZeroUsize::new_unchecked()` when defining internal constants.
 -   When the `std` feature is enabled:
-    -   An implementation of `UnixStream::peek` which uses `libc::recv`. This will be removed once [rust-lang/rust#73761](https://github.com/rust-lang/rust/pull/73761) is merged and stabilized.
+    -   An implementation of `UnixStream::peek` which uses `libc::recv`. This manual implementation will be removed once [rust-lang/rust#76923](https://github.com/rust-lang/rust/issues/76923) is stabilized.
 
 ## Future Plans + Roadmap to `1.0.0`
 
-Before `gdbstub` can comfortably commit to a stable `1.0.0` API, there are several outstanding features that should be implemented and questions that need to be addressed. Due to `gdbstub`'s heavy reliance on the Rust type system to enforce GDB protocol invariants, it's likely that a certain subset of yet-unimplemented protocol features may require breaking API changes.
+While the vast majority of GDB protocol features (e.g: remote filesystem support, tracepoint packets, most query packets, etc...) should _not_ require breaking API changes, there are still several key protocol features that'll need breaking API changes to be implemented.
 
-Notably, the vast majority of GDB protocol features (e.g: remote filesystem support, tracepoint packets, most query packets, etc...) should _not_ require breaking API changes, and could most likely be implemented using the standard backwards-compatible protocol extension approach.
-
-The following features are most likely to require breaking API changes, and should therefore be implemented prior to `1.0.0`.
+The following features are most likely to require breaking API changes, and should therefore be implemented prior to `1.0.0`. Not that this is _not_ an exhaustive list, and is subject to change.
 
 -   [ ] Stabilize the `Arch` trait
     -   [ ] Allow fine-grained control over target features ([\#12](https://github.com/daniel5151/gdbstub/issues/12))
@@ -159,19 +169,20 @@ The following features are most likely to require breaking API changes, and shou
 -   [ ] Implement GDB's various high-level operating modes:
     -   [x] Single/Multi Thread debugging
     -   [ ] Multiprocess Debugging
-        -   [ ] Add a third `base::multiprocess` API.
-        -   _Note:_ `gdbstub` already implements multiprocess extensions "under-the-hood", and just hard-codes a fake PID.
+        -   [ ] Will require adding a third `target::ext::base::multiprocess` API.
+        -   _Note:_ `gdbstub` already implements multiprocess extensions "under-the-hood", and just hard-codes a fake PID, so this is mostly a matter of "putting in the work".
     -   [x] [Extended Mode](https://sourceware.org/gdb/current/onlinedocs/gdb/Connecting.html) (`target extended-remote`)
     -   [ ] [Non-Stop Mode](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Non_002dStop.html#Remote-Non_002dStop)
         -   This may require some breaking API changes and/or some internals rework -- more research is needed.
 -   [ ] Have a working example of `gdbstub` running in a "bare-metal" `#![no_std]` environment (e.g: debugging a hobby OS via serial).
-    -   While there's no reason it _wouldn't_ work, it would be good to validate that the API + implementation supports this use-case.
+    -   While there's no reason it _shouldn't_ work, it would be good to validate that the API + implementation supports this use-case.
 
 Additionally, while not strict "blockers" to `1.0.0`, it would be good to explore these features as well:
 
--   [ ] Commit to a MSRV
--   [ ] Exposing an `async/await` interface
-    -   e.g: the current `check_gdb_interrupt` callback in `Target::resume()` could be modeled as a future.
-    -   Would require some tweaks to the Connection trait.
--   [ ] Adding [LLDB extension](https://raw.githubusercontent.com/llvm-mirror/lldb/master/docs/lldb-gdb-remote.txt) support
+-   [ ] Should `gdbstub` commit to a MSRV?
+-   [ ] Exposing `async/await` interfaces (particularly wrt. handling GDB client interrupts) ([\#36](https://github.com/daniel5151/gdbstub/issues/36))
+-   [ ] Supporting various [LLDB extensions](https://raw.githubusercontent.com/llvm-mirror/lldb/master/docs/lldb-gdb-remote.txt) to the GDB RSP
     -   Skimming through the list, it doesn't seem like these extensions would require breaking API changes -- more research is needed.
+-   [ ] Supporting multi-arch debugging via a single target
+    -   e.g: debugging both x86 and x64 processes when running in extended mode
+-   Proper handling of client "nack" packets for spotty connections.

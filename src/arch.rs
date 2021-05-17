@@ -1,18 +1,19 @@
-//! Traits which encode architecture-specific target information.
+//! Traits to encode architecture-specific target information.
 //!
-//! # Built in `Arch` Implementations
+//! # Community created `Arch` Implementations
 //!
 //! Before getting your hands dirty and implementing a new `Arch` from scratch,
 //! make sure to check out [`gdbstub_arch`](https://docs.rs/gdbstub_arch), a
 //! companion crate to `gdbstub` which aggregates community-created `Arch`
 //! implementations for most common architectures!
 //!
-//! _Note:_ Prior to `gdbstub 0.5`, `Arch` implementations were distributed as a
-//! part of the main `gdbstub` crate (under the `gdbstub::arch` module). This
+//! > _Note:_ Prior to `gdbstub 0.5`, `Arch` implementations were distributed as
+//! a part of the main `gdbstub` crate (under the `gdbstub::arch` module). This
 //! wasn't ideal, any `gdbstub::arch`-level breaking-changes forced the _entire_
-//! `gdbstub` crate to release a new (potentially breaking!) version. Having
-//! community-created `Arch` implementations be distributed in a separate crate
-//! helps minimize any unnecessary "version churn"
+//! `gdbstub` crate to release a new (potentially breaking!) version.
+//!
+//! > Having community-created `Arch` implementations distributed in a separate
+//! crate helps minimize any unnecessary "version churn" in `gdbstub` core.
 
 use core::fmt::Debug;
 
@@ -22,7 +23,10 @@ use crate::internal::{BeBytes, LeBytes};
 
 /// Register identifier for target registers.
 ///
-/// These identifiers are used by GDB for single register operations.
+/// These identifiers are used by GDB to signal which register to read/wite when
+/// performing [single register accesses].
+///
+/// [single register accesses]: crate::target::ext::base::SingleRegisterAccess
 pub trait RegId: Sized + Debug {
     /// Map raw GDB register number corresponding `RegId` and register size.
     ///
@@ -66,9 +70,9 @@ pub trait Registers: Default + Debug + Clone + PartialEq {
 /// Breakpoint kind for specific architectures.
 ///
 /// This trait corresponds to the _kind_ field of the "z" and "Z" breakpoint
-/// packets.
+/// packets, as documented [here](https://sourceware.org/gdb/onlinedocs/gdb/Packets.html#insert-breakpoint-or-watchpoint-packet).
 ///
-/// A breakpoint _kind_ is architecture-specific and typically indicates the
+/// A breakpoint "kind" is architecture-specific and typically indicates the
 /// size of the breakpoint in bytes that should be inserted. As such, most
 /// architectures will set `BreakpointKind = usize`.
 ///
@@ -105,16 +109,16 @@ impl BreakpointKind for usize {
 ///
 /// Types implementing `Arch` should be
 /// [Zero-variant Enums](https://doc.rust-lang.org/reference/items/enumerations.html#zero-variant-enums),
-/// as they are only ever used at the type level, and should never be
-/// instantiated.
+/// as `Arch` impls are only ever used at the type level, and should never be
+/// explicitly instantiated.
 pub trait Arch {
     /// The architecture's pointer size (e.g: `u32` on a 32-bit system).
     type Usize: FromPrimitive + PrimInt + Unsigned + BeBytes + LeBytes;
 
-    /// The architecture's register file.
+    /// The architecture's register file. See [`Registers`] for more details.
     type Registers: Registers<ProgramCounter = Self::Usize>;
 
-    /// The architecture's breakpoint kind, used to determine the "size"
+    /// The architecture's breakpoint "kind", used to determine the "size"
     /// of breakpoint to set. See [`BreakpointKind`] for more details.
     type BreakpointKind: BreakpointKind;
 
@@ -122,12 +126,13 @@ pub trait Arch {
     ///
     /// Used to access individual registers via `Target::read/write_register`.
     ///
-    /// NOTE: The `RegId` type is not required to have a 1:1 correspondence with
-    /// the `Registers` type, and may include register identifiers which are
-    /// separate from the main `Registers` structure.
+    /// > NOTE: An arch's `RegId` type is not strictly required to have a 1:1
+    /// correspondence with the `Registers` type, and may include register
+    /// identifiers which are separate from the main `Registers` structure.
+    /// (e.g: the RISC-V Control and Status registers)
     type RegId: RegId;
 
-    /// (optional) Return the target's description XML file (`target.xml`).
+    /// (optional) Return the arch's description XML file (`target.xml`).
     ///
     /// Implementing this method enables GDB to automatically detect the
     /// target's architecture, saving the hassle of having to run `set

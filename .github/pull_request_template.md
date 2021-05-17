@@ -4,7 +4,7 @@
 
 e.g: This PR implements the `foobar` extension, based off the GDB documentation [here](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Protocol.html).
 
-Closes #(issue number) <!-- if appropriate --> 
+Closes #(issue number) <!-- if appropriate -->
 
 ### API Stability
 
@@ -20,7 +20,9 @@ Closes #(issue number) <!-- if appropriate -->
   - [ ] `cargo fmt` was run
   - [ ] All tests pass
 - Documentation
-  - [ ] Added proper documentation (in code, rustdoc and README.md)
+  - [ ] rustdoc + approprate inline code comments
+  - [ ] Updated CHANGELOG.md
+  - [ ] (if appropriate) Added feature to "Debugging Features" in README.md
 - _If implementing a new protocol extension IDET_
   - [ ] Included a basic sample implementation in `examples/armv4t`
   - [ ] Included output of running `examples/armv4t` with `RUST_LOG=trace` + any relevant GDB output under the "Validation" section below
@@ -43,8 +45,8 @@ Closes #(issue number) <!-- if appropriate -->
 
 (gdb) info mem
 Using memory regions provided by the target.
-Num Enb Low Addr   High Addr  Attrs 
-0   y  	0x00000000 0x100000000 rw nocache 
+Num Enb Low Addr   High Addr  Attrs
+0   y  	0x00000000 0x100000000 rw nocache
 ```
 
 </details>

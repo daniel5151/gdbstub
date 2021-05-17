@@ -101,7 +101,6 @@ impl<'a> PacketBuf<'a> {
 
     /// Return a mut reference to the _entire_ underlying packet buffer, and the
     /// current body's range.
-    #[allow(dead_code)]
     pub fn into_raw_buf(self) -> (&'a mut [u8], core::ops::Range<usize>) {
         (self.buf, self.body_range)
     }

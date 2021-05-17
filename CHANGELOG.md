@@ -180,7 +180,7 @@ Thanks to [h33p](https://github.com/h33p) for reporting this issue ([\#27](https
 
 #### New Arch Implementations
 
-- Add x86_86 support [\#11](https://github.com/daniel5151/gdbstub/pull/11) ([jamcleod](https://github.com/jamcleod))
+- Add x86_64 support [\#11](https://github.com/daniel5151/gdbstub/pull/11) ([jamcleod](https://github.com/jamcleod))
 - Add Mips and Mips64 support [\#13](https://github.com/daniel5151/gdbstub/pull/13) ([starfleetcadet75](https://github.com/starfleetcadet75))
 
 #### Internal Improvements

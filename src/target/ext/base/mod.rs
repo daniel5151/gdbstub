@@ -1,8 +1,9 @@
 //! Base operations required to debug any target (read/write memory/registers,
 //! step/resume, etc...)
 //!
-//! While not strictly required, it is recommended that single threaded targets
-//! implement the simplified `singlethread` API.
+//! It is recommended that single threaded targets implement the simplified
+//! `singlethread` API, as `gdbstub` includes optimized implementations of
+//! certain internal routines when operating in singlethreaded mode.
 
 pub mod multithread;
 pub mod singlethread;

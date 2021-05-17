@@ -1,4 +1,4 @@
-//! Everything related to the [`Target`] trait + associated extension traits.
+//! The core [`Target`] trait, and all its various protocol extension traits.
 //!
 //! The [`Target`] trait describes how to control and modify a system's
 //! execution state during a GDB debugging session, and serves as the
@@ -10,23 +10,25 @@
 //!
 //! # Implementing `Target`
 //!
-//! `gdbstub` uses a technique called "Inlineable Dyn Extension Traits" (IDETs)
-//! to expose an ergonomic and extensible interface to the GDB protocol. It's
-//! not a very common pattern, and can seem a little "weird" at first glance,
-//! but it's actually very straightforward to use!
+//! `gdbstub` uses a technique called ["Inlineable Dyn Extension Traits"](ext)
+//! (IDETs) to expose an ergonomic and extensible interface to the GDB protocol.
+//! It's not a very common pattern, and can seem a little "weird" at first
+//! glance, but IDETs are actually very straightforward to use!
+//!
+//! **TL;DR:** Whenever you see a method that returns something that looks like
+//! `Option<ProtocolExtOps>`, you can enable that protocol extension by
+//! implementing the `ProtocolExt` type on your target, and overriding the
+//! `Option<ProtocolExtOps>` method to return `Some(self)`.
 //!
 //! Please refer to the [documentation in the `ext` module](ext) for more
-//! information on IDETs, and how they're used to implement `Target` and it's
-//! various extension traits.
-//!
-//! **TL;DR:** Whenever you see a method that has `Option<FooOps>` in the return
-//! type, that method should return `Some(self)` if the extension is
-//! implemented, or `None` if it's unimplemented / disabled.
+//! information on IDETs, including a more in-depth explanation of how they
+//! work, and how `Target` leverages them to provide fine grained control over
+//! enabled protocol features.
 //!
 //! ## Associated Types
 //!
 //! - The [`Target::Arch`](trait.Target.html#associatedtype.Arch) associated
-//!   type encodes information about the target's architecture, such as it's
+//!   type encodes information about the target's architecture, such as its
 //!   pointer size, register layout, etc... `gdbstub` comes with several
 //!   built-in architecture definitions, which can be found under the
 //!   [`arch`](../arch/index.html) module.
@@ -45,38 +47,140 @@
 //! becomes `fn resume(&mut self, ...) -> Result<_, MyEmuError>`, which makes it
 //! possible to preserve the target-specific error while using `gdbstub`!
 //!
-//! ## Required Methods
+//! > _Aside:_ What's with all the `<Self::Arch as Arch>::` syntax?
 //!
-//! The [`Target::base_ops`](trait.Target.html#tymethod.base_ops) method
-//! describes the base debugging operations that must be implemented by any
-//! target. These are things such as starting/stopping execution,
-//! reading/writing memory, etc..
+//! > As you explore `Target` and its many extension traits, you'll enounter
+//! many method signatures that use this pretty gnarly bit of Rust type syntax.
+//!
+//! > If [rust-lang/rust#38078](https://github.com/rust-lang/rust/issues/38078)
+//! gets fixed, then types like `<Self::Arch as Arch>::Foo` could be simplified
+//! to just `Self::Arch::Foo`, but until then, the much more explicit
+//! [fully qualified syntax](https://doc.rust-lang.org/book/ch19-03-advanced-traits.html#fully-qualified-syntax-for-disambiguation-calling-methods-with-the-same-name)
+//! must be used instead.
+//!
+//! > To improve the readability and maintainability of your own implementation,
+//! it'd be best to swap out the fully qualified syntax with whatever concrete
+//! type is being used. e.g: on a 32-bit target, instead of cluttering up a
+//! method implementation with a parameter passed as `(addr: <Self::Arch as
+//! Arch>::Usize)`, just write `(addr: u32)` directly.
+//!
+//! ## Required Methods (Base Protocol)
+//!
+//! A minimal `Target` implementation only needs to implement a single method:
+//! [`Target::base_ops`](trait.Target.html#tymethod.base_ops). This method is
+//! used to select which set of [`base`](crate::target::ext::base)
+//! debugging operations will be used to control the target. These are
+//! fundamental operations such as starting/stopping execution, reading/writing
+//! memory, etc...
 //!
 //! All other methods are entirely optional! Check out the
 //! [`ext`] module for a full list of currently supported protocol extensions.
 //!
-//! ## Example: A Bare-Minimum Single Threaded `Target`
+//! ### Example: A Bare-Minimum Single Threaded `Target`
 //!
-//! ```rust,ignore
-//! use gdbstub::target::Target;
+//! ```rust
+//! use gdbstub::target::{Target, TargetResult};
+//! use gdbstub::target::ext::base::BaseOps;
 //! use gdbstub::target::ext::base::singlethread::SingleThreadOps;
+//! use gdbstub::target::ext::base::singlethread::{ResumeAction, GdbInterrupt, StopReason};
 //!
-//! impl SingleThreadOps for MyTarget {
-//!     // ... omitted for brevity
-//! }
+//! struct MyTarget;
 //!
 //! impl Target for MyTarget {
-//!     fn base_ops(&mut self) -> base::BaseOps<Self::Arch, Self::Error> {
-//!         base::BaseOps::SingleThread(self)
+//!     type Error = ();
+//!     type Arch = gdbstub_arch::arm::Armv4t; // as an example
+//!
+//!     fn base_ops(&mut self) -> BaseOps<Self::Arch, Self::Error> {
+//!         BaseOps::SingleThread(self)
 //!     }
 //! }
+//!
+//! impl SingleThreadOps for MyTarget {
+//!     fn resume(
+//!         &mut self,
+//!         action: ResumeAction,
+//!         gdb_interrupt: GdbInterrupt<'_>,
+//!     ) -> Result<StopReason<u32>, ()> { todo!() }
+//!
+//!     fn read_registers(
+//!         &mut self,
+//!         regs: &mut gdbstub_arch::arm::reg::ArmCoreRegs,
+//!     ) -> TargetResult<(), Self> { todo!() }
+//!
+//!     fn write_registers(
+//!         &mut self,
+//!         regs: &gdbstub_arch::arm::reg::ArmCoreRegs
+//!     ) -> TargetResult<(), Self> { todo!() }
+//!
+//!     fn read_addrs(
+//!         &mut self,
+//!         start_addr: u32,
+//!         data: &mut [u8],
+//!     ) -> TargetResult<(), Self> { todo!() }
+//!
+//!     fn write_addrs(
+//!         &mut self,
+//!         start_addr: u32,
+//!         data: &[u8],
+//!     ) -> TargetResult<(), Self> { todo!() }
+//! }
 //! ```
+//!
+//! ## Optional Methods (Protocol Extensions)
+//!
+//! The GDB protocol is _massive_, and there are plenty of optional protocol
+//! extensions that targets can implement to enhance the base debugging
+//! experience. These protocol extensions range from relatively mundane things
+//! such as setting/removing breakpoints or reading/writing individual
+//! registers, but also include fancy things such as  support for time travel
+//! debugging, running shell commands remotely, or even performing file IO on
+//! the target!
+//!
+//! As a starting point, consider implementing some of the breakpoint related
+//! extensions under [`breakpoints`](crate::target::ext::breakpoints). While
+//! setting/removing breakpoints is technically an "optional" part of the GDB
+//! protocol, I'm sure you'd be hard pressed to find a debugger that doesn't
+//! support breakpoints.
+//!
+//! Please make sure to read and understand [the documentation](ext) regarding
+//! how IDETs work!
+//!
+//! ### Note: Missing Protocol Extensions
+//!
+//! `gdbstub`'s development is guided by the needs of its contributors, with
+//! new features being added on an "as-needed" basis.
+//!
+//! If there's a GDB protocol extensions you're interested in that hasn't been
+//! implemented in `gdbstub` yet, (e.g: remote filesystem access, tracepoint
+//! support, etc...), consider opening an issue / filing a PR on GitHub!
+//!
+//! Check out the [GDB Remote Configuration Docs](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Configuration.html)
+//! for a table of GDB commands + their corresponding Remote Serial Protocol
+//! packets.
+//!
+//! ## A note on error handling
+//!
+//! As you explore the various protocol extension traits, you'll often find that
+//! functions don't return a typical [`Result<T, Self::Error>`],
+//! and will instead return a [`TargetResult<T, Self>`].
+//!
+//! At first glance, this might look a bit strange, since it might look as
+//! though the `Err` variant of `TargetResult` is actually `Self` instead of
+//! `Self::Error`! Thankfully, there's a good reason for why that's the case,
+//! which you can read about as part of the [`TargetError`] documentation.
+//!
+//! In a nutshell, `TargetResult` wraps a typical `Result<T, Self::Error>` with
+//! a few additional error types which can be reported back to the GDB client
+//! via the GDB RSP. For example, if the GDB client tried to read memory from
+//! invalid memory, instead of immediately terminating the entire debugging
+//! session, it's possible to simply return a `Err(TargetError::Errno(14)) //
+//! EFAULT`, which will notify the GDB client that the operation has failed.
 
 use crate::arch::Arch;
 
 pub mod ext;
 
-/// The error type for various methods on `Target` and it's assorted associated
+/// The error type for various methods on `Target` and its assorted associated
 /// extension traits.
 ///
 /// # Error Handling over the GDB Remote Serial Protocol
@@ -113,7 +217,7 @@ pub mod ext;
 ///
 /// Unfortunately, a blanket impl such as `impl<T: Target> From<T::Error> for
 /// TargetError<T::Error>` isn't possible, as it could result in impl conflicts.
-/// For example, if a Target decided to use `()` as it's fatal error type, then
+/// For example, if a Target decided to use `()` as its fatal error type, then
 /// there would be conflict with the existing `From<()>` impl.
 #[non_exhaustive]
 pub enum TargetError<E> {
@@ -177,7 +281,7 @@ pub type TargetResult<T, Tgt> = Result<T, TargetError<<Tgt as Target>::Error>>;
 /// by anyone who uses the library!**
 ///
 /// Please refer to the the documentation in the [`target` module](self)
-/// for more information on how to implement and work with `Target` and it's
+/// for more information on how to implement and work with `Target` and its
 /// various extension traits.
 pub trait Target {
     /// The target's architecture.
