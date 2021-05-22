@@ -18,7 +18,7 @@ Check out [`transition_guide.md`](./docs/transition_guide.md) for guidance on up
 - Added the `Exited(u8)`, `Terminated(u8)`, and `ReplayLog("begin"|"end")` stop reasons.
 - Added `DisconnectReason::Exited(u8)` and `DisconnectReason::Terminated(u8)`.
 - Reworked the `MultiThreadOps::resume` API to be significantly more ergonomic and efficient
-  - See the [transition guide](https://github.com/daniel5151/gdbstub/blob/dev/0.5/docs/transition_guide.md#new-multithreadopsresume-api) for more details.
+  - See the [transition guide](https://github.com/daniel5151/gdbstub/blob/master/docs/transition_guide.md#new-multithreadopsresume-api) for more details.
 
 #### New Protocol Extensions
 
