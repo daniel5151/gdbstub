@@ -11,10 +11,8 @@ homepage = "https://github.com/daniel5151/gdbstub"
 repository  = "https://github.com/daniel5151/gdbstub"
 keywords = ["gdb", "emulation", "no_std", "debugging"]
 categories = ["development-tools::debugging", "embedded", "emulators", "no-std"]
-exclude = ["examples/**/*.elf", "examples/**/*.o"]
 
 [dependencies]
-gdbstub = { path = "../", default-features = false }
+gdbstub = { path = "../", version = "0.5", default-features = false }
 
 num-traits = { version = "0.2", default-features = false }
-

@@ -1,12 +1,8 @@
-# Changelog
-
 All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-# 0.5.0-dev
-
-**This changelog is not final, and is subject to change**
+# 0.5.0
 
 While the overall structure of the API has remained the same, `0.5.0` does introduce a few breaking API changes that require some attention. That being said, it should not be a difficult migration, and updating to `0.5.0` from `0.4` shouldn't take more than 10 mins of refactoring.
 
@@ -21,7 +17,7 @@ Check out [`transition_guide.md`](./docs/transition_guide.md) for guidance on up
 - Implement `ResumeAction::{Step,Continue}WithSignal`
 - Added the `Exited(u8)`, `Terminated(u8)`, and `ReplayLog("begin"|"end")` stop reasons.
 - Added `DisconnectReason::Exited(u8)` and `DisconnectReason::Terminated(u8)`.
-- Reworked the `MultiThreadOps::resume` API to be significantly more egonomic and efficient
+- Reworked the `MultiThreadOps::resume` API to be significantly more ergonomic and efficient
   - See the [transition guide](https://github.com/daniel5151/gdbstub/blob/dev/0.5/docs/transition_guide.md#new-multithreadopsresume-api) for more details.
 
 #### New Protocol Extensions
