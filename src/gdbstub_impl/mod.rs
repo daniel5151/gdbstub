@@ -4,9 +4,9 @@ use managed::ManagedSlice;
 
 use crate::common::*;
 use crate::connection::Connection;
+use crate::protocol::recv_packet::{RecvPacketBlocking, RecvPacketStateMachine};
 use crate::protocol::{commands::Command, Packet, ResponseWriter, SpecificIdKind};
 use crate::target::Target;
-use crate::util::managed_vec::ManagedVec;
 use crate::SINGLE_THREAD_TID;
 
 mod builder;
@@ -48,10 +48,12 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
 
     /// Create a new `GdbStub` using the provided connection.
     ///
-    /// For fine-grained control over various `GdbStub` options, use the
-    /// [`builder()`](GdbStub::builder) method instead.
+    /// _Note:_ `new` is only available when the `alloc` feature is enabled, as
+    /// it will use a dynamically allocated `Vec` as a packet buffer.
     ///
-    /// _Note:_ `new` is only available when the `alloc` feature is enabled.
+    /// For fine-grained control over various `GdbStub` options, including the
+    /// ability to specify a fixed-size buffer, use the [`GdbStub::builder`]
+    /// method instead.
     #[cfg(feature = "alloc")]
     pub fn new(conn: C) -> GdbStub<'a, T, C> {
         GdbStubBuilder::new(conn).build().unwrap()
@@ -64,6 +66,61 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
     pub fn run(&mut self, target: &mut T) -> Result<DisconnectReason, Error<T::Error, C::Error>> {
         self.state
             .run(target, &mut self.conn, &mut self.packet_buffer)
+    }
+
+    /// Starts a GDB remote debugging session, and convert this instance of
+    /// `GdbStub` into a [`GdbStubStateMachine`].
+    ///
+    /// Note: This method will invoke `Connection::on_session_start`, and
+    /// as such may return a connection error.
+    pub fn run_state_machine(
+        mut self,
+    ) -> Result<GdbStubStateMachine<'a, T, C>, Error<T::Error, C::Error>> {
+        self.conn
+            .on_session_start()
+            .map_err(Error::ConnectionRead)?;
+
+        Ok(GdbStubStateMachine {
+            conn: self.conn,
+            packet_buffer: self.packet_buffer,
+            recv_packet: RecvPacketStateMachine::new(),
+            state: self.state,
+        })
+    }
+}
+
+/// A variant of [`GdbStub`] which parses incoming packets using an asynchronous
+/// state machine.
+///
+/// TODO: more docs
+pub struct GdbStubStateMachine<'a, T: Target, C: Connection> {
+    conn: C,
+    packet_buffer: ManagedSlice<'a, u8>,
+    recv_packet: RecvPacketStateMachine,
+    state: GdbStubImpl<T, C>,
+}
+
+impl<'a, T: Target, C: Connection> GdbStubStateMachine<'a, T, C> {
+    /// Pass a byte to the `gdbstub` packet parser.
+    ///
+    /// Returns a `Some(DisconnectReason)` if the GDB client
+    pub fn pump(
+        &mut self,
+        target: &mut T,
+        byte: u8,
+    ) -> Result<Option<DisconnectReason>, Error<T::Error, C::Error>> {
+        let packet_buffer = match self.recv_packet.pump(&mut self.packet_buffer, byte)? {
+            Some(buf) => buf,
+            None => return Ok(None),
+        };
+
+        let packet = Packet::from_buf(target, packet_buffer).map_err(Error::PacketParse)?;
+        self.state.handle_packet(target, &mut self.conn, packet)
+    }
+
+    /// Return a mutable reference to the underlying connection.
+    pub fn borrow_conn(&mut self) -> &mut C {
+        &mut self.conn
     }
 }
 
@@ -111,96 +168,82 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         conn.on_session_start().map_err(Error::ConnectionRead)?;
 
         loop {
-            match Self::recv_packet(conn, target, packet_buffer)? {
-                Packet::Ack => {}
-                Packet::Nack => return Err(Error::ClientSentNack),
-                Packet::Interrupt => {
-                    debug!("<-- interrupt packet");
-                    let mut res = ResponseWriter::new(conn);
-                    res.write_str("S05")?;
-                    res.flush()?;
-                }
-                Packet::Command(command) => {
-                    // Acknowledge the command
-                    if !self.no_ack_mode {
-                        conn.write(b'+').map_err(Error::ConnectionRead)?;
-                    }
-
-                    let mut res = ResponseWriter::new(conn);
-                    let disconnect = match self.handle_command(&mut res, target, command) {
-                        Ok(HandlerStatus::Handled) => None,
-                        Ok(HandlerStatus::NeedsOk) => {
-                            res.write_str("OK")?;
-                            None
-                        }
-                        Ok(HandlerStatus::Disconnect(reason)) => Some(reason),
-                        // HACK: handling this "dummy" error is required as part of the
-                        // `TargetResultExt::handle_error()` machinery.
-                        Err(Error::NonFatalError(code)) => {
-                            res.write_str("E")?;
-                            res.write_num(code)?;
-                            None
-                        }
-                        Err(Error::TargetError(e)) => {
-                            // unlike all other errors which are "unrecoverable" in the sense that
-                            // the GDB session cannot continue, there's still a chance that a target
-                            // might want to keep the debugging session alive to do a "post-mortem"
-                            // analysis. As such, we simply report a standard TRAP stop reason.
-                            let mut res = ResponseWriter::new(conn);
-                            res.write_str("S05")?;
-                            res.flush()?;
-                            return Err(Error::TargetError(e));
-                        }
-                        Err(e) => return Err(e),
-                    };
-
-                    // HACK: this could be more elegant...
-                    if disconnect != Some(DisconnectReason::Kill) {
-                        res.flush()?;
-                    }
-
-                    if let Some(disconnect_reason) = disconnect {
-                        return Ok(disconnect_reason);
-                    }
-                }
+            use crate::protocol::recv_packet::RecvPacketError;
+            let packet_buffer = match RecvPacketBlocking::new().recv(packet_buffer, || conn.read())
+            {
+                Err(RecvPacketError::Capacity) => return Err(Error::PacketBufferOverflow),
+                Err(RecvPacketError::Connection(e)) => return Err(Error::ConnectionWrite(e)),
+                Ok(buf) => buf,
             };
+
+            let packet = Packet::from_buf(target, packet_buffer).map_err(Error::PacketParse)?;
+            if let Some(disconnect_reason) = self.handle_packet(target, conn, packet)? {
+                return Ok(disconnect_reason);
+            }
         }
     }
 
-    fn recv_packet<'a>(
-        conn: &mut C,
+    fn handle_packet(
+        &mut self,
         target: &mut T,
-        pkt_buf: &'a mut ManagedSlice<u8>,
-    ) -> Result<Packet<'a>, Error<T::Error, C::Error>> {
-        let header_byte = conn.read().map_err(Error::ConnectionRead)?;
-
-        // Wrap the buf in a `ManagedVec` to keep the code readable.
-        let mut buf = ManagedVec::new(pkt_buf);
-
-        buf.clear();
-        buf.push(header_byte)?;
-        if header_byte == b'$' {
-            // read the packet body
-            loop {
-                let c = conn.read().map_err(Error::ConnectionRead)?;
-                buf.push(c)?;
-                if c == b'#' {
-                    break;
-                }
+        conn: &mut C,
+        packet: Packet<'_>,
+    ) -> Result<Option<DisconnectReason>, Error<T::Error, C::Error>> {
+        match packet {
+            Packet::Ack => {}
+            Packet::Nack => return Err(Error::ClientSentNack),
+            Packet::Interrupt => {
+                debug!("<-- interrupt packet");
+                let mut res = ResponseWriter::new(conn);
+                res.write_str("S05")?;
+                res.flush()?;
             }
-            // read the checksum as well
-            buf.push(conn.read().map_err(Error::ConnectionRead)?)?;
-            buf.push(conn.read().map_err(Error::ConnectionRead)?)?;
-        }
+            Packet::Command(command) => {
+                // Acknowledge the command
+                if !self.no_ack_mode {
+                    conn.write(b'+').map_err(Error::ConnectionWrite)?;
+                }
 
-        trace!(
-            "<-- {}",
-            core::str::from_utf8(buf.as_slice()).unwrap_or("<invalid packet>")
-        );
+                let mut res = ResponseWriter::new(conn);
+                let disconnect_reason = match self.handle_command(&mut res, target, command) {
+                    Ok(HandlerStatus::Handled) => None,
+                    Ok(HandlerStatus::NeedsOk) => {
+                        res.write_str("OK")?;
+                        None
+                    }
+                    Ok(HandlerStatus::Disconnect(reason)) => Some(reason),
+                    // HACK: handling this "dummy" error is required as part of the
+                    // `TargetResultExt::handle_error()` machinery.
+                    Err(Error::NonFatalError(code)) => {
+                        res.write_str("E")?;
+                        res.write_num(code)?;
+                        None
+                    }
+                    Err(Error::TargetError(e)) => {
+                        // unlike all other errors which are "unrecoverable" in the sense that
+                        // the GDB session cannot continue, there's still a chance that a target
+                        // might want to keep the debugging session alive to do a "post-mortem"
+                        // analysis. As such, we simply report a standard TRAP stop reason.
+                        let mut res = ResponseWriter::new(conn);
+                        res.write_str("S05")?;
+                        res.flush()?;
+                        return Err(Error::TargetError(e));
+                    }
+                    Err(e) => return Err(e),
+                };
 
-        drop(buf);
+                // every response needs to be flushed, _except_ for the response to a kill
+                // packet, but ONLY when extended mode is NOT implemented.
+                let is_kill = matches!(disconnect_reason, Some(DisconnectReason::Kill));
+                if !(target.extended_mode().is_none() && is_kill) {
+                    res.flush()?;
+                }
 
-        Packet::from_buf(target, pkt_buf.as_mut()).map_err(Error::PacketParse)
+                return Ok(disconnect_reason);
+            }
+        };
+
+        Ok(None)
     }
 
     fn handle_command(

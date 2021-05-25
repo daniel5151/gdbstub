@@ -3,7 +3,7 @@
 
 extern crate libc;
 
-use gdbstub::{DisconnectReason, GdbStubBuilder, GdbStubError};
+use gdbstub::{Connection, DisconnectReason, GdbStubBuilder, GdbStubError};
 
 mod conn;
 mod gdb;
@@ -31,27 +31,36 @@ fn rust_main() -> Result<(), i32> {
     };
 
     let mut buf = [0; 4096];
-    let mut gdb = GdbStubBuilder::new(conn)
+    let gdb = GdbStubBuilder::new(conn)
         .with_packet_buffer(&mut buf)
         .build()
         .map_err(|_| 1)?;
 
     print_str("Starting GDB session...");
 
-    match gdb.run(&mut target) {
-        Ok(disconnect_reason) => match disconnect_reason {
-            DisconnectReason::Disconnect => print_str("GDB Disconnected"),
-            DisconnectReason::TargetExited(_) => print_str("Target exited"),
-            DisconnectReason::TargetTerminated(_) => print_str("Target halted"),
-            DisconnectReason::Kill => print_str("GDB sent a kill command"),
-        },
-        Err(GdbStubError::TargetError(_e)) => {
-            print_str("Target raised a fatal error");
+    let mut gdb = gdb.run_state_machine().map_err(|_| 1)?;
+
+    loop {
+        let byte = gdb.borrow_conn().read().map_err(|_| 1)?;
+        match gdb.pump(&mut target, byte) {
+            Ok(None) => {}
+            Ok(Some(disconnect_reason)) => match disconnect_reason {
+                DisconnectReason::Disconnect => {
+                    print_str("GDB Disconnected");
+                    break;
+                }
+                DisconnectReason::TargetExited(_) => print_str("Target exited"),
+                DisconnectReason::TargetTerminated(_) => print_str("Target halted"),
+                DisconnectReason::Kill => print_str("GDB sent a kill command"),
+            },
+            Err(GdbStubError::TargetError(_e)) => {
+                print_str("Target raised a fatal error");
+            }
+            Err(_e) => {
+                print_str("gdbstub internal error");
+            }
         }
-        Err(_e) => {
-            print_str("gdbstub internal error");
-        }
-    };
+    }
 
     Ok(())
 }

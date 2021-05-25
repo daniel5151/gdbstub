@@ -15,6 +15,10 @@ impl<'a, 'b, T> ManagedVec<'a, 'b, T> {
         ManagedVec { buf, len: 0 }
     }
 
+    pub fn new_with_idx(buf: &'b mut ManagedSlice<'a, T>, len: usize) -> Self {
+        ManagedVec { buf, len }
+    }
+
     pub fn clear(&mut self) {
         // While it's very tempting to just call `Vec::clear` in the `Owned` case, doing
         // so would modify the length of the underlying `ManagedSlice`, which isn't

@@ -4,6 +4,7 @@ mod packet;
 mod response_writer;
 
 pub(crate) mod commands;
+pub(crate) mod recv_packet;
 
 pub(crate) use common::thread_id::{IdKind, SpecificIdKind, SpecificThreadId};
 pub(crate) use packet::Packet;
