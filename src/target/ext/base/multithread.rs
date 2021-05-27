@@ -3,9 +3,10 @@
 use crate::arch::Arch;
 use crate::common::*;
 use crate::target::ext::breakpoints::WatchKind;
+use crate::target::ext::catch_syscalls::CatchSyscallPosition;
 use crate::target::{Target, TargetResult};
 
-use super::{CatchSyscallPosition, ReplayLogPosition, SingleRegisterAccessOps};
+use super::{ReplayLogPosition, SingleRegisterAccessOps};
 
 // Convenient re-exports
 pub use super::{GdbInterrupt, ResumeAction};

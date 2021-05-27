@@ -26,6 +26,16 @@ pub trait CatchSyscalls: Target {
 
 define_ext!(CatchSyscallsOps, CatchSyscalls);
 
+/// Describes why a catch syscall event was triggered for the corresponding stop
+/// reason.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CatchSyscallPosition {
+    /// Reached the entry location of the syscall.
+    Entry,
+    /// Reached the return location of the syscall.
+    Return,
+}
+
 /// Iterator of syscall numbers that should be reported to GDB.
 pub struct SyscallNumbers<'a, U> {
     pub(crate) inner: &'a mut dyn Iterator<Item = U>,
