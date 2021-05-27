@@ -258,6 +258,7 @@ macro_rules! define_ext {
 
 pub mod base;
 pub mod breakpoints;
+pub mod catch_syscalls;
 pub mod extended_mode;
 pub mod memory_map;
 pub mod monitor_cmd;

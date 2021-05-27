@@ -13,6 +13,7 @@ mod prelude {
 
 mod base;
 mod breakpoints;
+mod catch_syscalls;
 mod extended_mode;
 mod memory_map;
 mod monitor_cmd;

@@ -4,7 +4,9 @@ use crate::protocol::commands::ext::Base;
 use crate::arch::{Arch, Registers};
 use crate::protocol::{IdKind, SpecificIdKind, SpecificThreadId};
 use crate::target::ext::base::multithread::ThreadStopReason;
-use crate::target::ext::base::{BaseOps, GdbInterrupt, ReplayLogPosition, ResumeAction};
+use crate::target::ext::base::{
+    BaseOps, CatchSyscallPosition, GdbInterrupt, ReplayLogPosition, ResumeAction,
+};
 use crate::{FAKE_PID, SINGLE_THREAD_TID};
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
@@ -99,6 +101,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     if ops.hw_breakpoint().is_some() || ops.hw_watchpoint().is_some() {
                         res.write_str(";hwbreak+")?;
                     }
+                }
+
+                if target.catch_syscalls().is_some() {
+                    res.write_str(";QCatchSyscalls+")?;
                 }
 
                 if T::Arch::target_description_xml().is_some()
@@ -655,6 +661,12 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             };
         }
 
+        macro_rules! guard_catch_syscall {
+            () => {
+                target.catch_syscalls().is_some()
+            };
+        }
+
         let status = match stop_reason {
             ThreadStopReason::DoneStep | ThreadStopReason::GdbInterrupt => {
                 res.write_str("S05")?;
@@ -718,6 +730,20 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                 HandlerStatus::Handled
             }
+            ThreadStopReason::CatchSyscall { number, position } if guard_catch_syscall!() => {
+                crate::__dead_code_marker!("catch_syscall", "stop_reason");
+
+                res.write_str("T05")?;
+
+                res.write_str(match position {
+                    CatchSyscallPosition::Entry => "syscall_entry:",
+                    CatchSyscallPosition::Return => "syscall_return:",
+                })?;
+                res.write_num(number)?;
+                res.write_str(";")?;
+
+                HandlerStatus::Handled
+            }
             _ => return Err(Error::UnsupportedStopReason),
         };
 
@@ -742,6 +768,9 @@ impl<U> From<StopReason<U>> for ThreadStopReason<U> {
             },
             StopReason::Signal(sig) => ThreadStopReason::Signal(sig),
             StopReason::ReplayLog(pos) => ThreadStopReason::ReplayLog(pos),
+            StopReason::CatchSyscall { number, position } => {
+                ThreadStopReason::CatchSyscall { number, position }
+            }
         }
     }
 }

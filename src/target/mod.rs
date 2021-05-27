@@ -317,6 +317,12 @@ pub trait Target {
         None
     }
 
+    /// Set/Remove syscall catchpoints.
+    #[inline(always)]
+    fn catch_syscalls(&mut self) -> Option<ext::catch_syscalls::CatchSyscallsOps<Self>> {
+        None
+    }
+
     /// Handle custom GDB `monitor` commands.
     #[inline(always)]
     fn monitor_cmd(&mut self) -> Option<ext::monitor_cmd::MonitorCmdOps<Self>> {
@@ -369,6 +375,11 @@ macro_rules! impl_dyn_target {
             #[inline(always)]
             fn breakpoints(&mut self) -> Option<ext::breakpoints::BreakpointsOps<Self>> {
                 (**self).breakpoints()
+            }
+
+            #[inline(always)]
+            fn catch_syscalls(&mut self) -> Option<ext::catch_syscalls::CatchSyscallsOps<Self>> {
+                (**self).catch_syscalls()
             }
 
             #[inline(always)]

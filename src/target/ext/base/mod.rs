@@ -53,6 +53,16 @@ pub enum ReplayLogPosition {
     End,
 }
 
+/// Describes why a catch syscall event was triggered for the corresponding stop
+/// reason.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CatchSyscallPosition {
+    /// Reached the entry location of the syscall.
+    Entry,
+    /// Reached the return location of the syscall.
+    Return,
+}
+
 /// A handle to check for incoming GDB interrupts.
 ///
 /// At the moment, checking for incoming interrupts requires periodically
