@@ -216,4 +216,8 @@ commands! {
     reverse_step {
         "bs" => _bs::bs,
     }
+
+    memory_map {
+        "qXfer:memory-map:read" => _qXfer_memory_map::qXferMemoryMapRead,
+    }
 }

@@ -107,6 +107,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     res.write_str(";qXfer:features:read+")?;
                 }
 
+                if target.memory_map().is_some() {
+                    res.write_str(";qXfer:memory-map:read+")?;
+                }
+
                 HandlerStatus::Handled
             }
             Base::QStartNoAckMode(_) => {
