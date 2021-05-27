@@ -15,6 +15,7 @@ use crate::emu::{Emu, Event};
 // Additional GDB extensions
 
 mod breakpoints;
+mod catch_syscalls;
 mod extended_mode;
 mod memory_map;
 mod monitor_cmd;
@@ -77,6 +78,11 @@ impl Target for Emu {
 
     #[inline(always)]
     fn memory_map(&mut self) -> Option<target::ext::memory_map::MemoryMapOps<Self>> {
+        Some(self)
+    }
+
+    #[inline(always)]
+    fn catch_syscalls(&mut self) -> Option<target::ext::catch_syscalls::CatchSyscallsOps<Self>> {
         Some(self)
     }
 }
