@@ -13,17 +13,25 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
         let handler_status = match command {
             SingleRegisterAccess::p(p) => {
-                let mut dst = [0u8; 32]; // enough for 256-bit registers
                 let reg = <T::Arch as Arch>::RegId::from_raw_id(p.reg_id);
-                let (reg_id, reg_size) = match reg {
+                let (reg_id, _reg_size) = match reg {
                     // empty packet indicates unrecognized query
                     None => return Ok(HandlerStatus::Handled),
                     Some(v) => v,
                 };
-                let dst = &mut dst[0..reg_size];
-                ops.read_register(id, reg_id, dst).handle_error()?;
 
-                res.write_hex_buf(dst)?;
+                // TODO: Limit the number of bytes transferred on the wire to the register size
+                // (if specified). Maybe pad the register if the callee does not
+                // send enough data?
+                let mut err = Ok(());
+                ops.read_register(id, reg_id, &mut |buf| match res.write_hex_buf(buf) {
+                    Ok(_) => {}
+                    Err(e) => err = Err(e),
+                })
+                .handle_error()?;
+
+                err?;
+
                 HandlerStatus::Handled
             }
             SingleRegisterAccess::P(p) => {

@@ -1,3 +1,5 @@
+use core::num::NonZeroUsize;
+
 use gdbstub::arch::RegId;
 
 /// TI-MSP430 register identifier.
@@ -20,7 +22,7 @@ pub enum Msp430RegId {
 }
 
 impl RegId for Msp430RegId {
-    fn from_raw_id(id: usize) -> Option<(Self, usize)> {
+    fn from_raw_id(id: usize) -> Option<(Self, Option<NonZeroUsize>)> {
         let reg = match id {
             0 => Self::Pc,
             1 => Self::Sp,
@@ -29,7 +31,7 @@ impl RegId for Msp430RegId {
             4..=15 => Self::Gpr((id as u8) - 4),
             _ => return None,
         };
-        Some((reg, 2))
+        Some((reg, Some(NonZeroUsize::new(2).unwrap())))
     }
 }
 
@@ -57,7 +59,7 @@ mod tests {
         let mut i = 0;
         let mut sum_reg_sizes = 0;
         while let Some((_, size)) = RId::from_raw_id(i) {
-            sum_reg_sizes += size;
+            sum_reg_sizes += size.unwrap().get();
             i += 1;
         }
 

@@ -1,3 +1,5 @@
+use core::num::NonZeroUsize;
+
 use gdbstub::arch::RegId;
 
 /// RISC-V Register identifier.
@@ -22,15 +24,21 @@ pub enum RiscvRegId<U> {
 macro_rules! impl_riscv_reg_id {
     ($usize:ty) => {
         impl RegId for RiscvRegId<$usize> {
-            fn from_raw_id(id: usize) -> Option<(Self, usize)> {
+            fn from_raw_id(id: usize) -> Option<(Self, Option<NonZeroUsize>)> {
                 const USIZE: usize = core::mem::size_of::<$usize>();
 
                 let reg_size = match id {
-                    0..=31 => (Self::Gpr(id as u8), USIZE),
-                    32 => (Self::Pc, USIZE),
-                    33..=64 => (Self::Fpr((id - 33) as u8), USIZE),
-                    65..=4160 => (Self::Csr((id - 65) as u16), USIZE),
-                    4161 => (Self::Priv, 1),
+                    0..=31 => (Self::Gpr(id as u8), Some(NonZeroUsize::new(USIZE).unwrap())),
+                    32 => (Self::Pc, Some(NonZeroUsize::new(USIZE).unwrap())),
+                    33..=64 => (
+                        Self::Fpr((id - 33) as u8),
+                        Some(NonZeroUsize::new(USIZE).unwrap()),
+                    ),
+                    65..=4160 => (
+                        Self::Csr((id - 65) as u16),
+                        Some(NonZeroUsize::new(USIZE).unwrap()),
+                    ),
+                    4161 => (Self::Priv, Some(NonZeroUsize::new(1).unwrap())),
                     _ => return None,
                 };
                 Some(reg_size)

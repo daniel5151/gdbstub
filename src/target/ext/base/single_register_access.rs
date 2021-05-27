@@ -35,7 +35,7 @@ pub trait SingleRegisterAccess<Id>: Target {
         &mut self,
         tid: Id,
         reg_id: <Self::Arch as Arch>::RegId,
-        dst: &mut [u8],
+        output: &mut dyn FnMut(&[u8]),
     ) -> TargetResult<(), Self>;
 
     /// Write from a single register on the target.

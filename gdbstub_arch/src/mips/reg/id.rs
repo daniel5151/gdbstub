@@ -1,3 +1,5 @@
+use core::num::NonZeroUsize;
+
 use gdbstub::arch::RegId;
 
 /// MIPS register identifier.
@@ -44,7 +46,7 @@ pub enum MipsRegId<U> {
     _Size(U),
 }
 
-fn from_raw_id<U>(id: usize) -> Option<(MipsRegId<U>, usize)> {
+fn from_raw_id<U>(id: usize) -> Option<(MipsRegId<U>, Option<NonZeroUsize>)> {
     let reg = match id {
         0..=31 => MipsRegId::Gpr(id as u8),
         32 => MipsRegId::Status,
@@ -63,23 +65,23 @@ fn from_raw_id<U>(id: usize) -> Option<(MipsRegId<U>, usize)> {
         76 => MipsRegId::Hi3,
         77 => MipsRegId::Lo3,
         // `MipsRegId::Dspctl` is the only register that will always be 4 bytes wide
-        78 => return Some((MipsRegId::Dspctl, 4)),
+        78 => return Some((MipsRegId::Dspctl, Some(NonZeroUsize::new(4).unwrap()))),
         79 => MipsRegId::Restart,
         _ => return None,
     };
 
     let ptrsize = core::mem::size_of::<U>();
-    Some((reg, ptrsize))
+    Some((reg, Some(NonZeroUsize::new(ptrsize).unwrap())))
 }
 
 impl RegId for MipsRegId<u32> {
-    fn from_raw_id(id: usize) -> Option<(Self, usize)> {
+    fn from_raw_id(id: usize) -> Option<(Self, Option<NonZeroUsize>)> {
         from_raw_id::<u32>(id)
     }
 }
 
 impl RegId for MipsRegId<u64> {
-    fn from_raw_id(id: usize) -> Option<(Self, usize)> {
+    fn from_raw_id(id: usize) -> Option<(Self, Option<NonZeroUsize>)> {
         from_raw_id::<u64>(id)
     }
 }
@@ -104,7 +106,7 @@ mod tests {
         let mut i = 0;
         let mut sum_reg_sizes = 0;
         while let Some((_, size)) = RId::from_raw_id(i) {
-            sum_reg_sizes += size;
+            sum_reg_sizes += size.unwrap().get();
             i += 1;
         }
 
