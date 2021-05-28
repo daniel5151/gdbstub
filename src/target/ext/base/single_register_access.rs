@@ -26,11 +26,6 @@ pub trait SingleRegisterAccess<Id>: Target {
     ///
     /// If the requested register could not be accessed, an appropriate
     /// non-fatal error should be returned.
-    ///
-    /// _Note:_ This method includes a stubbed default implementation which
-    /// simply returns `Ok(())`. This is due to the fact that several built-in
-    /// `arch` implementations haven't been updated with proper `RegId`
-    /// implementations.
     fn read_register(
         &mut self,
         tid: Id,
@@ -49,11 +44,6 @@ pub trait SingleRegisterAccess<Id>: Target {
     ///
     /// If the requested register could not be accessed, an appropriate
     /// non-fatal error should be returned.
-    ///
-    /// _Note:_ This method includes a stubbed default implementation which
-    /// simply returns `Ok(())`. This is due to the fact that several built-in
-    /// `arch` implementations haven't been updated with proper `RegId`
-    /// implementations.
     fn write_register(
         &mut self,
         tid: Id,
