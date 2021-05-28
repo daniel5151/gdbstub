@@ -101,6 +101,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     }
                 }
 
+                if target.catch_syscalls().is_some() {
+                    res.write_str(";QCatchSyscalls+")?;
+                }
+
                 if T::Arch::target_description_xml().is_some()
                     || target.target_description_xml_override().is_some()
                 {
@@ -655,6 +659,12 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             };
         }
 
+        macro_rules! guard_catch_syscall {
+            () => {
+                target.catch_syscalls().is_some()
+            };
+        }
+
         let status = match stop_reason {
             ThreadStopReason::DoneStep | ThreadStopReason::GdbInterrupt => {
                 res.write_str("S05")?;
@@ -718,6 +728,21 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                 HandlerStatus::Handled
             }
+            ThreadStopReason::CatchSyscall { number, position } if guard_catch_syscall!() => {
+                crate::__dead_code_marker!("catch_syscall", "stop_reason");
+
+                res.write_str("T05")?;
+
+                use crate::target::ext::catch_syscalls::CatchSyscallPosition;
+                res.write_str(match position {
+                    CatchSyscallPosition::Entry => "syscall_entry:",
+                    CatchSyscallPosition::Return => "syscall_return:",
+                })?;
+                res.write_num(number)?;
+                res.write_str(";")?;
+
+                HandlerStatus::Handled
+            }
             _ => return Err(Error::UnsupportedStopReason),
         };
 
@@ -742,6 +767,9 @@ impl<U> From<StopReason<U>> for ThreadStopReason<U> {
             },
             StopReason::Signal(sig) => ThreadStopReason::Signal(sig),
             StopReason::ReplayLog(pos) => ThreadStopReason::ReplayLog(pos),
+            StopReason::CatchSyscall { number, position } => {
+                ThreadStopReason::CatchSyscall { number, position }
+            }
         }
     }
 }

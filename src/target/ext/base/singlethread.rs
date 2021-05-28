@@ -2,6 +2,7 @@
 
 use crate::arch::Arch;
 use crate::target::ext::breakpoints::WatchKind;
+use crate::target::ext::catch_syscalls::CatchSyscallPosition;
 use crate::target::{Target, TargetResult};
 
 use super::{ReplayLogPosition, SingleRegisterAccessOps};
@@ -236,4 +237,15 @@ pub enum StopReason<U> {
     /// further execution can be done. This stop reason tells GDB that this has
     /// occurred.
     ReplayLog(ReplayLogPosition),
+    /// The program has reached a syscall entry or return location.
+    ///
+    /// Requires: [`CatchSyscalls`].
+    ///
+    /// [`CatchSyscalls`]: crate::target::ext::catch_syscalls::CatchSyscalls
+    CatchSyscall {
+        /// The syscall number.
+        number: U,
+        /// The location the event occured at.
+        position: CatchSyscallPosition,
+    },
 }

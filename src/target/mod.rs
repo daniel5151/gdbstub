@@ -349,6 +349,12 @@ pub trait Target {
     fn memory_map(&mut self) -> Option<ext::memory_map::MemoryMapOps<Self>> {
         None
     }
+
+    /// Set/Remove syscall catchpoints.
+    #[inline(always)]
+    fn catch_syscalls(&mut self) -> Option<ext::catch_syscalls::CatchSyscallsOps<Self>> {
+        None
+    }
 }
 
 macro_rules! impl_dyn_target {
@@ -369,6 +375,11 @@ macro_rules! impl_dyn_target {
             #[inline(always)]
             fn breakpoints(&mut self) -> Option<ext::breakpoints::BreakpointsOps<Self>> {
                 (**self).breakpoints()
+            }
+
+            #[inline(always)]
+            fn catch_syscalls(&mut self) -> Option<ext::catch_syscalls::CatchSyscallsOps<Self>> {
+                (**self).catch_syscalls()
             }
 
             #[inline(always)]
