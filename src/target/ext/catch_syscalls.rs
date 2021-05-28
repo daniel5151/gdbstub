@@ -41,7 +41,7 @@ pub struct SyscallNumbers<'a, U> {
     pub(crate) inner: &'a mut dyn Iterator<Item = U>,
 }
 
-impl<U: num_traits::Unsigned> Iterator for SyscallNumbers<'_, U> {
+impl<U> Iterator for SyscallNumbers<'_, U> {
     type Item = U;
 
     fn next(&mut self) -> Option<Self::Item> {
