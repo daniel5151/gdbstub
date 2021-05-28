@@ -120,31 +120,26 @@ impl RegId for X86CoreRegId {
     fn from_raw_id(id: usize) -> Option<(Self, Option<NonZeroUsize>)> {
         use self::X86CoreRegId::*;
 
-        let r = match id {
-            0 => (Eax, Some(NonZeroUsize::new(4).unwrap())),
-            1 => (Ecx, Some(NonZeroUsize::new(4).unwrap())),
-            2 => (Edx, Some(NonZeroUsize::new(4).unwrap())),
-            3 => (Ebx, Some(NonZeroUsize::new(4).unwrap())),
-            4 => (Esp, Some(NonZeroUsize::new(4).unwrap())),
-            5 => (Ebp, Some(NonZeroUsize::new(4).unwrap())),
-            6 => (Esi, Some(NonZeroUsize::new(4).unwrap())),
-            7 => (Edi, Some(NonZeroUsize::new(4).unwrap())),
-            8 => (Eip, Some(NonZeroUsize::new(4).unwrap())),
-            9 => (Eflags, Some(NonZeroUsize::new(4).unwrap())),
-            10..=15 => (
-                Segment(X86SegmentRegId::from_u8(id as u8 - 10)?),
-                Some(NonZeroUsize::new(4).unwrap()),
-            ),
-            16..=23 => (St(id as u8 - 16), Some(NonZeroUsize::new(10).unwrap())),
-            24..=31 => (
-                Fpu(X87FpuInternalRegId::from_u8(id as u8 - 24)?),
-                Some(NonZeroUsize::new(4).unwrap()),
-            ),
-            32..=39 => (Xmm(id as u8 - 32), Some(NonZeroUsize::new(16).unwrap())),
-            40 => (Mxcsr, Some(NonZeroUsize::new(4).unwrap())),
+        let (r, sz): (X86CoreRegId, usize) = match id {
+            0 => (Eax, 4),
+            1 => (Ecx, 4),
+            2 => (Edx, 4),
+            3 => (Ebx, 4),
+            4 => (Esp, 4),
+            5 => (Ebp, 4),
+            6 => (Esi, 4),
+            7 => (Edi, 4),
+            8 => (Eip, 4),
+            9 => (Eflags, 4),
+            10..=15 => (Segment(X86SegmentRegId::from_u8(id as u8 - 10)?), 4),
+            16..=23 => (St(id as u8 - 16), 10),
+            24..=31 => (Fpu(X87FpuInternalRegId::from_u8(id as u8 - 24)?), 4),
+            32..=39 => (Xmm(id as u8 - 32), 16),
+            40 => (Mxcsr, 4),
             _ => return None,
         };
-        Some(r)
+
+        Some((r, Some(NonZeroUsize::new(sz).unwrap())))
     }
 }
 
@@ -178,24 +173,19 @@ impl RegId for X86_64CoreRegId {
     fn from_raw_id(id: usize) -> Option<(Self, Option<NonZeroUsize>)> {
         use self::X86_64CoreRegId::*;
 
-        let r = match id {
-            0..=15 => (Gpr(id as u8), Some(NonZeroUsize::new(8).unwrap())),
-            16 => (Rip, Some(NonZeroUsize::new(4).unwrap())),
-            17 => (Eflags, Some(NonZeroUsize::new(8).unwrap())),
-            18..=23 => (
-                Segment(X86SegmentRegId::from_u8(id as u8 - 18)?),
-                Some(NonZeroUsize::new(4).unwrap()),
-            ),
-            24..=31 => (St(id as u8 - 24), Some(NonZeroUsize::new(10).unwrap())),
-            32..=39 => (
-                Fpu(X87FpuInternalRegId::from_u8(id as u8 - 32)?),
-                Some(NonZeroUsize::new(4).unwrap()),
-            ),
-            40..=55 => (Xmm(id as u8 - 40), Some(NonZeroUsize::new(16).unwrap())),
-            56 => (Mxcsr, Some(NonZeroUsize::new(4).unwrap())),
+        let (r, sz): (X86_64CoreRegId, usize) = match id {
+            0..=15 => (Gpr(id as u8), 8),
+            16 => (Rip, 4),
+            17 => (Eflags, 8),
+            18..=23 => (Segment(X86SegmentRegId::from_u8(id as u8 - 18)?), 4),
+            24..=31 => (St(id as u8 - 24), 10),
+            32..=39 => (Fpu(X87FpuInternalRegId::from_u8(id as u8 - 32)?), 4),
+            40..=55 => (Xmm(id as u8 - 40), 16),
+            56 => (Mxcsr, 4),
             _ => return None,
         };
-        Some(r)
+
+        Some((r, Some(NonZeroUsize::new(sz).unwrap())))
     }
 }
 
