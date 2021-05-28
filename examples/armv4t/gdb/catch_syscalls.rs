@@ -9,12 +9,20 @@ use crate::gdb::Emu;
 impl target::ext::catch_syscalls::CatchSyscalls for Emu {
     fn enable_catch_syscalls(
         &mut self,
-        _filter: Option<SyscallNumbers<u32>>,
+        filter: Option<SyscallNumbers<u32>>,
     ) -> target::TargetResult<(), Self> {
+        match filter {
+            Some(numbers) => eprintln!(
+                "Enabled catching syscalls: {:?}",
+                numbers.collect::<Vec<u32>>()
+            ),
+            None => eprintln!("Enabled catching all syscalls"),
+        }
         Ok(())
     }
 
     fn disable_catch_syscalls(&mut self) -> target::TargetResult<(), Self> {
+        eprintln!("Disabled catching syscalls");
         Ok(())
     }
 }
