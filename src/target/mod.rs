@@ -317,12 +317,6 @@ pub trait Target {
         None
     }
 
-    /// Set/Remove syscall catchpoints.
-    #[inline(always)]
-    fn catch_syscalls(&mut self) -> Option<ext::catch_syscalls::CatchSyscallsOps<Self>> {
-        None
-    }
-
     /// Handle custom GDB `monitor` commands.
     #[inline(always)]
     fn monitor_cmd(&mut self) -> Option<ext::monitor_cmd::MonitorCmdOps<Self>> {
@@ -353,6 +347,12 @@ pub trait Target {
     /// Provide a target memory map.
     #[inline(always)]
     fn memory_map(&mut self) -> Option<ext::memory_map::MemoryMapOps<Self>> {
+        None
+    }
+
+    /// Set/Remove syscall catchpoints.
+    #[inline(always)]
+    fn catch_syscalls(&mut self) -> Option<ext::catch_syscalls::CatchSyscallsOps<Self>> {
         None
     }
 }

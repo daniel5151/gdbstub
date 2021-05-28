@@ -1,33 +1,33 @@
 //! Enable or disable catching syscalls from the inferior process.
 
 use crate::arch::Arch;
-use crate::target::Target;
+use crate::target::{Target, TargetResult};
 
 /// Target Extension - Enable and disable catching syscalls from the inferior
 /// process.
 ///
-/// Corresponds GDB's [`QCatchSyscalls`](https://sourceware.org/gdb/current/onlinedocs/gdb/General-Query-Packets.html#QCatchSyscalls) command.
+/// Corresponds to GDB's [`QCatchSyscalls`](https://sourceware.org/gdb/current/onlinedocs/gdb/General-Query-Packets.html#QCatchSyscalls) command.
 pub trait CatchSyscalls: Target {
     /// Enables catching syscalls from the inferior process.
     ///
-    /// If `filter` not `None`, then only the syscalls listed in the filter
-    /// should be reported to GDB.
+    /// If `filter` is `None`, then all syscalls should be reported to GDB. If a
+    /// filter is provided, only the syscalls listed in the filter should be
+    /// reported to GDB.
     ///
     /// Note: filters are not combined, subsequent calls this method should
     /// replace any existing syscall filtering.
     fn enable_catch_syscalls(
         &mut self,
         filter: Option<SyscallNumbers<<Self::Arch as Arch>::Usize>>,
-    ) -> Result<(), Self::Error>;
+    ) -> TargetResult<(), Self>;
 
     /// Disables catching syscalls from the inferior process.
-    fn disable_catch_syscalls(&mut self) -> Result<(), Self::Error>;
+    fn disable_catch_syscalls(&mut self) -> TargetResult<(), Self>;
 }
 
 define_ext!(CatchSyscallsOps, CatchSyscalls);
 
-/// Describes why a catch syscall event was triggered for the corresponding stop
-/// reason.
+/// Describes where the syscall catchpoint was triggered at.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CatchSyscallPosition {
     /// Reached the entry location of the syscall.

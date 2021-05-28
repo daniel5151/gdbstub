@@ -3,7 +3,7 @@ use super::prelude::*;
 #[derive(Debug)]
 pub struct vRun<'a> {
     pub filename: Option<&'a [u8]>,
-    pub args: Args<'a>,
+    pub args: lists::ArgListHex<'a>,
 }
 
 impl<'a> ParseCommand<'a> for vRun<'a> {
@@ -21,7 +21,7 @@ impl<'a> ParseCommand<'a> for vRun<'a> {
 
         Some(vRun {
             filename,
-            args: Args::from_packet(args)?,
+            args: lists::ArgListHex::from_packet(args)?,
         })
     }
 }

@@ -3,7 +3,7 @@ use super::prelude::*;
 #[derive(Debug)]
 pub enum QCatchSyscalls<'a> {
     Disable,
-    Enable(Args<'a>),
+    Enable(lists::ArgListHex<'a>),
     EnableAll,
 }
 
@@ -13,9 +13,9 @@ impl<'a> ParseCommand<'a> for QCatchSyscalls<'a> {
 
         match body {
             [b':', b'0'] => Some(QCatchSyscalls::Disable),
-            [b':', b'1', b';', sysno @ ..] => {
-                Some(QCatchSyscalls::Enable(Args::from_packet(sysno)?))
-            }
+            [b':', b'1', b';', sysno @ ..] => Some(QCatchSyscalls::Enable(
+                lists::ArgListHex::from_packet(sysno)?,
+            )),
             [b':', b'1'] => Some(QCatchSyscalls::EnableAll),
             _ => None,
         }

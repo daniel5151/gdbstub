@@ -10,11 +10,11 @@ impl target::ext::catch_syscalls::CatchSyscalls for Emu {
     fn enable_catch_syscalls(
         &mut self,
         _filter: Option<SyscallNumbers<u32>>,
-    ) -> Result<(), Self::Error> {
+    ) -> target::TargetResult<(), Self> {
         Ok(())
     }
 
-    fn disable_catch_syscalls(&mut self) -> Result<(), Self::Error> {
+    fn disable_catch_syscalls(&mut self) -> target::TargetResult<(), Self> {
         Ok(())
     }
 }

@@ -22,20 +22,24 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         let handler_status = match command {
             CatchSyscalls::QCatchSyscalls(cmd) => {
                 match cmd {
-                    QCatchSyscalls::Disable => {
-                        ops.disable_catch_syscalls().map_err(Error::TargetError)?
-                    }
+                    QCatchSyscalls::Disable => ops.disable_catch_syscalls().handle_error()?,
                     QCatchSyscalls::Enable(sysno) => {
-                        // FIXME: report integer overflow instead of silently ignoring
+                        let mut error = false;
                         let mut filter = sysno
                             .into_iter()
-                            .filter_map(|x| <T::Arch as Arch>::Usize::from_be_bytes(x));
+                            .map(|x| <T::Arch as Arch>::Usize::from_be_bytes(x))
+                            .take_while(|x| {
+                                error = x.is_none();
+                                !error
+                            })
+                            .flatten();
                         ops.enable_catch_syscalls(Some(SyscallNumbers { inner: &mut filter }))
-                            .map_err(Error::TargetError)?
+                            .handle_error()?;
+                        if error {
+                            return Err(Error::TargetMismatch);
+                        }
                     }
-                    QCatchSyscalls::EnableAll => ops
-                        .enable_catch_syscalls(None)
-                        .map_err(Error::TargetError)?,
+                    QCatchSyscalls::EnableAll => ops.enable_catch_syscalls(None).handle_error()?,
                 }
                 HandlerStatus::NeedsOk
             }
