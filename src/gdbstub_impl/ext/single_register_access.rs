@@ -2,7 +2,7 @@ use super::prelude::*;
 use crate::protocol::commands::ext::SingleRegisterAccess;
 
 use crate::arch::{Arch, RegId};
-use crate::target::ext::base::BaseOps;
+use crate::target::ext::base::{BaseOps, SendRegisterOutput};
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     fn inner<Id>(
@@ -20,14 +20,19 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     Some(v) => v,
                 };
 
+                let mut err = Ok(());
+
                 // TODO: Limit the number of bytes transferred on the wire to the register size
                 // (if specified). Maybe pad the register if the callee does not
                 // send enough data?
-                let mut err = Ok(());
-                ops.read_register(id, reg_id, &mut |buf| match res.write_hex_buf(buf) {
-                    Ok(_) => {}
-                    Err(e) => err = Err(e),
-                })
+                ops.read_register(
+                    id,
+                    reg_id,
+                    SendRegisterOutput::new(&mut |buf| match res.write_hex_buf(buf) {
+                        Ok(_) => {}
+                        Err(e) => err = Err(e),
+                    }),
+                )
                 .handle_error()?;
 
                 err?;

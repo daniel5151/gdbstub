@@ -35,7 +35,7 @@ pub trait SingleRegisterAccess<Id>: Target {
         &mut self,
         tid: Id,
         reg_id: <Self::Arch as Arch>::RegId,
-        output: &mut dyn FnMut(&[u8]),
+        output: SendRegisterOutput<'_>,
     ) -> TargetResult<(), Self>;
 
     /// Write from a single register on the target.
@@ -65,3 +65,19 @@ pub trait SingleRegisterAccess<Id>: Target {
 /// See [`SingleRegisterAccess`]
 pub type SingleRegisterAccessOps<'a, Id, T> =
     &'a mut dyn SingleRegisterAccess<Id, Arch = <T as Target>::Arch, Error = <T as Target>::Error>;
+
+/// An interface to send register data to the GDB remote debugger.
+pub struct SendRegisterOutput<'a> {
+    inner: &'a mut dyn FnMut(&[u8]),
+}
+
+impl<'a> SendRegisterOutput<'a> {
+    pub(crate) fn new(inner: &'a mut dyn FnMut(&[u8])) -> Self {
+        Self { inner }
+    }
+
+    /// Write out raw register bytes to the GDB debugger.
+    pub fn write(&mut self, data: &[u8]) {
+        (self.inner)(data)
+    }
+}
