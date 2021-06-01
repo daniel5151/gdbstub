@@ -33,6 +33,6 @@ impl RegId for ArmCoreRegId {
             25 => Self::Cpsr,
             _ => return None,
         };
-        Some((reg, Some(NonZeroUsize::new(4).unwrap())))
+        Some((reg, Some(NonZeroUsize::new(4)?)))
     }
 }

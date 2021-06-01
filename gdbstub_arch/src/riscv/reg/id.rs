@@ -36,7 +36,7 @@ macro_rules! impl_riscv_reg_id {
                     _ => return None,
                 };
 
-                Some((id, Some(NonZeroUsize::new(size).unwrap())))
+                Some((id, Some(NonZeroUsize::new(size)?)))
             }
         }
     };

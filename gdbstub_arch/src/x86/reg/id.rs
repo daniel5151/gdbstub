@@ -139,7 +139,7 @@ impl RegId for X86CoreRegId {
             _ => return None,
         };
 
-        Some((r, Some(NonZeroUsize::new(sz).unwrap())))
+        Some((r, Some(NonZeroUsize::new(sz)?)))
     }
 }
 
@@ -185,7 +185,7 @@ impl RegId for X86_64CoreRegId {
             _ => return None,
         };
 
-        Some((r, Some(NonZeroUsize::new(sz).unwrap())))
+        Some((r, Some(NonZeroUsize::new(sz)?)))
     }
 }
 

@@ -65,13 +65,13 @@ fn from_raw_id<U>(id: usize) -> Option<(MipsRegId<U>, Option<NonZeroUsize>)> {
         76 => MipsRegId::Hi3,
         77 => MipsRegId::Lo3,
         // `MipsRegId::Dspctl` is the only register that will always be 4 bytes wide
-        78 => return Some((MipsRegId::Dspctl, Some(NonZeroUsize::new(4).unwrap()))),
+        78 => return Some((MipsRegId::Dspctl, Some(NonZeroUsize::new(4)?))),
         79 => MipsRegId::Restart,
         _ => return None,
     };
 
     let ptrsize = core::mem::size_of::<U>();
-    Some((reg, Some(NonZeroUsize::new(ptrsize).unwrap())))
+    Some((reg, Some(NonZeroUsize::new(ptrsize)?)))
 }
 
 impl RegId for MipsRegId<u32> {

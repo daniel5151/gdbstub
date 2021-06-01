@@ -31,7 +31,7 @@ impl RegId for Msp430RegId {
             4..=15 => Self::Gpr((id as u8) - 4),
             _ => return None,
         };
-        Some((reg, Some(NonZeroUsize::new(2).unwrap())))
+        Some((reg, Some(NonZeroUsize::new(2)?)))
     }
 }
 
