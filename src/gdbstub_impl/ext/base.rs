@@ -596,17 +596,17 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         target: &mut T,
         actions: crate::protocol::commands::_vCont::Actions,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
-        loop {
-            let stop_reason = match target.base_ops() {
-                BaseOps::SingleThread(ops) => Self::do_vcont_single_thread(ops, res, &actions)?,
-                BaseOps::MultiThread(ops) => Self::do_vcont_multi_thread(ops, res, &actions)?,
-            };
+        let stop_reason = match target.base_ops() {
+            BaseOps::SingleThread(ops) => Self::do_vcont_single_thread(ops, res, &actions)?,
+            BaseOps::MultiThread(ops) => Self::do_vcont_multi_thread(ops, res, &actions)?,
+        };
 
-            match self.finish_exec(res, target, stop_reason)? {
-                Some(status) => break Ok(status),
-                None => continue,
-            }
+        if matches!(stop_reason, ThreadStopReason::Defer) {
+            return Ok(HandlerStatus::DeferredStopReason);
         }
+
+        self.finish_exec(res, target, stop_reason)
+            .map(|x| x.into_handler_status())
     }
 
     fn write_break_common(
@@ -629,12 +629,12 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         Ok(())
     }
 
-    pub(super) fn finish_exec(
+    pub(crate) fn finish_exec(
         &mut self,
         res: &mut ResponseWriter<C>,
         target: &mut T,
         stop_reason: ThreadStopReason<<T::Arch as Arch>::Usize>,
-    ) -> Result<Option<HandlerStatus>, Error<T::Error, C::Error>> {
+    ) -> Result<FinishExecStatus, Error<T::Error, C::Error>> {
         macro_rules! guard_reverse_exec {
             () => {{
                 let (reverse_cont, reverse_step) = match target.base_ops() {
@@ -666,36 +666,36 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         let status = match stop_reason {
             ThreadStopReason::DoneStep | ThreadStopReason::GdbInterrupt => {
                 res.write_str("S05")?;
-                HandlerStatus::Handled
+                FinishExecStatus::Handled
             }
             ThreadStopReason::Signal(sig) => {
                 res.write_str("S")?;
                 res.write_num(sig)?;
-                HandlerStatus::Handled
+                FinishExecStatus::Handled
             }
             ThreadStopReason::Exited(code) => {
                 res.write_str("W")?;
                 res.write_num(code)?;
-                HandlerStatus::Disconnect(DisconnectReason::TargetExited(code))
+                FinishExecStatus::Disconnect(DisconnectReason::TargetExited(code))
             }
             ThreadStopReason::Terminated(sig) => {
                 res.write_str("X")?;
                 res.write_num(sig)?;
-                HandlerStatus::Disconnect(DisconnectReason::TargetTerminated(sig))
+                FinishExecStatus::Disconnect(DisconnectReason::TargetTerminated(sig))
             }
             ThreadStopReason::SwBreak(tid) if guard_break!(sw_breakpoint) => {
                 crate::__dead_code_marker!("sw_breakpoint", "stop_reason");
 
                 self.write_break_common(res, tid)?;
                 res.write_str("swbreak:;")?;
-                HandlerStatus::Handled
+                FinishExecStatus::Handled
             }
             ThreadStopReason::HwBreak(tid) if guard_break!(hw_breakpoint) => {
                 crate::__dead_code_marker!("hw_breakpoint", "stop_reason");
 
                 self.write_break_common(res, tid)?;
                 res.write_str("hwbreak:;")?;
-                HandlerStatus::Handled
+                FinishExecStatus::Handled
             }
             ThreadStopReason::Watch { tid, kind, addr } if guard_break!(hw_watchpoint) => {
                 crate::__dead_code_marker!("hw_watchpoint", "stop_reason");
@@ -710,7 +710,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 }
                 res.write_num(addr)?;
                 res.write_str(";")?;
-                HandlerStatus::Handled
+                FinishExecStatus::Handled
             }
             ThreadStopReason::ReplayLog(pos) if guard_reverse_exec!() => {
                 crate::__dead_code_marker!("reverse_exec", "stop_reason");
@@ -724,7 +724,16 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 })?;
                 res.write_str(";")?;
 
-                HandlerStatus::Handled
+                FinishExecStatus::Handled
+            }
+            ThreadStopReason::Defer => return Err(Error::CannotDeferDefer),
+            // Explicitly avoid using `_ =>` to handle the "unguarded" variants, as doing so would
+            // squelch the useful compiler error that crops up whenever stop reasons are added.
+            ThreadStopReason::SwBreak(_)
+            | ThreadStopReason::HwBreak(_)
+            | ThreadStopReason::Watch { .. }
+            | ThreadStopReason::ReplayLog(_) => {
+                return Err(Error::UnsupportedStopReason);
             }
             ThreadStopReason::CatchSyscall { number, position } if guard_catch_syscall!() => {
                 crate::__dead_code_marker!("catch_syscall", "stop_reason");
@@ -739,12 +748,26 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 res.write_num(number)?;
                 res.write_str(";")?;
 
-                HandlerStatus::Handled
+                FinishExecStatus::Handled
             }
             _ => return Err(Error::UnsupportedStopReason),
         };
 
-        Ok(Some(status))
+        Ok(status)
+    }
+}
+
+pub(crate) enum FinishExecStatus {
+    Handled,
+    Disconnect(DisconnectReason),
+}
+
+impl FinishExecStatus {
+    pub(super) fn into_handler_status(self) -> HandlerStatus {
+        match self {
+            FinishExecStatus::Disconnect(status) => HandlerStatus::Disconnect(status),
+            FinishExecStatus::Handled => HandlerStatus::Handled,
+        }
     }
 }
 
@@ -768,6 +791,7 @@ impl<U> From<StopReason<U>> for ThreadStopReason<U> {
             StopReason::CatchSyscall { number, position } => {
                 ThreadStopReason::CatchSyscall { number, position }
             }
+            StopReason::Defer => ThreadStopReason::Defer,
         }
     }
 }

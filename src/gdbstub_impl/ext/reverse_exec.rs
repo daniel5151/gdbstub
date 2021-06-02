@@ -65,9 +65,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                 err?;
 
-                // FIXME: properly handle None case
                 self.finish_exec(res, target, stop_reason)?
-                    .ok_or(Error::PacketUnexpected)?
+                    .into_handler_status()
             }
         };
 
@@ -128,9 +127,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                 err?;
 
-                // FIXME: properly handle None case
                 self.finish_exec(res, target, stop_reason)?
-                    .ok_or(Error::PacketUnexpected)?
+                    .into_handler_status()
             }
         };
 

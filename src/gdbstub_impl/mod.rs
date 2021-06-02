@@ -4,7 +4,6 @@ use managed::ManagedSlice;
 
 use crate::common::*;
 use crate::connection::Connection;
-use crate::protocol::recv_packet::{RecvPacketBlocking, RecvPacketStateMachine};
 use crate::protocol::{commands::Command, Packet, ResponseWriter, SpecificIdKind};
 use crate::target::Target;
 use crate::SINGLE_THREAD_TID;
@@ -64,63 +63,187 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
     /// Returns once the GDB client closes the debugging session, or if the
     /// target halts.
     pub fn run(&mut self, target: &mut T) -> Result<DisconnectReason, Error<T::Error, C::Error>> {
-        self.state
-            .run(target, &mut self.conn, &mut self.packet_buffer)
-    }
-
-    /// Starts a GDB remote debugging session, and convert this instance of
-    /// `GdbStub` into a [`GdbStubStateMachine`].
-    ///
-    /// Note: This method will invoke `Connection::on_session_start`, and
-    /// as such may return a connection error.
-    pub fn run_state_machine(
-        mut self,
-    ) -> Result<GdbStubStateMachine<'a, T, C>, Error<T::Error, C::Error>> {
         self.conn
             .on_session_start()
             .map_err(Error::ConnectionRead)?;
 
-        Ok(GdbStubStateMachine {
-            conn: self.conn,
-            packet_buffer: self.packet_buffer,
-            recv_packet: RecvPacketStateMachine::new(),
-            state: self.state,
-        })
+        loop {
+            use crate::protocol::recv_packet::{RecvPacketBlocking, RecvPacketError};
+
+            let Self {
+                conn,
+                packet_buffer,
+                ..
+            } = self;
+
+            let buf = match RecvPacketBlocking::new().recv(packet_buffer, || conn.read()) {
+                Err(RecvPacketError::Capacity) => return Err(Error::PacketBufferOverflow),
+                Err(RecvPacketError::Connection(e)) => return Err(Error::ConnectionWrite(e)),
+                Ok(buf) => buf,
+            };
+
+            let packet = Packet::from_buf(target, buf).map_err(Error::PacketParse)?;
+            match self.state.handle_packet(target, &mut self.conn, packet)? {
+                state_machine::State::Pump(_) => {}
+                state_machine::State::Disconnect(reason, _) => return Ok(reason),
+                state_machine::State::DeferredStopReason(_) => {
+                    return Err(Error::CannotReturnDefer)
+                }
+            }
+        }
     }
-}
 
-/// A variant of [`GdbStub`] which parses incoming packets using an asynchronous
-/// state machine.
-///
-/// TODO: more docs
-pub struct GdbStubStateMachine<'a, T: Target, C: Connection> {
-    conn: C,
-    packet_buffer: ManagedSlice<'a, u8>,
-    recv_packet: RecvPacketStateMachine,
-    state: GdbStubImpl<T, C>,
-}
-
-impl<'a, T: Target, C: Connection> GdbStubStateMachine<'a, T, C> {
-    /// Pass a byte to the `gdbstub` packet parser.
+    /// Starts a GDB remote debugging session, and convert this instance of
+    /// `GdbStub` into a [`GdbStubStateMachine`] that is ready to receive data.
     ///
-    /// Returns a `Some(DisconnectReason)` if the GDB client
-    pub fn pump(
-        &mut self,
-        target: &mut T,
-        byte: u8,
-    ) -> Result<Option<DisconnectReason>, Error<T::Error, C::Error>> {
-        let packet_buffer = match self.recv_packet.pump(&mut self.packet_buffer, byte)? {
-            Some(buf) => buf,
-            None => return Ok(None),
-        };
+    /// Note: This method will invoke `Connection::on_session_start`, and
+    /// as such may return a connection error.
+    #[allow(clippy::type_complexity)]
+    pub fn run_state_machine(
+        mut self,
+    ) -> Result<
+        (
+            state_machine::GdbStubStateMachine<'a, T, C>,
+            state_machine::State,
+        ),
+        Error<T::Error, C::Error>,
+    > {
+        self.conn
+            .on_session_start()
+            .map_err(Error::ConnectionRead)?;
 
-        let packet = Packet::from_buf(target, packet_buffer).map_err(Error::PacketParse)?;
-        self.state.handle_packet(target, &mut self.conn, packet)
+        Ok((
+            state_machine::GdbStubStateMachine::from_plain_gdbstub(self),
+            state_machine::State::pump(),
+        ))
+    }
+}
+
+/// More complex state-machine based interface to `GdbStub`, enabling deferred
+/// stop reason reporting and incremental packet processing.
+pub mod state_machine {
+    use super::*;
+
+    use crate::protocol::recv_packet::RecvPacketStateMachine;
+
+    /// Zero-sized typestate tokens representing various GDB RSP states.
+    pub mod state {
+        use super::State;
+
+        /// ZST typestate token representing the "DeferredStopReason" state.
+        #[non_exhaustive]
+        pub struct DeferredStopReason {}
+
+        /// ZST typestate token representing the "Pump" state.
+        #[non_exhaustive]
+        pub struct Pump {}
+
+        impl Pump {
+            /// Shortcut to construct a [`State::Pump`] from a `Pump` token.
+            pub fn into_state(self) -> State {
+                State::Pump(self)
+            }
+        }
     }
 
-    /// Return a mutable reference to the underlying connection.
-    pub fn borrow_conn(&mut self) -> &mut C {
-        &mut self.conn
+    /// Possible GDB RSP states when running in state machine mode.
+    pub enum State {
+        /// GDB stub required additional data.
+        Pump(state::Pump),
+        /// Target has triggered a disconnect.
+        ///
+        /// Note that a disconnect will _not_ immediately terminate a GDB
+        /// session, and it may still be possible to conduct "post mortem"
+        /// debugging over the existing debugging session. As such, this state
+        /// includes access to a `state::Pump` token, which can be used to
+        /// re-enter the gdbstub loop.
+        Disconnect(DisconnectReason, state::Pump),
+        /// Target must report a stop reason.
+        DeferredStopReason(state::DeferredStopReason),
+    }
+
+    impl State {
+        pub(crate) fn pump() -> State {
+            State::Pump(state::Pump {})
+        }
+
+        pub(crate) fn disconnect(reason: DisconnectReason) -> State {
+            State::Disconnect(reason, state::Pump {})
+        }
+
+        pub(crate) fn deferred_stop_reason() -> State {
+            State::DeferredStopReason(state::DeferredStopReason {})
+        }
+    }
+
+    /// A variant of [`GdbStub`] which parses incoming packets using an
+    /// asynchronous state machine.
+    ///
+    /// TODO: more docs. also discuss the typestate token API...
+    ///
+    /// TODO: add docs to top-level `lib.rs` that point folks at this API.
+    pub struct GdbStubStateMachine<'a, T: Target, C: Connection> {
+        conn: C,
+        packet_buffer: ManagedSlice<'a, u8>,
+        recv_packet: RecvPacketStateMachine,
+        state: GdbStubImpl<T, C>,
+    }
+
+    impl<'a, T: Target, C: Connection> GdbStubStateMachine<'a, T, C> {
+        pub(crate) fn from_plain_gdbstub(stub: GdbStub<'a, T, C>) -> GdbStubStateMachine<'a, T, C> {
+            GdbStubStateMachine {
+                conn: stub.conn,
+                packet_buffer: stub.packet_buffer,
+                recv_packet: RecvPacketStateMachine::new(),
+                state: stub.state,
+            }
+        }
+
+        /// Pass a byte to the `gdbstub` packet parser.
+        pub fn pump(
+            &mut self,
+            state_token: state::Pump,
+            target: &mut T,
+            byte: u8,
+        ) -> Result<State, Error<T::Error, C::Error>> {
+            let _ = state_token;
+
+            let packet_buffer = match self.recv_packet.pump(&mut self.packet_buffer, byte)? {
+                Some(buf) => buf,
+                None => return Ok(State::pump()),
+            };
+
+            let packet = Packet::from_buf(target, packet_buffer).map_err(Error::PacketParse)?;
+            self.state.handle_packet(target, &mut self.conn, packet)
+        }
+
+        /// Report a deferred target stop reason back to GDB.
+        pub fn deferred_stop_reason(
+            &mut self,
+            state_token: state::DeferredStopReason,
+            target: &mut T,
+            reason: crate::target::ext::base::multithread::ThreadStopReason<
+                <T::Arch as crate::arch::Arch>::Usize,
+            >,
+        ) -> Result<State, Error<T::Error, C::Error>> {
+            let _ = state_token;
+
+            let state = match self.state.finish_exec(
+                &mut ResponseWriter::new(&mut self.conn),
+                target,
+                reason,
+            )? {
+                ext::FinishExecStatus::Handled => State::pump(),
+                ext::FinishExecStatus::Disconnect(reason) => State::disconnect(reason),
+            };
+
+            Ok(state)
+        }
+
+        /// Return a mutable reference to the underlying connection.
+        pub fn borrow_conn(&mut self) -> &mut C {
+            &mut self.conn
+        }
     }
 }
 
@@ -136,6 +259,7 @@ struct GdbStubImpl<T: Target, C: Connection> {
 enum HandlerStatus {
     Handled,
     NeedsOk,
+    DeferredStopReason,
     Disconnect(DisconnectReason),
 }
 
@@ -159,36 +283,12 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         }
     }
 
-    fn run(
-        &mut self,
-        target: &mut T,
-        conn: &mut C,
-        packet_buffer: &mut ManagedSlice<u8>,
-    ) -> Result<DisconnectReason, Error<T::Error, C::Error>> {
-        conn.on_session_start().map_err(Error::ConnectionRead)?;
-
-        loop {
-            use crate::protocol::recv_packet::RecvPacketError;
-            let packet_buffer = match RecvPacketBlocking::new().recv(packet_buffer, || conn.read())
-            {
-                Err(RecvPacketError::Capacity) => return Err(Error::PacketBufferOverflow),
-                Err(RecvPacketError::Connection(e)) => return Err(Error::ConnectionWrite(e)),
-                Ok(buf) => buf,
-            };
-
-            let packet = Packet::from_buf(target, packet_buffer).map_err(Error::PacketParse)?;
-            if let Some(disconnect_reason) = self.handle_packet(target, conn, packet)? {
-                return Ok(disconnect_reason);
-            }
-        }
-    }
-
     fn handle_packet(
         &mut self,
         target: &mut T,
         conn: &mut C,
         packet: Packet<'_>,
-    ) -> Result<Option<DisconnectReason>, Error<T::Error, C::Error>> {
+    ) -> Result<state_machine::State, Error<T::Error, C::Error>> {
         match packet {
             Packet::Ack => {}
             Packet::Nack => return Err(Error::ClientSentNack),
@@ -210,6 +310,9 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     Ok(HandlerStatus::NeedsOk) => {
                         res.write_str("OK")?;
                         None
+                    }
+                    Ok(HandlerStatus::DeferredStopReason) => {
+                        return Ok(state_machine::State::deferred_stop_reason())
                     }
                     Ok(HandlerStatus::Disconnect(reason)) => Some(reason),
                     // HACK: handling this "dummy" error is required as part of the
@@ -239,11 +342,16 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     res.flush()?;
                 }
 
-                return Ok(disconnect_reason);
+                let state = match disconnect_reason {
+                    Some(reason) => state_machine::State::disconnect(reason),
+                    None => state_machine::State::pump(),
+                };
+
+                return Ok(state);
             }
         };
 
-        Ok(None)
+        Ok(state_machine::State::pump())
     }
 
     fn handle_command(

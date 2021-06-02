@@ -337,4 +337,15 @@ pub enum ThreadStopReason<U> {
         /// The location the event occured at.
         position: CatchSyscallPosition,
     },
+    /// The target has been resumed, and will report a stop reason at some later
+    /// point.
+    ///
+    /// Requires: Using the
+    /// [`GdbStubStateMachine`](crate::state_machine::GdbStubStateMachine) API.
+    ///
+    /// Returning this stop reason will immediately yield control back to
+    /// `gdbstub`'s callee, while the target continues to run in the background.
+    ///
+    /// TODO: more docs
+    Defer,
 }
