@@ -33,7 +33,7 @@ pub trait RegId: Sized + Debug {
     ///
     /// If the register size is specified here, gdbstub will include a runtime
     /// check that ensures target implementations do not send back more
-    /// bytes than the register allows
+    /// bytes than the register allows.
     ///
     /// Returns `None` if the register is not available.
     fn from_raw_id(id: usize) -> Option<(Self, Option<NonZeroUsize>)>;

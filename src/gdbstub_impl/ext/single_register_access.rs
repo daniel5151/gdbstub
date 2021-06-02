@@ -33,7 +33,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                             // error out and stop sending data.
                             if let Some(size) = reg_size {
                                 n += buf.len();
-                                
+
                                 if n > size.get() {
                                     err = Err(Error::TargetMismatch);
                                     return;
