@@ -31,8 +31,9 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                             // If the register has a known size and read_register attempts
                             // to send more bytes than are present in the register,
                             // error out and stop sending data.
-                            n += buf.len();
                             if let Some(size) = reg_size {
+                                n += buf.len();
+                                
                                 if n > size.get() {
                                     err = Err(Error::TargetMismatch);
                                     return;
