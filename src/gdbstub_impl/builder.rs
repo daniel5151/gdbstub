@@ -105,7 +105,7 @@ impl<'a, T: Target, C: Connection> GdbStubBuilder<'a, T, C> {
         Ok(GdbStub {
             conn: self.conn,
             packet_buffer,
-            state: GdbStubImpl::new(),
+            inner: GdbStubImpl::new(),
         })
     }
 }

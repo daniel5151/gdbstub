@@ -257,6 +257,8 @@ pub enum StopReason<U> {
     /// Returning this stop reason will immediately yield control back to
     /// `gdbstub`'s callee, while the target continues to run in the background.
     ///
-    /// TODO: more docs
+    /// In the next breaking version of `gdbstub` (0.6), this variant will be
+    /// removed, and the signature of `resume` will be updated to return a
+    /// `Option<StopReason>` instead.
     Defer,
 }

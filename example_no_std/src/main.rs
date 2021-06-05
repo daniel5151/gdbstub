@@ -3,6 +3,7 @@
 
 extern crate libc;
 
+use gdbstub::state_machine::GdbStubStateMachine;
 use gdbstub::{Connection, DisconnectReason, GdbStubBuilder, GdbStubError};
 
 mod conn;
@@ -38,16 +39,23 @@ fn rust_main() -> Result<(), i32> {
 
     print_str("Starting GDB session...");
 
-    let (mut gdb, mut state) = gdb.run_state_machine().map_err(|_| 1)?;
+    let mut gdb = gdb.run_state_machine().map_err(|_| 1)?;
 
     loop {
-        use gdbstub::state_machine::State;
-
-        state = match state {
-            State::Pump(token) => {
+        gdb = match gdb {
+            GdbStubStateMachine::Pump(mut gdb) => {
                 let byte = gdb.borrow_conn().read().map_err(|_| 1)?;
-                match gdb.pump(token, &mut target, byte) {
-                    Ok(next_state) => next_state,
+                match gdb.pump(&mut target, byte) {
+                    Ok((_, Some(disconnect_reason))) => {
+                        match disconnect_reason {
+                            DisconnectReason::Disconnect => print_str("GDB Disconnected"),
+                            DisconnectReason::TargetExited(_) => print_str("Target exited"),
+                            DisconnectReason::TargetTerminated(_) => print_str("Target halted"),
+                            DisconnectReason::Kill => print_str("GDB sent a kill command"),
+                        }
+                        break;
+                    }
+                    Ok((gdb, None)) => gdb,
                     Err(GdbStubError::TargetError(_e)) => {
                         print_str("Target raised a fatal error");
                         break;
@@ -58,20 +66,9 @@ fn rust_main() -> Result<(), i32> {
                     }
                 }
             }
-            State::Disconnect(disconnect_reason, token) => {
-                match disconnect_reason {
-                    DisconnectReason::Disconnect => {
-                        print_str("GDB Disconnected");
-                        break;
-                    }
-                    DisconnectReason::TargetExited(_) => print_str("Target exited"),
-                    DisconnectReason::TargetTerminated(_) => print_str("Target halted"),
-                    DisconnectReason::Kill => print_str("GDB sent a kill command"),
-                };
-                token.into_state()
-            }
+
             // example_no_std stubs out resume, so this will never happen
-            State::DeferredStopReason(_) => return Err(-1),
+            GdbStubStateMachine::DeferredStopReason(_) => return Err(-1),
         }
     }
 

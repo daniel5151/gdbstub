@@ -36,7 +36,7 @@ pub enum DisconnectReason {
 pub struct GdbStub<'a, T: Target, C: Connection> {
     conn: C,
     packet_buffer: ManagedSlice<'a, u8>,
-    state: GdbStubImpl<T, C>,
+    inner: GdbStubImpl<T, C>,
 }
 
 impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
@@ -83,168 +83,202 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
             };
 
             let packet = Packet::from_buf(target, buf).map_err(Error::PacketParse)?;
-            match self.state.handle_packet(target, &mut self.conn, packet)? {
-                state_machine::State::Pump(_) => {}
-                state_machine::State::Disconnect(reason, _) => return Ok(reason),
-                state_machine::State::DeferredStopReason(_) => {
-                    return Err(Error::CannotReturnDefer)
-                }
+            match self.inner.handle_packet(target, &mut self.conn, packet)? {
+                State::Pump => {}
+                State::Disconnect(reason) => return Ok(reason),
+                State::DeferredStopReason => return Err(Error::CannotReturnDefer),
             }
         }
     }
 
     /// Starts a GDB remote debugging session, and convert this instance of
-    /// `GdbStub` into a [`GdbStubStateMachine`] that is ready to receive data.
+    /// `GdbStub` into a
+    /// [`GdbStubStateMachine`](state_machine::GdbStubStateMachine) that is
+    /// ready to receive data.
     ///
     /// Note: This method will invoke `Connection::on_session_start`, and
     /// as such may return a connection error.
     #[allow(clippy::type_complexity)]
     pub fn run_state_machine(
         mut self,
-    ) -> Result<
-        (
-            state_machine::GdbStubStateMachine<'a, T, C>,
-            state_machine::State,
-        ),
-        Error<T::Error, C::Error>,
-    > {
+    ) -> Result<state_machine::GdbStubStateMachine<'a, T, C>, Error<T::Error, C::Error>> {
         self.conn
             .on_session_start()
             .map_err(Error::ConnectionRead)?;
 
-        Ok((
-            state_machine::GdbStubStateMachine::from_plain_gdbstub(self),
-            state_machine::State::pump(),
-        ))
+        Ok(state_machine::GdbStubStateMachineInner::from_plain_gdbstub(self).into())
     }
 }
 
-/// More complex state-machine based interface to `GdbStub`, enabling deferred
-/// stop reason reporting and incremental packet processing.
+/// More complex state-machine based interface to `GdbStub` which supports
+/// deferred stop reason reporting and incremental packet processing.
+///
+/// TODO: more docs. also discuss the typestate token API...
+///
+/// TODO: add docs to top-level `lib.rs` that point folks at this API.
+#[allow(clippy::type_complexity)]
 pub mod state_machine {
     use super::*;
 
     use crate::protocol::recv_packet::RecvPacketStateMachine;
 
-    /// Zero-sized typestate tokens representing various GDB RSP states.
+    /// Wrapper around [`GdbStubStateMachineInner`] which encapsulates all
+    /// possible state machine variants.
+    pub enum GdbStubStateMachine<'a, T, C>
+    where
+        T: Target,
+        C: Connection,
+    {
+        /// Stub is waiting for target to report a stop reason
+        DeferredStopReason(GdbStubStateMachineInner<'a, state::DeferredStopReason, T, C>),
+        /// Stub is waiting for additional input
+        Pump(GdbStubStateMachineInner<'a, state::Pump, T, C>),
+    }
+
+    /// Zero-sized typestates.
+    ///
+    /// The types in this module are used to parameterize instances of
+    /// `GdbStubStateMachineInner`, thereby enforcing that certain API methods
+    /// can only be called while the stub is in a certain state.
     pub mod state {
-        use super::State;
+        /// ZST typestate corresponding to the "DeferredStopReason" state.
+        pub enum DeferredStopReason {}
 
-        /// ZST typestate token representing the "DeferredStopReason" state.
-        #[non_exhaustive]
-        pub struct DeferredStopReason {}
+        /// ZST typestate corresponding to the "Pump" state.
+        pub enum Pump {}
+    }
 
-        /// ZST typestate token representing the "Pump" state.
-        #[non_exhaustive]
-        pub struct Pump {}
+    /// Internal helper macro to convert between a particular inner state into
+    /// its corresponding `GdbStubStateMachine` variant.
+    macro_rules! impl_from_inner {
+        ($state:ident) => {
+            impl<'a, T, C> From<GdbStubStateMachineInner<'a, state::$state, T, C>>
+                for GdbStubStateMachine<'a, T, C>
+            where
+                T: Target,
+                C: Connection,
+            {
+                fn from(inner: GdbStubStateMachineInner<'a, state::$state, T, C>) -> Self {
+                    GdbStubStateMachine::$state(inner)
+                }
+            }
+        };
+    }
 
-        impl Pump {
-            /// Shortcut to construct a [`State::Pump`] from a `Pump` token.
-            pub fn into_state(self) -> State {
-                State::Pump(self)
+    impl_from_inner!(Pump);
+    impl_from_inner!(DeferredStopReason);
+
+    /// Internal helper trait to cut down on boilerplate required to transition
+    /// between states.
+    trait Transition<'a, T, C>
+    where
+        T: Target,
+        C: Connection,
+    {
+        fn transition<S>(self) -> GdbStubStateMachineInner<'a, S, T, C>;
+    }
+
+    impl<'a, S1, T, C> Transition<'a, T, C> for GdbStubStateMachineInner<'a, S1, T, C>
+    where
+        T: Target,
+        C: Connection,
+    {
+        #[inline(always)]
+        fn transition<S>(self) -> GdbStubStateMachineInner<'a, S, T, C> {
+            GdbStubStateMachineInner {
+                conn: self.conn,
+                packet_buffer: self.packet_buffer,
+                recv_packet: self.recv_packet,
+                inner: self.inner,
+                _state: PhantomData,
             }
         }
     }
 
-    /// Possible GDB RSP states when running in state machine mode.
-    pub enum State {
-        /// GDB stub required additional data.
-        Pump(state::Pump),
-        /// Target has triggered a disconnect.
-        ///
-        /// Note that a disconnect will _not_ immediately terminate a GDB
-        /// session, and it may still be possible to conduct "post mortem"
-        /// debugging over the existing debugging session. As such, this state
-        /// includes access to a `state::Pump` token, which can be used to
-        /// re-enter the gdbstub loop.
-        Disconnect(DisconnectReason, state::Pump),
-        /// Target must report a stop reason.
-        DeferredStopReason(state::DeferredStopReason),
-    }
-
-    impl State {
-        pub(crate) fn pump() -> State {
-            State::Pump(state::Pump {})
-        }
-
-        pub(crate) fn disconnect(reason: DisconnectReason) -> State {
-            State::Disconnect(reason, state::Pump {})
-        }
-
-        pub(crate) fn deferred_stop_reason() -> State {
-            State::DeferredStopReason(state::DeferredStopReason {})
-        }
-    }
-
-    /// A variant of [`GdbStub`] which parses incoming packets using an
-    /// asynchronous state machine.
-    ///
-    /// TODO: more docs. also discuss the typestate token API...
-    ///
-    /// TODO: add docs to top-level `lib.rs` that point folks at this API.
-    pub struct GdbStubStateMachine<'a, T: Target, C: Connection> {
+    /// Core state machine implementation which is parameterized by various
+    /// [states](state).
+    pub struct GdbStubStateMachineInner<'a, S, T: Target, C: Connection> {
         conn: C,
         packet_buffer: ManagedSlice<'a, u8>,
         recv_packet: RecvPacketStateMachine,
-        state: GdbStubImpl<T, C>,
+        inner: GdbStubImpl<T, C>,
+        _state: PhantomData<S>,
     }
 
-    impl<'a, T: Target, C: Connection> GdbStubStateMachine<'a, T, C> {
-        pub(crate) fn from_plain_gdbstub(stub: GdbStub<'a, T, C>) -> GdbStubStateMachine<'a, T, C> {
-            GdbStubStateMachine {
-                conn: stub.conn,
-                packet_buffer: stub.packet_buffer,
-                recv_packet: RecvPacketStateMachine::new(),
-                state: stub.state,
-            }
-        }
-
-        /// Pass a byte to the `gdbstub` packet parser.
-        pub fn pump(
-            &mut self,
-            state_token: state::Pump,
-            target: &mut T,
-            byte: u8,
-        ) -> Result<State, Error<T::Error, C::Error>> {
-            let _ = state_token;
-
-            let packet_buffer = match self.recv_packet.pump(&mut self.packet_buffer, byte)? {
-                Some(buf) => buf,
-                None => return Ok(State::pump()),
-            };
-
-            let packet = Packet::from_buf(target, packet_buffer).map_err(Error::PacketParse)?;
-            self.state.handle_packet(target, &mut self.conn, packet)
-        }
-
-        /// Report a deferred target stop reason back to GDB.
-        pub fn deferred_stop_reason(
-            &mut self,
-            state_token: state::DeferredStopReason,
-            target: &mut T,
-            reason: crate::target::ext::base::multithread::ThreadStopReason<
-                <T::Arch as crate::arch::Arch>::Usize,
-            >,
-        ) -> Result<State, Error<T::Error, C::Error>> {
-            let _ = state_token;
-
-            let state = match self.state.finish_exec(
-                &mut ResponseWriter::new(&mut self.conn),
-                target,
-                reason,
-            )? {
-                ext::FinishExecStatus::Handled => State::pump(),
-                ext::FinishExecStatus::Disconnect(reason) => State::disconnect(reason),
-            };
-
-            Ok(state)
-        }
-
+    /// Methods which can be called regardless of the current state.
+    impl<'a, S, T: Target, C: Connection> GdbStubStateMachineInner<'a, S, T, C> {
         /// Return a mutable reference to the underlying connection.
         pub fn borrow_conn(&mut self) -> &mut C {
             &mut self.conn
         }
     }
+
+    impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::Pump, T, C> {
+        pub(crate) fn from_plain_gdbstub(
+            stub: GdbStub<'a, T, C>,
+        ) -> GdbStubStateMachineInner<'a, state::Pump, T, C> {
+            GdbStubStateMachineInner {
+                conn: stub.conn,
+                packet_buffer: stub.packet_buffer,
+                recv_packet: RecvPacketStateMachine::new(),
+                inner: stub.inner,
+                _state: PhantomData,
+            }
+        }
+
+        /// Pass a byte to the GDB stub.
+        pub fn pump(
+            mut self,
+            target: &mut T,
+            byte: u8,
+        ) -> Result<
+            (GdbStubStateMachine<'a, T, C>, Option<DisconnectReason>),
+            Error<T::Error, C::Error>,
+        > {
+            let packet_buffer = match self.recv_packet.pump(&mut self.packet_buffer, byte)? {
+                Some(buf) => buf,
+                None => return Ok((self.into(), None)),
+            };
+
+            let packet = Packet::from_buf(target, packet_buffer).map_err(Error::PacketParse)?;
+            let state = self.inner.handle_packet(target, &mut self.conn, packet)?;
+            match state {
+                State::Pump => Ok((self.into(), None)),
+                State::Disconnect(reason) => Ok((self.into(), Some(reason))),
+                State::DeferredStopReason => {
+                    Ok((self.transition::<state::DeferredStopReason>().into(), None))
+                }
+            }
+        }
+    }
+
+    impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::DeferredStopReason, T, C> {
+        /// Report a deferred target stop reason back to GDB.
+        pub fn deferred_stop_reason(
+            mut self,
+            target: &mut T,
+            reason: crate::target::ext::base::multithread::ThreadStopReason<
+                <T::Arch as crate::arch::Arch>::Usize,
+            >,
+        ) -> Result<
+            (GdbStubStateMachine<'a, T, C>, Option<DisconnectReason>),
+            Error<T::Error, C::Error>,
+        > {
+            let mut res = ResponseWriter::new(&mut self.conn);
+            let event = match self.inner.finish_exec(&mut res, target, reason)? {
+                ext::FinishExecStatus::Handled => None,
+                ext::FinishExecStatus::Disconnect(reason) => Some(reason),
+            };
+
+            Ok((self.transition::<state::Pump>().into(), event))
+        }
+    }
+}
+
+enum State {
+    Pump,
+    DeferredStopReason,
+    Disconnect(DisconnectReason),
 }
 
 struct GdbStubImpl<T: Target, C: Connection> {
@@ -288,15 +322,16 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         target: &mut T,
         conn: &mut C,
         packet: Packet<'_>,
-    ) -> Result<state_machine::State, Error<T::Error, C::Error>> {
+    ) -> Result<State, Error<T::Error, C::Error>> {
         match packet {
-            Packet::Ack => {}
-            Packet::Nack => return Err(Error::ClientSentNack),
+            Packet::Ack => Ok(State::Pump),
+            Packet::Nack => Err(Error::ClientSentNack),
             Packet::Interrupt => {
                 debug!("<-- interrupt packet");
                 let mut res = ResponseWriter::new(conn);
                 res.write_str("S05")?;
                 res.flush()?;
+                Ok(State::Pump)
             }
             Packet::Command(command) => {
                 // Acknowledge the command
@@ -311,9 +346,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         res.write_str("OK")?;
                         None
                     }
-                    Ok(HandlerStatus::DeferredStopReason) => {
-                        return Ok(state_machine::State::deferred_stop_reason())
-                    }
+                    Ok(HandlerStatus::DeferredStopReason) => return Ok(State::DeferredStopReason),
                     Ok(HandlerStatus::Disconnect(reason)) => Some(reason),
                     // HACK: handling this "dummy" error is required as part of the
                     // `TargetResultExt::handle_error()` machinery.
@@ -343,15 +376,13 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 }
 
                 let state = match disconnect_reason {
-                    Some(reason) => state_machine::State::disconnect(reason),
-                    None => state_machine::State::pump(),
+                    Some(reason) => State::Disconnect(reason),
+                    None => State::Pump,
                 };
 
-                return Ok(state);
+                Ok(state)
             }
-        };
-
-        Ok(state_machine::State::pump())
+        }
     }
 
     fn handle_command(
