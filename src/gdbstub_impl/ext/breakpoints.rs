@@ -18,57 +18,60 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
         let addr =
             <T::Arch as Arch>::Usize::from_be_bytes(cmd.addr).ok_or(Error::TargetMismatch)?;
-        let kind =
-            <T::Arch as Arch>::BreakpointKind::from_usize(cmd.kind).ok_or(Error::TargetMismatch)?;
 
-        let handler_status = match cmd_kind {
-            CmdKind::Add => {
-                use crate::target::ext::breakpoints::WatchKind::*;
-                let supported = match cmd.type_ {
-                    0 => (ops.sw_breakpoint()).map(|op| op.add_sw_breakpoint(addr, kind)),
-                    1 => (ops.hw_breakpoint()).map(|op| op.add_hw_breakpoint(addr, kind)),
-                    2 => (ops.hw_watchpoint()).map(|op| op.add_hw_watchpoint(addr, Write)),
-                    3 => (ops.hw_watchpoint()).map(|op| op.add_hw_watchpoint(addr, Read)),
-                    4 => (ops.hw_watchpoint()).map(|op| op.add_hw_watchpoint(addr, ReadWrite)),
-                    // only 5 types in the protocol
-                    _ => None,
-                };
+        macro_rules! bp_kind {
+            () => {
+                BeBytes::from_be_bytes(cmd.kind)
+                    .and_then(<T::Arch as Arch>::BreakpointKind::from_usize)
+                    .ok_or(Error::TargetMismatch)?
+            };
+        }
 
-                match supported {
-                    None => HandlerStatus::Handled,
-                    Some(Err(e)) => {
-                        Err(e).handle_error()?;
-                        HandlerStatus::Handled
-                    }
-                    Some(Ok(true)) => HandlerStatus::NeedsOk,
-                    Some(Ok(false)) => return Err(Error::NonFatalError(22)),
+        let supported = match cmd.type_ {
+            0 if ops.sw_breakpoint().is_some() => {
+                let ops = ops.sw_breakpoint().unwrap();
+                let bp_kind = bp_kind!();
+                match cmd_kind {
+                    CmdKind::Add => ops.add_sw_breakpoint(addr, bp_kind),
+                    CmdKind::Remove => ops.remove_sw_breakpoint(addr, bp_kind),
                 }
             }
-            CmdKind::Remove => {
-                use crate::target::ext::breakpoints::WatchKind::*;
-                let supported = match cmd.type_ {
-                    0 => (ops.sw_breakpoint()).map(|op| op.remove_sw_breakpoint(addr, kind)),
-                    1 => (ops.hw_breakpoint()).map(|op| op.remove_hw_breakpoint(addr, kind)),
-                    2 => (ops.hw_watchpoint()).map(|op| op.remove_hw_watchpoint(addr, Write)),
-                    3 => (ops.hw_watchpoint()).map(|op| op.remove_hw_watchpoint(addr, Read)),
-                    4 => (ops.hw_watchpoint()).map(|op| op.remove_hw_watchpoint(addr, ReadWrite)),
-                    // only 5 types in the protocol
-                    _ => None,
-                };
-
-                match supported {
-                    None => HandlerStatus::Handled,
-                    Some(Err(e)) => {
-                        Err(e).handle_error()?;
-                        HandlerStatus::Handled
-                    }
-                    Some(Ok(true)) => HandlerStatus::NeedsOk,
-                    Some(Ok(false)) => return Err(Error::NonFatalError(22)),
+            1 if ops.hw_breakpoint().is_some() => {
+                let ops = ops.hw_breakpoint().unwrap();
+                let bp_kind = bp_kind!();
+                match cmd_kind {
+                    CmdKind::Add => ops.add_hw_breakpoint(addr, bp_kind),
+                    CmdKind::Remove => ops.remove_hw_breakpoint(addr, bp_kind),
                 }
             }
+            2 | 3 | 4 if ops.hw_watchpoint().is_some() => {
+                use crate::target::ext::breakpoints::WatchKind;
+                let kind = match cmd.type_ {
+                    2 => WatchKind::Write,
+                    3 => WatchKind::Read,
+                    4 => WatchKind::ReadWrite,
+                    _ => unreachable!(),
+                };
+                let len = <T::Arch as Arch>::Usize::from_be_bytes(cmd.kind)
+                    .ok_or(Error::TargetMismatch)?;
+                let ops = ops.hw_watchpoint().unwrap();
+                match cmd_kind {
+                    CmdKind::Add => ops.add_hw_watchpoint(addr, len, kind),
+                    CmdKind::Remove => ops.remove_hw_watchpoint(addr, len, kind),
+                }
+            }
+            // only 5 types defined by the protocol
+            _ => return Ok(HandlerStatus::Handled),
         };
 
-        Ok(handler_status)
+        match supported {
+            Err(e) => {
+                Err(e).handle_error()?;
+                Ok(HandlerStatus::Handled)
+            }
+            Ok(true) => Ok(HandlerStatus::NeedsOk),
+            Ok(false) => Err(Error::NonFatalError(22)),
+        }
     }
 
     pub(crate) fn handle_breakpoints<'a>(
@@ -87,10 +90,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         let handler_status = match command {
             Breakpoints::z(cmd) => self.handle_breakpoint_common(ops, cmd, CmdKind::Remove)?,
             Breakpoints::Z(cmd) => self.handle_breakpoint_common(ops, cmd, CmdKind::Add)?,
-            Breakpoints::ZWithBytecode(cmd) => {
-                warn!("Client sent breakpoint packet with bytecode even though target didn't support agent expressions");
-                self.handle_breakpoint_common(ops, cmd.base, CmdKind::Add)?
-            }
+            // TODO: handle ZWithBytecode once agent expressions are implemented
+            _ => HandlerStatus::Handled,
         };
         Ok(handler_status)
     }

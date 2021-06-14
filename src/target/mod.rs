@@ -223,7 +223,7 @@ pub mod ext;
 pub enum TargetError<E> {
     /// A non-specific, non-fatal error has occurred.
     NonFatal,
-    /// I/O Error. Only available when the `std` feature is enabled.
+    /// Non-fatal I/O Error. Only available when the `std` feature is enabled.
     ///
     /// At the moment, this is just shorthand for
     /// `TargetError::NonFatal(e.raw_os_err().unwrap_or(121))`. Error code `121`
@@ -263,7 +263,10 @@ impl<E> From<std::io::Error> for TargetError<E> {
     }
 }
 
-/// A specialized `Result` type for `Target` operations.
+/// A specialized `Result` type for `Target` operations. Supports reporting
+/// non-fatal errors back to the GDB client.
+///
+/// See [`TargetError`] for more details.
 ///
 /// _Note:_ While it's typically parameterized as `TargetResult<T, Self>`, the
 /// error value is in-fact `TargetError<Self::Error>` (not `Self`).

@@ -37,6 +37,7 @@ define_ext!(BreakpointsOps, Breakpoints);
 /// CPU cycle, ignoring the specified breakpoint `kind` entirely.
 pub trait SwBreakpoint: Target + Breakpoints {
     /// Add a new software breakpoint.
+    ///
     /// Return `Ok(false)` if the operation could not be completed.
     fn add_sw_breakpoint(
         &mut self,
@@ -45,6 +46,7 @@ pub trait SwBreakpoint: Target + Breakpoints {
     ) -> TargetResult<bool, Self>;
 
     /// Remove an existing software breakpoint.
+    ///
     /// Return `Ok(false)` if the operation could not be completed.
     fn remove_sw_breakpoint(
         &mut self,
@@ -66,6 +68,7 @@ define_ext!(SwBreakpointOps, SwBreakpoint);
 /// just-as-fast).
 pub trait HwBreakpoint: Target + Breakpoints {
     /// Add a new hardware breakpoint.
+    ///
     /// Return `Ok(false)` if the operation could not be completed.
     fn add_hw_breakpoint(
         &mut self,
@@ -74,6 +77,7 @@ pub trait HwBreakpoint: Target + Breakpoints {
     ) -> TargetResult<bool, Self>;
 
     /// Remove an existing hardware breakpoint.
+    ///
     /// Return `Ok(false)` if the operation could not be completed.
     fn remove_hw_breakpoint(
         &mut self,
@@ -106,18 +110,24 @@ pub enum WatchKind {
 /// location after each step).
 pub trait HwWatchpoint: Target + Breakpoints {
     /// Add a new hardware watchpoint.
+    /// The number of bytes to watch is specified by `len`.
+    ///
     /// Return `Ok(false)` if the operation could not be completed.
     fn add_hw_watchpoint(
         &mut self,
         addr: <Self::Arch as Arch>::Usize,
+        len: <Self::Arch as Arch>::Usize,
         kind: WatchKind,
     ) -> TargetResult<bool, Self>;
 
     /// Remove an existing hardware watchpoint.
+    /// The number of bytes to watch is specified by `len`.
+    ///
     /// Return `Ok(false)` if the operation could not be completed.
     fn remove_hw_watchpoint(
         &mut self,
         addr: <Self::Arch as Arch>::Usize,
+        len: <Self::Arch as Arch>::Usize,
         kind: WatchKind,
     ) -> TargetResult<bool, Self>;
 }

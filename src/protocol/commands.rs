@@ -146,7 +146,7 @@ macro_rules! commands {
                     if buf.strip_prefix(b"Z") {
                         // TODO: agent bytecode currently unimplemented
                         if true {
-                           let cmd = BasicBreakpoint::from_slice(buf.into_body())?;
+                            let cmd = BasicBreakpoint::from_slice(buf.into_body())?;
                             return Some(Command::Breakpoints(ext::Breakpoints::Z(cmd)))
                         } else {
                             let cmd = BytecodeBreakpoint::from_slice(buf.into_body())?;

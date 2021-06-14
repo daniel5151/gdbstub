@@ -21,7 +21,7 @@ pub struct BasicBreakpoint<'a> {
     pub type_: u8,
     pub addr: &'a [u8],
     /// architecture dependent
-    pub kind: usize,
+    pub kind: &'a [u8],
 }
 
 impl<'a> BasicBreakpoint<'a> {
@@ -29,7 +29,7 @@ impl<'a> BasicBreakpoint<'a> {
         let mut body = body.splitn_mut(4, |b| matches!(*b, b',' | b';'));
         let type_ = decode_hex(body.next()?).ok()?;
         let addr = decode_hex_buf(body.next()?).ok()?;
-        let kind = decode_hex(body.next()?).ok()?;
+        let kind = decode_hex_buf(body.next()?).ok()?;
 
         Some(BasicBreakpoint { type_, addr, kind })
     }

@@ -240,7 +240,12 @@ impl target::ext::breakpoints::SwBreakpoint for Emu {
 }
 
 impl target::ext::breakpoints::HwWatchpoint for Emu {
-    fn add_hw_watchpoint(&mut self, addr: u32, kind: WatchKind) -> TargetResult<bool, Self> {
+    fn add_hw_watchpoint(
+        &mut self,
+        addr: u32,
+        _len: u32, // TODO: properly handle `len` parameter
+        kind: WatchKind,
+    ) -> TargetResult<bool, Self> {
         self.watchpoints.push(addr);
 
         let entry = self.watchpoint_kind.entry(addr).or_insert((false, false));
@@ -253,7 +258,12 @@ impl target::ext::breakpoints::HwWatchpoint for Emu {
         Ok(true)
     }
 
-    fn remove_hw_watchpoint(&mut self, addr: u32, kind: WatchKind) -> TargetResult<bool, Self> {
+    fn remove_hw_watchpoint(
+        &mut self,
+        addr: u32,
+        _len: u32, // TODO: properly handle `len` parameter
+        kind: WatchKind,
+    ) -> TargetResult<bool, Self> {
         let entry = self.watchpoint_kind.entry(addr).or_insert((false, false));
         match kind {
             WatchKind::Write => entry.1 = false,
