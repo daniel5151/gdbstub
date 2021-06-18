@@ -3,7 +3,7 @@ use std::net::{TcpListener, TcpStream};
 #[cfg(unix)]
 use std::os::unix::net::{UnixListener, UnixStream};
 
-use gdbstub::{Connection, DisconnectReason, GdbStub};
+use gdbstub::{state_machine::GdbStubStateMachine, Connection, DisconnectReason, GdbStub};
 
 pub type DynResult<T> = Result<T, Box<dyn std::error::Error>>;
 
@@ -64,20 +64,92 @@ fn main() -> DynResult<()> {
     };
 
     // hook-up debugger
-    let mut debugger = GdbStub::new(connection);
+    let gdb = GdbStub::new(connection);
+    let mut gdb = gdb.run_state_machine()?;
+    loop {
+        gdb = match gdb {
+            GdbStubStateMachine::Pump(mut gdb) => {
+                let byte = gdb.borrow_conn().read()?;
+                match gdb.pump(&mut emu, byte) {
+                    Ok((_, Some(disconnect_reason))) => {
+                        match disconnect_reason {
+                            DisconnectReason::Disconnect => {
+                                // run to completion
+                                while emu.step() != Some(emu::Event::Halted) {}
+                            }
+                            DisconnectReason::TargetExited(code) => {
+                                println!("Target exited with code {}!", code)
+                            }
+                            DisconnectReason::TargetTerminated(sig) => {
+                                println!("Target terminated with signal {}!", sig)
+                            }
+                            DisconnectReason::Kill => println!("GDB sent a kill command!"),
+                        }
+                        break;
+                    }
+                    Ok((gdb, None)) => gdb,
+                    Err(gdbstub::GdbStubError::TargetError(_e)) => {
+                        println!("Target raised a fatal error");
+                        break;
+                    }
+                    Err(e) => {
+                        println!("gdbstub internal error: {}", e);
+                        break;
+                    }
+                }
+            }
 
-    match debugger.run(&mut emu)? {
-        DisconnectReason::Disconnect => {
-            // run to completion
-            while emu.step() != Some(emu::Event::Halted) {}
-        }
-        DisconnectReason::TargetExited(code) => println!("Target exited with code {}!", code),
-        DisconnectReason::TargetTerminated(sig) => {
-            println!("Target terminated with signal {}!", sig)
-        }
-        DisconnectReason::Kill => {
-            println!("GDB sent a kill command!");
-            return Ok(());
+            GdbStubStateMachine::DeferredStopReason(mut gdb) => {
+                // armv4t example doesn't actually defer stop reasons
+                // instead, i've wired it up to defer GDB interrupts, as a way to demonstrate
+                // the API
+                //
+                // in a system with proper deferred stop reasons, you'll have to "select" on
+                // both the incoming data, and whatever mechanism you're using to detect stop
+                // events.
+                //
+                // I will think about how to improve the API to avoid having this manual byte !=
+                // 0x03 check, because this is pretty ugly at the moment.
+
+                let byte = gdb.borrow_conn().read()?;
+                if byte != 0x03 {
+                    println!("expected breakpoint packet, got something else: {}", byte);
+                    return Ok(());
+                }
+
+                eprintln!("deferred_stop_reason with GdbInterrupt");
+
+                match gdb.deferred_stop_reason(
+                    &mut emu,
+                    gdbstub::target::ext::base::multithread::ThreadStopReason::GdbInterrupt,
+                ) {
+                    Ok((_, Some(disconnect_reason))) => {
+                        match disconnect_reason {
+                            DisconnectReason::Disconnect => {
+                                // run to completion
+                                while emu.step() != Some(emu::Event::Halted) {}
+                            }
+                            DisconnectReason::TargetExited(code) => {
+                                println!("Target exited with code {}!", code)
+                            }
+                            DisconnectReason::TargetTerminated(sig) => {
+                                println!("Target terminated with signal {}!", sig)
+                            }
+                            DisconnectReason::Kill => println!("GDB sent a kill command!"),
+                        }
+                        break;
+                    }
+                    Ok((gdb, None)) => gdb,
+                    Err(gdbstub::GdbStubError::TargetError(_e)) => {
+                        println!("Target raised a fatal error");
+                        break;
+                    }
+                    Err(e) => {
+                        println!("gdbstub internal error: {}", e);
+                        break;
+                    }
+                }
+            }
         }
     }
 

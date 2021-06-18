@@ -269,6 +269,7 @@ pub mod state_machine {
                 ext::FinishExecStatus::Handled => None,
                 ext::FinishExecStatus::Disconnect(reason) => Some(reason),
             };
+            res.flush()?;
 
             Ok((self.transition::<state::Pump>().into(), event))
         }
@@ -328,9 +329,6 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             Packet::Nack => Err(Error::ClientSentNack),
             Packet::Interrupt => {
                 debug!("<-- interrupt packet");
-                let mut res = ResponseWriter::new(conn);
-                res.write_str("S05")?;
-                res.flush()?;
                 Ok(State::Pump)
             }
             Packet::Command(command) => {

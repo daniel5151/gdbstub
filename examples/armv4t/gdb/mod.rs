@@ -117,7 +117,7 @@ impl Emu {
                     // check for GDB interrupt every 1024 instructions
                     cycles += 1;
                     if cycles % 1024 == 0 && check_gdb_interrupt() {
-                        return Ok(StopReason::GdbInterrupt);
+                        return Ok(StopReason::Defer);
                     }
                 }
             }
@@ -125,7 +125,7 @@ impl Emu {
         };
 
         Ok(match event {
-            Event::Halted => StopReason::Terminated(19), // SIGSTOP
+            Event::Halted => StopReason::Terminated(17), // SIGSTOP
             Event::Break => StopReason::SwBreak,
             Event::WatchWrite(addr) => StopReason::Watch {
                 kind: WatchKind::Write,
