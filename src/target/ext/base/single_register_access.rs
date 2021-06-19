@@ -22,7 +22,7 @@ pub trait SingleRegisterAccess<Id>: Target {
     /// On single threaded targets, `tid` is set to `()` and can be ignored.
     ///
     /// Implementations should write the value of the register using target's
-    /// native byte order in the buffer `dst`.
+    /// native byte order when writing via `output`.
     ///
     /// If the requested register could not be accessed, an appropriate
     /// non-fatal error should be returned.
@@ -30,7 +30,7 @@ pub trait SingleRegisterAccess<Id>: Target {
         &mut self,
         tid: Id,
         reg_id: <Self::Arch as Arch>::RegId,
-        dst: &mut [u8],
+        output: SendRegisterOutput<'_>,
     ) -> TargetResult<(), Self>;
 
     /// Write from a single register on the target.
@@ -55,3 +55,19 @@ pub trait SingleRegisterAccess<Id>: Target {
 /// See [`SingleRegisterAccess`]
 pub type SingleRegisterAccessOps<'a, Id, T> =
     &'a mut dyn SingleRegisterAccess<Id, Arch = <T as Target>::Arch, Error = <T as Target>::Error>;
+
+/// An interface to send register data to the GDB remote debugger.
+pub struct SendRegisterOutput<'a> {
+    inner: &'a mut dyn FnMut(&[u8]),
+}
+
+impl<'a> SendRegisterOutput<'a> {
+    pub(crate) fn new(inner: &'a mut dyn FnMut(&[u8])) -> Self {
+        Self { inner }
+    }
+
+    /// Write out raw register bytes to the GDB debugger.
+    pub fn write(&mut self, data: &[u8]) {
+        (self.inner)(data)
+    }
+}

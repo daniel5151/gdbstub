@@ -1,3 +1,5 @@
+use core::num::NonZeroUsize;
+
 use gdbstub::arch::RegId;
 
 /// 32-bit ARM core register identifier.
@@ -21,7 +23,7 @@ pub enum ArmCoreRegId {
 }
 
 impl RegId for ArmCoreRegId {
-    fn from_raw_id(id: usize) -> Option<(Self, usize)> {
+    fn from_raw_id(id: usize) -> Option<(Self, Option<NonZeroUsize>)> {
         let reg = match id {
             0..=12 => Self::Gpr(id as u8),
             13 => Self::Sp,
@@ -31,6 +33,6 @@ impl RegId for ArmCoreRegId {
             25 => Self::Cpsr,
             _ => return None,
         };
-        Some((reg, 4))
+        Some((reg, Some(NonZeroUsize::new(4)?)))
     }
 }

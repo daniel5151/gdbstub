@@ -10,7 +10,9 @@ pub mod singlethread;
 
 mod single_register_access;
 
-pub use single_register_access::{SingleRegisterAccess, SingleRegisterAccessOps};
+pub use single_register_access::{
+    SendRegisterOutput, SingleRegisterAccess, SingleRegisterAccessOps,
+};
 
 /// Base operations for single/multi threaded targets.
 pub enum BaseOps<'a, A, E> {

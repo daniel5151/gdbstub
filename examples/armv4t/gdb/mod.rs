@@ -6,6 +6,7 @@ use gdbstub::target::ext::base::singlethread::{
     GdbInterrupt, ResumeAction, SingleThreadOps, SingleThreadReverseContOps,
     SingleThreadReverseStepOps, StopReason,
 };
+use gdbstub::target::ext::base::SendRegisterOutput;
 use gdbstub::target::ext::breakpoints::WatchKind;
 use gdbstub::target::{Target, TargetError, TargetResult};
 use gdbstub_arch::arm::reg::id::ArmCoreRegId;
@@ -218,11 +219,11 @@ impl target::ext::base::SingleRegisterAccess<()> for Emu {
         &mut self,
         _tid: (),
         reg_id: gdbstub_arch::arm::reg::id::ArmCoreRegId,
-        dst: &mut [u8],
+        mut output: SendRegisterOutput,
     ) -> TargetResult<(), Self> {
         if let Some(i) = cpu_reg_id(reg_id) {
             let w = self.cpu.reg_get(self.cpu.mode(), i);
-            dst.copy_from_slice(&w.to_le_bytes());
+            output.write(&w.to_le_bytes());
             Ok(())
         } else {
             Err(().into())

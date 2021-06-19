@@ -2,7 +2,7 @@ use super::prelude::*;
 use crate::protocol::commands::ext::SingleRegisterAccess;
 
 use crate::arch::{Arch, RegId};
-use crate::target::ext::base::BaseOps;
+use crate::target::ext::base::{BaseOps, SendRegisterOutput};
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     fn inner<Id>(
@@ -13,17 +13,41 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
         let handler_status = match command {
             SingleRegisterAccess::p(p) => {
-                let mut dst = [0u8; 32]; // enough for 256-bit registers
                 let reg = <T::Arch as Arch>::RegId::from_raw_id(p.reg_id);
                 let (reg_id, reg_size) = match reg {
                     // empty packet indicates unrecognized query
                     None => return Ok(HandlerStatus::Handled),
                     Some(v) => v,
                 };
-                let dst = &mut dst[0..reg_size];
-                ops.read_register(id, reg_id, dst).handle_error()?;
 
-                res.write_hex_buf(dst)?;
+                let mut n = 0usize;
+                let mut err = Ok(());
+
+                ops.read_register(
+                    id,
+                    reg_id,
+                    SendRegisterOutput::new(&mut |buf| {
+                        if err.is_ok() {
+                            // If the register has a known size and read_register attempts
+                            // to send more bytes than are present in the register,
+                            // error out and stop sending data.
+                            if let Some(size) = reg_size {
+                                n += buf.len();
+
+                                if n > size.get() {
+                                    err = Err(Error::TargetMismatch);
+                                    return;
+                                }
+                            }
+
+                            err = res.write_hex_buf(buf).map_err(|e| e.into());
+                        }
+                    }),
+                )
+                .handle_error()?;
+
+                err?;
+
                 HandlerStatus::Handled
             }
             SingleRegisterAccess::P(p) => {
