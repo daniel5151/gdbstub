@@ -199,7 +199,6 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
     ///
     /// Note: This method will invoke `Connection::on_session_start`, and
     /// as such may return a connection error.
-    #[allow(clippy::type_complexity)]
     pub fn run_state_machine(
         mut self,
     ) -> Result<state_machine::GdbStubStateMachine<'a, T, C>, Error<T::Error, C::Error>> {
@@ -218,7 +217,6 @@ pub use state_machine::GdbStubStateMachine;
 /// TODO: more docs. also discuss the typestate token API...
 ///
 /// TODO: add docs to top-level `lib.rs` that point folks at this API.
-#[allow(clippy::type_complexity)]
 pub mod state_machine {
     use super::*;
 

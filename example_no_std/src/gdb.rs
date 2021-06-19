@@ -40,9 +40,9 @@ impl MultiThreadOps for DummyTarget {
         &mut self,
         _default_resume_action: ResumeAction,
         _check_gdb_interrupt: GdbInterrupt<'_>,
-    ) -> Result<ThreadStopReason<u32>, Self::Error> {
+    ) -> Result<Option<ThreadStopReason<u32>>, Self::Error> {
         print_str("> resume");
-        Ok(ThreadStopReason::DoneStep)
+        Ok(Some(ThreadStopReason::DoneStep))
     }
 
     #[inline(never)]

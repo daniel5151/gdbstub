@@ -40,6 +40,16 @@ impl TcpConnection {
             Ok(TcpConnection { sock, fd })
         }
     }
+
+    pub fn read(&mut self) -> Result<u8, &'static str> {
+        let mut buf = [0];
+        let ret = unsafe { libc::read(self.fd, buf.as_mut_ptr() as _, 1) };
+        if ret == -1 || ret != 1 {
+            Err("socket read failed")
+        } else {
+            Ok(buf[0])
+        }
+    }
 }
 
 impl Drop for TcpConnection {
@@ -53,16 +63,6 @@ impl Drop for TcpConnection {
 
 impl Connection for TcpConnection {
     type Error = &'static str;
-
-    fn read(&mut self) -> Result<u8, &'static str> {
-        let mut buf = [0];
-        let ret = unsafe { libc::read(self.fd, buf.as_mut_ptr() as _, 1) };
-        if ret == -1 || ret != 1 {
-            Err("socket read failed")
-        } else {
-            Ok(buf[0])
-        }
-    }
 
     fn write(&mut self, b: u8) -> Result<(), &'static str> {
         let buf = [b];

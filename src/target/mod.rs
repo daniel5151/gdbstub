@@ -100,7 +100,7 @@
 //!         &mut self,
 //!         action: ResumeAction,
 //!         gdb_interrupt: GdbInterrupt<'_>,
-//!     ) -> Result<StopReason<u32>, ()> { todo!() }
+//!     ) -> Result<Option<StopReason<u32>>, ()> { todo!() }
 //!
 //!     fn read_registers(
 //!         &mut self,
@@ -362,7 +362,6 @@ pub trait Target {
 
 macro_rules! impl_dyn_target {
     ($type:ty) => {
-        #[allow(clippy::type_complexity)]
         impl<A, E> Target for $type
         where
             A: Arch,

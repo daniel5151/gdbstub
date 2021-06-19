@@ -60,13 +60,17 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     ReverseContOps::SingleThread(ops) => ops
                         .reverse_cont(GdbInterrupt::new(&mut check_gdb_interrupt))
                         .map_err(Error::TargetError)?
-                        .into(),
+                        .map(Into::into),
                 };
 
                 err?;
 
-                self.finish_exec(res, target, stop_reason)?
-                    .into_handler_status()
+                match stop_reason {
+                    None => HandlerStatus::DeferredStopReason,
+                    Some(stop_reason) => self
+                        .finish_exec(res, target, stop_reason)?
+                        .into_handler_status(),
+                }
             }
         };
 
@@ -122,13 +126,17 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     ReverseStepOps::SingleThread(ops) => ops
                         .reverse_step(GdbInterrupt::new(&mut check_gdb_interrupt))
                         .map_err(Error::TargetError)?
-                        .into(),
+                        .map(Into::into),
                 };
 
                 err?;
 
-                self.finish_exec(res, target, stop_reason)?
-                    .into_handler_status()
+                match stop_reason {
+                    None => HandlerStatus::DeferredStopReason,
+                    Some(stop_reason) => self
+                        .finish_exec(res, target, stop_reason)?
+                        .into_handler_status(),
+                }
             }
         };
 

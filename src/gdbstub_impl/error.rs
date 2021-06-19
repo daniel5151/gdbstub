@@ -36,8 +36,6 @@ pub enum GdbStubError<T, C> {
     /// least one running.
     NoActiveThreads,
 
-    /// Cannot defer a `StopReason::Defer`.
-    CannotDeferDefer,
     /// Targets cannot return `StopReason::Defer` when running outside of
     /// `GdbStubStateMachine`.
     CannotReturnDefer,
@@ -81,7 +79,6 @@ where
             TargetError(e) => write!(f, "Target threw a fatal error: {:?}", e),
             UnsupportedStopReason => write!(f, "Target responded with an unsupported stop reason."),
             NoActiveThreads => write!(f, "Target didn't report any active threads when there should have been at least one running."),
-            CannotDeferDefer => write!(f, "Cannot defer a `StopReason::Defer`."),
             CannotReturnDefer => write!(f, "Cannot return `StopReason::Running` outside of `GdbStubStateMachine`."),
             NonFatalError(_) => write!(f, "Internal - A non-fatal error occurred (with errno-style error code)"),
         }

@@ -63,7 +63,7 @@ impl MultiThreadOps for Emu {
         &mut self,
         default_resume_action: ResumeAction,
         gdb_interrupt: GdbInterrupt<'_>,
-    ) -> Result<ThreadStopReason<u32>, Self::Error> {
+    ) -> Result<Option<ThreadStopReason<u32>>, Self::Error> {
         // In general, the behavior of multi-threaded systems during debugging is
         // determined by the system scheduler. On certain systems, this behavior can be
         // configured using the GDB command `set scheduler-locking _mode_`, but at the
@@ -75,13 +75,13 @@ impl MultiThreadOps for Emu {
             _ => return Err("no support for resuming with signal"),
         };
 
-        match self
+        let stop_reason = match self
             .resume_action_is_step
             .unwrap_or(default_resume_action_is_step)
         {
             true => match self.step() {
-                Some((event, id)) => Ok(event_to_stopreason(event, id)),
-                None => Ok(ThreadStopReason::DoneStep),
+                Some((event, id)) => event_to_stopreason(event, id),
+                None => ThreadStopReason::DoneStep,
             },
             false => {
                 let mut gdb_interrupt = gdb_interrupt.no_async();
@@ -89,16 +89,18 @@ impl MultiThreadOps for Emu {
                 loop {
                     // check for GDB interrupt every 1024 instructions
                     if cycles % 1024 == 0 && gdb_interrupt.pending() {
-                        return Ok(ThreadStopReason::GdbInterrupt);
+                        break ThreadStopReason::GdbInterrupt;
                     }
                     cycles += 1;
 
                     if let Some((event, id)) = self.step() {
-                        return Ok(event_to_stopreason(event, id));
+                        break event_to_stopreason(event, id);
                     };
                 }
             }
-        }
+        };
+
+        Ok(Some(stop_reason))
     }
 
     // FIXME: properly handle multiple actions

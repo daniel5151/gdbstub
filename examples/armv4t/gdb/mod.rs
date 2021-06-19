@@ -101,11 +101,11 @@ impl Emu {
         &mut self,
         action: ResumeAction,
         mut check_gdb_interrupt: impl FnMut() -> bool,
-    ) -> Result<StopReason<u32>, &'static str> {
+    ) -> Result<Option<StopReason<u32>>, &'static str> {
         let event = match action {
             ResumeAction::Step => match self.step() {
                 Some(e) => e,
-                None => return Ok(StopReason::DoneStep),
+                None => return Ok(Some(StopReason::DoneStep)),
             },
             ResumeAction::Continue => {
                 let mut cycles = 0;
@@ -117,14 +117,14 @@ impl Emu {
                     // check for GDB interrupt every 1024 instructions
                     cycles += 1;
                     if cycles % 1024 == 0 && check_gdb_interrupt() {
-                        return Ok(StopReason::Defer);
+                        return Ok(None);
                     }
                 }
             }
             _ => return Err("cannot resume with signal"),
         };
 
-        Ok(match event {
+        Ok(Some(match event {
             Event::Halted => StopReason::Terminated(17), // SIGSTOP
             Event::Break => StopReason::SwBreak,
             Event::WatchWrite(addr) => StopReason::Watch {
@@ -135,7 +135,7 @@ impl Emu {
                 kind: WatchKind::Read,
                 addr,
             },
-        })
+        }))
     }
 }
 
@@ -144,7 +144,7 @@ impl SingleThreadOps for Emu {
         &mut self,
         action: ResumeAction,
         gdb_interrupt: GdbInterrupt<'_>,
-    ) -> Result<StopReason<u32>, Self::Error> {
+    ) -> Result<Option<StopReason<u32>>, Self::Error> {
         let mut gdb_interrupt = gdb_interrupt.no_async();
         self.inner_resume(action, || gdb_interrupt.pending())
     }
@@ -290,7 +290,7 @@ impl target::ext::base::singlethread::SingleThreadReverseCont for Emu {
     fn reverse_cont(
         &mut self,
         gdb_interrupt: GdbInterrupt<'_>,
-    ) -> Result<StopReason<u32>, Self::Error> {
+    ) -> Result<Option<StopReason<u32>>, Self::Error> {
         // FIXME: actually implement reverse step
         eprintln!(
             "FIXME: Not actually reverse-continuing. Performing forwards continue instead..."
@@ -303,7 +303,7 @@ impl target::ext::base::singlethread::SingleThreadReverseStep for Emu {
     fn reverse_step(
         &mut self,
         gdb_interrupt: GdbInterrupt<'_>,
-    ) -> Result<StopReason<u32>, Self::Error> {
+    ) -> Result<Option<StopReason<u32>>, Self::Error> {
         // FIXME: actually implement reverse step
         eprintln!(
             "FIXME: Not actually reverse-stepping. Performing single forwards step instead..."
@@ -318,16 +318,16 @@ impl target::ext::base::singlethread::SingleThreadRangeStepping for Emu {
         start: u32,
         end: u32,
         gdb_interrupt: GdbInterrupt<'_>,
-    ) -> Result<StopReason<u32>, Self::Error> {
+    ) -> Result<Option<StopReason<u32>>, Self::Error> {
         let mut gdb_interrupt = gdb_interrupt.no_async();
         loop {
             match self.inner_resume(ResumeAction::Step, || gdb_interrupt.pending())? {
-                StopReason::DoneStep => {}
+                Some(StopReason::DoneStep) => {}
                 stop_reason => return Ok(stop_reason),
             }
 
             if !(start..end).contains(&self.cpu.reg_get(self.cpu.mode(), reg::PC)) {
-                return Ok(StopReason::DoneStep);
+                return Ok(Some(StopReason::DoneStep));
             }
         }
     }

@@ -426,7 +426,6 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         Ok(handler_status)
     }
 
-    #[allow(clippy::type_complexity)]
     fn do_vcont_single_thread(
         ops: &mut dyn crate::target::ext::base::singlethread::SingleThreadOps<
             Arch = T::Arch,
@@ -434,7 +433,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         >,
         res: &mut ResponseWriter<C>,
         actions: &crate::protocol::commands::_vCont::Actions,
-    ) -> Result<ThreadStopReason<<T::Arch as Arch>::Usize>, Error<T::Error, C::Error>> {
+    ) -> Result<Option<ThreadStopReason<<T::Arch as Arch>::Usize>>, Error<T::Error, C::Error>> {
         use crate::protocol::commands::_vCont::VContKind;
 
         let mut err = Ok(());
@@ -487,7 +486,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     let ret = ops
                         .resume_range_step(start, end, GdbInterrupt::new(&mut check_gdb_interrupt))
                         .map_err(Error::TargetError)?
-                        .into();
+                        .map(Into::into);
                     err?;
                     return Ok(ret);
                 } else {
@@ -501,12 +500,11 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         let ret = ops
             .resume(action, GdbInterrupt::new(&mut check_gdb_interrupt))
             .map_err(Error::TargetError)?
-            .into();
+            .map(Into::into);
         err?;
         Ok(ret)
     }
 
-    #[allow(clippy::type_complexity)]
     fn do_vcont_multi_thread(
         ops: &mut dyn crate::target::ext::base::multithread::MultiThreadOps<
             Arch = T::Arch,
@@ -514,7 +512,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         >,
         res: &mut ResponseWriter<C>,
         actions: &crate::protocol::commands::_vCont::Actions,
-    ) -> Result<ThreadStopReason<<T::Arch as Arch>::Usize>, Error<T::Error, C::Error>> {
+    ) -> Result<Option<ThreadStopReason<<T::Arch as Arch>::Usize>>, Error<T::Error, C::Error>> {
         // this is a pretty arbitrary choice, but it seems reasonable for most cases.
         let mut default_resume_action = ResumeAction::Continue;
 
@@ -601,12 +599,12 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             BaseOps::MultiThread(ops) => Self::do_vcont_multi_thread(ops, res, &actions)?,
         };
 
-        if matches!(stop_reason, ThreadStopReason::Defer) {
-            return Ok(HandlerStatus::DeferredStopReason);
+        match stop_reason {
+            None => Ok(HandlerStatus::DeferredStopReason),
+            Some(stop_reason) => self
+                .finish_exec(res, target, stop_reason)
+                .map(|x| x.into_handler_status()),
         }
-
-        self.finish_exec(res, target, stop_reason)
-            .map(|x| x.into_handler_status())
     }
 
     fn write_break_common(
@@ -726,7 +724,6 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                 FinishExecStatus::Handled
             }
-            ThreadStopReason::Defer => return Err(Error::CannotDeferDefer),
             // Explicitly avoid using `_ =>` to handle the "unguarded" variants, as doing so would
             // squelch the useful compiler error that crops up whenever stop reasons are added.
             ThreadStopReason::SwBreak(_)
@@ -791,7 +788,6 @@ impl<U> From<StopReason<U>> for ThreadStopReason<U> {
             StopReason::CatchSyscall { number, position } => {
                 ThreadStopReason::CatchSyscall { number, position }
             }
-            StopReason::Defer => ThreadStopReason::Defer,
         }
     }
 }

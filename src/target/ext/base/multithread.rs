@@ -12,7 +12,6 @@ use super::{ReplayLogPosition, SingleRegisterAccessOps};
 pub use super::{GdbInterrupt, ResumeAction};
 
 /// Base debugging operations for multi threaded targets.
-#[allow(clippy::type_complexity)]
 pub trait MultiThreadOps: Target {
     /// Resume execution on the target.
     ///
@@ -25,11 +24,22 @@ pub trait MultiThreadOps: Target {
     /// `set_resume_action`. The GDB client typically sets this to
     /// `ResumeAction::Continue`, though this is not guaranteed.
     ///
-    /// The `check_gdb_interrupt` callback can be invoked to check if GDB sent
-    /// an Interrupt packet (i.e: the user pressed Ctrl-C). It's recommended to
-    /// invoke this callback every-so-often while the system is running (e.g:
-    /// every X cycles/milliseconds). Periodically checking for incoming
-    /// interrupt packets is _not_ required, but it is _recommended_.
+    /// # Checking for Ctrl-C interrupts
+    ///
+    /// The `gdb_interrupt` callback provides a conceptually simple, albeit
+    /// inefficient way check if GDB sent an Ctrl-C interrupt packet. It's
+    /// recommended to invoke this callback every-so-often while the system
+    /// is running (e.g: every X cycles/milliseconds), and returning a
+    /// `StopReason::GdbInterrupt` if an interrupt is encountered.
+    ///
+    /// Periodically checking for incoming interrupt packets is _not_ required,
+    /// but it is _recommended_.
+    ///
+    /// Note: targets using [deferred stop reasons](#Deferred-Stop-Reason)
+    /// should bypass the `gdb_interrupt` API, and check for GDB interrupts as
+    /// part of the
+    /// [`GdbStubStateMachine`](crate::state_machine::GdbStubStateMachine)
+    /// event loop.
     ///
     /// # Implementation requirements
     ///
@@ -72,7 +82,7 @@ pub trait MultiThreadOps: Target {
         &mut self,
         default_resume_action: ResumeAction,
         gdb_interrupt: GdbInterrupt<'_>,
-    ) -> Result<ThreadStopReason<<Self::Arch as Arch>::Usize>, Self::Error>;
+    ) -> Result<Option<ThreadStopReason<<Self::Arch as Arch>::Usize>>, Self::Error>;
 
     /// Clear all previously set resume actions.
     fn clear_resume_actions(&mut self) -> Result<(), Self::Error>;
@@ -216,7 +226,7 @@ pub trait MultiThreadReverseCont: Target + MultiThreadOps {
     fn reverse_cont(
         &mut self,
         gdb_interrupt: GdbInterrupt<'_>,
-    ) -> Result<ThreadStopReason<<Self::Arch as Arch>::Usize>, Self::Error>;
+    ) -> Result<Option<ThreadStopReason<<Self::Arch as Arch>::Usize>>, Self::Error>;
 }
 
 define_ext!(MultiThreadReverseContOps, MultiThreadReverseCont);
@@ -232,7 +242,7 @@ pub trait MultiThreadReverseStep: Target + MultiThreadOps {
         &mut self,
         tid: Tid,
         gdb_interrupt: GdbInterrupt<'_>,
-    ) -> Result<ThreadStopReason<<Self::Arch as Arch>::Usize>, Self::Error>;
+    ) -> Result<Option<ThreadStopReason<<Self::Arch as Arch>::Usize>>, Self::Error>;
 }
 
 define_ext!(MultiThreadReverseStepOps, MultiThreadReverseStep);
@@ -337,17 +347,4 @@ pub enum ThreadStopReason<U> {
         /// The location the event occured at.
         position: CatchSyscallPosition,
     },
-    /// The target has been resumed, and will report a stop reason at some later
-    /// point.
-    ///
-    /// Requires: Using the
-    /// [`GdbStubStateMachine`](crate::state_machine::GdbStubStateMachine) API.
-    ///
-    /// Returning this stop reason will immediately yield control back to
-    /// `gdbstub`'s callee, while the target continues to run in the background.
-    ///
-    /// In the next breaking version of `gdbstub` (0.6), this variant will be
-    /// removed, and the signature of `resume` will be updated to return a
-    /// `Option<StopReason>` instead.
-    Defer,
 }

@@ -138,6 +138,21 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![deny(missing_docs)]
+// Primarily due to rust-lang/rust#8995
+//
+// If this ever gets fixed, it's be possible to rewrite complex types using inherent associated type
+// aliases.
+//
+// For example, instead of writing this monstrosity:
+//
+// Result<Option<ThreadStopReason<<Self::Arch as Arch>::Usize>>, Self::Error>
+//
+// ...it could be rewritten as:
+//
+// type StopReason = ThreadStopReason<<Self::Arch as Arch>::Usize>>;
+//
+// Result<Option<StopReason>, Self::Error>
+#![allow(clippy::type_complexity)]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;

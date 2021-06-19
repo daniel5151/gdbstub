@@ -4,7 +4,7 @@
 extern crate libc;
 
 use gdbstub::state_machine::GdbStubStateMachine;
-use gdbstub::{Connection, DisconnectReason, GdbStubBuilder, GdbStubError};
+use gdbstub::{DisconnectReason, GdbStubBuilder, GdbStubError};
 
 mod conn;
 mod gdb;
