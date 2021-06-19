@@ -157,7 +157,7 @@ pub mod arch;
 pub mod common;
 pub mod target;
 
-pub use connection::Connection;
+pub use connection::{Connection, ConnectionExt};
 pub use gdbstub_impl::*;
 
 /// (Internal) The fake Tid that's used when running in single-threaded mode.

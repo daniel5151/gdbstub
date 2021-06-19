@@ -3,7 +3,7 @@ use std::net::{TcpListener, TcpStream};
 #[cfg(unix)]
 use std::os::unix::net::{UnixListener, UnixStream};
 
-use gdbstub::{Connection, DisconnectReason, GdbStub};
+use gdbstub::{ConnectionExt, DisconnectReason, GdbStub};
 
 pub type DynResult<T> = Result<T, Box<dyn std::error::Error>>;
 
@@ -48,7 +48,7 @@ fn main() -> DynResult<()> {
 
     let mut emu = emu::Emu::new(TEST_PROGRAM_ELF)?;
 
-    let connection: Box<dyn Connection<Error = std::io::Error>> = {
+    let connection: Box<dyn ConnectionExt<Error = std::io::Error>> = {
         if std::env::args().nth(1) == Some("--uds".to_string()) {
             #[cfg(not(unix))]
             {
@@ -66,7 +66,8 @@ fn main() -> DynResult<()> {
     // hook-up debugger
     let mut debugger = GdbStub::new(connection);
 
-    match debugger.run(&mut emu)? {
+    // use quickstart run method
+    match debugger.run(&mut emu, ConnectionExt::read)? {
         DisconnectReason::Disconnect => {
             // run to completion
             while emu.step() != Some((emu::Event::Halted, emu::CpuId::Cpu)) {}

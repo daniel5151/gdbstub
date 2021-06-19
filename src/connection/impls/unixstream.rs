@@ -4,8 +4,9 @@ use std::os::unix::io::AsRawFd;
 use std::os::unix::net::UnixStream;
 
 use crate::Connection;
+use crate::ConnectionExt;
 
-// TODO: Remove PeekExt once `gdbstub`'s MSRV >1.48 (rust-lang/rust#73761)
+// TODO: Remove PeekExt once rust-lang/rust#73761 is stabilized
 trait PeekExt {
     fn peek(&self, buf: &mut [u8]) -> io::Result<usize>;
 }
@@ -49,26 +50,6 @@ impl PeekExt for UnixStream {
 impl Connection for UnixStream {
     type Error = std::io::Error;
 
-    fn read(&mut self) -> Result<u8, Self::Error> {
-        use std::io::Read;
-
-        self.set_nonblocking(false)?;
-
-        let mut buf = [0u8];
-        match Read::read_exact(self, &mut buf) {
-            Ok(_) => Ok(buf[0]),
-            Err(e) => Err(e),
-        }
-    }
-
-    fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
-        use std::io::Read;
-
-        self.set_nonblocking(false)?;
-
-        Read::read_exact(self, buf)
-    }
-
     fn peek(&mut self) -> Result<Option<u8>, Self::Error> {
         self.set_nonblocking(true)?;
 
@@ -96,5 +77,19 @@ impl Connection for UnixStream {
         use std::io::Write;
 
         Write::flush(self)
+    }
+}
+
+impl ConnectionExt for UnixStream {
+    fn read(&mut self) -> Result<u8, Self::Error> {
+        use std::io::Read;
+
+        self.set_nonblocking(false)?;
+
+        let mut buf = [0u8];
+        match Read::read_exact(self, &mut buf) {
+            Ok(_) => Ok(buf[0]),
+            Err(e) => Err(e),
+        }
     }
 }

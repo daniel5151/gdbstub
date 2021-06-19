@@ -5,7 +5,7 @@ use std::os::unix::net::{UnixListener, UnixStream};
 
 use gdbstub::state_machine::{Event, GdbStubStateMachine};
 use gdbstub::target::ext::base::multithread::ThreadStopReason;
-use gdbstub::{target::Target, Connection, DisconnectReason, GdbStub};
+use gdbstub::{target::Target, ConnectionExt, DisconnectReason, GdbStub};
 
 pub type DynResult<T> = Result<T, Box<dyn std::error::Error>>;
 
@@ -45,7 +45,7 @@ fn wait_for_uds(path: &str) -> DynResult<UnixStream> {
     Ok(stream)
 }
 
-fn run_debugger<T: Target, C: Connection>(
+fn run_debugger<T: Target, C: ConnectionExt>(
     emu: &mut T,
     gdb: GdbStub<'_, T, C>,
 ) -> Result<DisconnectReason, gdbstub::GdbStubError<T::Error, C::Error>> {
@@ -116,7 +116,7 @@ fn main() -> DynResult<()> {
 
     let mut emu = emu::Emu::new(TEST_PROGRAM_ELF)?;
 
-    let connection: Box<dyn Connection<Error = std::io::Error>> = {
+    let connection: Box<dyn ConnectionExt<Error = std::io::Error>> = {
         if std::env::args().nth(1) == Some("--uds".to_string()) {
             #[cfg(not(unix))]
             {

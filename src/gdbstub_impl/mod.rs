@@ -60,39 +60,139 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
 
     /// Starts a GDB remote debugging session.
     ///
-    /// Returns once the GDB client closes the debugging session, or if the
-    /// target halts.
-    pub fn run(&mut self, target: &mut T) -> Result<DisconnectReason, Error<T::Error, C::Error>> {
-        self.conn
-            .on_session_start()
-            .map_err(Error::ConnectionRead)?;
+    /// This method provides a quick and easy way to get up and running with
+    /// `gdbstub`, and can be used as a _stepping-stone_ towards the
+    /// fully-featured [state-machine](`state_machine::GdbStubStateMachine`)
+    /// based interface.
+    ///
+    /// `GdbStub::run` will only return once the GDB client closes the debugging
+    /// session, or if the target halts.
+    ///
+    /// # Implementing `read_byte`
+    ///
+    /// `read_byte` must fetch a single byte from the underlying `Connection`
+    /// using a _blocking read_. The precise mechanism of how to read a
+    /// single byte depends on the type of `Connection` being used.
+    ///
+    /// If you're using the standard library's `TcpStream` or `UnixStream`,
+    /// `gdbstub` provides implementations of
+    /// [`ConnectionExt::read`](crate::ConnectionExt::read) for these types,
+    /// which perfectly matches the function signature of `read_byte`:
+    ///
+    /// ```rust
+    /// # use gdbstub::target::Target;
+    /// # use gdbstub::{ConnectionExt, GdbStubError, GdbStub};
+    /// # fn run_debugger<T: Target, C: ConnectionExt>(
+    /// #     mut target: T,
+    /// #     mut gdb: GdbStub<'_, T, C>,
+    /// # ) -> Result<(), GdbStubError<T::Error, C::Error>> {
+    /// gdb.run(&mut target, ConnectionExt::read);
+    /// # unimplemented!()
+    /// # }
+    /// ```
+    ///
+    /// As another example, if the `Connection` implements `std::io::Read`,
+    /// one way to implement `read_byte` is as follows:
+    ///
+    /// ```rust
+    /// use std::io::Read;
+    /// # fn foo<C>(c: C) -> impl FnMut(&mut C) -> Result<u8, C::Error>
+    /// # where C: gdbstub::Connection<Error = std::io::Error> + Read
+    /// # {
+    /// |conn| conn.bytes().next().unwrap()
+    /// # }
+    /// ```
+    ///
+    /// # Limitations of `run`, and when to switch to `run_state_machine`
+    ///
+    /// As you continue to flesh-out your target implementation, you'll soon run
+    /// into some major limitations of the `GdbStub::run` API:
+    ///
+    /// ## No support of deferred stop reasons.
+    ///
+    /// If a target attempts to use deferred stop reasons while running under
+    /// `GdbStub::run`, this API will return [`Error::CannotReturnDefer`] at
+    /// runtime!
+    ///
+    /// ## Handling GDB Ctrl-C interrupts
+    ///
+    /// A target that doesn't use deferred stop reasons will need to _busy poll_
+    /// for incoming GDB interrupts using the callback passed to `resume`. While
+    /// conceptually simple, busy-polling is neither elegant nor efficient, as
+    /// most transports support some kind of efficient "waiting" mechanism
+    /// (e.g: epoll/select/kqueue, async/await, etc...)
+    ///
+    /// Using the more advanced `GdbStubStateMachine` API (alongside deferred
+    /// stop reasons) makes it possible to lift the responsibility of checking
+    /// for GDB Ctrl-C interrupts out of the target's `resume` implementation
+    /// (i.e: polling the callback function), and into the top-level `gdbstub`
+    /// event loop.
+    ///
+    /// A key consequence of lifting this responsibility up the call-stack is
+    /// that the `gdbstub` event loop knows the _concrete_ `Connection` type
+    /// being used, enabling implementations to leverage whatever
+    /// transport-specific efficient waiting mechanism it exposes. Compare this
+    /// with polling for interrupts in the target's `resume` implementation,
+    /// where the method _doesn't_ have access to the the concrete `Connection`
+    /// type being used.
+    ///
+    /// ## Driving `gdbstub` in an event loop / via interrupt handlers
+    ///
+    /// The `read_byte` closure used by `GdbStub::run` is a _blocking_ API,
+    /// which will block the thread that that GDB server is running on.
+    /// Conceptually, this API will "pull" data from the connection whenever it
+    /// requires it.
+    ///
+    /// This blocking behavior can be a non-starter when integrating `gdbstub`
+    /// in certain projects, such as `no_std` projects using `gdbstub` to debug
+    /// code at the bare-metal. In these scenarios, it may not be possible to
+    /// "block" the current thread of execution, as doing so would effectively
+    /// block the entire machine.
+    ///
+    /// `GdbStubStateMachine` provides an alternative "push" based API, whereby
+    /// the implementation can provide data to `gdbstub` as it becomes available
+    /// (e.g: via a UART interrupt handler), and having `gdbstub` "react"
+    /// whenever a complete packet is received.
+    pub fn run(
+        &mut self,
+        target: &mut T,
+        mut read_byte: impl FnMut(&mut C) -> Result<u8, C::Error>,
+    ) -> Result<DisconnectReason, Error<T::Error, C::Error>> {
+        // destructure Self to avoid borrow checker issues when invoking
+        // `RecvPacketBlocking::recv`
+        let Self {
+            conn,
+            packet_buffer,
+            inner,
+        } = self;
+
+        conn.on_session_start().map_err(Error::ConnectionRead)?;
 
         loop {
             use crate::protocol::recv_packet::{RecvPacketBlocking, RecvPacketError};
 
-            let Self {
-                conn,
-                packet_buffer,
-                ..
-            } = self;
-
-            let buf = match RecvPacketBlocking::new().recv(packet_buffer, || conn.read()) {
+            let buf = match RecvPacketBlocking::new().recv(packet_buffer, || read_byte(conn)) {
                 Err(RecvPacketError::Capacity) => return Err(Error::PacketBufferOverflow),
                 Err(RecvPacketError::Connection(e)) => return Err(Error::ConnectionWrite(e)),
                 Ok(buf) => buf,
             };
 
             let packet = Packet::from_buf(target, buf).map_err(Error::PacketParse)?;
-            match self.inner.handle_packet(target, &mut self.conn, packet)? {
+            match inner.handle_packet(target, conn, packet)? {
                 State::Pump => {}
                 State::Disconnect(reason) => return Ok(reason),
                 State::DeferredStopReason => return Err(Error::CannotReturnDefer),
-                State::CtrlCInterrupt => {}
+                // This arm will never get hit, as client will only ever send interrupt packets when
+                // the target is running.
+                State::CtrlCInterrupt => {
+                    log::error!("Unexpected interrupt packet!");
+                    return Err(Error::PacketUnexpected);
+                }
             }
         }
     }
 
-    /// Starts a GDB remote debugging session, and convert this instance of
+    /// Starts a GDB remote debugging session, converting this instance of
     /// `GdbStub` into a
     /// [`GdbStubStateMachine`](state_machine::GdbStubStateMachine) that is
     /// ready to receive data.
@@ -111,8 +211,9 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
     }
 }
 
-/// More complex state-machine based interface to `GdbStub` which supports
-/// deferred stop reason reporting and incremental packet processing.
+pub use state_machine::GdbStubStateMachine;
+
+/// State-machine interface to `GdbStub`.
 ///
 /// TODO: more docs. also discuss the typestate token API...
 ///
@@ -123,8 +224,10 @@ pub mod state_machine {
 
     use crate::protocol::recv_packet::RecvPacketStateMachine;
 
-    /// Wrapper around [`GdbStubStateMachineInner`] which encapsulates all
-    /// possible state machine variants.
+    /// State-machine interface to `GdbStub`, supporting advanced features such
+    /// as deferred stop reasons and incremental packet processing.
+    ///
+    /// See the [module level documentation](self) for more details.
     pub enum GdbStubStateMachine<'a, T, C>
     where
         T: Target,
@@ -269,7 +372,7 @@ pub mod state_machine {
     /// Methods which can be called from the
     /// [`GdbStubStateMachine::DeferredStopReason`] state.
     impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::DeferredStopReason, T, C> {
-        /// Report a deferred target stop reason back to GDB.
+        /// Report a target stop reason back to GDB.
         pub fn deferred_stop_reason(
             mut self,
             target: &mut T,
