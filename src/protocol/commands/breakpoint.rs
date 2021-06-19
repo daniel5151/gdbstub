@@ -1,7 +1,5 @@
-pub use crate::common::*;
-pub use crate::protocol::common::hex::{decode_hex, decode_hex_buf};
-pub use crate::protocol::packet::PacketBuf;
-pub use core::convert::{TryFrom, TryInto};
+use crate::protocol::common::hex::{decode_hex, decode_hex_buf};
+use crate::util::no_panic_iter::SliceExt;
 
 // Breakpoint packets are split up like this:
 //
@@ -26,7 +24,7 @@ pub struct BasicBreakpoint<'a> {
 
 impl<'a> BasicBreakpoint<'a> {
     pub fn from_slice(body: &'a mut [u8]) -> Option<BasicBreakpoint<'a>> {
-        let mut body = body.splitn_mut(4, |b| matches!(*b, b',' | b';'));
+        let mut body = body.splitn_mut_no_panic(4, |b| matches!(*b, b',' | b';'));
         let type_ = decode_hex(body.next()?).ok()?;
         let addr = decode_hex_buf(body.next()?).ok()?;
         let kind = decode_hex_buf(body.next()?).ok()?;
@@ -44,7 +42,7 @@ pub struct BytecodeBreakpoint<'a> {
 
 impl<'a> BytecodeBreakpoint<'a> {
     pub fn from_slice(body: &'a mut [u8]) -> Option<BytecodeBreakpoint<'a>> {
-        let mut body = body.splitn_mut(2, |b| *b == b';');
+        let mut body = body.splitn_mut_no_panic(2, |b| *b == b';');
 
         let base = BasicBreakpoint::from_slice(body.next()?)?;
 

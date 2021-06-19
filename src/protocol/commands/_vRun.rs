@@ -10,7 +10,7 @@ impl<'a> ParseCommand<'a> for vRun<'a> {
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
         let body = buf.into_body();
 
-        let mut body = body.splitn_mut(3, |b| *b == b';');
+        let mut body = body.splitn_mut_no_panic(3, |b| *b == b';');
 
         let _first_semi = body.next()?;
         let filename = match decode_hex_buf(body.next()?).ok()? {

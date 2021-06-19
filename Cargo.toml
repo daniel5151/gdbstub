@@ -31,6 +31,7 @@ goblin = "0.2"
 default = ["std"]
 alloc = ["managed/alloc"]
 std = ["alloc"]
+paranoid_unsafe = []
 
 # INTERNAL: enables the `__dead_code_marker!` macro.
 # used as part of the `scripts/test_dead_code_elim.sh`

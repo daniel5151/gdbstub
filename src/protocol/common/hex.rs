@@ -8,7 +8,7 @@ pub enum DecodeHexError {
     InvalidOutput,
 }
 
-/// Decode a GDB dex string into the specified integer.
+/// Decode a GDB hex string into the specified integer.
 ///
 /// GDB hex strings may include "xx", which represent "missing" data. This
 /// method simply treats "xx" as 0x00.
@@ -35,7 +35,7 @@ where
     Ok(result)
 }
 
-/// Wrapper around a raw hex string. Enabled "late" calls to `decode` from
+/// Wrapper around a raw hex string. Enables "late" calls to `decode` from
 /// outside the `crate::protocol` module.
 #[derive(Debug, Clone, Copy)]
 pub struct HexString<'a>(pub &'a [u8]);
@@ -64,7 +64,7 @@ fn ascii2byte(c: u8) -> Option<u8> {
     }
 }
 
-/// Check if the byte `c` is a valid GDB hex digit `[0-9][a-f][A-F][xX]`
+/// Check if the byte `c` is a valid GDB hex digit `[0-9a-fA-FxX]`
 #[allow(clippy::match_like_matches_macro)]
 pub fn is_hex(c: u8) -> bool {
     match c {
@@ -81,7 +81,74 @@ pub fn is_hex(c: u8) -> bool {
 /// GDB hex strings may include "xx", which represent "missing" data. This
 /// method simply treats "xx" as 0x00.
 // TODO: maybe don't blindly translate "xx" as 0x00?
-// TODO: rewrite this method to elide bound checks
+#[cfg(not(feature = "paranoid_unsafe"))]
+pub fn decode_hex_buf(base_buf: &mut [u8]) -> Result<&mut [u8], DecodeHexBufError> {
+    use DecodeHexBufError::*;
+
+    if base_buf.is_empty() {
+        return Ok(&mut []);
+    }
+
+    let odd_adust = base_buf.len() % 2;
+    if odd_adust != 0 {
+        base_buf[0] = ascii2byte(base_buf[0]).ok_or(NotAscii)?;
+    }
+
+    let buf = &mut base_buf[odd_adust..];
+
+    let decoded_len = buf.len() / 2;
+    for i in 0..decoded_len {
+        // SAFETY: rustc isn't smart enough to automatically elide these bound checks.
+        //
+        // If buf.len() == 0 or 1: trivially safe, since the for block is never taken
+        // If buf.len() >= 2: the range of values for `i` is 0..(buf.len() / 2 - 1)
+        let (hi, lo, b) = unsafe {
+            (
+                //    (buf.len() / 2 - 1) * 2
+                // == (buf.len() - 2)
+                // since buf.len() is >2, this is in-bounds
+                *buf.get_unchecked(i * 2),
+                //    (buf.len() / 2 - 1) * 2 + 1
+                // == (buf.len() - 1)
+                // since buf.len() is >2, this is in-bounds
+                *buf.get_unchecked(i * 2 + 1),
+                // since buf.len() is >2, (buf.len() / 2 - 1) is always in-bounds
+                buf.get_unchecked_mut(i),
+            )
+        };
+
+        let hi = ascii2byte(hi).ok_or(NotAscii)?;
+        let lo = ascii2byte(lo).ok_or(NotAscii)?;
+        *b = hi << 4 | lo;
+    }
+
+    // SAFETY: rustc isn't smart enough to automatically elide this bound check.
+    //
+    // Consider the different values (decoded_len + odd_adust) can take:
+    //
+    //  buf.len() | (decoded_len + odd_adust)
+    // -----------|---------------------------
+    //      0     | (0 + 0) == 0
+    //      1     | (0 + 1) == 1
+    //      2     | (1 + 0) == 1
+    //      3     | (1 + 1) == 2
+    //      4     | (2 + 0) == 2
+    //      5     | (2 + 1) == 3
+    //
+    // Note that the computed index is always in-bounds.
+    //
+    // If I were still in undergrad, I could probably have whipped up a proper
+    // mathematical proof by induction or whatnot, but hopefully this "proof by
+    // example" ought to suffice.
+    unsafe { Ok(base_buf.get_unchecked_mut(..decoded_len + odd_adust)) }
+}
+
+/// Decode a GDB hex string into a byte slice _in place_.
+///
+/// GDB hex strings may include "xx", which represent "missing" data. This
+/// method simply treats "xx" as 0x00.
+// TODO: maybe don't blindly translate "xx" as 0x00?
+#[cfg(feature = "paranoid_unsafe")]
 pub fn decode_hex_buf(base_buf: &mut [u8]) -> Result<&mut [u8], DecodeHexBufError> {
     use DecodeHexBufError::*;
 

@@ -29,11 +29,9 @@ impl<'a> ParseCommand<'a> for m<'a> {
         // +------+------------------+------------------------------------------------+
 
         let (buf, body_range) = buf.into_raw_buf();
-        let body = &mut buf[body_range.start..];
+        let body = buf.get_mut(body_range.start..body_range.end)?;
 
-        // should return 3 slices: the addr (hex-encoded), len (hex-encoded), and the
-        // "rest" of the buffer
-        let mut body = body.split_mut(|b| *b == b',' || *b == b'#');
+        let mut body = body.split_mut_no_panic(|b| *b == b',');
 
         let addr = decode_hex_buf(body.next()?).ok()?;
         let addr_len = addr.len();
@@ -41,8 +39,13 @@ impl<'a> ParseCommand<'a> for m<'a> {
 
         drop(body);
 
+        // ensures that `split_at_mut` doesn't panic
+        if buf.len() < body_range.start + addr_len {
+            return None;
+        }
+
         let (addr, buf) = buf.split_at_mut(body_range.start + addr_len);
-        let addr = &addr[b"$m".len()..];
+        let addr = addr.get(b"$m".len()..)?;
 
         Some(m { addr, len, buf })
     }

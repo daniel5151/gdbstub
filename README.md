@@ -22,17 +22,19 @@ Why use `gdbstub`?
         -   Organizes GDB's countless optional protocol extensions into a coherent, understandable, and type-safe hierarchy of traits.
         -   Automatically handles client/server protocol feature negotiation, without needing to micro-manage the specific [`qSupported` packet](https://sourceware.org/gdb/onlinedocs/gdb/General-Query-Packets.html#qSupported) response.
     -   `gdbstub` makes _extensive_ use of Rust's powerful type system + generics to enforce protocol invariants at compile time, minimizing the number of tricky protocol details end users have to worry about.
-    -   Using a novel technique called [**Inlineable Dyn Extension Traits**](#zero-overhead-protocol-extensions) (IDETs), `gdbstub` enables fine-grained control over active protocol extensions _without_ relying on clunky `cargo` features.
+    -   Using a novel technique called [**Inlineable Dyn Extension Traits**](#zero-overhead-protocol-extensions) (IDETs), `gdbstub` enables fine-grained control over active protocol extensions _without_ relying on clunky `cargo` features or the use of `unsafe` code!
 -   **Easy to Integrate**
     -   `gdbstub`'s API is designed to be as unobtrusive as possible, and shouldn't require any large refactoring effort to integrate into an existing project. It doesn't require taking direct ownership of any key data structures, and aims to be a "drop in" solution when you need to add debugging to a project.
 -   **`#![no_std]` Ready & Size Optimized**
     -   `gdbstub` is a **`no_std` first** library, whereby all protocol features are required to be `no_std` compatible.
     -   `gdbstub` does not require _any_ dynamic memory allocation, and can be configured to use fixed-size, pre-allocated buffers. This enables `gdbstub` to be used on even the most resource constrained, no-[`alloc`](https://doc.rust-lang.org/alloc/) platforms.
-    -   `gdbstub` is transport-layer agnostic, and uses a basic [`Connection`](https://docs.rs/gdbstub/latest/gdbstub/trait.Connection.html) interface to communicate with the GDB server. As long as target has some method of performing in-order, serial, byte-wise I/O (e.g: putchar/getchar over UART), it's possible to run `gdbstub` on it.
-    -   "You don't pay for what you don't use": All code related to parsing/handling protocol extensions is guaranteed to be dead-code-eliminated from an optimized binary if left unimplmeneted! See the [Zero-overhead Protocol Extensions](#zero-overhead-protocol-extensions) section below for more details.
-    -   `gdbstub` tries to keep the binary and RAM footprint of its minimal configuration to a bare minimum, enabling it to be used on even the most resource-constrained microcontrollers.
-        -   When compiled in release mode, using all the tricks outlined in [`min-sized-rust`](https://github.com/johnthagen/min-sized-rust), a baseline `gdbstub` implementation weighs in at **_roughly 10kb of `.text` and negligible `.rodata`!_** \*
-        - \* Exact numbers vary by target platform, compiler version, and `gdbstub` revision. Data was collected using the included `example_no_std` project compiled on x86_64.
+    -   `gdbstub` is entirely **panic free** (when compiled in release mode, without the `paranoid_unsafe` cargo feature).
+        -   Validated by inspecting the asm output of the in-tree `example_no_std`.
+    -   `gdbstub` is transport-layer agnostic, and uses a basic [`Connection`](https://docs.rs/gdbstub/latest/gdbstub/trait.Connection.html) interface to communicate with the GDB server. As long as target has some method of performing in-order, serial, byte-wise I/O (e.g: putchar/getchar over UART), it's possible to run `gdbstub` on it!
+    -   "You don't pay for what you don't use": All code related to parsing/handling protocol extensions is guaranteed to be dead-code-eliminated from an optimized binary if left unimplemented! See the [Zero-overhead Protocol Extensions](#zero-overhead-protocol-extensions) section below for more details.
+    -   `gdbstub`'s minimal configuration has an incredibly low binary size + RAM overhead, enabling it to be used on even the most resource-constrained microcontrollers.
+        -   When compiled in release mode, using all the tricks outlined in [`min-sized-rust`](https://github.com/johnthagen/min-sized-rust), a baseline `gdbstub` implementation can weigh in at **_less than 10kb of `.text` + `.rodata`!_** \*
+        - \*Exact numbers vary by target platform, compiler version, and `gdbstub` revision. Data was collected using the included `example_no_std` project compiled on x86_64.
 
 ### Can I Use `gdbstub` in Production?
 
@@ -102,6 +104,11 @@ When using `gdbstub` in `#![no_std]` contexts, make sure to set `default-feature
     -   Implement `Connection` for [`TcpStream`](https://doc.rust-lang.org/std/net/struct.TcpStream.html) and [`UnixStream`](https://doc.rust-lang.org/std/os/unix/net/struct.UnixStream.html).
     -   Implement [`std::error::Error`](https://doc.rust-lang.org/std/error/trait.Error.html) for `gdbstub::Error`.
     -   Add a `TargetError::Io` variant to simplify `std::io::Error` handling from Target methods.
+-   `paranoid_unsafe`
+    -   Enabling the `paranoid_unsafe` feature will swap out a handful of unsafe `get_unchecked_mut` operations with their safe equivalents, at the expense of introducing panicking code into `gdbstub`.
+        -   `rustc` + LLVM do a pretty incredible job at eliding bounds checks... most of the time. Unfortunately, there are a few places in the code where the compiler is not smart enough to "prove" that a bounds check isn't needed, and a bit of unsafe code is required to remove those bounds checks.
+    -   This feature is **disabled** by default, as the unsafe code has been aggressively audited and tested for correctness. That said, if you're particularly paranoid about the use of unsafe code, enabling this feature may offer some piece of mind.
+    -   Please refer to the [`unsafe` in `gdbstub`](#unsafe-in-gdbstub) section below for more details.
 
 ## Examples
 
@@ -150,8 +157,13 @@ If you happen to stumble across this crate and end up using it to debug some bar
 
 -   When no cargo features are enabled:
     -   A few trivially safe calls to `NonZeroUsize::new_unchecked()` when defining internal constants.
+
+-   When the `paranoid_unsafe` feature is enabled, the following `unsafe` code is _removed_:
+    -   `src/protocol/packet.rs`: Swaps a couple slice-index methods in `PacketBuf` to use `get_unchecked_mut`. The public API of struct ensures that the bounds used to index into the array remain in-bounds.
+    -   `src/protocol/common/hex`: Use an alternate implementation of `decode_hex_buf` which uses unsafe slice indexing.
+
 -   When the `std` feature is enabled:
-    -   An implementation of `UnixStream::peek` which uses `libc::recv`. This manual implementation will be removed once [rust-lang/rust#76923](https://github.com/rust-lang/rust/issues/76923) is stabilized.
+    -   `src/connection/impls/unixstream.rs`: An implementation of `UnixStream::peek` which uses `libc::recv`. This manual implementation will be removed once [rust-lang/rust#76923](https://github.com/rust-lang/rust/issues/76923) is stabilized.
 
 ## Future Plans + Roadmap to `1.0.0`
 

@@ -147,11 +147,24 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
 
     /// Write a single byte as a hex string (two ascii chars)
     fn write_hex(&mut self, byte: u8) -> Result<(), Error<C::Error>> {
-        for digit in [(byte & 0xf0) >> 4, byte & 0x0f].iter() {
+        for &digit in [(byte & 0xf0) >> 4, byte & 0x0f].iter() {
             let c = match digit {
                 0..=9 => b'0' + digit,
                 10..=15 => b'a' + digit - 10,
-                _ => unreachable!(),
+                // This match arm is unreachable, but the compiler isn't smart enough to optimize
+                // out the branch. As such, using `unreachable!` here would introduce panicking
+                // code to `gdbstub`.
+                //
+                // In this case, it'd be totally reasonable to use
+                // `unsafe { core::hint::unreachable_unchecked() }`, but i'll be honest, using some
+                // spooky unsafe compiler hints just to eek out a smidge more performance here just
+                // isn't worth the cognitive overhead.
+                //
+                // Moreover, I've played around with this code in godbolt.org, and it turns out that
+                // leaving this match arm as `=> digit` ends up generating the _exact same code_ as
+                // using `unreachable_unchecked` (at least on x86_64 targets compiled using the
+                // latest Rust compiler). YMMV on other platforms.
+                _ => digit,
             };
             self.write(c)?;
         }

@@ -13,6 +13,7 @@ pub(self) mod prelude {
     };
     pub use crate::protocol::common::Bstr;
     pub use crate::protocol::packet::PacketBuf;
+    pub use crate::util::no_panic_iter::SliceExt;
     pub use core::convert::{TryFrom, TryInto};
 }
 
