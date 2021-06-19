@@ -3,7 +3,9 @@ use std::net::{TcpListener, TcpStream};
 #[cfg(unix)]
 use std::os::unix::net::{UnixListener, UnixStream};
 
-use gdbstub::{state_machine::GdbStubStateMachine, Connection, DisconnectReason, GdbStub};
+use gdbstub::state_machine::{Event, GdbStubStateMachine};
+use gdbstub::target::ext::base::multithread::ThreadStopReason;
+use gdbstub::{target::Target, Connection, DisconnectReason, GdbStub};
 
 pub type DynResult<T> = Result<T, Box<dyn std::error::Error>>;
 
@@ -43,6 +45,72 @@ fn wait_for_uds(path: &str) -> DynResult<UnixStream> {
     Ok(stream)
 }
 
+fn run_debugger<T: Target, C: Connection>(
+    emu: &mut T,
+    gdb: GdbStub<'_, T, C>,
+) -> Result<DisconnectReason, gdbstub::GdbStubError<T::Error, C::Error>> {
+    let mut gdb = gdb.run_state_machine()?;
+    loop {
+        gdb = match gdb {
+            GdbStubStateMachine::Pump(mut gdb) => {
+                let byte = gdb
+                    .borrow_conn()
+                    .read()
+                    .map_err(gdbstub::GdbStubError::ConnectionRead)?;
+
+                let (gdb, disconnect_reason) = gdb.pump(emu, byte)?;
+                if let Some(disconnect_reason) = disconnect_reason {
+                    break Ok(disconnect_reason);
+                }
+                gdb
+            }
+
+            GdbStubStateMachine::DeferredStopReason(mut gdb) => {
+                // Note that the `armv4t` example doesn't use actually leverage deferred stop
+                // reasons, and simply runs the emulator inline as part of the `resume` logic.
+                //
+                // Nonetheless, as a way to demonstrate the state-machine API, I've tweaked the
+                // target's `resume` implementation to return `StopReason::Defer` if it peeks an
+                // interrupt packet.
+                //
+                // An implementation that uses stop reasons would need to "select" on both the
+                // data coming over the connection (which gets passed to `pump`) and whatever
+                // mechanism it is using to detect stop events.
+                //
+                // The specifics of how this "select" mechanism might work will depends on where
+                // `gdbstub` is being used.
+                //
+                // - A mpsc channel
+                // - epoll/kqueue
+                // - Running the target + stopping every so often to peek the connection
+                // - Driving `GdbStub` from various interrupt handlers
+
+                let byte = gdb
+                    .borrow_conn()
+                    .read()
+                    .map_err(gdbstub::GdbStubError::ConnectionRead)?;
+
+                let (gdb, event) = gdb.pump(emu, byte)?;
+                match event {
+                    Event::None => gdb,
+                    Event::Disconnect(disconnect_reason) => break Ok(disconnect_reason),
+                    Event::CtrlCInterrupt => {
+                        // when an interrupt is received, report the `GdbInterrupt` stop reason.
+                        if let GdbStubStateMachine::DeferredStopReason(gdb) = gdb {
+                            match gdb.deferred_stop_reason(emu, ThreadStopReason::GdbInterrupt)? {
+                                (_, Some(disconnect_reason)) => break Ok(disconnect_reason),
+                                (gdb, None) => gdb,
+                            }
+                        } else {
+                            gdb
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 fn main() -> DynResult<()> {
     pretty_env_logger::init();
 
@@ -63,98 +131,31 @@ fn main() -> DynResult<()> {
         }
     };
 
-    // hook-up debugger
     let gdb = GdbStub::new(connection);
-    let mut gdb = gdb.run_state_machine()?;
-    loop {
-        gdb = match gdb {
-            GdbStubStateMachine::Pump(mut gdb) => {
-                let byte = gdb.borrow_conn().read()?;
-                match gdb.pump(&mut emu, byte) {
-                    Ok((_, Some(disconnect_reason))) => {
-                        match disconnect_reason {
-                            DisconnectReason::Disconnect => {
-                                // run to completion
-                                while emu.step() != Some(emu::Event::Halted) {}
-                            }
-                            DisconnectReason::TargetExited(code) => {
-                                println!("Target exited with code {}!", code)
-                            }
-                            DisconnectReason::TargetTerminated(sig) => {
-                                println!("Target terminated with signal {}!", sig)
-                            }
-                            DisconnectReason::Kill => println!("GDB sent a kill command!"),
-                        }
-                        break;
-                    }
-                    Ok((gdb, None)) => gdb,
-                    Err(gdbstub::GdbStubError::TargetError(_e)) => {
-                        println!("Target raised a fatal error");
-                        break;
-                    }
-                    Err(e) => {
-                        println!("gdbstub internal error: {}", e);
-                        break;
-                    }
-                }
+
+    match run_debugger(&mut emu, gdb) {
+        Ok(disconnect_reason) => match disconnect_reason {
+            DisconnectReason::Disconnect => {
+                // run to completion
+                while emu.step() != Some(emu::Event::Halted) {}
+                let ret = emu.cpu.reg_get(armv4t_emu::Mode::User, 0);
+                println!("Program completed. Return value: {}", ret)
             }
-
-            GdbStubStateMachine::DeferredStopReason(mut gdb) => {
-                // armv4t example doesn't actually defer stop reasons
-                // instead, i've wired it up to defer GDB interrupts, as a way to demonstrate
-                // the API
-                //
-                // in a system with proper deferred stop reasons, you'll have to "select" on
-                // both the incoming data, and whatever mechanism you're using to detect stop
-                // events.
-                //
-                // I will think about how to improve the API to avoid having this manual byte !=
-                // 0x03 check, because this is pretty ugly at the moment.
-
-                let byte = gdb.borrow_conn().read()?;
-                if byte != 0x03 {
-                    println!("expected breakpoint packet, got something else: {}", byte);
-                    return Ok(());
-                }
-
-                eprintln!("deferred_stop_reason with GdbInterrupt");
-
-                match gdb.deferred_stop_reason(
-                    &mut emu,
-                    gdbstub::target::ext::base::multithread::ThreadStopReason::GdbInterrupt,
-                ) {
-                    Ok((_, Some(disconnect_reason))) => {
-                        match disconnect_reason {
-                            DisconnectReason::Disconnect => {
-                                // run to completion
-                                while emu.step() != Some(emu::Event::Halted) {}
-                            }
-                            DisconnectReason::TargetExited(code) => {
-                                println!("Target exited with code {}!", code)
-                            }
-                            DisconnectReason::TargetTerminated(sig) => {
-                                println!("Target terminated with signal {}!", sig)
-                            }
-                            DisconnectReason::Kill => println!("GDB sent a kill command!"),
-                        }
-                        break;
-                    }
-                    Ok((gdb, None)) => gdb,
-                    Err(gdbstub::GdbStubError::TargetError(_e)) => {
-                        println!("Target raised a fatal error");
-                        break;
-                    }
-                    Err(e) => {
-                        println!("gdbstub internal error: {}", e);
-                        break;
-                    }
-                }
+            DisconnectReason::TargetExited(code) => {
+                println!("Target exited with code {}!", code)
             }
+            DisconnectReason::TargetTerminated(sig) => {
+                println!("Target terminated with signal {}!", sig)
+            }
+            DisconnectReason::Kill => println!("GDB sent a kill command!"),
+        },
+        Err(gdbstub::GdbStubError::TargetError(e)) => {
+            println!("target encountered a fatal error: {}", e)
+        }
+        Err(e) => {
+            println!("gdbstub encountered a fatal error: {}", e)
         }
     }
-
-    let ret = emu.cpu.reg_get(armv4t_emu::Mode::User, 0);
-    println!("Program completed. Return value: {}", ret);
 
     Ok(())
 }

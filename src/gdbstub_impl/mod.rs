@@ -87,6 +87,7 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
                 State::Pump => {}
                 State::Disconnect(reason) => return Ok(reason),
                 State::DeferredStopReason => return Err(Error::CannotReturnDefer),
+                State::CtrlCInterrupt => {}
             }
         }
     }
@@ -129,10 +130,15 @@ pub mod state_machine {
         T: Target,
         C: Connection,
     {
-        /// Stub is waiting for target to report a stop reason
-        DeferredStopReason(GdbStubStateMachineInner<'a, state::DeferredStopReason, T, C>),
-        /// Stub is waiting for additional input
+        /// The target is completely stopped, and the GDB stub is waiting for
+        /// additional input.
         Pump(GdbStubStateMachineInner<'a, state::Pump, T, C>),
+        /// The target is currently running, and the GDB client is waiting for
+        /// the target to report a stop reason.
+        ///
+        /// Note that the client may still send packets to the target
+        /// (e.g: to trigger a Ctrl-C interrupt).
+        DeferredStopReason(GdbStubStateMachineInner<'a, state::DeferredStopReason, T, C>),
     }
 
     /// Zero-sized typestates.
@@ -141,11 +147,11 @@ pub mod state_machine {
     /// `GdbStubStateMachineInner`, thereby enforcing that certain API methods
     /// can only be called while the stub is in a certain state.
     pub mod state {
-        /// ZST typestate corresponding to the "DeferredStopReason" state.
-        pub enum DeferredStopReason {}
-
         /// ZST typestate corresponding to the "Pump" state.
         pub enum Pump {}
+
+        /// ZST typestate corresponding to the "DeferredStopReason" state.
+        pub enum DeferredStopReason {}
     }
 
     /// Internal helper macro to convert between a particular inner state into
@@ -213,6 +219,8 @@ pub mod state_machine {
         }
     }
 
+    /// Methods which can be called from the [`GdbStubStateMachine::Pump`]
+    /// state.
     impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::Pump, T, C> {
         pub(crate) fn from_plain_gdbstub(
             stub: GdbStub<'a, T, C>,
@@ -248,10 +256,18 @@ pub mod state_machine {
                 State::DeferredStopReason => {
                     Ok((self.transition::<state::DeferredStopReason>().into(), None))
                 }
+                // This arm will never get hit, as client will only ever send interrupt packets when
+                // the target is running.
+                State::CtrlCInterrupt => {
+                    log::error!("Unexpected interrupt packet!");
+                    Err(Error::PacketUnexpected)
+                }
             }
         }
     }
 
+    /// Methods which can be called from the
+    /// [`GdbStubStateMachine::DeferredStopReason`] state.
     impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::DeferredStopReason, T, C> {
         /// Report a deferred target stop reason back to GDB.
         pub fn deferred_stop_reason(
@@ -273,12 +289,65 @@ pub mod state_machine {
 
             Ok((self.transition::<state::Pump>().into(), event))
         }
+
+        /// Pass a byte to the GDB stub.
+        // DEVNOTE: unlike the `pump` method in the `state::Pump` state, this method
+        // doesn't transition to `state::Pump`, as the client is still waiting for the
+        // target to report a stop reason.
+        pub fn pump(
+            mut self,
+            target: &mut T,
+            byte: u8,
+        ) -> Result<(GdbStubStateMachine<'a, T, C>, Event), Error<T::Error, C::Error>> {
+            let packet_buffer = match self.recv_packet.pump(&mut self.packet_buffer, byte)? {
+                Some(buf) => buf,
+                None => return Ok((self.into(), Event::None)),
+            };
+
+            let packet = Packet::from_buf(target, packet_buffer).map_err(Error::PacketParse)?;
+            let state = self.inner.handle_packet(target, &mut self.conn, packet)?;
+            match state {
+                State::Pump => Ok((self.into(), Event::None)),
+                State::Disconnect(reason) => Ok((self.into(), Event::Disconnect(reason))),
+                State::DeferredStopReason => Ok((self.into(), Event::None)),
+                State::CtrlCInterrupt => Ok((self.into(), Event::CtrlCInterrupt)),
+            }
+        }
+    }
+
+    /// Events which may occur after calling `pump()` on a
+    /// [`GdbStubStateMachine::DeferredStopReason`].
+    pub enum Event {
+        /// Nothing happened.
+        None,
+        /// The client has triggered a disconnect.
+        Disconnect(DisconnectReason),
+        /// The client has sent a Ctrl-C interrupt.
+        ///
+        /// Please note the following GDB docs:
+        ///
+        /// > Stubs are not required to recognize these interrupt mechanisms and
+        /// the precise meaning associated with receipt of the interrupt is
+        /// implementation defined.
+        /// >
+        /// > If the target supports debugging of multiple threads and/or
+        /// processes, it should attempt to interrupt all currently-executing
+        /// threads and processes. If the stub is successful at interrupting the
+        /// running program, it should send one of the stop reply packets (see
+        /// Stop Reply Packets) to GDB as a result of successfully stopping the
+        /// program in all-stop mode, and a stop reply for each stopped thread
+        /// in non-stop mode.
+        /// >
+        /// > Interrupts received while the program is stopped are queued and
+        /// the program will be interrupted when it is resumed next time.
+        CtrlCInterrupt,
     }
 }
 
 enum State {
     Pump,
     DeferredStopReason,
+    CtrlCInterrupt,
     Disconnect(DisconnectReason),
 }
 
@@ -329,7 +398,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             Packet::Nack => Err(Error::ClientSentNack),
             Packet::Interrupt => {
                 debug!("<-- interrupt packet");
-                Ok(State::Pump)
+                Ok(State::CtrlCInterrupt)
             }
             Packet::Command(command) => {
                 // Acknowledge the command
