@@ -17,6 +17,9 @@ pub enum Event {
 pub struct Emu {
     start_addr: u32,
 
+    // example custom register. only read/written to from the GDB client
+    pub(crate) custom_reg: u32,
+
     pub(crate) cpu: Cpu,
     pub(crate) mem: ExampleMem,
 
@@ -61,6 +64,9 @@ impl Emu {
 
         Ok(Emu {
             start_addr: elf_header.entry as u32,
+
+            custom_reg: 0x12345678,
+
             cpu,
             mem,
 
