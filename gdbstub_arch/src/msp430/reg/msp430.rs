@@ -5,8 +5,8 @@ use gdbstub::internal::LeBytes;
 
 /// TI-MSP430 registers.
 ///
-/// The register width `<U>` should be set to `u16` for 16-bit MSP430 CPUs and
-/// to `u32` for 20-bit MSP430 CPUs (CPUX).
+/// The register width is set based on the `<U>` type. For 16-bit MSP430 CPUs
+/// this should be `u16` and for 20-bit MSP430 CPUs (CPUX) this should be `u32`.
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct Msp430Regs<U> {
     /// Program Counter (R0)

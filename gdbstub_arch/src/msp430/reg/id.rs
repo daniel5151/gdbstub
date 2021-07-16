@@ -65,7 +65,7 @@ mod tests {
 
         // The `Msp430Regs` implementation does not increment the size for
         // the CG register since it will always be the constant zero.
-        serialized_data_len += 4;
+        serialized_data_len += RId::from_raw_id(3).unwrap().1;
 
         // Accumulate register sizes returned by `from_raw_id`.
         let mut i = 0;
@@ -80,6 +80,11 @@ mod tests {
 
     #[test]
     fn test_msp430() {
-        test::<crate::msp430::reg::Msp430Regs, crate::msp430::reg::id::Msp430RegId>()
+        test::<crate::msp430::reg::Msp430Regs<u16>, crate::msp430::reg::id::Msp430RegId<u16>>()
+    }
+
+    #[test]
+    fn test_msp430x() {
+        test::<crate::msp430::reg::Msp430Regs<u32>, crate::msp430::reg::id::Msp430RegId<u32>>()
     }
 }

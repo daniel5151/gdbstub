@@ -25,7 +25,7 @@ impl<RegIdImpl: RegId> Arch for Msp430<RegIdImpl> {
     }
 }
 
-/// Implements `Arch` for CPUX 20-bit TI-MSP430 MCUs.
+/// Implements `Arch` for 20-bit TI-MSP430 MCUs (CPUX).
 ///
 /// Check out the [module level docs](gdbstub::arch#whats-with-regidimpl) for
 /// more info about the `RegIdImpl` type parameter.
