@@ -1,60 +1,74 @@
-use gdbstub::arch::Registers;
+use num_traits::PrimInt;
 
-/// 16-bit TI-MSP430 registers.
+use gdbstub::arch::Registers;
+use gdbstub::internal::LeBytes;
+
+/// TI-MSP430 registers.
+///
+/// The register width is set based on the `<U>` type. For 16-bit MSP430 CPUs
+/// this should be `u16` and for 20-bit MSP430 CPUs (CPUX) this should be `u32`.
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
-pub struct Msp430Regs {
+pub struct Msp430Regs<U> {
     /// Program Counter (R0)
-    pub pc: u16,
+    pub pc: U,
     /// Stack Pointer (R1)
-    pub sp: u16,
+    pub sp: U,
     /// Status Register (R2)
-    pub sr: u16,
+    pub sr: U,
     /// General Purpose Registers (R4-R15)
-    pub r: [u16; 11],
+    pub r: [U; 12],
 }
 
-impl Registers for Msp430Regs {
-    type ProgramCounter = u16;
+impl<U> Registers for Msp430Regs<U>
+where
+    U: PrimInt + LeBytes + Default + core::fmt::Debug,
+{
+    type ProgramCounter = U;
 
     fn pc(&self) -> Self::ProgramCounter {
         self.pc
     }
 
     fn gdb_serialize(&self, mut write_byte: impl FnMut(Option<u8>)) {
-        macro_rules! write_bytes {
-            ($bytes:expr) => {
-                for b in $bytes {
-                    write_byte(Some(*b))
+        macro_rules! write_le_bytes {
+            ($value:expr) => {
+                let mut buf = [0; 4];
+                // infallible (register size a maximum of 32-bits)
+                let len = $value.to_le_bytes(&mut buf).unwrap();
+                let buf = &buf[..len];
+                for b in buf {
+                    write_byte(Some(*b));
                 }
             };
         }
 
-        write_bytes!(&self.pc.to_le_bytes());
-        write_bytes!(&self.sp.to_le_bytes());
-        write_bytes!(&self.sr.to_le_bytes());
-        (0..4).for_each(|_| write_byte(None)); // Constant Generator (CG/R3)
+        write_le_bytes!(&self.pc);
+        write_le_bytes!(&self.sp);
+        write_le_bytes!(&self.sr);
+        (0..core::mem::size_of::<U>()).for_each(|_| write_byte(None)); // Constant Generator (CG/R3)
         for reg in self.r.iter() {
-            write_bytes!(&reg.to_le_bytes());
+            write_le_bytes!(&reg);
         }
     }
 
     fn gdb_deserialize(&mut self, bytes: &[u8]) -> Result<(), ()> {
-        // ensure bytes.chunks_exact(2) won't panic
-        if bytes.len() % 2 != 0 {
+        let ptrsize = core::mem::size_of::<U>();
+
+        // Ensure bytes contains enough data for all 16 registers
+        if bytes.len() < ptrsize * 16 {
             return Err(());
         }
 
-        use core::convert::TryInto;
         let mut regs = bytes
-            .chunks_exact(2)
-            .map(|c| u16::from_le_bytes(c.try_into().unwrap()));
+            .chunks_exact(ptrsize)
+            .map(|c| U::from_le_bytes(c).unwrap());
 
         self.pc = regs.next().ok_or(())?;
         self.sp = regs.next().ok_or(())?;
         self.sr = regs.next().ok_or(())?;
 
         // Constant Generator (CG/R3) should always be 0
-        if regs.next().ok_or(())? != 0 {
+        if regs.next().ok_or(())? != U::zero() {
             return Err(());
         }
 
