@@ -131,16 +131,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 match xml {
                     Some(xml) => {
                         let xml = xml.trim().as_bytes();
-                        if cmd.offset < xml.len() {
-                            // still more data
-                            res.write_str("m")?;
-                            res.write_binary(
-                                &xml[cmd.offset..][..cmd.len.min(xml.len() - cmd.offset)],
-                            )?
-                        } else {
-                            // no more data
-                            res.write_str("l")?;
-                        }
+                        res.write_binary_range(xml, cmd.offset, cmd.len)?;
                     }
                     // If the target hasn't provided their own XML, then the initial response to
                     // "qSupported" wouldn't have included "qXfer:features:read", and gdb wouldn't

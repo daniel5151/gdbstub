@@ -193,6 +193,25 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
         Ok(())
     }
 
+    /// Write a range of data specified by offset and len.
+    /// Used by qXfer:_object_:read commands.
+    pub fn write_binary_range(
+        &mut self,
+        data: &[u8],
+        offset: usize,
+        len: usize,
+    ) -> Result<(), Error<C::Error>> {
+        if offset < data.len() {
+            // still more data
+            self.write_str("m")?;
+            self.write_binary(&data[offset..][..len.min(data.len() - offset)])?
+        } else {
+            // no more data
+            self.write_str("l")?;
+        }
+        Ok(())
+    }
+
     /// Write a number as a big-endian hex string using the most compact
     /// representation possible (i.e: trimming leading zeros).
     pub fn write_num<D: BeBytes + PrimInt>(&mut self, digit: D) -> Result<(), Error<C::Error>> {
