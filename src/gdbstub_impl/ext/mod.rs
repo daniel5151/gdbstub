@@ -15,6 +15,7 @@ mod base;
 mod breakpoints;
 mod catch_syscalls;
 mod extended_mode;
+mod host_io;
 mod memory_map;
 mod monitor_cmd;
 mod reverse_exec;

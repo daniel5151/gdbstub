@@ -358,6 +358,11 @@ pub trait Target {
     fn catch_syscalls(&mut self) -> Option<ext::catch_syscalls::CatchSyscallsOps<Self>> {
         None
     }
+
+    /// Support Host I/O operations.
+    fn host_io(&mut self) -> Option<ext::host_io::HostIoOps<Self>> {
+        None
+    }
 }
 
 macro_rules! impl_dyn_target {

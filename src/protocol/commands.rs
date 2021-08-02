@@ -223,6 +223,13 @@ commands! {
         "qXfer:memory-map:read" => _qXfer_memory_map::qXferMemoryMapRead,
     }
 
+    host_io use 'a{
+        "vFile:open" => _vFile_open::vFileOpen<'a>,
+        "vFile:close" => _vFile_close::vFileClose,
+        "vFile:pread" => _vFile_pread::vFilePread,
+        "vFile:setfs" => _vFile_setfs::vFileSetfs,
+    }
+
     catch_syscalls use 'a {
         "QCatchSyscalls" => _QCatchSyscalls::QCatchSyscalls<'a>,
     }
