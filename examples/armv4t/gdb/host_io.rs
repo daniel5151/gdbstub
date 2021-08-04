@@ -2,8 +2,11 @@ use gdbstub::target;
 
 use crate::emu::Emu;
 
+use gdbstub::common::{HostMode, HostOpenFlags};
+use gdbstub::target::ext::host_io::PreadOutput;
+
 impl target::ext::host_io::HostIo for Emu {
-    fn open(&self, filename: &[u8], _flags: u64, _mode: u64) -> i64 {
+    fn open(&self, filename: &[u8], _flags: HostOpenFlags, _mode: HostMode) -> i64 {
         if filename == b"/proc/1/maps" {
             1
         } else {
@@ -11,13 +14,22 @@ impl target::ext::host_io::HostIo for Emu {
         }
     }
 
-    fn pread(&self, fd: usize, count: usize, offset: usize) -> &[u8] {
+    fn pread(
+        &self,
+        fd: usize,
+        count: u32,
+        offset: u32,
+        output: &mut PreadOutput<'_>,
+    ) -> Result<(), Self::Error> {
         if fd == 1 {
             let maps = b"0x55550000-0x55550078 r-x 0 0 0\n";
             let len = maps.len();
-            &maps[offset.min(len)..(offset + count).min(len)]
+            let count: usize = count as usize;
+            let offset: usize = offset as usize;
+            output.write(&maps[offset.min(len)..(offset + count).min(len)]);
+            Ok(())
         } else {
-            b""
+            Err("pread failed")
         }
     }
 

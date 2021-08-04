@@ -1,5 +1,7 @@
 use super::prelude::*;
+use crate::arch::Arch;
 use crate::protocol::commands::ext::HostIo;
+use crate::target::ext::host_io::PreadOutput;
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     pub(crate) fn handle_host_io(
@@ -29,11 +31,29 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 HandlerStatus::Handled
             }
             HostIo::vFilePread(cmd) => {
-                let data = ops.pread(cmd.fd, cmd.count, cmd.offset);
-                res.write_str("F")?;
-                res.write_num(data.len())?;
-                res.write_str(";")?;
-                res.write_binary(data)?;
+                let count = <T::Arch as Arch>::Usize::from_be_bytes(cmd.count)
+                    .ok_or(Error::TargetMismatch)?;
+                let offset = <T::Arch as Arch>::Usize::from_be_bytes(cmd.offset)
+                    .ok_or(Error::TargetMismatch)?;
+                let mut err: Result<_, Error<T::Error, C::Error>> = Ok(());
+                let mut callback = |data: &[u8]| {
+                    let e = (|| {
+                        res.write_str("F")?;
+                        res.write_num(data.len())?;
+                        res.write_str(";")?;
+                        res.write_binary(data)?;
+                        Ok(())
+                    })();
+
+                    if let Err(e) = e {
+                        err = Err(e)
+                    }
+                };
+
+                ops.pread(cmd.fd, count, offset, &mut PreadOutput::new(&mut callback))
+                    .map_err(Error::TargetError)?;
+                err?;
+
                 HandlerStatus::Handled
             }
             HostIo::vFileSetfs(cmd) => {
