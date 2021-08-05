@@ -2,7 +2,7 @@ use super::prelude::*;
 
 #[derive(Debug)]
 pub struct vFileClose {
-    pub fd: usize,
+    pub fd: i32,
 }
 
 impl<'a> ParseCommand<'a> for vFileClose {

@@ -2,25 +2,49 @@ use gdbstub::target;
 
 use crate::emu::Emu;
 
-use gdbstub::common::{HostMode, HostOpenFlags};
-use gdbstub::target::ext::host_io::PreadOutput;
+use gdbstub::target::ext::host_io::{HostIoOutput, HostMode, HostOpenFlags};
+use gdbstub::target::TargetResult;
 
 impl target::ext::host_io::HostIo for Emu {
-    fn open(&self, filename: &[u8], _flags: HostOpenFlags, _mode: HostMode) -> i64 {
-        if filename == b"/proc/1/maps" {
-            1
-        } else {
-            -1
-        }
+    #[inline(always)]
+    fn enable_open(&mut self) -> Option<target::ext::host_io::HostIoOpenOps<Self>> {
+        Some(self)
     }
 
+    #[inline(always)]
+    fn enable_pread(&mut self) -> Option<target::ext::host_io::HostIoPreadOps<Self>> {
+        Some(self)
+    }
+
+    #[inline(always)]
+    fn enable_close(&mut self) -> Option<target::ext::host_io::HostIoCloseOps<Self>> {
+        Some(self)
+    }
+}
+
+impl target::ext::host_io::HostIoOpen for Emu {
+    fn open(
+        &mut self,
+        filename: &[u8],
+        _flags: HostOpenFlags,
+        _mode: HostMode,
+    ) -> TargetResult<i32, Self> {
+        if filename == b"/proc/1/maps" {
+            Ok(1)
+        } else {
+            Ok(-1)
+        }
+    }
+}
+
+impl target::ext::host_io::HostIoPread for Emu {
     fn pread(
-        &self,
-        fd: usize,
+        &mut self,
+        fd: i32,
         count: u32,
         offset: u32,
-        output: &mut PreadOutput<'_>,
-    ) -> Result<(), Self::Error> {
+        output: HostIoOutput<'_>,
+    ) -> TargetResult<(), Self> {
         if fd == 1 {
             let maps = b"0x55550000-0x55550078 r-x 0 0 0\n";
             let len = maps.len();
@@ -29,19 +53,17 @@ impl target::ext::host_io::HostIo for Emu {
             output.write(&maps[offset.min(len)..(offset + count).min(len)]);
             Ok(())
         } else {
-            Err("pread failed")
+            Err(().into())
         }
     }
+}
 
-    fn close(&self, fd: usize) -> i64 {
+impl target::ext::host_io::HostIoClose for Emu {
+    fn close(&mut self, fd: i32) -> TargetResult<i64, Self> {
         if fd == 1 {
-            0
+            Ok(0)
         } else {
-            -1
+            Ok(-1)
         }
-    }
-
-    fn setfs(&self, _fd: usize) -> i64 {
-        0
     }
 }

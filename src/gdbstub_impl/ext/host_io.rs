@@ -1,7 +1,7 @@
 use super::prelude::*;
 use crate::arch::Arch;
 use crate::protocol::commands::ext::HostIo;
-use crate::target::ext::host_io::PreadOutput;
+use crate::target::ext::host_io::HostIoOutput;
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     pub(crate) fn handle_host_io(
@@ -18,19 +18,21 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         crate::__dead_code_marker!("host_io", "impl");
 
         let handler_status = match command {
-            HostIo::vFileOpen(cmd) => {
-                let ret = ops.open(cmd.filename, cmd.flags, cmd.mode);
+            HostIo::vFileOpen(cmd) if ops.enable_open().is_some() => {
+                let ops = ops.enable_open().unwrap();
+                let ret = ops.open(cmd.filename, cmd.flags, cmd.mode).handle_error()?;
                 res.write_str("F")?;
                 res.write_num(ret)?;
                 HandlerStatus::Handled
             }
-            HostIo::vFileClose(cmd) => {
-                let ret = ops.close(cmd.fd);
+            HostIo::vFileClose(cmd) if ops.enable_close().is_some() => {
+                let ops = ops.enable_close().unwrap();
+                let ret = ops.close(cmd.fd).handle_error()?;
                 res.write_str("F")?;
                 res.write_num(ret)?;
                 HandlerStatus::Handled
             }
-            HostIo::vFilePread(cmd) => {
+            HostIo::vFilePread(cmd) if ops.enable_pread().is_some() => {
                 let count = <T::Arch as Arch>::Usize::from_be_bytes(cmd.count)
                     .ok_or(Error::TargetMismatch)?;
                 let offset = <T::Arch as Arch>::Usize::from_be_bytes(cmd.offset)
@@ -50,18 +52,65 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     }
                 };
 
-                ops.pread(cmd.fd, count, offset, &mut PreadOutput::new(&mut callback))
-                    .map_err(Error::TargetError)?;
+                let ops = ops.enable_pread().unwrap();
+                ops.pread(cmd.fd, count, offset, HostIoOutput::new(&mut callback))
+                    .handle_error()?;
                 err?;
 
                 HandlerStatus::Handled
             }
-            HostIo::vFileSetfs(cmd) => {
-                let ret = ops.setfs(cmd.fd);
+            HostIo::vFilePwrite(cmd) if ops.enable_pwrite().is_some() => {
+                let offset = <T::Arch as Arch>::Usize::from_be_bytes(cmd.offset)
+                    .ok_or(Error::TargetMismatch)?;
+                let ops = ops.enable_pwrite().unwrap();
+                let ret = ops.pwrite(cmd.fd, offset, cmd.data).handle_error()?;
                 res.write_str("F")?;
                 res.write_num(ret)?;
                 HandlerStatus::Handled
             }
+            HostIo::vFileFstat(cmd) if ops.enable_fstat().is_some() => {
+                let mut err: Result<_, Error<T::Error, C::Error>> = Ok(());
+                let mut callback = |data: &[u8]| {
+                    let e = (|| {
+                        res.write_str("F")?;
+                        res.write_num(data.len())?;
+                        res.write_str(";")?;
+                        res.write_binary(data)?;
+                        Ok(())
+                    })();
+
+                    if let Err(e) = e {
+                        err = Err(e)
+                    }
+                };
+
+                let ops = ops.enable_fstat().unwrap();
+                ops.fstat(cmd.fd, HostIoOutput::new(&mut callback))
+                    .handle_error()?;
+                err?;
+
+                HandlerStatus::Handled
+            }
+            HostIo::vFileUnlink(cmd) if ops.enable_unlink().is_some() => {
+                let ops = ops.enable_unlink().unwrap();
+                let ret = ops.unlink(cmd.filename).handle_error()?;
+                res.write_str("F")?;
+                res.write_num(ret)?;
+                HandlerStatus::Handled
+            }
+            HostIo::vFileReadlink(cmd) if ops.enable_readlink().is_some() => {
+                let ops = ops.enable_readlink().unwrap();
+                let ret = ops.readlink(cmd.filename).handle_error()?;
+                res.write_str("F")?;
+                res.write_num(ret)?;
+                HandlerStatus::Handled
+            }
+            HostIo::vFileSetfs(cmd) if ops.enable_setfs().is_some() => {
+                let ops = ops.enable_setfs().unwrap();
+                ops.setfs(cmd.pid).handle_error()?;
+                HandlerStatus::Handled
+            }
+            _ => HandlerStatus::Handled,
         };
 
         Ok(handler_status)

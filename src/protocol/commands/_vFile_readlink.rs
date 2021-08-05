@@ -1,11 +1,11 @@
 use super::prelude::*;
 
 #[derive(Debug)]
-pub struct vFileSetfs {
-    pub pid: usize,
+pub struct vFileReadlink<'a> {
+    pub filename: &'a [u8],
 }
 
-impl<'a> ParseCommand<'a> for vFileSetfs {
+impl<'a> ParseCommand<'a> for vFileReadlink<'a> {
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
         let body = buf.into_body();
         if body.is_empty() {
@@ -14,8 +14,8 @@ impl<'a> ParseCommand<'a> for vFileSetfs {
 
         match body {
             [b':', body @ ..] => {
-                let pid = decode_hex(body).ok()?;
-                Some(vFileSetfs{pid})
+                let filename = decode_hex_buf(body).ok()?;
+                Some(vFileReadlink{filename})
             },
             _ => None,
         }

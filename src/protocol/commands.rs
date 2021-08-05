@@ -227,6 +227,10 @@ commands! {
         "vFile:open" => _vFile_open::vFileOpen<'a>,
         "vFile:close" => _vFile_close::vFileClose,
         "vFile:pread" => _vFile_pread::vFilePread<'a>,
+        "vFile:pwrite" => _vFile_pwrite::vFilePwrite<'a>,
+        "vFile:fstat" => _vFile_fstat::vFileFstat,
+        "vFile:unlink" => _vFile_unlink::vFileUnlink<'a>,
+        "vFile:readlink" => _vFile_readlink::vFileReadlink<'a>,
         "vFile:setfs" => _vFile_setfs::vFileSetfs,
     }
 

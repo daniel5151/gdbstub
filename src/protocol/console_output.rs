@@ -30,7 +30,7 @@ impl<'a> fmt::Write for ConsoleOutput<'a> {
 }
 
 impl<'a> ConsoleOutput<'a> {
-    pub(crate) fn new(callback: &'a mut dyn FnMut(&[u8])) -> Self {
+    pub(crate) fn new(callback: &'a mut dyn FnMut(&[u8])) -> ConsoleOutput<'a> {
         ConsoleOutput {
             #[cfg(feature = "alloc")]
             buf: Vec::new(),

@@ -1,6 +1,6 @@
 use super::prelude::*;
 
-use crate::common::{HostOpenFlags, HostMode};
+use crate::target::ext::host_io::{HostOpenFlags, HostMode};
 
 #[derive(Debug)]
 pub struct vFileOpen<'a> {
@@ -20,8 +20,8 @@ impl<'a> ParseCommand<'a> for vFileOpen<'a> {
             [b':', body @ ..] => {
                 let mut body = body.splitn_mut_no_panic(3, |b| *b == b',');
                 let filename = decode_hex_buf(body.next()?).ok()?;
-                let flags = HostOpenFlags::from_bits_truncate(decode_hex(body.next()?).ok()?);
-                let mode = HostMode::from_bits_truncate(decode_hex(body.next()?).ok()?);
+                let flags = HostOpenFlags::from_bits(decode_hex(body.next()?).ok()?).unwrap();
+                let mode = HostMode::from_bits(decode_hex(body.next()?).ok()?).unwrap();
                 Some(vFileOpen{filename, flags, mode})
             },
             _ => None,

@@ -400,6 +400,16 @@ macro_rules! impl_dyn_target {
             }
 
             #[inline(always)]
+            fn host_io(&mut self) -> Option<ext::host_io::HostIoOps<Self>> {
+                (**self).host_io()
+            }
+
+            #[inline(always)]
+            fn memory_map(&mut self) -> Option<ext::memory_map::MemoryMapOps<Self>> {
+                (**self).memory_map()
+            }
+
+            #[inline(always)]
             fn section_offsets(&mut self) -> Option<ext::section_offsets::SectionOffsetsOps<Self>> {
                 (**self).section_offsets()
             }
