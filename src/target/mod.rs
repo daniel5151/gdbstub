@@ -360,6 +360,7 @@ pub trait Target {
     }
 
     /// Support Host I/O operations.
+    #[inline(always)]
     fn host_io(&mut self) -> Option<ext::host_io::HostIoOps<Self>> {
         None
     }

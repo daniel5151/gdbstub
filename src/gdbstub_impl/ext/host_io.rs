@@ -1,7 +1,7 @@
 use super::prelude::*;
 use crate::arch::Arch;
 use crate::protocol::commands::ext::HostIo;
-use crate::target::ext::host_io::HostIoOutput;
+use crate::target::ext::host_io::{HostStat, PreadOutput};
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     pub(crate) fn handle_host_io(
@@ -53,7 +53,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 };
 
                 let ops = ops.enable_pread().unwrap();
-                ops.pread(cmd.fd, count, offset, HostIoOutput::new(&mut callback))
+                ops.pread(cmd.fd, count, offset, PreadOutput::new(&mut callback))
                     .handle_error()?;
                 err?;
 
@@ -69,26 +69,15 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 HandlerStatus::Handled
             }
             HostIo::vFileFstat(cmd) if ops.enable_fstat().is_some() => {
-                let mut err: Result<_, Error<T::Error, C::Error>> = Ok(());
-                let mut callback = |data: &[u8]| {
-                    let e = (|| {
-                        res.write_str("F")?;
-                        res.write_num(data.len())?;
-                        res.write_str(";")?;
-                        res.write_binary(data)?;
-                        Ok(())
-                    })();
-
-                    if let Err(e) = e {
-                        err = Err(e)
-                    }
-                };
-
                 let ops = ops.enable_fstat().unwrap();
-                ops.fstat(cmd.fd, HostIoOutput::new(&mut callback))
-                    .handle_error()?;
-                err?;
-
+                let stat = ops.fstat(cmd.fd).handle_error()?;
+                let size = core::mem::size_of_val(&stat);
+                let p: *const HostStat = &stat;
+                let p: *const u8 = p as *const u8;
+                res.write_str("F")?;
+                res.write_num(size)?;
+                res.write_str(";")?;
+                res.write_binary(unsafe { core::slice::from_raw_parts(p, size) })?;
                 HandlerStatus::Handled
             }
             HostIo::vFileUnlink(cmd) if ops.enable_unlink().is_some() => {
@@ -107,7 +96,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             }
             HostIo::vFileSetfs(cmd) if ops.enable_setfs().is_some() => {
                 let ops = ops.enable_setfs().unwrap();
-                ops.setfs(cmd.pid).handle_error()?;
+                ops.setfs(cmd.fs).handle_error()?;
                 HandlerStatus::Handled
             }
             _ => HandlerStatus::Handled,
