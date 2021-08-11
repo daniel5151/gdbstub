@@ -2,8 +2,9 @@ use gdbstub::target;
 
 use crate::emu::Emu;
 
-use gdbstub::target::ext::host_io::{HostMode, HostOpenFlags, PreadOutput, PreadToken};
-use gdbstub::target::TargetResult;
+use gdbstub::target::ext::host_io::{
+    HostIoErrno, HostIoError, HostIoMode, HostIoOpenFlags, HostIoResult, PreadOutput, PreadToken,
+};
 
 impl target::ext::host_io::HostIo for Emu {
     #[inline(always)]
@@ -26,14 +27,14 @@ impl target::ext::host_io::HostIoOpen for Emu {
     fn open(
         &mut self,
         filename: &[u8],
-        _flags: HostOpenFlags,
-        _mode: HostMode,
-    ) -> TargetResult<i32, Self> {
+        _flags: HostIoOpenFlags,
+        _mode: HostIoMode,
+    ) -> HostIoResult<u32, Self> {
         // Support `info proc mappings` command
         if filename == b"/proc/1/maps" {
             Ok(1)
         } else {
-            Ok(-1)
+            Err(HostIoError::Errno(HostIoErrno::EPERM))
         }
     }
 }
@@ -45,7 +46,7 @@ impl target::ext::host_io::HostIoPread for Emu {
         count: u32,
         offset: u32,
         output: PreadOutput<'a>,
-    ) -> TargetResult<PreadToken<'a>, Self> {
+    ) -> HostIoResult<PreadToken<'a>, Self> {
         if fd == 1 {
             let maps = b"0x55550000-0x55550078 r-x 0 0 0\n";
             let len = maps.len();
@@ -53,17 +54,17 @@ impl target::ext::host_io::HostIoPread for Emu {
             let offset: usize = offset as usize;
             Ok(output.write(&maps[offset.min(len)..(offset + count).min(len)]))
         } else {
-            Err(().into())
+            Err(HostIoError::Errno(HostIoErrno::EPERM))
         }
     }
 }
 
 impl target::ext::host_io::HostIoClose for Emu {
-    fn close(&mut self, fd: i32) -> TargetResult<i64, Self> {
+    fn close(&mut self, fd: i32) -> HostIoResult<u32, Self> {
         if fd == 1 {
             Ok(0)
         } else {
-            Ok(-1)
+            Err(HostIoError::Errno(HostIoErrno::EPERM))
         }
     }
 }

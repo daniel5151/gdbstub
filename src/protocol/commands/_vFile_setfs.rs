@@ -16,9 +16,9 @@ impl<'a> ParseCommand<'a> for vFileSetfs {
 
         match body {
             [b':', body @ ..] => {
-                let fs = match decode_hex(body).ok()? {
-                    0 => FsKind::Stub,
-                    pid => FsKind::Pid(NonZeroUsize::new(pid).unwrap()),
+                let fs = match NonZeroUsize::new(decode_hex(body).ok()?) {
+                    None => FsKind::Stub,
+                    Some(pid) => FsKind::Pid(pid),
                 };
                 Some(vFileSetfs{fs})
             },
