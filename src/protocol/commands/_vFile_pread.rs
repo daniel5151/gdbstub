@@ -2,7 +2,7 @@ use super::prelude::*;
 
 #[derive(Debug)]
 pub struct vFilePread<'a> {
-    pub fd: i32,
+    pub fd: u32,
     pub count: &'a [u8],
     pub offset: &'a [u8],
 }

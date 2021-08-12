@@ -2,7 +2,7 @@ use super::prelude::*;
 
 #[derive(Debug)]
 pub struct vFilePwrite<'a> {
-    pub fd: i32,
+    pub fd: u32,
     pub offset: &'a [u8],
     pub data: &'a [u8],
 }

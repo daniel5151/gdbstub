@@ -2,7 +2,7 @@ use super::prelude::*;
 
 #[derive(Debug)]
 pub struct vFileFstat {
-    pub fd: i32,
+    pub fd: u32,
 }
 
 impl<'a> ParseCommand<'a> for vFileFstat {

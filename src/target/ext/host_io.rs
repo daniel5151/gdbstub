@@ -31,7 +31,7 @@ bitflags! {
     ///
     /// Extracted from the GDB documentation at
     /// [mode_t Values](https://sourceware.org/gdb/current/onlinedocs/gdb/mode_005ft-Values.html#mode_005ft-Values)
-    pub struct HostIoMode: u32 {
+    pub struct HostIoOpenMode: u32 {
         /// A regular file.
         const S_IFREG = 0o100000;
         /// A directory.
@@ -62,13 +62,13 @@ bitflags! {
 /// Extracted from the GDB documentation at
 /// [struct stat](https://sourceware.org/gdb/current/onlinedocs/gdb/struct-stat.html#struct-stat)
 #[derive(Debug)]
-pub struct HostStat {
+pub struct HostIoStat {
     /// The device.
     pub st_dev: u32,
     /// The inode.
     pub st_ino: u32,
     /// Protection bits.
-    pub st_mode: HostIoMode,
+    pub st_mode: HostIoOpenMode,
     /// The number of hard links.
     pub st_nlink: u32,
     /// The user id of the owner.
@@ -178,25 +178,25 @@ pub enum HostIoError<E> {
 /// See [`HostIoError`] for more details.
 pub type HostIoResult<T, Tgt> = Result<T, HostIoError<<Tgt as Target>::Error>>;
 
-/// Zero-sized type token that ensures PreadOutput::write is called
-pub struct PreadToken<'a>(core::marker::PhantomData<&'a *mut ()>);
+/// Zero-sized type token that ensures HostIoOutput::write is called
+pub struct HostIoToken<'a>(core::marker::PhantomData<&'a *mut ()>);
 
 /// An interface to send pread data back to the GDB client.
-pub struct PreadOutput<'a> {
+pub struct HostIoOutput<'a> {
     cb: &'a mut dyn FnMut(&[u8]),
-    token: PreadToken<'a>,
+    token: HostIoToken<'a>,
 }
 
-impl<'a> PreadOutput<'a> {
+impl<'a> HostIoOutput<'a> {
     pub(crate) fn new(cb: &'a mut dyn FnMut(&[u8])) -> Self {
         Self {
             cb,
-            token: PreadToken(core::marker::PhantomData),
+            token: HostIoToken(core::marker::PhantomData),
         }
     }
 
     /// Write out raw file bytes to the GDB debugger.
-    pub fn write(self, buf: &[u8]) -> PreadToken<'a> {
+    pub fn write(self, buf: &[u8]) -> HostIoToken<'a> {
         (self.cb)(buf);
         self.token
     }
@@ -251,17 +251,17 @@ define_ext!(HostIoOps, HostIo);
 /// Nested Target Extension - Host I/O open operation.
 pub trait HostIoOpen: HostIo {
     /// Open a file at filename and return a file descriptor for it, or return
-    /// -1 if an error occurs.
+    /// [`HostIoError::Errno`] if an error occurs.
     ///
     /// The filename is a string, flags is an integer indicating a mask of open
     /// flags (see [`HostIoOpenFlags`]), and mode is an integer indicating a
     /// mask of mode bits to use if the file is created (see
-    /// [`HostIoMode`]).
+    /// [`HostIoOpenMode`]).
     fn open(
         &mut self,
         filename: &[u8],
         flags: HostIoOpenFlags,
-        mode: HostIoMode,
+        mode: HostIoOpenMode,
     ) -> HostIoResult<u32, Self>;
 }
 
@@ -269,9 +269,9 @@ define_ext!(HostIoOpenOps, HostIoOpen);
 
 /// Nested Target Extension - Host I/O close operation.
 pub trait HostIoClose: HostIo {
-    /// Close the open file corresponding to fd and return 0, or -1 if an error
-    /// occurs.
-    fn close(&mut self, fd: i32) -> HostIoResult<u32, Self>;
+    /// Close the open file corresponding to fd and return 0, or
+    /// [`HostIoError::Errno`] if an error occurs.
+    fn close(&mut self, fd: u32) -> HostIoResult<u32, Self>;
 }
 
 define_ext!(HostIoCloseOps, HostIoClose);
@@ -283,18 +283,14 @@ pub trait HostIoPread: HostIo {
     /// Up to count bytes will be read from the file, starting at offset
     /// relative to the start of the file.
     ///
-    /// The target may read fewer bytes; common reasons include packet size
-    /// limits and an end-of-file condition.
-    ///
-    /// The number of bytes read is returned. Zero should only be returned for a
-    /// successful read at the end of the file, or if count was zero.
+    /// The data read should be sent with [`HostIoOutput`].
     fn pread<'a>(
         &mut self,
-        fd: i32,
+        fd: u32,
         count: <Self::Arch as Arch>::Usize,
         offset: <Self::Arch as Arch>::Usize,
-        output: PreadOutput<'a>,
-    ) -> HostIoResult<PreadToken<'a>, Self>;
+        output: HostIoOutput<'a>,
+    ) -> HostIoResult<HostIoToken<'a>, Self>;
 }
 
 define_ext!(HostIoPreadOps, HostIoPread);
@@ -308,11 +304,11 @@ pub trait HostIoPwrite: HostIo {
     /// Unlike many write system calls, there is no separate count argument; the
     /// length of data in the packet is used.
     ///
-    /// ‘vFile:pwrite’ returns the number of bytes written, which may be shorter
-    /// than the length of data, or -1 if an error occurred.
+    /// Return the number of bytes written, which may be shorter
+    /// than the length of data, or [`HostIoError::Errno`] if an error occurred.
     fn pwrite(
         &mut self,
-        fd: i32,
+        fd: u32,
         offset: <Self::Arch as Arch>::Usize,
         data: &[u8],
     ) -> HostIoResult<u32, Self>;
@@ -324,19 +320,17 @@ define_ext!(HostIoPwriteOps, HostIoPwrite);
 pub trait HostIoFstat: HostIo {
     /// Get information about the open file corresponding to fd.
     ///
-    /// On success the information is returned as a binary attachment and the
-    /// return value is the size of this attachment in bytes. If an error occurs
-    /// the return value is -1.
-    fn fstat(&mut self, fd: i32) -> HostIoResult<HostStat, Self>;
+    /// On success return a [`HostIoStat`] struct.
+    /// Return [`HostIoError::Errno`] if an error occurs.
+    fn fstat(&mut self, fd: u32) -> HostIoResult<HostIoStat, Self>;
 }
 
 define_ext!(HostIoFstatOps, HostIoFstat);
 
 /// Nested Target Extension - Host I/O unlink operation.
 pub trait HostIoUnlink: HostIo {
-    /// Delete the file at filename on the target.
-    ///
-    /// Return 0, or -1 if an error occurs.
+    /// Delete the file at filename on the target and return 0, or
+    /// [`HostIoError::Errno`] if an error occurs.
     fn unlink(&mut self, filename: &[u8]) -> HostIoResult<u32, Self>;
 }
 
@@ -344,16 +338,14 @@ define_ext!(HostIoUnlinkOps, HostIoUnlink);
 
 /// Nested Target Extension - Host I/O readlink operation.
 pub trait HostIoReadlink: HostIo {
-    /// Read value of symbolic link filename on the target. Return the number of
-    /// bytes read, or -1 if an error occurs.
+    /// Read value of symbolic link filename on the target.
     ///
-    /// The data read should be returned as a binary attachment on success. If
-    /// zero bytes were read, the response should include an empty binary
-    /// attachment (i.e. a trailing semicolon).
-    ///
-    /// The return value is the number of target bytes read; the binary
-    /// attachment may be longer if some characters were escaped.
-    fn readlink(&mut self, filename: &[u8]) -> HostIoResult<u32, Self>;
+    /// The data read should be sent with [`HostIoOutput`].
+    fn readlink<'a>(
+        &mut self,
+        filename: &[u8],
+        output: HostIoOutput<'a>,
+    ) -> HostIoResult<u32, Self>;
 }
 
 define_ext!(HostIoReadlinkOps, HostIoReadlink);
@@ -365,12 +357,11 @@ pub trait HostIoSetfs: HostIo {
     /// remote targets where the remote stub does not share a common filesystem
     /// with the inferior(s).
     ///
-    /// If pid is nonzero, select the filesystem as seen by process pid. If pid
-    /// is zero, select the filesystem as seen by the remote stub.
+    /// See [`FsKind`] for the meaning of argument.
     ///
-    /// Return 0 on success, or -1 if an error occurs. If vFile:setfs: indicates
-    /// success, the selected filesystem remains selected until the next
-    /// successful vFile:setfs: operation.
+    /// Return 0 on success, or [`HostIoError::Errno`] if an error occurs. If
+    /// setfs indicates success, the selected filesystem remains selected
+    /// until the next successful setfs operation.
     fn setfs(&mut self, fs: FsKind) -> HostIoResult<u32, Self>;
 }
 

@@ -1,12 +1,12 @@
 use super::prelude::*;
 
-use crate::target::ext::host_io::{HostIoOpenFlags, HostIoMode};
+use crate::target::ext::host_io::{HostIoOpenFlags, HostIoOpenMode};
 
 #[derive(Debug)]
 pub struct vFileOpen<'a> {
     pub filename: &'a [u8],
     pub flags: HostIoOpenFlags,
-    pub mode: HostIoMode,
+    pub mode: HostIoOpenMode,
 }
 
 impl<'a> ParseCommand<'a> for vFileOpen<'a> {
@@ -21,7 +21,7 @@ impl<'a> ParseCommand<'a> for vFileOpen<'a> {
                 let mut body = body.splitn_mut_no_panic(3, |b| *b == b',');
                 let filename = decode_hex_buf(body.next()?).ok()?;
                 let flags = HostIoOpenFlags::from_bits(decode_hex(body.next()?).ok()?).unwrap();
-                let mode = HostIoMode::from_bits(decode_hex(body.next()?).ok()?).unwrap();
+                let mode = HostIoOpenMode::from_bits(decode_hex(body.next()?).ok()?).unwrap();
                 Some(vFileOpen{filename, flags, mode})
             },
             _ => None,

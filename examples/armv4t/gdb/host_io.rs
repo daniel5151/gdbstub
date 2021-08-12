@@ -3,7 +3,8 @@ use gdbstub::target;
 use crate::emu::Emu;
 
 use gdbstub::target::ext::host_io::{
-    HostIoErrno, HostIoError, HostIoMode, HostIoOpenFlags, HostIoResult, PreadOutput, PreadToken,
+    HostIoErrno, HostIoError, HostIoOpenFlags, HostIoOpenMode, HostIoOutput, HostIoResult,
+    HostIoToken,
 };
 
 impl target::ext::host_io::HostIo for Emu {
@@ -28,7 +29,7 @@ impl target::ext::host_io::HostIoOpen for Emu {
         &mut self,
         filename: &[u8],
         _flags: HostIoOpenFlags,
-        _mode: HostIoMode,
+        _mode: HostIoOpenMode,
     ) -> HostIoResult<u32, Self> {
         // Support `info proc mappings` command
         if filename == b"/proc/1/maps" {
@@ -42,11 +43,11 @@ impl target::ext::host_io::HostIoOpen for Emu {
 impl target::ext::host_io::HostIoPread for Emu {
     fn pread<'a>(
         &mut self,
-        fd: i32,
+        fd: u32,
         count: u32,
         offset: u32,
-        output: PreadOutput<'a>,
-    ) -> HostIoResult<PreadToken<'a>, Self> {
+        output: HostIoOutput<'a>,
+    ) -> HostIoResult<HostIoToken<'a>, Self> {
         if fd == 1 {
             let maps = b"0x55550000-0x55550078 r-x 0 0 0\n";
             let len = maps.len();
@@ -60,7 +61,7 @@ impl target::ext::host_io::HostIoPread for Emu {
 }
 
 impl target::ext::host_io::HostIoClose for Emu {
-    fn close(&mut self, fd: i32) -> HostIoResult<u32, Self> {
+    fn close(&mut self, fd: u32) -> HostIoResult<u32, Self> {
         if fd == 1 {
             Ok(0)
         } else {
