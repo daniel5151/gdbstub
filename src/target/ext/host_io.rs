@@ -172,6 +172,22 @@ pub enum HostIoError<E> {
     Fatal(E),
 }
 
+/// Converts a `std::io::Error` into a `HostIoError::Errno`.
+#[cfg(feature = "std")]
+impl<E> From<std::io::Error> for HostIoError<E> {
+    fn from(e: std::io::Error) -> HostIoError<E> {
+        use std::io::ErrorKind::*;
+        match e.kind() {
+            PermissionDenied => HostIoError::Errno(HostIoErrno::EPERM),
+            NotFound => HostIoError::Errno(HostIoErrno::ENOENT),
+            Interrupted => HostIoError::Errno(HostIoErrno::EINTR),
+            AlreadyExists => HostIoError::Errno(HostIoErrno::EEXIST),
+            InvalidInput => HostIoError::Errno(HostIoErrno::EINVAL),
+            _ => HostIoError::Errno(HostIoErrno::EUNKNOWN),
+        }
+    }
+}
+
 /// A specialized `Result` type for Host I/O operations. Supports reporting
 /// non-fatal errors back to the GDB client.
 ///
@@ -269,9 +285,9 @@ define_ext!(HostIoOpenOps, HostIoOpen);
 
 /// Nested Target Extension - Host I/O close operation.
 pub trait HostIoClose: HostIo {
-    /// Close the open file corresponding to fd and return 0, or
+    /// Close the open file corresponding to fd and return Ok(()), or
     /// [`HostIoError::Errno`] if an error occurs.
-    fn close(&mut self, fd: u32) -> HostIoResult<u32, Self>;
+    fn close(&mut self, fd: u32) -> HostIoResult<(), Self>;
 }
 
 define_ext!(HostIoCloseOps, HostIoClose);
@@ -329,9 +345,9 @@ define_ext!(HostIoFstatOps, HostIoFstat);
 
 /// Nested Target Extension - Host I/O unlink operation.
 pub trait HostIoUnlink: HostIo {
-    /// Delete the file at filename on the target and return 0, or
+    /// Delete the file at filename on the target and return Ok(()), or
     /// [`HostIoError::Errno`] if an error occurs.
-    fn unlink(&mut self, filename: &[u8]) -> HostIoResult<u32, Self>;
+    fn unlink(&mut self, filename: &[u8]) -> HostIoResult<(), Self>;
 }
 
 define_ext!(HostIoUnlinkOps, HostIoUnlink);
@@ -345,7 +361,7 @@ pub trait HostIoReadlink: HostIo {
         &mut self,
         filename: &[u8],
         output: HostIoOutput<'a>,
-    ) -> HostIoResult<u32, Self>;
+    ) -> HostIoResult<HostIoToken<'a>, Self>;
 }
 
 define_ext!(HostIoReadlinkOps, HostIoReadlink);
@@ -359,10 +375,10 @@ pub trait HostIoSetfs: HostIo {
     ///
     /// See [`FsKind`] for the meaning of argument.
     ///
-    /// Return 0 on success, or [`HostIoError::Errno`] if an error occurs. If
-    /// setfs indicates success, the selected filesystem remains selected
+    /// Return Ok(()) on success, or [`HostIoError::Errno`] if an error occurs.
+    /// If setfs indicates success, the selected filesystem remains selected
     /// until the next successful setfs operation.
-    fn setfs(&mut self, fs: FsKind) -> HostIoResult<u32, Self>;
+    fn setfs(&mut self, fs: FsKind) -> HostIoResult<(), Self>;
 }
 
 define_ext!(HostIoSetfsOps, HostIoSetfs);

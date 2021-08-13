@@ -35,7 +35,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             HostIo::vFileOpen(cmd) if ops.enable_open().is_some() => {
                 let ops = ops.enable_open().unwrap();
                 handle_hostio_result! {
-                if let Ok(fd) = ops.open(cmd.filename, cmd.flags, cmd.mode) => {
+                    if let Ok(fd) = ops.open(cmd.filename, cmd.flags, cmd.mode) => {
                         res.write_str("F")?;
                         res.write_num(fd)?;
                     }
@@ -45,9 +45,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             HostIo::vFileClose(cmd) if ops.enable_close().is_some() => {
                 let ops = ops.enable_close().unwrap();
                 handle_hostio_result! {
-                    if let Ok(ret) = ops.close(cmd.fd) => {
-                        res.write_str("F")?;
-                        res.write_num(ret)?;
+                    if let Ok(()) = ops.close(cmd.fd) => {
+                        res.write_str("F0")?;
                     }
                 }
                 HandlerStatus::Handled
@@ -120,9 +119,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             HostIo::vFileUnlink(cmd) if ops.enable_unlink().is_some() => {
                 let ops = ops.enable_unlink().unwrap();
                 handle_hostio_result! {
-                    if let Ok(ret) = ops.unlink(cmd.filename) => {
-                        res.write_str("F")?;
-                        res.write_num(ret)?;
+                    if let Ok(()) = ops.unlink(cmd.filename) => {
+                        res.write_str("F0")?;
                     }
                 };
                 HandlerStatus::Handled
@@ -154,9 +152,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             HostIo::vFileSetfs(cmd) if ops.enable_setfs().is_some() => {
                 let ops = ops.enable_setfs().unwrap();
                 handle_hostio_result! {
-                    if let Ok(ret) = ops.setfs(cmd.fs) => {
-                        res.write_str("F")?;
-                        res.write_num(ret)?;
+                    if let Ok(()) = ops.setfs(cmd.fs) => {
+                        res.write_str("F0")?;
                     }
                 };
                 HandlerStatus::Handled
