@@ -24,7 +24,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     Ok($val) => $callback,
                     Err(HostIoError::Errno(errno)) => {
                         res.write_str("F-1,")?;
-                        res.write_num(errno as i32)?;
+                        res.write_num(errno as u32)?;
                     }
                     Err(HostIoError::Fatal(e)) => return Err(GdbStubError::TargetError(e)),
                 }

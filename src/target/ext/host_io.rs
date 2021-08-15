@@ -172,7 +172,10 @@ pub enum HostIoError<E> {
     Fatal(E),
 }
 
-/// Converts a `std::io::Error` into a `HostIoError::Errno`.
+/// When the `std` feature is enabled, `HostIoError` implements
+/// `From<std::io::Error>`, mapping [`std::io::ErrorKind`] to the appropriate
+/// [`HostIoErrno`] when possible, and falling back to [`HostIoErrno::EUNKNOWN`]
+/// when no mapping exists.
 #[cfg(feature = "std")]
 impl<E> From<std::io::Error> for HostIoError<E> {
     fn from(e: std::io::Error) -> HostIoError<E> {
@@ -285,8 +288,7 @@ define_ext!(HostIoOpenOps, HostIoOpen);
 
 /// Nested Target Extension - Host I/O close operation.
 pub trait HostIoClose: HostIo {
-    /// Close the open file corresponding to fd and return Ok(()), or
-    /// [`HostIoError::Errno`] if an error occurs.
+    /// Close the open file corresponding to fd.
     fn close(&mut self, fd: u32) -> HostIoResult<(), Self>;
 }
 
@@ -299,7 +301,10 @@ pub trait HostIoPread: HostIo {
     /// Up to count bytes will be read from the file, starting at offset
     /// relative to the start of the file.
     ///
-    /// The data read should be sent with [`HostIoOutput`].
+    /// The data read _must_ be sent by calling [`HostIoOutput::write`], which
+    /// will consume the `output` object and return a [`HostIoToken`]. This
+    /// token ensures that the implementer of this method calls
+    /// [`HostIoOutput::write`].
     fn pread<'a>(
         &mut self,
         fd: u32,
@@ -345,8 +350,7 @@ define_ext!(HostIoFstatOps, HostIoFstat);
 
 /// Nested Target Extension - Host I/O unlink operation.
 pub trait HostIoUnlink: HostIo {
-    /// Delete the file at filename on the target and return Ok(()), or
-    /// [`HostIoError::Errno`] if an error occurs.
+    /// Delete the file at filename on the target.
     fn unlink(&mut self, filename: &[u8]) -> HostIoResult<(), Self>;
 }
 
@@ -356,7 +360,10 @@ define_ext!(HostIoUnlinkOps, HostIoUnlink);
 pub trait HostIoReadlink: HostIo {
     /// Read value of symbolic link filename on the target.
     ///
-    /// The data read should be sent with [`HostIoOutput`].
+    /// The data read _must_ be sent by calling [`HostIoOutput::write`], which
+    /// will consume the `output` object and return a [`HostIoToken`]. This
+    /// token ensures that the implementer of this method calls
+    /// [`HostIoOutput::write`].
     fn readlink<'a>(
         &mut self,
         filename: &[u8],
@@ -375,7 +382,6 @@ pub trait HostIoSetfs: HostIo {
     ///
     /// See [`FsKind`] for the meaning of argument.
     ///
-    /// Return Ok(()) on success, or [`HostIoError::Errno`] if an error occurs.
     /// If setfs indicates success, the selected filesystem remains selected
     /// until the next successful setfs operation.
     fn setfs(&mut self, fs: FsKind) -> HostIoResult<(), Self>;
