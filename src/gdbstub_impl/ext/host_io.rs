@@ -1,6 +1,7 @@
 use super::prelude::*;
-use crate::arch::Arch;
 use crate::protocol::commands::ext::HostIo;
+
+use crate::arch::Arch;
 use crate::target::ext::host_io::{HostIoError, HostIoOutput, HostIoStat};
 use crate::GdbStubError;
 
@@ -99,19 +100,19 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         res.write_str("F")?;
                         res.write_num(size)?;
                         res.write_str(";")?;
-                        res.write_binary(&stat.st_dev.to_le_bytes())?;
-                        res.write_binary(&stat.st_ino.to_le_bytes())?;
-                        res.write_binary(&(stat.st_mode.bits()).to_le_bytes())?;
-                        res.write_binary(&stat.st_nlink.to_le_bytes())?;
-                        res.write_binary(&stat.st_uid.to_le_bytes())?;
-                        res.write_binary(&stat.st_gid.to_le_bytes())?;
-                        res.write_binary(&stat.st_rdev.to_le_bytes())?;
-                        res.write_binary(&stat.st_size.to_le_bytes())?;
-                        res.write_binary(&stat.st_blksize.to_le_bytes())?;
-                        res.write_binary(&stat.st_blocks.to_le_bytes())?;
-                        res.write_binary(&stat.st_atime.to_le_bytes())?;
-                        res.write_binary(&stat.st_mtime.to_le_bytes())?;
-                        res.write_binary(&stat.st_ctime.to_le_bytes())?;
+                        res.write_binary(&stat.st_dev.to_be_bytes())?;
+                        res.write_binary(&stat.st_ino.to_be_bytes())?;
+                        res.write_binary(&(stat.st_mode.bits()).to_be_bytes())?;
+                        res.write_binary(&stat.st_nlink.to_be_bytes())?;
+                        res.write_binary(&stat.st_uid.to_be_bytes())?;
+                        res.write_binary(&stat.st_gid.to_be_bytes())?;
+                        res.write_binary(&stat.st_rdev.to_be_bytes())?;
+                        res.write_binary(&stat.st_size.to_be_bytes())?;
+                        res.write_binary(&stat.st_blksize.to_be_bytes())?;
+                        res.write_binary(&stat.st_blocks.to_be_bytes())?;
+                        res.write_binary(&stat.st_atime.to_be_bytes())?;
+                        res.write_binary(&stat.st_mtime.to_be_bytes())?;
+                        res.write_binary(&stat.st_ctime.to_be_bytes())?;
                     }
                 };
                 HandlerStatus::Handled

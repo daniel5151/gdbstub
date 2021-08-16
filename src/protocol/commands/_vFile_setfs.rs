@@ -1,6 +1,6 @@
 use super::prelude::*;
+
 use crate::target::ext::host_io::FsKind;
-use core::num::NonZeroUsize;
 
 #[derive(Debug)]
 pub struct vFileSetfs {
@@ -16,7 +16,7 @@ impl<'a> ParseCommand<'a> for vFileSetfs {
 
         match body {
             [b':', body @ ..] => {
-                let fs = match NonZeroUsize::new(decode_hex(body).ok()?) {
+                let fs = match core::num::NonZeroUsize::new(decode_hex(body).ok()?) {
                     None => FsKind::Stub,
                     Some(pid) => FsKind::Pid(pid),
                 };

@@ -1,12 +1,11 @@
 use gdbstub::target;
-use std::io::{Read, Seek, Write};
-
-use crate::emu::{Emu, FD_MAX};
-
 use gdbstub::target::ext::host_io::{
     FsKind, HostIoErrno, HostIoError, HostIoOpenFlags, HostIoOpenMode, HostIoOutput, HostIoResult,
     HostIoStat, HostIoToken,
 };
+use std::io::{Read, Seek, Write};
+
+use crate::emu::Emu;
 
 impl target::ext::host_io::HostIo for Emu {
     #[inline(always)]
@@ -26,6 +25,11 @@ impl target::ext::host_io::HostIo for Emu {
 
     #[inline(always)]
     fn enable_pwrite(&mut self) -> Option<target::ext::host_io::HostIoPwriteOps<Self>> {
+        Some(self)
+    }
+
+    #[inline(always)]
+    fn enable_fstat(&mut self) -> Option<target::ext::host_io::HostIoFstatOps<Self>> {
         Some(self)
     }
 
@@ -52,10 +56,12 @@ impl target::ext::host_io::HostIoOpen for Emu {
         flags: HostIoOpenFlags,
         _mode: HostIoOpenMode,
     ) -> HostIoResult<u32, Self> {
-        let path = match std::str::from_utf8(filename) {
-            Ok(v) => v,
-            Err(_) => return Err(HostIoError::Errno(HostIoErrno::ENOENT)),
-        };
+        if filename.starts_with(b"/proc") {
+            return Err(HostIoError::Errno(HostIoErrno::ENOENT));
+        }
+
+        let path =
+            std::str::from_utf8(filename).map_err(|_| HostIoError::Errno(HostIoErrno::ENOENT))?;
 
         let mut read = false;
         let mut write = false;
@@ -77,27 +83,35 @@ impl target::ext::host_io::HostIoOpen for Emu {
             .create_new(flags.contains(HostIoOpenFlags::O_EXCL))
             .open(path)?;
 
-        let n = 0;
-        for n in 0..FD_MAX {
-            if self.files[n as usize].is_none() {
-                break;
+        let n = match self.files.iter_mut().enumerate().find(|(_, f)| f.is_none()) {
+            Some((n, free_file)) => {
+                *free_file = Some(file);
+                n
             }
-        }
-        if n == FD_MAX {
-            return Err(HostIoError::Errno(HostIoErrno::ENFILE));
-        }
+            None => {
+                self.files.push(Some(file));
+                self.files.len() - 1
+            }
+        };
 
-        self.files[n as usize] = Some(file);
-        Ok(n)
+        Ok(n as u32)
     }
 }
 
 impl target::ext::host_io::HostIoClose for Emu {
     fn close(&mut self, fd: u32) -> HostIoResult<(), Self> {
-        if fd < FD_MAX {
-            self.files[fd as usize]
-                .take()
-                .ok_or(HostIoError::Errno(HostIoErrno::EBADF))?;
+        let fd: usize = fd as usize;
+        if fd < self.files.len() {
+            if fd == self.files.len() - 1 {
+                self.files.pop();
+                while let Some(None) = self.files.last() {
+                    self.files.pop();
+                }
+            } else {
+                self.files[fd]
+                    .take()
+                    .ok_or(HostIoError::Errno(HostIoErrno::EBADF))?;
+            }
             Ok(())
         } else {
             Err(HostIoError::Errno(HostIoErrno::EBADF))
@@ -113,8 +127,9 @@ impl target::ext::host_io::HostIoPread for Emu {
         offset: u32,
         output: HostIoOutput<'a>,
     ) -> HostIoResult<HostIoToken<'a>, Self> {
-        if fd < FD_MAX {
-            if let Some(ref mut file) = self.files[fd as usize] {
+        let fd: usize = fd as usize;
+        if fd < self.files.len() {
+            if let Some(ref mut file) = self.files[fd] {
                 let mut buffer = vec![0; count as usize];
                 file.seek(std::io::SeekFrom::Start(offset as u64))?;
                 let n = file.read(&mut buffer)?;
@@ -130,8 +145,9 @@ impl target::ext::host_io::HostIoPread for Emu {
 
 impl target::ext::host_io::HostIoPwrite for Emu {
     fn pwrite(&mut self, fd: u32, offset: u32, data: &[u8]) -> HostIoResult<u32, Self> {
-        if fd < FD_MAX {
-            if let Some(ref mut file) = self.files[fd as usize] {
+        let fd: usize = fd as usize;
+        if fd < self.files.len() {
+            if let Some(ref mut file) = self.files[fd] {
                 file.seek(std::io::SeekFrom::Start(offset as u64))?;
                 let n = file.write(data)?;
                 Ok(n as u32)
@@ -146,27 +162,22 @@ impl target::ext::host_io::HostIoPwrite for Emu {
 
 impl target::ext::host_io::HostIoFstat for Emu {
     fn fstat(&mut self, fd: u32) -> HostIoResult<HostIoStat, Self> {
-        if fd < FD_MAX {
-            if let Some(ref mut file) = self.files[fd as usize] {
+        let fd: usize = fd as usize;
+        if fd < self.files.len() {
+            if let Some(ref mut file) = self.files[fd] {
                 let metadata = file.metadata()?;
-                let atime = metadata
-                    .accessed()
-                    .map_err(|_| HostIoError::Errno(HostIoErrno::EACCES))?
-                    .duration_since(std::time::SystemTime::UNIX_EPOCH)
-                    .map_err(|_| HostIoError::Errno(HostIoErrno::EACCES))?
-                    .as_secs() as u32;
-                let mtime = metadata
-                    .modified()
-                    .map_err(|_| HostIoError::Errno(HostIoErrno::EACCES))?
-                    .duration_since(std::time::SystemTime::UNIX_EPOCH)
-                    .map_err(|_| HostIoError::Errno(HostIoErrno::EACCES))?
-                    .as_secs() as u32;
-                let ctime = metadata
-                    .created()
-                    .map_err(|_| HostIoError::Errno(HostIoErrno::EACCES))?
-                    .duration_since(std::time::SystemTime::UNIX_EPOCH)
-                    .map_err(|_| HostIoError::Errno(HostIoErrno::EACCES))?
-                    .as_secs() as u32;
+                macro_rules! time_to_secs {
+                    ($time:expr) => {
+                        $time
+                            .map_err(|_| HostIoError::Errno(HostIoErrno::EACCES))?
+                            .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                            .map_err(|_| HostIoError::Errno(HostIoErrno::EACCES))?
+                            .as_secs() as u32
+                    };
+                }
+                let atime = time_to_secs!(metadata.accessed());
+                let mtime = time_to_secs!(metadata.modified());
+                let ctime = time_to_secs!(metadata.created());
                 Ok(HostIoStat {
                     st_dev: 0,
                     st_ino: 0,
@@ -193,10 +204,8 @@ impl target::ext::host_io::HostIoFstat for Emu {
 
 impl target::ext::host_io::HostIoUnlink for Emu {
     fn unlink(&mut self, filename: &[u8]) -> HostIoResult<(), Self> {
-        let path = match std::str::from_utf8(filename) {
-            Ok(v) => v,
-            Err(_) => return Err(HostIoError::Errno(HostIoErrno::ENOENT)),
-        };
+        let path =
+            std::str::from_utf8(filename).map_err(|_| HostIoError::Errno(HostIoErrno::ENOENT))?;
         std::fs::remove_file(path)?;
         Ok(())
     }
@@ -214,12 +223,12 @@ impl target::ext::host_io::HostIoReadlink for Emu {
         } else if filename == b"/proc/1/cwd" {
             // Support `info proc cwd` command
             return Ok(output.write(b"/"));
+        } else if filename.starts_with(b"/proc") {
+            return Err(HostIoError::Errno(HostIoErrno::ENOENT));
         }
 
-        let path = match std::str::from_utf8(filename) {
-            Ok(v) => v,
-            Err(_) => return Err(HostIoError::Errno(HostIoErrno::ENOENT)),
-        };
+        let path =
+            std::str::from_utf8(filename).map_err(|_| HostIoError::Errno(HostIoErrno::ENOENT))?;
         Ok(output.write(
             std::fs::read_link(path)?
                 .to_str()

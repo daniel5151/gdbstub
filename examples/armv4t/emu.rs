@@ -4,7 +4,6 @@ use crate::mem_sniffer::{AccessKind, MemSniffer};
 use crate::DynResult;
 
 const HLE_RETURN_ADDR: u32 = 0x12345678;
-pub const FD_MAX: u32 = 256;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Event {
@@ -26,12 +25,11 @@ pub struct Emu {
 
     pub(crate) watchpoints: Vec<u32>,
     pub(crate) breakpoints: Vec<u32>,
-    pub(crate) files: [Option<std::fs::File>; FD_MAX as usize],
+    pub(crate) files: Vec<Option<std::fs::File>>,
 }
 
 impl Emu {
     pub fn new(program_elf: &[u8]) -> DynResult<Emu> {
-        const FILE_INIT: Option<std::fs::File> = None;
         // set up emulated system
         let mut cpu = Cpu::new();
         let mut mem = ExampleMem::new();
@@ -75,7 +73,7 @@ impl Emu {
 
             watchpoints: Vec::new(),
             breakpoints: Vec::new(),
-            files: [FILE_INIT; FD_MAX as usize],
+            files: Vec::new(),
         })
     }
 

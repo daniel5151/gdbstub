@@ -1,7 +1,8 @@
 //! Provide Host I/O operations for the target.
+use bitflags::bitflags;
+
 use crate::arch::Arch;
 use crate::target::Target;
-use bitflags::bitflags;
 
 bitflags! {
     /// Host flags for opening files.
@@ -95,9 +96,9 @@ pub struct HostIoStat {
 /// command.
 #[derive(Debug)]
 pub enum FsKind {
-    /// select the filesystem as seen by the remote stub
+    /// Select the filesystem as seen by the remote stub.
     Stub,
-    /// select the filesystem as seen by process pid
+    /// Select the filesystem as seen by process pid.
     Pid(crate::common::Pid),
 }
 
@@ -197,7 +198,7 @@ impl<E> From<std::io::Error> for HostIoError<E> {
 /// See [`HostIoError`] for more details.
 pub type HostIoResult<T, Tgt> = Result<T, HostIoError<<Tgt as Target>::Error>>;
 
-/// Zero-sized type token that ensures HostIoOutput::write is called
+/// Zero-sized type token that ensures HostIoOutput::write is called.
 pub struct HostIoToken<'a>(core::marker::PhantomData<&'a *mut ()>);
 
 /// An interface to send pread data back to the GDB client.
@@ -269,13 +270,12 @@ define_ext!(HostIoOps, HostIo);
 
 /// Nested Target Extension - Host I/O open operation.
 pub trait HostIoOpen: HostIo {
-    /// Open a file at filename and return a file descriptor for it, or return
+    /// Open a file at `filename` and return a file descriptor for it, or return
     /// [`HostIoError::Errno`] if an error occurs.
     ///
-    /// The filename is a string, flags is an integer indicating a mask of open
-    /// flags (see [`HostIoOpenFlags`]), and mode is an integer indicating a
-    /// mask of mode bits to use if the file is created (see
-    /// [`HostIoOpenMode`]).
+    /// `flags` is the flags used when open (see [`HostIoOpenFlags`]), and
+    /// `mode` is the mode used if the file is created
+    /// (see [`HostIoOpenMode`]).
     fn open(
         &mut self,
         filename: &[u8],
@@ -288,7 +288,7 @@ define_ext!(HostIoOpenOps, HostIoOpen);
 
 /// Nested Target Extension - Host I/O close operation.
 pub trait HostIoClose: HostIo {
-    /// Close the open file corresponding to fd.
+    /// Close the open file corresponding to `fd`.
     fn close(&mut self, fd: u32) -> HostIoResult<(), Self>;
 }
 
@@ -296,9 +296,9 @@ define_ext!(HostIoCloseOps, HostIoClose);
 
 /// Nested Target Extension - Host I/O pread operation.
 pub trait HostIoPread: HostIo {
-    /// Read data from the open file corresponding to fd.
+    /// Read data from the open file corresponding to `fd`.
     ///
-    /// Up to count bytes will be read from the file, starting at offset
+    /// Up to `count` bytes will be read from the file, starting at `offset`
     /// relative to the start of the file.
     ///
     /// The data read _must_ be sent by calling [`HostIoOutput::write`], which
@@ -318,12 +318,9 @@ define_ext!(HostIoPreadOps, HostIoPread);
 
 /// Nested Target Extension - Host I/O pwrite operation.
 pub trait HostIoPwrite: HostIo {
-    /// Write data (a binary buffer) to the open file corresponding to fd.
+    /// Write `data` to the open file corresponding to `fd`.
     ///
-    /// Start the write at offset from the start of the file.
-    ///
-    /// Unlike many write system calls, there is no separate count argument; the
-    /// length of data in the packet is used.
+    /// Start the write at `offset` from the start of the file.
     ///
     /// Return the number of bytes written, which may be shorter
     /// than the length of data, or [`HostIoError::Errno`] if an error occurred.
@@ -332,14 +329,14 @@ pub trait HostIoPwrite: HostIo {
         fd: u32,
         offset: <Self::Arch as Arch>::Usize,
         data: &[u8],
-    ) -> HostIoResult<u32, Self>;
+    ) -> HostIoResult<<Self::Arch as Arch>::Usize, Self>;
 }
 
 define_ext!(HostIoPwriteOps, HostIoPwrite);
 
 /// Nested Target Extension - Host I/O fstat operation.
 pub trait HostIoFstat: HostIo {
-    /// Get information about the open file corresponding to fd.
+    /// Get information about the open file corresponding to `fd`.
     ///
     /// On success return a [`HostIoStat`] struct.
     /// Return [`HostIoError::Errno`] if an error occurs.
@@ -350,7 +347,7 @@ define_ext!(HostIoFstatOps, HostIoFstat);
 
 /// Nested Target Extension - Host I/O unlink operation.
 pub trait HostIoUnlink: HostIo {
-    /// Delete the file at filename on the target.
+    /// Delete the file at `filename` on the target.
     fn unlink(&mut self, filename: &[u8]) -> HostIoResult<(), Self>;
 }
 
@@ -358,7 +355,7 @@ define_ext!(HostIoUnlinkOps, HostIoUnlink);
 
 /// Nested Target Extension - Host I/O readlink operation.
 pub trait HostIoReadlink: HostIo {
-    /// Read value of symbolic link filename on the target.
+    /// Read value of symbolic link `filename` on the target.
     ///
     /// The data read _must_ be sent by calling [`HostIoOutput::write`], which
     /// will consume the `output` object and return a [`HostIoToken`]. This
@@ -380,7 +377,7 @@ pub trait HostIoSetfs: HostIo {
     /// remote targets where the remote stub does not share a common filesystem
     /// with the inferior(s).
     ///
-    /// See [`FsKind`] for the meaning of argument.
+    /// See [`FsKind`] for the meaning of `fs`.
     ///
     /// If setfs indicates success, the selected filesystem remains selected
     /// until the next successful setfs operation.
