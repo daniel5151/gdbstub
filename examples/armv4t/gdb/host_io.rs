@@ -1,9 +1,10 @@
+use std::io::{Read, Seek, Write};
+
 use gdbstub::target;
 use gdbstub::target::ext::host_io::{
     FsKind, HostIoErrno, HostIoError, HostIoOpenFlags, HostIoOpenMode, HostIoOutput, HostIoResult,
     HostIoStat, HostIoToken,
 };
-use std::io::{Read, Seek, Write};
 
 use crate::emu::Emu;
 
@@ -100,17 +101,10 @@ impl target::ext::host_io::HostIoOpen for Emu {
 
 impl target::ext::host_io::HostIoClose for Emu {
     fn close(&mut self, fd: u32) -> HostIoResult<(), Self> {
-        let fd: usize = fd as usize;
-        if fd < self.files.len() {
-            if fd == self.files.len() - 1 {
+        if let Some(file) = self.files.get_mut(fd as usize) {
+            file.take().ok_or(HostIoError::Errno(HostIoErrno::EBADF))?;
+            while let Some(None) = self.files.last() {
                 self.files.pop();
-                while let Some(None) = self.files.last() {
-                    self.files.pop();
-                }
-            } else {
-                self.files[fd]
-                    .take()
-                    .ok_or(HostIoError::Errno(HostIoErrno::EBADF))?;
             }
             Ok(())
         } else {
@@ -127,16 +121,11 @@ impl target::ext::host_io::HostIoPread for Emu {
         offset: u32,
         output: HostIoOutput<'a>,
     ) -> HostIoResult<HostIoToken<'a>, Self> {
-        let fd: usize = fd as usize;
-        if fd < self.files.len() {
-            if let Some(ref mut file) = self.files[fd] {
-                let mut buffer = vec![0; count as usize];
-                file.seek(std::io::SeekFrom::Start(offset as u64))?;
-                let n = file.read(&mut buffer)?;
-                Ok(output.write(&buffer[..n]))
-            } else {
-                Err(HostIoError::Errno(HostIoErrno::EBADF))
-            }
+        if let Some(Some(file)) = self.files.get_mut(fd as usize) {
+            let mut buffer = vec![0; count as usize];
+            file.seek(std::io::SeekFrom::Start(offset as u64))?;
+            let n = file.read(&mut buffer)?;
+            Ok(output.write(&buffer[..n]))
         } else {
             Err(HostIoError::Errno(HostIoErrno::EBADF))
         }
@@ -145,15 +134,10 @@ impl target::ext::host_io::HostIoPread for Emu {
 
 impl target::ext::host_io::HostIoPwrite for Emu {
     fn pwrite(&mut self, fd: u32, offset: u32, data: &[u8]) -> HostIoResult<u32, Self> {
-        let fd: usize = fd as usize;
-        if fd < self.files.len() {
-            if let Some(ref mut file) = self.files[fd] {
-                file.seek(std::io::SeekFrom::Start(offset as u64))?;
-                let n = file.write(data)?;
-                Ok(n as u32)
-            } else {
-                Err(HostIoError::Errno(HostIoErrno::EBADF))
-            }
+        if let Some(Some(file)) = self.files.get_mut(fd as usize) {
+            file.seek(std::io::SeekFrom::Start(offset as u64))?;
+            let n = file.write(data)?;
+            Ok(n as u32)
         } else {
             Err(HostIoError::Errno(HostIoErrno::EBADF))
         }
@@ -162,40 +146,35 @@ impl target::ext::host_io::HostIoPwrite for Emu {
 
 impl target::ext::host_io::HostIoFstat for Emu {
     fn fstat(&mut self, fd: u32) -> HostIoResult<HostIoStat, Self> {
-        let fd: usize = fd as usize;
-        if fd < self.files.len() {
-            if let Some(ref mut file) = self.files[fd] {
-                let metadata = file.metadata()?;
-                macro_rules! time_to_secs {
-                    ($time:expr) => {
-                        $time
-                            .map_err(|_| HostIoError::Errno(HostIoErrno::EACCES))?
-                            .duration_since(std::time::SystemTime::UNIX_EPOCH)
-                            .map_err(|_| HostIoError::Errno(HostIoErrno::EACCES))?
-                            .as_secs() as u32
-                    };
-                }
-                let atime = time_to_secs!(metadata.accessed());
-                let mtime = time_to_secs!(metadata.modified());
-                let ctime = time_to_secs!(metadata.created());
-                Ok(HostIoStat {
-                    st_dev: 0,
-                    st_ino: 0,
-                    st_mode: HostIoOpenMode::empty(),
-                    st_nlink: 0,
-                    st_uid: 0,
-                    st_gid: 0,
-                    st_rdev: 0,
-                    st_size: metadata.len(),
-                    st_blksize: 0,
-                    st_blocks: 0,
-                    st_atime: atime,
-                    st_mtime: mtime,
-                    st_ctime: ctime,
-                })
-            } else {
-                Err(HostIoError::Errno(HostIoErrno::EBADF))
+        if let Some(Some(file)) = self.files.get(fd as usize) {
+            let metadata = file.metadata()?;
+            macro_rules! time_to_secs {
+                ($time:expr) => {
+                    $time
+                        .map_err(|_| HostIoError::Errno(HostIoErrno::EACCES))?
+                        .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                        .map_err(|_| HostIoError::Errno(HostIoErrno::EACCES))?
+                        .as_secs() as u32
+                };
             }
+            let atime = time_to_secs!(metadata.accessed());
+            let mtime = time_to_secs!(metadata.modified());
+            let ctime = time_to_secs!(metadata.created());
+            Ok(HostIoStat {
+                st_dev: 0,
+                st_ino: 0,
+                st_mode: HostIoOpenMode::empty(),
+                st_nlink: 0,
+                st_uid: 0,
+                st_gid: 0,
+                st_rdev: 0,
+                st_size: metadata.len(),
+                st_blksize: 0,
+                st_blocks: 0,
+                st_atime: atime,
+                st_mtime: mtime,
+                st_ctime: ctime,
+            })
         } else {
             Err(HostIoError::Errno(HostIoErrno::EBADF))
         }
