@@ -6,7 +6,9 @@ use crate::target::Target;
 pub(self) mod prelude {
     pub use super::ParseCommand;
     pub use crate::common::*;
-    pub use crate::protocol::common::hex::{decode_hex, decode_hex_buf, is_hex, HexString};
+    pub use crate::protocol::common::hex::{
+        decode_bin_buf, decode_hex, decode_hex_buf, is_hex, HexString,
+    };
     pub use crate::protocol::common::lists;
     pub use crate::protocol::common::thread_id::{
         IdKind, SpecificIdKind, SpecificThreadId, ThreadId,

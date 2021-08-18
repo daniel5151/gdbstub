@@ -54,7 +54,7 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
         #[cfg(feature = "std")]
         trace!(
             "--> ${}#{:02x?}",
-            core::str::from_utf8(&self.msg).unwrap(), // buffers are always ascii
+            String::from_utf8_lossy(&self.msg),
             checksum
         );
 

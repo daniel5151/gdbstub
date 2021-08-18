@@ -561,9 +561,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
         match cmd {
             Command::Unknown(cmd) => {
-                // cmd must be ASCII, as the slice originated from a PacketBuf, which checks for
-                // ASCII as part of the initial validation.
-                info!("Unknown command: {}", core::str::from_utf8(cmd).unwrap());
+                info!("Unknown command: {:?}", core::str::from_utf8(cmd));
                 Ok(HandlerStatus::Handled)
             }
             // `handle_X` methods are defined in the `ext` module

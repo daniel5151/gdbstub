@@ -168,7 +168,34 @@ pub fn decode_hex_buf(base_buf: &mut [u8]) -> Result<&mut [u8], DecodeHexBufErro
     Ok(&mut base_buf[..decoded_len + odd_adust])
 }
 
-#[allow(dead_code)]
+#[derive(Debug)]
+pub enum DecodeBinBufError {
+    UnexpectedEnd,
+}
+
+/// Decode GDB escaped binary bytes into origin bytes _in place_.
+pub fn decode_bin_buf(buf: &mut [u8]) -> Result<&mut [u8], DecodeBinBufError> {
+    use DecodeBinBufError::*;
+    let mut i = 0;
+    let mut j = 0;
+    let len = buf.len();
+    while i < len {
+        if buf[i] == b'}' {
+            if i == len - 1 {
+                return Err(UnexpectedEnd);
+            } else {
+                buf[j] = buf[i + 1] ^ 0x20;
+                i += 1;
+            }
+        } else {
+            buf[j] = buf[i];
+        }
+        i += 1;
+        j += 1;
+    }
+    Ok(&mut buf[..j])
+}
+
 #[derive(Debug)]
 pub enum EncodeHexBufError {
     SmallBuffer,
@@ -267,5 +294,12 @@ mod tests {
         let mut payload = b"1".to_vec();
         let res = decode_hex_buf(&mut payload).unwrap();
         assert_eq!(res, [0x1]);
+    }
+
+    #[test]
+    fn decode_bin_buf_escaped() {
+        let mut payload = b"}\x03}\x04}]}\n".to_vec();
+        let res = decode_bin_buf(&mut payload).unwrap();
+        assert_eq!(res, [0x23, 0x24, 0x7d, 0x2a]);
     }
 }

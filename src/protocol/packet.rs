@@ -10,7 +10,6 @@ pub enum PacketParseError {
     MissingChecksum,
     MalformedChecksum,
     MalformedCommand,
-    NotAscii,
     UnexpectedHeader(u8),
 }
 
@@ -57,11 +56,6 @@ impl<'a> PacketBuf<'a> {
             .get(..2)
             .ok_or(PacketParseError::MalformedChecksum)?;
 
-        // validate that the body is valid ASCII
-        if !body.is_ascii() {
-            return Err(PacketParseError::NotAscii);
-        }
-
         // validate the checksum
         let checksum = decode_hex(checksum).map_err(|_| PacketParseError::MalformedChecksum)?;
         let calculated = body.iter().fold(0u8, |a, x| a.wrapping_add(*x));
@@ -84,11 +78,6 @@ impl<'a> PacketBuf<'a> {
     /// the header/checksum trimming stage. ASCII validation is still performed.
     #[cfg(test)]
     pub fn new_with_raw_body(body: &'a mut [u8]) -> Result<PacketBuf<'a>, PacketParseError> {
-        // validate the packet is valid ASCII
-        if !body.is_ascii() {
-            return Err(PacketParseError::NotAscii);
-        }
-
         let len = body.len();
         Ok(PacketBuf {
             buf: body,
