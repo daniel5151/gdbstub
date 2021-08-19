@@ -179,9 +179,9 @@ pub fn decode_bin_buf(buf: &mut [u8]) -> Result<&mut [u8], DecodeBinBufError> {
     let mut i = 0;
     let mut j = 0;
     let len = buf.len();
-    while i < len {
+    while i < len && j < len {
         if buf[i] == b'}' {
-            if i == len - 1 {
+            if i + 1 >= len {
                 return Err(UnexpectedEnd);
             } else {
                 buf[j] = buf[i + 1] ^ 0x20;
@@ -193,7 +193,15 @@ pub fn decode_bin_buf(buf: &mut [u8]) -> Result<&mut [u8], DecodeBinBufError> {
         i += 1;
         j += 1;
     }
-    Ok(&mut buf[..j])
+
+    // SAFETY: by inspection, the value of j will never exceed buf.len().
+    // Unfortunately, the LLVM optimizer isn't smart enough to see this, so
+    // we have to manually elide the bounds check...
+    if cfg!(feature = "paranoid_unsafe") {
+        Ok(&mut buf[..j])
+    } else {
+        unsafe { Ok(buf.get_unchecked_mut(..j)) }
+    }
 }
 
 #[derive(Debug)]
