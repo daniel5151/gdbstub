@@ -40,7 +40,7 @@ pub struct PacketBuf<'a> {
 
 impl<'a> PacketBuf<'a> {
     /// Validate the contents of the raw packet buffer, checking for checksum
-    /// consistency, structural correctness, and ASCII validation.
+    /// consistency and structural correctness.
     pub fn new(pkt_buf: &'a mut [u8]) -> Result<PacketBuf<'a>, PacketParseError> {
         if pkt_buf.is_empty() {
             return Err(PacketParseError::EmptyBuf);
@@ -75,7 +75,7 @@ impl<'a> PacketBuf<'a> {
     }
 
     /// (used for tests) Create a packet buffer from a raw body buffer, skipping
-    /// the header/checksum trimming stage. ASCII validation is still performed.
+    /// the header/checksum trimming stage.
     #[cfg(test)]
     pub fn new_with_raw_body(body: &'a mut [u8]) -> Result<PacketBuf<'a>, PacketParseError> {
         let len = body.len();

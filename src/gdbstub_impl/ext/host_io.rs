@@ -3,7 +3,6 @@ use crate::protocol::commands::ext::HostIo;
 
 use crate::arch::Arch;
 use crate::target::ext::host_io::{HostIoError, HostIoOutput, HostIoStat};
-use crate::GdbStubError;
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     pub(crate) fn handle_host_io(
@@ -27,7 +26,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         res.write_str("F-1,")?;
                         res.write_num(errno as u32)?;
                     }
-                    Err(HostIoError::Fatal(e)) => return Err(GdbStubError::TargetError(e)),
+                    Err(HostIoError::Fatal(e)) => return Err(Error::TargetError(e)),
                 }
             }};
         }

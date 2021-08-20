@@ -181,14 +181,15 @@ pub enum HostIoError<E> {
 impl<E> From<std::io::Error> for HostIoError<E> {
     fn from(e: std::io::Error) -> HostIoError<E> {
         use std::io::ErrorKind::*;
-        match e.kind() {
-            PermissionDenied => HostIoError::Errno(HostIoErrno::EPERM),
-            NotFound => HostIoError::Errno(HostIoErrno::ENOENT),
-            Interrupted => HostIoError::Errno(HostIoErrno::EINTR),
-            AlreadyExists => HostIoError::Errno(HostIoErrno::EEXIST),
-            InvalidInput => HostIoError::Errno(HostIoErrno::EINVAL),
-            _ => HostIoError::Errno(HostIoErrno::EUNKNOWN),
-        }
+        let errno = match e.kind() {
+            PermissionDenied => HostIoErrno::EPERM,
+            NotFound => HostIoErrno::ENOENT,
+            Interrupted => HostIoErrno::EINTR,
+            AlreadyExists => HostIoErrno::EEXIST,
+            InvalidInput => HostIoErrno::EINVAL,
+            _ => HostIoErrno::EUNKNOWN,
+        };
+        HostIoError::Errno(errno)
     }
 }
 
@@ -273,9 +274,9 @@ pub trait HostIoOpen: HostIo {
     /// Open a file at `filename` and return a file descriptor for it, or return
     /// [`HostIoError::Errno`] if an error occurs.
     ///
-    /// `flags` is the flags used when open (see [`HostIoOpenFlags`]), and
-    /// `mode` is the mode used if the file is created
-    /// (see [`HostIoOpenMode`]).
+    /// `flags` are the flags used when opening the file (see
+    /// [`HostIoOpenFlags`]), and `mode` is the mode used if the file is
+    /// created (see [`HostIoOpenMode`]).
     fn open(
         &mut self,
         filename: &[u8],

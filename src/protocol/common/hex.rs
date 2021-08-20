@@ -200,6 +200,7 @@ pub fn decode_bin_buf(buf: &mut [u8]) -> Result<&mut [u8], DecodeBinBufError> {
     if cfg!(feature = "paranoid_unsafe") {
         Ok(&mut buf[..j])
     } else {
+        debug_assert!(j <= len);
         unsafe { Ok(buf.get_unchecked_mut(..j)) }
     }
 }
