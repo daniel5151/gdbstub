@@ -25,6 +25,7 @@ pub struct Emu {
 
     pub(crate) watchpoints: Vec<u32>,
     pub(crate) breakpoints: Vec<u32>,
+    pub(crate) files: Vec<Option<std::fs::File>>,
 }
 
 impl Emu {
@@ -72,6 +73,7 @@ impl Emu {
 
             watchpoints: Vec::new(),
             breakpoints: Vec::new(),
+            files: Vec::new(),
         })
     }
 

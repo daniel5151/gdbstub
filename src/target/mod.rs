@@ -358,6 +358,12 @@ pub trait Target {
     fn catch_syscalls(&mut self) -> Option<ext::catch_syscalls::CatchSyscallsOps<Self>> {
         None
     }
+
+    /// Support Host I/O operations.
+    #[inline(always)]
+    fn host_io(&mut self) -> Option<ext::host_io::HostIoOps<Self>> {
+        None
+    }
 }
 
 macro_rules! impl_dyn_target {
@@ -392,6 +398,16 @@ macro_rules! impl_dyn_target {
             #[inline(always)]
             fn extended_mode(&mut self) -> Option<ext::extended_mode::ExtendedModeOps<Self>> {
                 (**self).extended_mode()
+            }
+
+            #[inline(always)]
+            fn host_io(&mut self) -> Option<ext::host_io::HostIoOps<Self>> {
+                (**self).host_io()
+            }
+
+            #[inline(always)]
+            fn memory_map(&mut self) -> Option<ext::memory_map::MemoryMapOps<Self>> {
+                (**self).memory_map()
             }
 
             #[inline(always)]

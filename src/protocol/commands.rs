@@ -6,7 +6,9 @@ use crate::target::Target;
 pub(self) mod prelude {
     pub use super::ParseCommand;
     pub use crate::common::*;
-    pub use crate::protocol::common::hex::{decode_hex, decode_hex_buf, is_hex, HexString};
+    pub use crate::protocol::common::hex::{
+        decode_bin_buf, decode_hex, decode_hex_buf, is_hex, HexString,
+    };
     pub use crate::protocol::common::lists;
     pub use crate::protocol::common::thread_id::{
         IdKind, SpecificIdKind, SpecificThreadId, ThreadId,
@@ -221,6 +223,17 @@ commands! {
 
     memory_map {
         "qXfer:memory-map:read" => _qXfer_memory_map::qXferMemoryMapRead,
+    }
+
+    host_io use 'a {
+        "vFile:open" => _vFile_open::vFileOpen<'a>,
+        "vFile:close" => _vFile_close::vFileClose,
+        "vFile:pread" => _vFile_pread::vFilePread<'a>,
+        "vFile:pwrite" => _vFile_pwrite::vFilePwrite<'a>,
+        "vFile:fstat" => _vFile_fstat::vFileFstat,
+        "vFile:unlink" => _vFile_unlink::vFileUnlink<'a>,
+        "vFile:readlink" => _vFile_readlink::vFileReadlink<'a>,
+        "vFile:setfs" => _vFile_setfs::vFileSetfs,
     }
 
     catch_syscalls use 'a {
