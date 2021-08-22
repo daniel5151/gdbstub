@@ -16,6 +16,7 @@ use crate::emu::{Emu, Event};
 
 mod breakpoints;
 mod catch_syscalls;
+mod exec_file;
 mod extended_mode;
 mod host_io;
 mod memory_map;
@@ -98,6 +99,11 @@ impl Target for Emu {
 
     #[inline(always)]
     fn host_io(&mut self) -> Option<target::ext::host_io::HostIoOps<Self>> {
+        Some(self)
+    }
+
+    #[inline(always)]
+    fn exec_file(&mut self) -> Option<target::ext::exec_file::ExecFileOps<Self>> {
         Some(self)
     }
 }

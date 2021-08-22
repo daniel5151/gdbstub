@@ -14,6 +14,7 @@ mod prelude {
 mod base;
 mod breakpoints;
 mod catch_syscalls;
+mod exec_file;
 mod extended_mode;
 mod host_io;
 mod memory_map;

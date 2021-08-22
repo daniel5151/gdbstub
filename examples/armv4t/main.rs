@@ -9,7 +9,7 @@ use gdbstub::{target::Target, ConnectionExt, DisconnectReason, GdbStub};
 
 pub type DynResult<T> = Result<T, Box<dyn std::error::Error>>;
 
-static TEST_PROGRAM_ELF: &[u8] = include_bytes!("test_bin/test.elf");
+pub static TEST_PROGRAM_ELF: &[u8] = include_bytes!("test_bin/test.elf");
 
 mod emu;
 mod gdb;

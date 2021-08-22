@@ -1,5 +1,6 @@
 use std::io::{Read, Seek, Write};
 
+use crate::TEST_PROGRAM_ELF;
 use gdbstub::target;
 use gdbstub::target::ext::host_io::{
     FsKind, HostIoErrno, HostIoError, HostIoOpenFlags, HostIoOpenMode, HostIoOutput, HostIoResult,
@@ -7,6 +8,8 @@ use gdbstub::target::ext::host_io::{
 };
 
 use crate::emu::Emu;
+
+const FD_RESERVED: u32 = 1;
 
 impl target::ext::host_io::HostIo for Emu {
     #[inline(always)]
@@ -61,6 +64,10 @@ impl target::ext::host_io::HostIoOpen for Emu {
             return Err(HostIoError::Errno(HostIoErrno::ENOENT));
         }
 
+        if filename == b"/test.elf" {
+            return Ok(0);
+        }
+
         let path =
             std::str::from_utf8(filename).map_err(|_| HostIoError::Errno(HostIoErrno::ENOENT))?;
 
@@ -95,13 +102,17 @@ impl target::ext::host_io::HostIoOpen for Emu {
             }
         };
 
-        Ok(n as u32)
+        Ok(n as u32 + FD_RESERVED)
     }
 }
 
 impl target::ext::host_io::HostIoClose for Emu {
     fn close(&mut self, fd: u32) -> HostIoResult<(), Self> {
-        let file = match self.files.get_mut(fd as usize) {
+        if fd < FD_RESERVED {
+            return Ok(());
+        }
+
+        let file = match self.files.get_mut((fd - FD_RESERVED) as usize) {
             Some(file) => file,
             _ => return Err(HostIoError::Errno(HostIoErrno::EBADF)),
         };
@@ -122,7 +133,18 @@ impl target::ext::host_io::HostIoPread for Emu {
         offset: u32,
         output: HostIoOutput<'a>,
     ) -> HostIoResult<HostIoToken<'a>, Self> {
-        let file = match self.files.get_mut(fd as usize) {
+        if fd < FD_RESERVED {
+            if fd == 0 {
+                let len = TEST_PROGRAM_ELF.len();
+                return Ok(output.write(
+                    &TEST_PROGRAM_ELF[len.min(offset as usize)..len.min((offset + count) as usize)],
+                ));
+            } else {
+                return Err(HostIoError::Errno(HostIoErrno::EBADF));
+            }
+        }
+
+        let file = match self.files.get_mut((fd - FD_RESERVED) as usize) {
             Some(Some(file)) => file,
             _ => return Err(HostIoError::Errno(HostIoErrno::EBADF)),
         };
@@ -136,7 +158,11 @@ impl target::ext::host_io::HostIoPread for Emu {
 
 impl target::ext::host_io::HostIoPwrite for Emu {
     fn pwrite(&mut self, fd: u32, offset: u32, data: &[u8]) -> HostIoResult<u32, Self> {
-        let file = match self.files.get_mut(fd as usize) {
+        if fd < FD_RESERVED {
+            return Err(HostIoError::Errno(HostIoErrno::EACCES));
+        }
+
+        let file = match self.files.get_mut((fd - FD_RESERVED) as usize) {
             Some(Some(file)) => file,
             _ => return Err(HostIoError::Errno(HostIoErrno::EBADF)),
         };
@@ -149,7 +175,28 @@ impl target::ext::host_io::HostIoPwrite for Emu {
 
 impl target::ext::host_io::HostIoFstat for Emu {
     fn fstat(&mut self, fd: u32) -> HostIoResult<HostIoStat, Self> {
-        let metadata = match self.files.get(fd as usize) {
+        if fd < FD_RESERVED {
+            if fd == 0 {
+                return Ok(HostIoStat {
+                    st_dev: 0,
+                    st_ino: 0,
+                    st_mode: HostIoOpenMode::empty(),
+                    st_nlink: 0,
+                    st_uid: 0,
+                    st_gid: 0,
+                    st_rdev: 0,
+                    st_size: TEST_PROGRAM_ELF.len() as u64,
+                    st_blksize: 0,
+                    st_blocks: 0,
+                    st_atime: 0,
+                    st_mtime: 0,
+                    st_ctime: 0,
+                });
+            } else {
+                return Err(HostIoError::Errno(HostIoErrno::EBADF));
+            }
+        }
+        let metadata = match self.files.get((fd - FD_RESERVED) as usize) {
             Some(Some(file)) => file.metadata()?,
             _ => return Err(HostIoError::Errno(HostIoErrno::EBADF)),
         };

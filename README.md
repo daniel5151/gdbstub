@@ -77,6 +77,7 @@ Of course, most use-cases will want to support additional debugging features as 
     -   Extend the GDB protocol with custom debug commands using GDB's `monitor` command
 -   Get target memory map
 -   Perform Host I/O operations
+-   Get target exec file
 
 _Note:_ GDB features are implemented on an as-needed basis by `gdbstub`'s contributors. If there's a missing GDB feature that you'd like `gdbstub` to implement, please file an issue and/or open a PR!
 

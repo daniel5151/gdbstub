@@ -578,6 +578,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             Command::ReverseStep(cmd) => self.handle_reverse_step(res, target, cmd),
             Command::MemoryMap(cmd) => self.handle_memory_map(res, target, cmd),
             Command::HostIo(cmd) => self.handle_host_io(res, target, cmd),
+            Command::ExecFile(cmd) => self.handle_exec_file(res, target, cmd),
         }
     }
 }
