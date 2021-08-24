@@ -17,7 +17,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
         let handler_status = match command {
             ExecFile::qXferExecFileRead(cmd) => {
-                let filename = ops.get_exec_file(cmd.pid);
+                let filename = ops.get_exec_file(cmd.pid).handle_error()?;
                 res.write_binary_range(filename, cmd.offset, cmd.len)?;
                 HandlerStatus::Handled
             }
