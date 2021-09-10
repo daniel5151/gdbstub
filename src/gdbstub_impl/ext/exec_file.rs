@@ -1,8 +1,6 @@
 use super::prelude::*;
 use crate::protocol::commands::ext::ExecFile;
 
-use crate::arch::Arch;
-
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     pub(crate) fn handle_exec_file(
         &mut self,
@@ -19,18 +17,14 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
         let handler_status = match command {
             ExecFile::qXferExecFileRead(cmd) => {
-                let offset = <T::Arch as Arch>::Usize::from_be_bytes(cmd.offset)
-                    .ok_or(Error::TargetMismatch)?;
-                let length = <T::Arch as Arch>::Usize::from_be_bytes(cmd.length)
-                    .ok_or(Error::TargetMismatch)?;
                 let ret = ops
-                    .get_exec_file(cmd.pid, offset, length, cmd.buf)
+                    .get_exec_file(cmd.pid, cmd.offset, cmd.length, cmd.buf)
                     .handle_error()?;
-                if ret.is_empty() {
+                if ret == 0 {
                     res.write_str("l")?;
                 } else {
                     res.write_str("m")?;
-                    res.write_binary(ret)?;
+                    res.write_binary(&cmd.buf[..ret])?;
                 }
                 HandlerStatus::Handled
             }

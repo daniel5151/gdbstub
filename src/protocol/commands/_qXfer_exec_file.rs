@@ -5,8 +5,8 @@ use crate::common::Pid;
 #[derive(Debug)]
 pub struct qXferExecFileRead<'a> {
     pub pid: Option<Pid>,
-    pub offset: &'a [u8],
-    pub length: &'a [u8],
+    pub offset: usize,
+    pub length: usize,
 
     pub buf: &'a mut [u8],
 }
@@ -14,18 +14,18 @@ pub struct qXferExecFileRead<'a> {
 impl<'a> ParseCommand<'a> for qXferExecFileRead<'a> {
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
         let (buf, body_range) = buf.into_raw_buf();
-        let (body, buf) = buf[body_range.start..].split_at_mut(body_range.end - body_range.start);
+        let body = buf.get_mut(body_range.start..body_range.end)?;
 
         if body.is_empty() {
             return None;
         }
 
-        let mut body = body.split_mut_no_panic(|b| *b == b':').skip(1);
+        let mut body = body.split(|b| *b == b':').skip(1);
         let pid = decode_hex(body.next()?).ok().and_then(Pid::new);
 
-        let mut body = body.next()?.split_mut_no_panic(|b| *b == b',');
-        let offset = decode_hex_buf(body.next()?).ok()?;
-        let length = decode_hex_buf(body.next()?).ok()?;
+        let mut body = body.next()?.split(|b| *b == b',');
+        let offset = decode_hex(body.next()?).ok()?;
+        let length = decode_hex(body.next()?).ok()?;
 
         drop(body);
 

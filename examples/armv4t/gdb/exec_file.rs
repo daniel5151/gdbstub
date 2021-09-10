@@ -5,19 +5,19 @@ use gdbstub::target::TargetResult;
 use crate::emu::Emu;
 
 impl target::ext::exec_file::ExecFile for Emu {
-    fn get_exec_file<'a>(
+    fn get_exec_file(
         &self,
         _pid: Option<Pid>,
-        offset: u32,
-        length: u32,
-        buf: &'a mut [u8],
-    ) -> TargetResult<&'a [u8], Self> {
+        offset: usize,
+        length: usize,
+        buf: &mut [u8],
+    ) -> TargetResult<usize, Self> {
         let filename = b"/test.elf";
         let len = filename.len();
         let data =
             &filename[(offset as usize).min(len) as usize..((offset + length) as usize).min(len)];
         let buf = &mut buf[..data.len()];
         buf.copy_from_slice(data);
-        Ok(buf)
+        Ok(data.len())
     }
 }
