@@ -24,7 +24,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     res.write_str("l")?;
                 } else {
                     res.write_str("m")?;
-                    res.write_binary(&cmd.buf[..ret])?;
+                    // TODO: add more specific error variant?
+                    res.write_binary(cmd.buf.get(..ret).ok_or(Error::PacketBufferOverflow)?)?;
                 }
                 HandlerStatus::Handled
             }
