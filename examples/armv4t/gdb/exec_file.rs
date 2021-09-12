@@ -15,7 +15,7 @@ impl target::ext::exec_file::ExecFile for Emu {
         let filename = b"/test.elf";
         let len = filename.len();
         let data =
-            &filename[(offset as usize).min(len) as usize..((offset + length) as usize).min(len)];
+            &filename[offset.min(len)..(offset + length).min(len)];
         let buf = &mut buf[..data.len()];
         buf.copy_from_slice(data);
         Ok(data.len())
