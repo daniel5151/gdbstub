@@ -24,7 +24,7 @@ impl<'a> ParseCommand<'a> for qXferExecFileRead<'a> {
         let pid = match body.next()? {
             [] => None,
             buf => Some(Pid::new(decode_hex(buf).ok()?)?)
-        }
+        };
 
         let mut body = body.next()?.split(|b| *b == b',');
         let offset = decode_hex(body.next()?).ok()?;
