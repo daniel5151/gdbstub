@@ -23,7 +23,7 @@ pub trait ExecFile: Target {
     fn get_exec_file(
         &self,
         pid: Option<Pid>,
-        offset: usize,
+        offset: u64,
         length: usize,
         buf: &mut [u8],
     ) -> TargetResult<usize, Self>;

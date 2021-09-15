@@ -5,7 +5,7 @@ use crate::common::Pid;
 #[derive(Debug)]
 pub struct qXferExecFileRead<'a> {
     pub pid: Option<Pid>,
-    pub offset: usize,
+    pub offset: u64,
     pub length: usize,
 
     pub buf: &'a mut [u8],
