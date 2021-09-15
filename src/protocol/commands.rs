@@ -225,6 +225,10 @@ commands! {
         "qXfer:memory-map:read" => _qXfer_memory_map::qXferMemoryMapRead,
     }
 
+    exec_file use 'a {
+        "qXfer:exec-file:read" => _qXfer_exec_file::qXferExecFileRead<'a>,
+    }
+
     host_io use 'a {
         "vFile:open" => _vFile_open::vFileOpen<'a>,
         "vFile:close" => _vFile_close::vFileClose,

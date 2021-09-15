@@ -364,6 +364,11 @@ pub trait Target {
     fn host_io(&mut self) -> Option<ext::host_io::HostIoOps<Self>> {
         None
     }
+
+    /// Provide exec-file
+    fn exec_file(&mut self) -> Option<ext::exec_file::ExecFileOps<Self>> {
+        None
+    }
 }
 
 macro_rules! impl_dyn_target {
@@ -393,6 +398,11 @@ macro_rules! impl_dyn_target {
             #[inline(always)]
             fn monitor_cmd(&mut self) -> Option<ext::monitor_cmd::MonitorCmdOps<Self>> {
                 (**self).monitor_cmd()
+            }
+
+            #[inline(always)]
+            fn exec_file(&mut self) -> Option<ext::exec_file::ExecFileOps<Self>> {
+                (**self).exec_file()
             }
 
             #[inline(always)]

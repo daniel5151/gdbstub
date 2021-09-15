@@ -16,7 +16,7 @@ impl<'a> ParseCommand<'a> for vFileSetfs {
 
         match body {
             [b':', body @ ..] => {
-                let fs = match core::num::NonZeroUsize::new(decode_hex(body).ok()?) {
+                let fs = match crate::common::Pid::new(decode_hex(body).ok()?) {
                     None => FsKind::Stub,
                     Some(pid) => FsKind::Pid(pid),
                 };
