@@ -1,6 +1,6 @@
 # gdbstub_arch
 
-[![](http://meritbadge.herokuapp.com/gdbstub_arch)](https://crates.io/crates/gdbstub_arch)
+[![](https://img.shields.io/crates/v/gdbstub_arch.svg)](https://crates.io/crates/gdbstub_arch)
 [![](https://docs.rs/gdbstub_arch/badge.svg)](https://docs.rs/gdbstub_arch)
 
 Community-contributed implementations of `gdbstub::arch::Arch` for various
