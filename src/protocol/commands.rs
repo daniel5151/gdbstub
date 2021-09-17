@@ -180,7 +180,7 @@ commands! {
         "QStartNoAckMode" => _QStartNoAckMode::QStartNoAckMode,
         "qsThreadInfo" => _qsThreadInfo::qsThreadInfo,
         "qSupported" => _qSupported::qSupported<'a>,
-        "qXfer:features:read" => _qXfer_features_read::qXferFeaturesRead,
+        "qXfer:features:read" => _qXfer_features_read::qXferFeaturesRead<'a>,
         "s" => _s::s<'a>,
         "T" => _t_upcase::T,
         "vCont" => _vCont::vCont<'a>,
@@ -221,8 +221,8 @@ commands! {
         "bs" => _bs::bs,
     }
 
-    memory_map {
-        "qXfer:memory-map:read" => _qXfer_memory_map::qXferMemoryMapRead,
+    memory_map use 'a {
+        "qXfer:memory-map:read" => _qXfer_memory_map::qXferMemoryMapRead<'a>,
     }
 
     exec_file use 'a {

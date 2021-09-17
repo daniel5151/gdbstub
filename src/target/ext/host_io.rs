@@ -199,30 +199,6 @@ impl<E> From<std::io::Error> for HostIoError<E> {
 /// See [`HostIoError`] for more details.
 pub type HostIoResult<T, Tgt> = Result<T, HostIoError<<Tgt as Target>::Error>>;
 
-/// Zero-sized type token that ensures HostIoOutput::write is called.
-pub struct HostIoToken<'a>(core::marker::PhantomData<&'a *mut ()>);
-
-/// An interface to send pread data back to the GDB client.
-pub struct HostIoOutput<'a> {
-    cb: &'a mut dyn FnMut(&[u8]),
-    token: HostIoToken<'a>,
-}
-
-impl<'a> HostIoOutput<'a> {
-    pub(crate) fn new(cb: &'a mut dyn FnMut(&[u8])) -> Self {
-        Self {
-            cb,
-            token: HostIoToken(core::marker::PhantomData),
-        }
-    }
-
-    /// Write out raw file bytes to the GDB debugger.
-    pub fn write(self, buf: &[u8]) -> HostIoToken<'a> {
-        (self.cb)(buf);
-        self.token
-    }
-}
-
 /// Target Extension - Perform I/O operations on host
 pub trait HostIo: Target {
     /// Enable open operation.
@@ -309,10 +285,10 @@ pub trait HostIoPread: HostIo {
     fn pread<'a>(
         &mut self,
         fd: u32,
-        count: <Self::Arch as Arch>::Usize,
-        offset: <Self::Arch as Arch>::Usize,
-        output: HostIoOutput<'a>,
-    ) -> HostIoResult<HostIoToken<'a>, Self>;
+        count: usize,
+        offset: u64,
+        buf: &mut [u8],
+    ) -> HostIoResult<usize, Self>;
 }
 
 define_ext!(HostIoPreadOps, HostIoPread);
@@ -362,11 +338,7 @@ pub trait HostIoReadlink: HostIo {
     /// will consume the `output` object and return a [`HostIoToken`]. This
     /// token ensures that the implementer of this method calls
     /// [`HostIoOutput::write`].
-    fn readlink<'a>(
-        &mut self,
-        filename: &[u8],
-        output: HostIoOutput<'a>,
-    ) -> HostIoResult<HostIoToken<'a>, Self>;
+    fn readlink<'a>(&mut self, filename: &[u8], buf: &mut [u8]) -> HostIoResult<usize, Self>;
 }
 
 define_ext!(HostIoReadlinkOps, HostIoReadlink);
