@@ -120,6 +120,7 @@ When using `gdbstub` in `#![no_std]` contexts, make sure to set `default-feature
 -   Virtual Machine Monitors (VMMs)
     -   [crosvm](https://chromium.googlesource.com/chromiumos/platform/crosvm/+/refs/heads/main#gdb-support) - The Chrome OS Virtual Machine Monitor (x64)
     -   [Firecracker](https://firecracker-microvm.github.io/) - A lightweight VMM developed by AWS - feature is in [PR](https://github.com/firecracker-microvm/firecracker/pull/2168)
+    -   [uhyve](https://github.com/hermitcore/uhyve) - A minimal hypervisor for [RustyHermit](https://github.com/hermitcore/rusty-hermit)
 -   Emulators (x64)
     -   [clicky](https://github.com/daniel5151/clicky/) - An emulator for classic clickwheel iPods (dual-core ARMv4T SoC)
     -   [rustyboyadvance-ng](https://github.com/michelhe/rustboyadvance-ng/) - Nintendo GameBoy Advance emulator and debugger (ARMv4T)
