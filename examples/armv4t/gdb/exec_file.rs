@@ -2,6 +2,7 @@ use gdbstub::common::Pid;
 use gdbstub::target;
 use gdbstub::target::TargetResult;
 
+use super::copy_range_to_buf;
 use crate::emu::Emu;
 
 impl target::ext::exec_file::ExecFile for Emu {
@@ -13,10 +14,6 @@ impl target::ext::exec_file::ExecFile for Emu {
         buf: &mut [u8],
     ) -> TargetResult<usize, Self> {
         let filename = b"/test.elf";
-        let len = filename.len();
-        let data = &filename[len.min(offset as usize)..len.min(offset as usize + length)];
-        let buf = &mut buf[..data.len()];
-        buf.copy_from_slice(data);
-        Ok(data.len())
+        Ok(copy_range_to_buf(filename, offset, length, buf))
     }
 }

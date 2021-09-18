@@ -1,6 +1,7 @@
 use gdbstub::target;
 use gdbstub::target::TargetResult;
 
+use super::copy_range_to_buf;
 use crate::emu::Emu;
 
 impl target::ext::target_description_xml_override::TargetDescriptionXmlOverride for Emu {
@@ -76,10 +77,6 @@ impl target::ext::target_description_xml_override::TargetDescriptionXmlOverride 
         .trim()
         .as_bytes();
 
-        let len = xml.len();
-        let data = &xml[len.min(offset as usize)..len.min(offset as usize + length)];
-        let buf = &mut buf[..data.len()];
-        buf.copy_from_slice(data);
-        Ok(data.len())
+        Ok(copy_range_to_buf(xml, offset, length, buf))
     }
 }

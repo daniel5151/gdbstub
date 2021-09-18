@@ -1,6 +1,7 @@
 use gdbstub::target;
 use gdbstub::target::TargetResult;
 
+use super::copy_range_to_buf;
 use crate::emu::Emu;
 
 impl target::ext::memory_map::MemoryMap for Emu {
@@ -21,11 +22,6 @@ impl target::ext::memory_map::MemoryMap for Emu {
 </memory-map>"#
             .trim()
             .as_bytes();
-
-        let len = memory_map.len();
-        let data = &memory_map[len.min(offset as usize)..len.min(offset as usize + length)];
-        let buf = &mut buf[..data.len()];
-        buf.copy_from_slice(data);
-        Ok(data.len())
+        Ok(copy_range_to_buf(memory_map, offset, length, buf))
     }
 }

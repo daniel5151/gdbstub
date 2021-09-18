@@ -5,6 +5,7 @@ use gdbstub::target::ext::host_io::{
     FsKind, HostIoErrno, HostIoError, HostIoOpenFlags, HostIoOpenMode, HostIoResult, HostIoStat,
 };
 
+use super::copy_range_to_buf;
 use crate::emu::Emu;
 use crate::TEST_PROGRAM_ELF;
 
@@ -138,12 +139,7 @@ impl target::ext::host_io::HostIoPread for Emu {
     ) -> HostIoResult<usize, Self> {
         if fd < FD_RESERVED {
             if fd == 0 {
-                let len = TEST_PROGRAM_ELF.len();
-                let data =
-                    &TEST_PROGRAM_ELF[len.min(offset as usize)..len.min(offset as usize + count)];
-                let buf = &mut buf[..data.len()];
-                buf.copy_from_slice(data);
-                return Ok(data.len());
+                return Ok(copy_range_to_buf(TEST_PROGRAM_ELF, offset, count, buf));
             } else {
                 return Err(HostIoError::Errno(HostIoErrno::EBADF));
             }
@@ -250,15 +246,11 @@ impl target::ext::host_io::HostIoReadlink for Emu {
         if filename == b"/proc/1/exe" {
             // Support `info proc exe` command
             let exe = b"/test.elf";
-            let buf = &mut buf[..exe.len()];
-            buf.copy_from_slice(exe);
-            return Ok(exe.len());
+            return Ok(copy_range_to_buf(exe, 0, exe.len(), buf));
         } else if filename == b"/proc/1/cwd" {
             // Support `info proc cwd` command
             let cwd = b"/";
-            let buf = &mut buf[..cwd.len()];
-            buf.copy_from_slice(cwd);
-            return Ok(cwd.len());
+            return Ok(copy_range_to_buf(cwd, 0, cwd.len(), buf));
         } else if filename.starts_with(b"/proc") {
             return Err(HostIoError::Errno(HostIoErrno::ENOENT));
         }
@@ -270,10 +262,7 @@ impl target::ext::host_io::HostIoReadlink for Emu {
             .to_str()
             .ok_or(HostIoError::Errno(HostIoErrno::ENOENT))?
             .as_bytes();
-        let len = data.len();
-        let buf = &mut buf[..len];
-        buf.copy_from_slice(data);
-        Ok(len)
+        Ok(copy_range_to_buf(data, 0, data.len(), buf))
     }
 }
 

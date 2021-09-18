@@ -36,6 +36,14 @@ fn cpu_reg_id(id: ArmCoreRegId) -> Option<u8> {
     }
 }
 
+pub fn copy_range_to_buf(data: &[u8], offset: u64, length: usize, buf: &mut [u8]) -> usize {
+    let len = data.len();
+    let data = &data[len.min(offset as usize)..len.min(offset as usize + length)];
+    let buf = &mut buf[..data.len()];
+    buf.copy_from_slice(data);
+    data.len()
+}
+
 impl Target for Emu {
     // As an example, I've defined a custom architecture based off
     // `gdbstub_arch::arm::Armv4t`. The implementation is in the `custom_arch`
