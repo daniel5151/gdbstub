@@ -1,0 +1,51 @@
+on: [push, pull_request]
+
+name: ci
+
+jobs:
+  test:
+    name: clippy + tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+      - name: cargo clippy
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: --workspace --tests --examples --features=std -- -D warnings
+      # don't forget the no_std example!
+      - name: cargo clippy (example_no_std)
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: --manifest-path example_no_std/Cargo.toml
+      - name: cargo test
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --workspace --features=std
+  rustfmt:
+    name: rustfmt (nightly)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          components: rustfmt
+      - name: cargo +nightly fmt
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+      # don't forget the no_std example!
+      - name: cargo +nightly fmt (example_no_std)
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --manifest-path example_no_std/Cargo.toml
