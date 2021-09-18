@@ -278,11 +278,12 @@ pub trait HostIoPread: HostIo {
     /// Up to `count` bytes will be read from the file, starting at `offset`
     /// relative to the start of the file.
     ///
-    /// The data read _must_ be sent by calling [`HostIoOutput::write`], which
-    /// will consume the `output` object and return a [`HostIoToken`]. This
-    /// token ensures that the implementer of this method calls
-    /// [`HostIoOutput::write`].
-    fn pread<'a>(
+    /// Return the number of bytes written into `buf` (which may be less than
+    /// `count`).
+    ///
+    /// If `offset` is greater than the length of the underlying data, return
+    /// `Ok(0)`.
+    fn pread(
         &mut self,
         fd: u32,
         count: usize,
@@ -334,11 +335,8 @@ define_ext!(HostIoUnlinkOps, HostIoUnlink);
 pub trait HostIoReadlink: HostIo {
     /// Read value of symbolic link `filename` on the target.
     ///
-    /// The data read _must_ be sent by calling [`HostIoOutput::write`], which
-    /// will consume the `output` object and return a [`HostIoToken`]. This
-    /// token ensures that the implementer of this method calls
-    /// [`HostIoOutput::write`].
-    fn readlink<'a>(&mut self, filename: &[u8], buf: &mut [u8]) -> HostIoResult<usize, Self>;
+    /// Return the number of bytes written into `buf`.
+    fn readlink(&mut self, filename: &[u8], buf: &mut [u8]) -> HostIoResult<usize, Self>;
 }
 
 define_ext!(HostIoReadlinkOps, HostIoReadlink);

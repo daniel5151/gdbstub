@@ -10,6 +10,7 @@ pub struct vFileReadlink<'a> {
 impl<'a> ParseCommand<'a> for vFileReadlink<'a> {
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
         let (buf, body_range) = buf.into_raw_buf();
+        // TODO: rewrite to avoid panic
         let (body, buf) = buf[body_range.start..].split_at_mut(body_range.end - body_range.start);
 
         if body.is_empty() {
