@@ -36,6 +36,10 @@ fn cpu_reg_id(id: ArmCoreRegId) -> Option<u8> {
     }
 }
 
+/// Copy a range of `data` (start at `offset` with a size of `length`) to `buf`.
+/// Return the size of data copied. Return 0 if encounter EOF.
+///
+/// Mainly used by qXfer:_object_:read commands.
 pub fn copy_range_to_buf(data: &[u8], offset: u64, length: usize, buf: &mut [u8]) -> usize {
     let len = data.len();
     let data = &data[len.min(offset as usize)..len.min(offset as usize + length)];

@@ -131,17 +131,23 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         .handle_error()?
                 } else if let Some(xml) = T::Arch::target_description_xml() {
                     let xml = xml.trim().as_bytes();
-                    let len = xml.len();
-                    let data = &xml
-                        [len.min(cmd.offset as usize)..len.min(cmd.offset as usize + cmd.length)];
-                    let buf = &mut cmd.buf[..data.len()];
-                    buf.copy_from_slice(data);
-                    data.len()
+                    let xml_len = xml.len();
+
+                    let start = xml_len.min(cmd.offset as usize);
+                    let end = xml_len.min(cmd.offset as usize + cmd.length);
+
+                    // LLVM isn't smart enough to realize that `end` will always be greater than
+                    // `start`, and fails to elide the `slice_index_order_fail` check unless we
+                    // include this seemingly useless call to `max`.
+                    let data = &xml[start..end.max(start)];
+
+                    let n = data.len().min(cmd.buf.len());
+                    cmd.buf[..n].copy_from_slice(&data[..n]);
+                    n
                 } else {
                     // If the target hasn't provided their own XML, then the initial response to
-                    // "qSupported" wouldn't have included "qXfer:features:read", and gdb
-                    // wouldn't send this packet unless it was
-                    // explicitly marked as supported.
+                    // "qSupported" wouldn't have included "qXfer:features:read", and gdb wouldn't
+                    // send this packet unless it was explicitly marked as supported.
                     return Err(Error::PacketUnexpected);
                 };
 
