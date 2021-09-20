@@ -336,6 +336,10 @@ pub trait HostIoReadlink: HostIo {
     /// Read value of symbolic link `filename` on the target.
     ///
     /// Return the number of bytes written into `buf`.
+    ///
+    /// Unlike most other Host IO handlers, if the resolved file path exceeds
+    /// the length of the provided `buf`, the target should NOT return a
+    /// partial response, and MUST return a `Err(HostIoErrno::ENAMETOOLONG)`.
     fn readlink(&mut self, filename: &[u8], buf: &mut [u8]) -> HostIoResult<usize, Self>;
 }
 
