@@ -262,7 +262,11 @@ impl target::ext::host_io::HostIoReadlink for Emu {
             .to_str()
             .ok_or(HostIoError::Errno(HostIoErrno::ENOENT))?
             .as_bytes();
-        Ok(copy_range_to_buf(data, 0, data.len(), buf))
+        if data.len() <= buf.len() {
+            Ok(copy_range_to_buf(data, 0, data.len(), buf))
+        } else {
+            Err(HostIoError::Errno(HostIoErrno::ENAMETOOLONG))
+        }
     }
 }
 
