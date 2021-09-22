@@ -22,16 +22,18 @@ pub trait SingleRegisterAccess<Id>: Target {
     /// On single threaded targets, `tid` is set to `()` and can be ignored.
     ///
     /// Implementations should write the value of the register using target's
-    /// native byte order in the buffer `dst`.
+    /// native byte order in the buffer `buf`.
     ///
     /// If the requested register could not be accessed, an appropriate
     /// non-fatal error should be returned.
+    ///
+    /// Return the number of bytes written into `buf`.
     fn read_register(
         &mut self,
         tid: Id,
         reg_id: <Self::Arch as Arch>::RegId,
-        dst: &mut [u8],
-    ) -> TargetResult<(), Self>;
+        buf: &mut [u8],
+    ) -> TargetResult<usize, Self>;
 
     /// Write from a single register on the target.
     ///

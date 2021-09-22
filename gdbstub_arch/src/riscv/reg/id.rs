@@ -22,15 +22,13 @@ pub enum RiscvRegId<U> {
 macro_rules! impl_riscv_reg_id {
     ($usize:ty) => {
         impl RegId for RiscvRegId<$usize> {
-            fn from_raw_id(id: usize) -> Option<(Self, usize)> {
-                const USIZE: usize = core::mem::size_of::<$usize>();
-
+            fn from_raw_id(id: usize) -> Option<Self> {
                 let reg_size = match id {
-                    0..=31 => (Self::Gpr(id as u8), USIZE),
-                    32 => (Self::Pc, USIZE),
-                    33..=64 => (Self::Fpr((id - 33) as u8), USIZE),
-                    65..=4160 => (Self::Csr((id - 65) as u16), USIZE),
-                    4161 => (Self::Priv, 1),
+                    0..=31 => Self::Gpr(id as u8),
+                    32 => Self::Pc,
+                    33..=64 => Self::Fpr((id - 33) as u8),
+                    65..=4160 => Self::Csr((id - 65) as u16),
+                    4161 => Self::Priv,
                     _ => return None,
                 };
                 Some(reg_size)

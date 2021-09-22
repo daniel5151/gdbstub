@@ -115,25 +115,25 @@ pub enum X86CoreRegId {
 }
 
 impl RegId for X86CoreRegId {
-    fn from_raw_id(id: usize) -> Option<(Self, usize)> {
+    fn from_raw_id(id: usize) -> Option<Self> {
         use self::X86CoreRegId::*;
 
         let r = match id {
-            0 => (Eax, 4),
-            1 => (Ecx, 4),
-            2 => (Edx, 4),
-            3 => (Ebx, 4),
-            4 => (Esp, 4),
-            5 => (Ebp, 4),
-            6 => (Esi, 4),
-            7 => (Edi, 4),
-            8 => (Eip, 4),
-            9 => (Eflags, 4),
-            10..=15 => (Segment(X86SegmentRegId::from_u8(id as u8 - 10)?), 4),
-            16..=23 => (St(id as u8 - 16), 10),
-            24..=31 => (Fpu(X87FpuInternalRegId::from_u8(id as u8 - 24)?), 4),
-            32..=39 => (Xmm(id as u8 - 32), 16),
-            40 => (Mxcsr, 4),
+            0 => Eax,
+            1 => Ecx,
+            2 => Edx,
+            3 => Ebx,
+            4 => Esp,
+            5 => Ebp,
+            6 => Esi,
+            7 => Edi,
+            8 => Eip,
+            9 => Eflags,
+            10..=15 => Segment(X86SegmentRegId::from_u8(id as u8 - 10)?),
+            16..=23 => St(id as u8 - 16),
+            24..=31 => Fpu(X87FpuInternalRegId::from_u8(id as u8 - 24)?),
+            32..=39 => Xmm(id as u8 - 32),
+            40 => Mxcsr,
             _ => return None,
         };
         Some(r)
@@ -167,61 +167,20 @@ pub enum X86_64CoreRegId {
 }
 
 impl RegId for X86_64CoreRegId {
-    fn from_raw_id(id: usize) -> Option<(Self, usize)> {
+    fn from_raw_id(id: usize) -> Option<Self> {
         use self::X86_64CoreRegId::*;
 
         let r = match id {
-            0..=15 => (Gpr(id as u8), 8),
-            16 => (Rip, 4),
-            17 => (Eflags, 8),
-            18..=23 => (Segment(X86SegmentRegId::from_u8(id as u8 - 18)?), 4),
-            24..=31 => (St(id as u8 - 24), 10),
-            32..=39 => (Fpu(X87FpuInternalRegId::from_u8(id as u8 - 32)?), 4),
-            40..=55 => (Xmm(id as u8 - 40), 16),
-            56 => (Mxcsr, 4),
+            0..=15 => Gpr(id as u8),
+            16 => Rip,
+            17 => Eflags,
+            18..=23 => Segment(X86SegmentRegId::from_u8(id as u8 - 18)?),
+            24..=31 => St(id as u8 - 24),
+            32..=39 => Fpu(X87FpuInternalRegId::from_u8(id as u8 - 32)?),
+            40..=55 => Xmm(id as u8 - 40),
+            56 => Mxcsr,
             _ => return None,
         };
         Some(r)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use gdbstub::arch::RegId;
-    use gdbstub::arch::Registers;
-
-    /// Compare the following two values which are expected to be the same:
-    /// * length of data written by `Registers::gdb_serialize()` in byte
-    /// * sum of sizes of all registers obtained by `RegId::from_raw_id()`
-    fn test<Rs: Registers, RId: RegId>() {
-        // Obtain the data length written by `gdb_serialize` by passing a custom
-        // closure.
-        let mut serialized_data_len = 0;
-        let counter = |b: Option<u8>| {
-            if b.is_some() {
-                serialized_data_len += 1;
-            }
-        };
-        Rs::default().gdb_serialize(counter);
-
-        // Accumulate register sizes returned by `from_raw_id`.
-        let mut i = 0;
-        let mut sum_reg_sizes = 0;
-        while let Some((_, size)) = RId::from_raw_id(i) {
-            sum_reg_sizes += size;
-            i += 1;
-        }
-
-        assert_eq!(serialized_data_len, sum_reg_sizes);
-    }
-
-    #[test]
-    fn test_x86() {
-        test::<crate::x86::reg::X86CoreRegs, crate::x86::reg::id::X86CoreRegId>()
-    }
-
-    #[test]
-    fn test_x86_64() {
-        test::<crate::x86::reg::X86_64CoreRegs, crate::x86::reg::id::X86_64CoreRegId>()
     }
 }

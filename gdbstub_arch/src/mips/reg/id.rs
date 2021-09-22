@@ -44,7 +44,7 @@ pub enum MipsRegId<U> {
     _Size(U),
 }
 
-fn from_raw_id<U>(id: usize) -> Option<(MipsRegId<U>, usize)> {
+fn from_raw_id<U>(id: usize) -> Option<MipsRegId<U>> {
     let reg = match id {
         0..=31 => MipsRegId::Gpr(id as u8),
         32 => MipsRegId::Status,
@@ -62,62 +62,22 @@ fn from_raw_id<U>(id: usize) -> Option<(MipsRegId<U>, usize)> {
         75 => MipsRegId::Lo2,
         76 => MipsRegId::Hi3,
         77 => MipsRegId::Lo3,
-        // `MipsRegId::Dspctl` is the only register that will always be 4 bytes wide
-        78 => return Some((MipsRegId::Dspctl, 4)),
+        78 => MipsRegId::Dspctl,
         79 => MipsRegId::Restart,
         _ => return None,
     };
 
-    let ptrsize = core::mem::size_of::<U>();
-    Some((reg, ptrsize))
+    Some(reg)
 }
 
 impl RegId for MipsRegId<u32> {
-    fn from_raw_id(id: usize) -> Option<(Self, usize)> {
+    fn from_raw_id(id: usize) -> Option<Self> {
         from_raw_id::<u32>(id)
     }
 }
 
 impl RegId for MipsRegId<u64> {
-    fn from_raw_id(id: usize) -> Option<(Self, usize)> {
+    fn from_raw_id(id: usize) -> Option<Self> {
         from_raw_id::<u64>(id)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use gdbstub::arch::RegId;
-    use gdbstub::arch::Registers;
-
-    fn test<Rs: Registers, RId: RegId>() {
-        // Obtain the data length written by `gdb_serialize` by passing a custom
-        // closure.
-        let mut serialized_data_len = 0;
-        let counter = |b: Option<u8>| {
-            if b.is_some() {
-                serialized_data_len += 1;
-            }
-        };
-        Rs::default().gdb_serialize(counter);
-
-        // Accumulate register sizes returned by `from_raw_id`.
-        let mut i = 0;
-        let mut sum_reg_sizes = 0;
-        while let Some((_, size)) = RId::from_raw_id(i) {
-            sum_reg_sizes += size;
-            i += 1;
-        }
-
-        assert_eq!(serialized_data_len, sum_reg_sizes);
-    }
-
-    #[test]
-    fn test_mips32() {
-        test::<crate::mips::reg::MipsCoreRegsWithDsp<u32>, crate::mips::reg::id::MipsRegId<u32>>()
-    }
-
-    #[test]
-    fn test_mips64() {
-        test::<crate::mips::reg::MipsCoreRegsWithDsp<u64>, crate::mips::reg::id::MipsRegId<u64>>()
     }
 }
