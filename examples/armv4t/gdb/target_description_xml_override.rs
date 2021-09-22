@@ -76,7 +76,6 @@ impl target::ext::target_description_xml_override::TargetDescriptionXmlOverride 
         "#
         .trim()
         .as_bytes();
-
         Ok(copy_range_to_buf(xml, offset, length, buf))
     }
 }
