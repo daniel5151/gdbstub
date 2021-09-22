@@ -2,7 +2,7 @@ use super::prelude::*;
 use crate::protocol::commands::ext::HostIo;
 
 use crate::arch::Arch;
-use crate::target::ext::host_io::{HostIoError, HostIoOutput, HostIoStat};
+use crate::target::ext::host_io::{HostIoError, HostIoStat};
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     pub(crate) fn handle_host_io(
@@ -52,30 +52,15 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 HandlerStatus::Handled
             }
             HostIo::vFilePread(cmd) if ops.enable_pread().is_some() => {
-                let count = <T::Arch as Arch>::Usize::from_be_bytes(cmd.count)
-                    .ok_or(Error::TargetMismatch)?;
-                let offset = <T::Arch as Arch>::Usize::from_be_bytes(cmd.offset)
-                    .ok_or(Error::TargetMismatch)?;
-                let mut err: Result<_, Error<T::Error, C::Error>> = Ok(());
-                let mut callback = |data: &[u8]| {
-                    let e = (|| {
-                        res.write_str("F")?;
-                        res.write_num(data.len())?;
-                        res.write_str(";")?;
-                        res.write_binary(data)?;
-                        Ok(())
-                    })();
-
-                    if let Err(e) = e {
-                        err = Err(e)
-                    }
-                };
-
                 let ops = ops.enable_pread().unwrap();
                 handle_hostio_result! {
-                    if let Ok(_) = ops.pread(cmd.fd, count, offset, HostIoOutput::new(&mut callback)) => {}
+                    if let Ok(ret) = ops.pread(cmd.fd, cmd.count, cmd.offset, cmd.buf) => {
+                        res.write_str("F")?;
+                        res.write_num(ret)?;
+                        res.write_str(";")?;
+                        res.write_binary(cmd.buf.get(..ret).ok_or(Error::PacketBufferOverflow)?)?;
+                    }
                 };
-                err?;
 
                 HandlerStatus::Handled
             }
@@ -126,26 +111,15 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 HandlerStatus::Handled
             }
             HostIo::vFileReadlink(cmd) if ops.enable_readlink().is_some() => {
-                let mut err: Result<_, Error<T::Error, C::Error>> = Ok(());
-                let mut callback = |data: &[u8]| {
-                    let e = (|| {
-                        res.write_str("F")?;
-                        res.write_num(data.len())?;
-                        res.write_str(";")?;
-                        res.write_binary(data)?;
-                        Ok(())
-                    })();
-
-                    if let Err(e) = e {
-                        err = Err(e)
-                    }
-                };
-
                 let ops = ops.enable_readlink().unwrap();
                 handle_hostio_result! {
-                    if let Ok(_) = ops.readlink(cmd.filename, HostIoOutput::new(&mut callback)) => {}
+                    if let Ok(ret) = ops.readlink(cmd.filename, cmd.buf) => {
+                        res.write_str("F")?;
+                        res.write_num(ret)?;
+                        res.write_str(";")?;
+                        res.write_binary(cmd.buf.get(..ret).ok_or(Error::PacketBufferOverflow)?)?;
+                    }
                 };
-                err?;
 
                 HandlerStatus::Handled
             }

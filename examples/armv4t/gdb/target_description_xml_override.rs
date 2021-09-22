@@ -1,10 +1,17 @@
 use gdbstub::target;
+use gdbstub::target::TargetResult;
 
+use super::copy_range_to_buf;
 use crate::emu::Emu;
 
 impl target::ext::target_description_xml_override::TargetDescriptionXmlOverride for Emu {
-    fn target_description_xml(&self) -> &str {
-        r#"<?xml version="1.0"?>
+    fn target_description_xml(
+        &self,
+        offset: u64,
+        length: usize,
+        buf: &mut [u8],
+    ) -> TargetResult<usize, Self> {
+        let xml = r#"<?xml version="1.0"?>
 <!DOCTYPE target SYSTEM "gdb-target.dtd">
 <target version="1.0">
     <architecture>armv4t</architecture>
@@ -67,5 +74,8 @@ impl target::ext::target_description_xml_override::TargetDescriptionXmlOverride 
     </feature>
 </target>
         "#
+        .trim()
+        .as_bytes();
+        Ok(copy_range_to_buf(xml, offset, length, buf))
     }
 }

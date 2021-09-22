@@ -17,8 +17,16 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
         let handler_status = match command {
             MemoryMap::qXferMemoryMapRead(cmd) => {
-                let xml = ops.memory_map_xml().trim().as_bytes();
-                res.write_binary_range(xml, cmd.offset, cmd.len)?;
+                let ret = ops
+                    .memory_map_xml(cmd.offset, cmd.length, cmd.buf)
+                    .handle_error()?;
+                if ret == 0 {
+                    res.write_str("l")?;
+                } else {
+                    res.write_str("m")?;
+                    // TODO: add more specific error variant?
+                    res.write_binary(cmd.buf.get(..ret).ok_or(Error::PacketBufferOverflow)?)?;
+                }
                 HandlerStatus::Handled
             }
         };

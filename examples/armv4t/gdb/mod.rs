@@ -1,4 +1,4 @@
-use core::convert::TryInto;
+use core::convert::{TryFrom, TryInto};
 
 use armv4t_emu::{reg, Memory};
 use gdbstub::target;
@@ -34,6 +34,22 @@ fn cpu_reg_id(id: ArmCoreRegId) -> Option<u8> {
         ArmCoreRegId::Cpsr => Some(reg::CPSR),
         _ => None,
     }
+}
+
+/// Copy a range of `data` (start at `offset` with a size of `length`) to `buf`.
+/// Return the size of data copied. Returns 0 if `offset >= buf.len()`.
+///
+/// Mainly used by qXfer:_object_:read commands.
+pub fn copy_range_to_buf(data: &[u8], offset: u64, length: usize, buf: &mut [u8]) -> usize {
+    let offset = match usize::try_from(offset) {
+        Ok(v) => v,
+        Err(_) => return 0,
+    };
+    let len = data.len();
+    let data = &data[len.min(offset)..len.min(offset + length)];
+    let buf = &mut buf[..data.len()];
+    buf.copy_from_slice(data);
+    data.len()
 }
 
 impl Target for Emu {

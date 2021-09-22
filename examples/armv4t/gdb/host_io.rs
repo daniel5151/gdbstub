@@ -2,10 +2,10 @@ use std::io::{Read, Seek, Write};
 
 use gdbstub::target;
 use gdbstub::target::ext::host_io::{
-    FsKind, HostIoErrno, HostIoError, HostIoOpenFlags, HostIoOpenMode, HostIoOutput, HostIoResult,
-    HostIoStat, HostIoToken,
+    FsKind, HostIoErrno, HostIoError, HostIoOpenFlags, HostIoOpenMode, HostIoResult, HostIoStat,
 };
 
+use super::copy_range_to_buf;
 use crate::emu::Emu;
 use crate::TEST_PROGRAM_ELF;
 
@@ -133,16 +133,13 @@ impl target::ext::host_io::HostIoPread for Emu {
     fn pread<'a>(
         &mut self,
         fd: u32,
-        count: u32,
-        offset: u32,
-        output: HostIoOutput<'a>,
-    ) -> HostIoResult<HostIoToken<'a>, Self> {
+        count: usize,
+        offset: u64,
+        buf: &mut [u8],
+    ) -> HostIoResult<usize, Self> {
         if fd < FD_RESERVED {
             if fd == 0 {
-                let len = TEST_PROGRAM_ELF.len();
-                return Ok(output.write(
-                    &TEST_PROGRAM_ELF[len.min(offset as usize)..len.min((offset + count) as usize)],
-                ));
+                return Ok(copy_range_to_buf(TEST_PROGRAM_ELF, offset, count, buf));
             } else {
                 return Err(HostIoError::Errno(HostIoErrno::EBADF));
             }
@@ -153,10 +150,9 @@ impl target::ext::host_io::HostIoPread for Emu {
             _ => return Err(HostIoError::Errno(HostIoErrno::EBADF)),
         };
 
-        let mut buffer = vec![0; count as usize];
-        file.seek(std::io::SeekFrom::Start(offset as u64))?;
-        let n = file.read(&mut buffer)?;
-        Ok(output.write(&buffer[..n]))
+        file.seek(std::io::SeekFrom::Start(offset))?;
+        let n = file.read(buf)?;
+        Ok(n)
     }
 }
 
@@ -246,29 +242,31 @@ impl target::ext::host_io::HostIoUnlink for Emu {
 }
 
 impl target::ext::host_io::HostIoReadlink for Emu {
-    fn readlink<'a>(
-        &mut self,
-        filename: &[u8],
-        output: HostIoOutput<'a>,
-    ) -> HostIoResult<HostIoToken<'a>, Self> {
+    fn readlink<'a>(&mut self, filename: &[u8], buf: &mut [u8]) -> HostIoResult<usize, Self> {
         if filename == b"/proc/1/exe" {
             // Support `info proc exe` command
-            return Ok(output.write(b"/test.elf"));
+            let exe = b"/test.elf";
+            return Ok(copy_range_to_buf(exe, 0, exe.len(), buf));
         } else if filename == b"/proc/1/cwd" {
             // Support `info proc cwd` command
-            return Ok(output.write(b"/"));
+            let cwd = b"/";
+            return Ok(copy_range_to_buf(cwd, 0, cwd.len(), buf));
         } else if filename.starts_with(b"/proc") {
             return Err(HostIoError::Errno(HostIoErrno::ENOENT));
         }
 
         let path =
             std::str::from_utf8(filename).map_err(|_| HostIoError::Errno(HostIoErrno::ENOENT))?;
-        Ok(output.write(
-            std::fs::read_link(path)?
-                .to_str()
-                .ok_or(HostIoError::Errno(HostIoErrno::ENOENT))?
-                .as_bytes(),
-        ))
+        let link = std::fs::read_link(path)?;
+        let data = link
+            .to_str()
+            .ok_or(HostIoError::Errno(HostIoErrno::ENOENT))?
+            .as_bytes();
+        if data.len() <= buf.len() {
+            Ok(copy_range_to_buf(data, 0, data.len(), buf))
+        } else {
+            Err(HostIoError::Errno(HostIoErrno::ENAMETOOLONG))
+        }
     }
 }
 
