@@ -15,7 +15,7 @@ exclude = ["examples/**/*.elf", "examples/**/*.o"]
 
 [dependencies]
 bitflags = "1.3"
-cfg-if = "0.1.10"
+cfg-if = "1.0"
 log = "0.4"
 managed = { version = "0.8", default-features = false }
 num-traits = { version = "0.2", default-features = false }
@@ -26,7 +26,7 @@ gdbstub_arch = { path = "./gdbstub_arch/" }
 
 armv4t_emu = "0.1"
 pretty_env_logger = "0.4"
-goblin = "0.2"
+goblin = "0.4"
 
 [features]
 default = ["std"]
