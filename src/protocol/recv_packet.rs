@@ -53,6 +53,7 @@ impl RecvPacketStateMachine {
         }
 
         if matches!(self.state, State::Ready) {
+            #[cfg(feature = "trace-pkt")]
             trace!(
                 "<-- {}",
                 core::str::from_utf8(buf.as_slice()).unwrap_or("<invalid packet>")
@@ -111,6 +112,7 @@ impl RecvPacketBlocking {
             buf.push(get_byte().map_err(RecvPacketError::Connection)?)?;
         }
 
+        #[cfg(feature = "trace-pkt")]
         trace!(
             "<-- {}",
             core::str::from_utf8(buf.as_slice()).unwrap_or("<invalid packet>")

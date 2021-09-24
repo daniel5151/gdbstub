@@ -1,3 +1,8 @@
+#[cfg(feature = "trace-pkt")]
+use alloc::string::String;
+#[cfg(feature = "trace-pkt")]
+use alloc::vec::Vec;
+
 use num_traits::PrimInt;
 
 use crate::internal::BeBytes;
@@ -24,7 +29,7 @@ pub struct ResponseWriter<'a, C: Connection + 'a> {
     rle_char: u8,
     rle_repeat: u8,
     // buffer to log outgoing packets. only allocates if logging is enabled.
-    #[cfg(feature = "std")]
+    #[cfg(feature = "trace-pkt")]
     msg: Vec<u8>,
 }
 
@@ -37,7 +42,7 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
             checksum: 0,
             rle_char: 0,
             rle_repeat: 0,
-            #[cfg(feature = "std")]
+            #[cfg(feature = "trace-pkt")]
             msg: Vec::new(),
         }
     }
@@ -51,7 +56,7 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
         // added to the checksum, and is just sitting in the RLE buffer)
         let checksum = self.checksum;
 
-        #[cfg(feature = "std")]
+        #[cfg(feature = "trace-pkt")]
         trace!(
             "--> ${}#{:02x?}",
             String::from_utf8_lossy(&self.msg),
@@ -73,7 +78,7 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
     }
 
     fn inner_write(&mut self, byte: u8) -> Result<(), Error<C::Error>> {
-        #[cfg(feature = "std")]
+        #[cfg(feature = "trace-pkt")]
         if log_enabled!(log::Level::Trace) {
             match self.msg.as_slice() {
                 [.., c, b'*'] => {
