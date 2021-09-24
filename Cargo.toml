@@ -29,7 +29,7 @@ pretty_env_logger = "0.4"
 goblin = "0.2"
 
 [features]
-default = ["std"]
+default = ["std", "trace-pkt"]
 alloc = ["managed/alloc"]
 std = ["alloc"]
 trace-pkt = ["alloc"]
