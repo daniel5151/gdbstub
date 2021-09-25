@@ -177,8 +177,8 @@ impl RegId for X86_64CoreRegId {
             18..=23 => (Segment(X86SegmentRegId::from_u8(id as u8 - 18)?), 4),
             24..=31 => (St(id as u8 - 24), 10),
             32..=39 => (Fpu(X87FpuInternalRegId::from_u8(id as u8 - 32)?), 4),
-            40..=55 => (Xmm(id as u8 - 40), 16),
-            56 => (Mxcsr, 4),
+            40..=56 => (Xmm(id as u8 - 40), 16),
+            57 => (Mxcsr, 4),
             _ => return None,
         };
         Some(r)
