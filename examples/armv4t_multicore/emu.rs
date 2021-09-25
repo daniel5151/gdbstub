@@ -69,12 +69,12 @@ impl Emu {
         for h in sections {
             eprintln!(
                 "loading section {:?} into memory from [{:#010x?}..{:#010x?}]",
-                elf_header.shdr_strtab.get(h.sh_name).unwrap().unwrap(),
+                elf_header.shdr_strtab.get_at(h.sh_name).unwrap(),
                 h.sh_addr,
                 h.sh_addr + h.sh_size,
             );
 
-            for (i, b) in program_elf[h.file_range()].iter().enumerate() {
+            for (i, b) in program_elf[h.file_range().unwrap()].iter().enumerate() {
                 mem.w8(h.sh_addr as u32 + i as u32, *b);
             }
         }
