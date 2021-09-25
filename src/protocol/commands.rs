@@ -185,6 +185,7 @@ commands! {
         "T" => _t_upcase::T,
         "vCont" => _vCont::vCont<'a>,
         "vKill" => _vKill::vKill,
+        "X" => _x_upcase::X<'a>,
     }
 
     single_register_access use 'a {
