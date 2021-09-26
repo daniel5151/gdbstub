@@ -314,6 +314,19 @@ pub trait Target {
     /// ```
     fn base_ops(&mut self) -> ext::base::BaseOps<Self::Arch, Self::Error>;
 
+    /// Enable/disable using the more efficient `X` packet to write to target
+    /// memory (as opposed to the basic `M` packet).
+    ///
+    /// By default, this method returns `true`.
+    ///
+    /// _Author's note:_ Unless you're _really_ trying to squeeze `gdbstub` onto
+    /// a particularly resource-constrained platform, you may as well leave this
+    /// optimization enabled.
+    #[inline(always)]
+    fn use_x_upcase_packet(&self) -> bool {
+        true
+    }
+
     /// Set/Remove software breakpoints.
     #[inline(always)]
     fn breakpoints(&mut self) -> Option<ext::breakpoints::BreakpointsOps<Self>> {

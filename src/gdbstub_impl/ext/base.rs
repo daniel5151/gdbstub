@@ -433,20 +433,6 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     return Err(Error::NonFatalError(1));
                 }
             }
-            Base::X(cmd) => {
-                let addr = <T::Arch as Arch>::Usize::from_be_bytes(cmd.addr)
-                    .ok_or(Error::TargetMismatch)?;
-
-                match target.base_ops() {
-                    BaseOps::SingleThread(ops) => ops.write_addrs(addr, cmd.val),
-                    BaseOps::MultiThread(ops) => {
-                        ops.write_addrs(addr, cmd.val, self.current_mem_tid)
-                    }
-                }
-                .handle_error()?;
-
-                HandlerStatus::NeedsOk
-            }
         };
         Ok(handler_status)
     }

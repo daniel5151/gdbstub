@@ -566,6 +566,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             }
             // `handle_X` methods are defined in the `ext` module
             Command::Base(cmd) => self.handle_base(res, target, cmd),
+            Command::XUpcasePacket(cmd) => self.handle_x_upcase_packet(res, target, cmd),
             Command::SingleRegisterAccess(cmd) => {
                 self.handle_single_register_access(res, target, cmd)
             }
