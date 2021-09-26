@@ -369,6 +369,11 @@ pub trait Target {
     fn exec_file(&mut self) -> Option<ext::exec_file::ExecFileOps<Self>> {
         None
     }
+
+    /// Provide auxv
+    fn auxv(&mut self) -> Option<ext::auxv::AuxvOps<Self>> {
+        None
+    }
 }
 
 macro_rules! impl_dyn_target {
@@ -418,6 +423,11 @@ macro_rules! impl_dyn_target {
             #[inline(always)]
             fn memory_map(&mut self) -> Option<ext::memory_map::MemoryMapOps<Self>> {
                 (**self).memory_map()
+            }
+
+            #[inline(always)]
+            fn auxv(&mut self) -> Option<ext::auxv::AuxvOps<Self>> {
+                (**self).auxv()
             }
 
             #[inline(always)]

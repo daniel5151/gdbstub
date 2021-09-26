@@ -119,6 +119,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     res.write_str(";qXfer:exec-file:read+")?;
                 }
 
+                if target.auxv().is_some() {
+                    res.write_str(";qXfer:auxv:read+")?;
+                }
+
                 HandlerStatus::Handled
             }
             Base::QStartNoAckMode(_) => {

@@ -13,6 +13,12 @@ pub trait TargetDescriptionXmlOverride: Target {
     /// Refer to the
     /// [target_description_xml](crate::arch::Arch::target_description_xml)
     /// docs for more info.
+    ///
+    /// Return the number of bytes written into `buf` (which may be less than
+    /// `length`).
+    ///
+    /// If `offset` is greater than the length of the underlying data, return
+    /// `Ok(0)`.
     fn target_description_xml(
         &self,
         offset: u64,

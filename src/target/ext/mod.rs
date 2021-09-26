@@ -256,6 +256,7 @@ macro_rules! define_ext {
     };
 }
 
+pub mod auxv;
 pub mod base;
 pub mod breakpoints;
 pub mod catch_syscalls;

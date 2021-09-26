@@ -14,6 +14,7 @@ use crate::emu::{Emu, Event};
 
 // Additional GDB extensions
 
+mod auxv;
 mod breakpoints;
 mod catch_syscalls;
 mod exec_file;
@@ -120,6 +121,11 @@ impl Target for Emu {
 
     #[inline(always)]
     fn exec_file(&mut self) -> Option<target::ext::exec_file::ExecFileOps<Self>> {
+        Some(self)
+    }
+
+    #[inline(always)]
+    fn auxv(&mut self) -> Option<target::ext::auxv::AuxvOps<Self>> {
         Some(self)
     }
 }
