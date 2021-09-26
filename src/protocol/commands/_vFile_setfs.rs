@@ -20,7 +20,7 @@ impl<'a> ParseCommand<'a> for vFileSetfs {
                     None => FsKind::Stub,
                     Some(pid) => FsKind::Pid(pid),
                 };
-                Some(vFileSetfs{fs})
+                Some(vFileSetfs { fs })
             },
             _ => None,
         }

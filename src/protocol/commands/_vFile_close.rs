@@ -15,7 +15,7 @@ impl<'a> ParseCommand<'a> for vFileClose {
         match body {
             [b':', body @ ..] => {
                 let fd = decode_hex(body).ok()?;
-                Some(vFileClose{fd})
+                Some(vFileClose { fd })
             },
             _ => None,
         }

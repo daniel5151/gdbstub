@@ -20,7 +20,7 @@ impl<'a> ParseCommand<'a> for vFileReadlink<'a> {
         match body {
             [b':', body @ ..] => {
                 let filename = decode_hex_buf(body).ok()?;
-                Some(vFileReadlink{filename, buf})
+                Some(vFileReadlink { filename, buf })
             },
             _ => None,
         }

@@ -22,7 +22,7 @@ impl<'a> ParseCommand<'a> for vFileOpen<'a> {
                 let filename = decode_hex_buf(body.next()?).ok()?;
                 let flags = HostIoOpenFlags::from_bits(decode_hex(body.next()?).ok()?)?;
                 let mode = HostIoOpenMode::from_bits(decode_hex(body.next()?).ok()?)?;
-                Some(vFileOpen{filename, flags, mode})
+                Some(vFileOpen { filename, flags, mode })
             },
             _ => None,
         }

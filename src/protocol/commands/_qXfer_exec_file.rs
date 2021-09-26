@@ -32,6 +32,6 @@ impl<'a> ParseCommand<'a> for qXferExecFileRead<'a> {
 
         drop(body);
 
-        Some(qXferExecFileRead {pid, offset, length, buf})
+        Some(qXferExecFileRead { pid, offset, length, buf })
     }
 }
