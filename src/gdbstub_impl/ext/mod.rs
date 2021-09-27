@@ -22,5 +22,6 @@ mod monitor_cmd;
 mod reverse_exec;
 mod section_offsets;
 mod single_register_access;
+mod x_upcase_packet;
 
 pub(crate) use base::FinishExecStatus;

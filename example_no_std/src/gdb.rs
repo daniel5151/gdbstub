@@ -24,6 +24,12 @@ impl Target for DummyTarget {
         target::ext::base::BaseOps::MultiThread(self)
     }
 
+    // disable X packet optimization in order to save space
+    #[inline(always)]
+    fn use_x_upcase_packet(&self) -> bool {
+        false
+    }
+
     #[inline(always)]
     fn breakpoints(&mut self) -> Option<target::ext::breakpoints::BreakpointsOps<Self>> {
         Some(self)

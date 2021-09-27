@@ -85,6 +85,7 @@ macro_rules! commands {
                     fn single_register_access(&mut self) -> Option<()>;
                     fn reverse_step(&mut self) -> Option<()>;
                     fn reverse_cont(&mut self) -> Option<()>;
+                    fn x_upcase_packet(&mut self) -> Option<()>;
                 }
 
                 impl<T: Target> Hack for T {
@@ -113,6 +114,14 @@ macro_rules! commands {
                         match self.base_ops() {
                             BaseOps::SingleThread(ops) => ops.support_reverse_cont().map(drop),
                             BaseOps::MultiThread(ops) => ops.support_reverse_cont().map(drop),
+                        }
+                    }
+
+                    fn x_upcase_packet(&mut self) -> Option<()> {
+                        if self.use_x_upcase_packet() {
+                            Some(())
+                        } else {
+                            None
                         }
                     }
                 }
@@ -185,6 +194,10 @@ commands! {
         "T" => _t_upcase::T,
         "vCont" => _vCont::vCont<'a>,
         "vKill" => _vKill::vKill,
+    }
+
+    x_upcase_packet use 'a {
+        "X" => _x_upcase::X<'a>,
     }
 
     single_register_access use 'a {
