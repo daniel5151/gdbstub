@@ -28,15 +28,15 @@ use crate::internal::{BeBytes, LeBytes};
 ///
 /// [single register accesses]: crate::target::ext::base::SingleRegisterAccess
 pub trait RegId: Sized + Debug {
-    /// Map raw GDB register number corresponding `RegId`.
+    /// Map raw GDB register number corresponding `RegId` and register size.
     ///
     /// Returns `None` if the register is not available.
-    fn from_raw_id(id: usize) -> Option<Self>;
+    fn from_raw_id(id: usize) -> Option<(Self, usize)>;
 }
 
 /// Stub implementation -- Returns `None` for all raw IDs.
 impl RegId for () {
-    fn from_raw_id(_id: usize) -> Option<Self> {
+    fn from_raw_id(_id: usize) -> Option<(Self, usize)> {
         None
     }
 }

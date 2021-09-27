@@ -21,7 +21,7 @@ pub enum Msp430RegId<U> {
     _Size(U),
 }
 
-fn from_raw_id<U>(id: usize) -> Option<Msp430RegId<U>> {
+fn from_raw_id<U>(id: usize) -> Option<(Msp430RegId<U>, usize)> {
     let reg = match id {
         0 => Msp430RegId::Pc,
         1 => Msp430RegId::Sp,
@@ -31,17 +31,60 @@ fn from_raw_id<U>(id: usize) -> Option<Msp430RegId<U>> {
         _ => return None,
     };
 
-    Some(reg)
+    let ptrsize = core::mem::size_of::<U>();
+    Some((reg, ptrsize))
 }
 
 impl RegId for Msp430RegId<u16> {
-    fn from_raw_id(id: usize) -> Option<Self> {
+    fn from_raw_id(id: usize) -> Option<(Self, usize)> {
         from_raw_id::<u16>(id)
     }
 }
 
 impl RegId for Msp430RegId<u32> {
-    fn from_raw_id(id: usize) -> Option<Self> {
+    fn from_raw_id(id: usize) -> Option<(Self, usize)> {
         from_raw_id::<u32>(id)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use gdbstub::arch::RegId;
+    use gdbstub::arch::Registers;
+
+    fn test<Rs: Registers, RId: RegId>() {
+        // Obtain the data length written by `gdb_serialize` by passing a custom
+        // closure.
+        let mut serialized_data_len = 0;
+        let counter = |b: Option<u8>| {
+            if b.is_some() {
+                serialized_data_len += 1;
+            }
+        };
+        Rs::default().gdb_serialize(counter);
+
+        // The `Msp430Regs` implementation does not increment the size for
+        // the CG register since it will always be the constant zero.
+        serialized_data_len += RId::from_raw_id(3).unwrap().1;
+
+        // Accumulate register sizes returned by `from_raw_id`.
+        let mut i = 0;
+        let mut sum_reg_sizes = 0;
+        while let Some((_, size)) = RId::from_raw_id(i) {
+            sum_reg_sizes += size;
+            i += 1;
+        }
+
+        assert_eq!(serialized_data_len, sum_reg_sizes);
+    }
+
+    #[test]
+    fn test_msp430() {
+        test::<crate::msp430::reg::Msp430Regs<u16>, crate::msp430::reg::id::Msp430RegId<u16>>()
+    }
+
+    #[test]
+    fn test_msp430x() {
+        test::<crate::msp430::reg::Msp430Regs<u32>, crate::msp430::reg::id::Msp430RegId<u32>>()
     }
 }

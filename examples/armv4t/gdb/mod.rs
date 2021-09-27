@@ -451,16 +451,16 @@ mod custom_arch {
     }
 
     impl RegId for ArmCoreRegIdCustom {
-        fn from_raw_id(id: usize) -> Option<Self> {
+        fn from_raw_id(id: usize) -> Option<(Self, usize)> {
             let reg = match id {
                 26 => Self::Custom,
                 27 => Self::Time,
                 _ => {
-                    let reg = ArmCoreRegId::from_raw_id(id)?;
-                    return Some(Self::Core(reg));
+                    let (reg, size) = ArmCoreRegId::from_raw_id(id)?;
+                    return Some((Self::Core(reg), size));
                 }
             };
-            Some(reg)
+            Some((reg, 4))
         }
     }
 

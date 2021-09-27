@@ -21,7 +21,7 @@ pub enum ArmCoreRegId {
 }
 
 impl RegId for ArmCoreRegId {
-    fn from_raw_id(id: usize) -> Option<Self> {
+    fn from_raw_id(id: usize) -> Option<(Self, usize)> {
         let reg = match id {
             0..=12 => Self::Gpr(id as u8),
             13 => Self::Sp,
@@ -31,6 +31,6 @@ impl RegId for ArmCoreRegId {
             25 => Self::Cpsr,
             _ => return None,
         };
-        Some(reg)
+        Some((reg, 4))
     }
 }
