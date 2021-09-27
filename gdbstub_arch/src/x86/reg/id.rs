@@ -172,7 +172,7 @@ impl RegId for X86_64CoreRegId {
 
         let r = match id {
             0..=15 => (Gpr(id as u8), 8),
-            16 => (Rip, 4),
+            16 => (Rip, 8),
             17 => (Eflags, 8),
             18..=23 => (Segment(X86SegmentRegId::from_u8(id as u8 - 18)?), 4),
             24..=31 => (St(id as u8 - 24), 10),
