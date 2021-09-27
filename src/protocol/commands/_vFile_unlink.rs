@@ -15,7 +15,7 @@ impl<'a> ParseCommand<'a> for vFileUnlink<'a> {
         match body {
             [b':', body @ ..] => {
                 let filename = decode_hex_buf(body).ok()?;
-                Some(vFileUnlink{filename})
+                Some(vFileUnlink { filename })
             },
             _ => None,
         }

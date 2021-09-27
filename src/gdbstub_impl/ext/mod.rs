@@ -11,6 +11,7 @@ mod prelude {
     pub(super) use super::super::{DisconnectReason, GdbStubImpl, HandlerStatus};
 }
 
+mod auxv;
 mod base;
 mod breakpoints;
 mod catch_syscalls;

@@ -27,7 +27,7 @@ impl<'a> ParseCommand<'a> for vFilePread<'a> {
 
                 drop(body);
 
-                Some(vFilePread{fd, count, offset, buf})
+                Some(vFilePread { fd, count, offset, buf })
             },
             _ => None,
         }

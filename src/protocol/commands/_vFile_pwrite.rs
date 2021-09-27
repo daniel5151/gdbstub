@@ -20,7 +20,7 @@ impl<'a> ParseCommand<'a> for vFilePwrite<'a> {
                 let fd = decode_hex(body.next()?).ok()?;
                 let offset = decode_hex_buf(body.next()?).ok()?;
                 let data = decode_bin_buf(body.next()?).ok()?;
-                Some(vFilePwrite{fd, offset, data})
+                Some(vFilePwrite { fd, offset, data })
             },
             _ => None,
         }

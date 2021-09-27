@@ -238,6 +238,10 @@ commands! {
         "qXfer:memory-map:read" => _qXfer_memory_map::qXferMemoryMapRead<'a>,
     }
 
+    auxv use 'a {
+        "qXfer:auxv:read" => _qXfer_auxv_read::qXferAuxvRead<'a>,
+    }
+
     exec_file use 'a {
         "qXfer:exec-file:read" => _qXfer_exec_file::qXferExecFileRead<'a>,
     }

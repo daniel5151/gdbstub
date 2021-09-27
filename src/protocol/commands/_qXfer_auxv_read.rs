@@ -1,17 +1,14 @@
 use super::prelude::*;
 
-use crate::common::Pid;
-
 #[derive(Debug)]
-pub struct qXferExecFileRead<'a> {
-    pub pid: Option<Pid>,
+pub struct qXferAuxvRead<'a> {
     pub offset: u64,
     pub length: usize,
 
     pub buf: &'a mut [u8],
 }
 
-impl<'a> ParseCommand<'a> for qXferExecFileRead<'a> {
+impl<'a> ParseCommand<'a> for qXferAuxvRead<'a> {
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
         let (buf, body_range) = buf.into_raw_buf();
         let body = buf.get_mut(body_range.start..body_range.end)?;
@@ -21,10 +18,10 @@ impl<'a> ParseCommand<'a> for qXferExecFileRead<'a> {
         }
 
         let mut body = body.split(|b| *b == b':').skip(1);
-        let pid = match body.next()? {
-            [] => None,
-            buf => Some(Pid::new(decode_hex(buf).ok()?)?)
-        };
+        let annex = body.next()?;
+        if annex != b"" {
+            return None;
+        }
 
         let mut body = body.next()?.split(|b| *b == b',');
         let offset = decode_hex(body.next()?).ok()?;
@@ -32,6 +29,6 @@ impl<'a> ParseCommand<'a> for qXferExecFileRead<'a> {
 
         drop(body);
 
-        Some(qXferExecFileRead { pid, offset, length, buf })
+        Some(qXferAuxvRead { offset, length, buf })
     }
 }

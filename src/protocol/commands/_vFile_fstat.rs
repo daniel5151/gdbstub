@@ -15,7 +15,7 @@ impl<'a> ParseCommand<'a> for vFileFstat {
         match body {
             [b':', body @ ..] => {
                 let fd = decode_hex(body).ok()?;
-                Some(vFileFstat{fd})
+                Some(vFileFstat { fd })
             },
             _ => None,
         }
