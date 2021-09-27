@@ -367,6 +367,8 @@ impl target::ext::base::singlethread::SingleThreadRangeStepping for Emu {
 }
 
 mod custom_arch {
+    use core::num::NonZeroUsize;
+
     use gdbstub::arch::{Arch, RegId, Registers};
 
     use gdbstub_arch::arm::reg::id::ArmCoreRegId;
@@ -451,7 +453,7 @@ mod custom_arch {
     }
 
     impl RegId for ArmCoreRegIdCustom {
-        fn from_raw_id(id: usize) -> Option<(Self, usize)> {
+        fn from_raw_id(id: usize) -> Option<(Self, Option<NonZeroUsize>)> {
             let reg = match id {
                 26 => Self::Custom,
                 27 => Self::Time,
@@ -460,7 +462,7 @@ mod custom_arch {
                     return Some((Self::Core(reg), size));
                 }
             };
-            Some((reg, 4))
+            Some((reg, Some(NonZeroUsize::new(4)?)))
         }
     }
 

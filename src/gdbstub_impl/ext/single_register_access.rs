@@ -19,10 +19,20 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     None => return Ok(HandlerStatus::Handled),
                     Some(v) => v,
                 };
-                let buf = &mut p.buf[0..reg_size];
+                let mut buf = p.buf;
+                if let Some(size) = reg_size {
+                    buf = &mut buf[0..size.get()];
+                }
+
                 let len = ops.read_register(id, reg_id, buf).handle_error()?;
 
-                let buf = &mut buf[0..len];
+                if let Some(size) = reg_size {
+                    if size.get() != len {
+                        return Err(Error::TargetMismatch);
+                    }
+                } else {
+                    buf = &mut buf[0..len];
+                }
                 res.write_hex_buf(buf)?;
                 HandlerStatus::Handled
             }

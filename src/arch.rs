@@ -15,7 +15,7 @@
 //! > Having community-created `Arch` implementations distributed in a separate
 //! crate helps minimize any unnecessary "version churn" in `gdbstub` core.
 
-use core::fmt::Debug;
+use core::{fmt::Debug, num::NonZeroUsize};
 
 use num_traits::{FromPrimitive, PrimInt, Unsigned};
 
@@ -28,15 +28,20 @@ use crate::internal::{BeBytes, LeBytes};
 ///
 /// [single register accesses]: crate::target::ext::base::SingleRegisterAccess
 pub trait RegId: Sized + Debug {
-    /// Map raw GDB register number corresponding `RegId` and register size.
+    /// Map raw GDB register number to a corresponding `RegId` and optional
+    /// register size.
+    ///
+    /// If the register size is specified here, gdbstub will include a runtime
+    /// check that ensures target implementations do not send back more
+    /// bytes than the register allows.
     ///
     /// Returns `None` if the register is not available.
-    fn from_raw_id(id: usize) -> Option<(Self, usize)>;
+    fn from_raw_id(id: usize) -> Option<(Self, Option<NonZeroUsize>)>;
 }
 
 /// Stub implementation -- Returns `None` for all raw IDs.
 impl RegId for () {
-    fn from_raw_id(_id: usize) -> Option<(Self, usize)> {
+    fn from_raw_id(_id: usize) -> Option<(Self, Option<NonZeroUsize>)> {
         None
     }
 }
