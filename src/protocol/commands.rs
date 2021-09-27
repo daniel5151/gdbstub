@@ -10,6 +10,7 @@ pub(self) mod prelude {
         decode_bin_buf, decode_hex, decode_hex_buf, is_hex, HexString,
     };
     pub use crate::protocol::common::lists;
+    pub use crate::protocol::common::qxfer::{ParseAnnex, QXferReadBase};
     pub use crate::protocol::common::thread_id::{
         IdKind, SpecificIdKind, SpecificThreadId, ThreadId,
     };

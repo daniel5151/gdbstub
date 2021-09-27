@@ -1,34 +1,16 @@
 use super::prelude::*;
 
+pub type qXferAuxvRead<'a> = QXferReadBase<'a, AuxvAnnex>;
+
 #[derive(Debug)]
-pub struct qXferAuxvRead<'a> {
-    pub offset: u64,
-    pub length: usize,
+pub struct AuxvAnnex;
 
-    pub buf: &'a mut [u8],
-}
-
-impl<'a> ParseCommand<'a> for qXferAuxvRead<'a> {
-    fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
-        let (buf, body_range) = buf.into_raw_buf();
-        let body = buf.get_mut(body_range.start..body_range.end)?;
-
-        if body.is_empty() {
+impl ParseAnnex for AuxvAnnex {
+    fn from_buf(buf: &[u8]) -> Option<Self> {
+        if buf != b"" {
             return None;
         }
 
-        let mut body = body.split(|b| *b == b':').skip(1);
-        let annex = body.next()?;
-        if annex != b"" {
-            return None;
-        }
-
-        let mut body = body.next()?.split(|b| *b == b',');
-        let offset = decode_hex(body.next()?).ok()?;
-        let length = decode_hex(body.next()?).ok()?;
-
-        drop(body);
-
-        Some(qXferAuxvRead { offset, length, buf })
+        Some(AuxvAnnex)
     }
 }

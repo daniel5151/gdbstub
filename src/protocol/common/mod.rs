@@ -1,5 +1,6 @@
 pub mod hex;
 pub mod lists;
+pub mod qxfer;
 pub mod thread_id;
 
 /// Lightweight wrapper around `&[u8]` which denotes that the contained data is
