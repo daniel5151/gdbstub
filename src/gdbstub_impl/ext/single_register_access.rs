@@ -21,7 +21,9 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 };
                 let mut buf = p.buf;
                 if let Some(size) = reg_size {
-                    buf = &mut buf[0..size.get()];
+                    buf = buf
+                        .get_mut(..size.get())
+                        .ok_or(Error::PacketBufferOverflow)?;
                 }
 
                 let len = ops.read_register(id, reg_id, buf).handle_error()?;
@@ -31,7 +33,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         return Err(Error::TargetMismatch);
                     }
                 } else {
-                    buf = &mut buf[0..len];
+                    buf = buf.get_mut(..len).ok_or(Error::PacketBufferOverflow)?;
                 }
                 res.write_hex_buf(buf)?;
                 HandlerStatus::Handled

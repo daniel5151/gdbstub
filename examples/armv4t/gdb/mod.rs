@@ -269,23 +269,25 @@ impl target::ext::base::SingleRegisterAccess<()> for Emu {
             custom_arch::ArmCoreRegIdCustom::Core(reg_id) => {
                 if let Some(i) = cpu_reg_id(reg_id) {
                     let w = self.cpu.reg_get(self.cpu.mode(), i);
-                    let data = &w.to_le_bytes();
-                    Ok(copy_to_buf(data, buf))
+                    buf.copy_from_slice(&w.to_le_bytes());
+                    Ok(buf.len())
                 } else {
                     Err(().into())
                 }
             }
             custom_arch::ArmCoreRegIdCustom::Custom => {
-                let data = &self.custom_reg.to_le_bytes();
-                Ok(copy_to_buf(data, buf))
+                buf.copy_from_slice(&self.custom_reg.to_le_bytes());
+                Ok(buf.len())
             }
             custom_arch::ArmCoreRegIdCustom::Time => {
-                let data = &(std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_millis() as u32)
-                    .to_le_bytes();
-                Ok(copy_to_buf(data, buf))
+                buf.copy_from_slice(
+                    &(std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_millis() as u32)
+                        .to_le_bytes(),
+                );
+                Ok(buf.len())
             }
         }
     }

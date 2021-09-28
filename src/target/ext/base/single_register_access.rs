@@ -24,10 +24,10 @@ pub trait SingleRegisterAccess<Id>: Target {
     /// Implementations should write the value of the register using target's
     /// native byte order in the buffer `buf`.
     ///
+    /// Return the number of bytes written into `buf`.
+    ///
     /// If the requested register could not be accessed, an appropriate
     /// non-fatal error should be returned.
-    ///
-    /// Return the number of bytes written into `buf`.
     fn read_register(
         &mut self,
         tid: Id,
