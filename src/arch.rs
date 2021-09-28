@@ -15,7 +15,8 @@
 //! > Having community-created `Arch` implementations distributed in a separate
 //! crate helps minimize any unnecessary "version churn" in `gdbstub` core.
 
-use core::{fmt::Debug, num::NonZeroUsize};
+use core::fmt::Debug;
+use core::num::NonZeroUsize;
 
 use num_traits::{FromPrimitive, PrimInt, Unsigned};
 
