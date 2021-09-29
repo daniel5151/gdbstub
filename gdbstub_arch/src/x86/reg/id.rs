@@ -1,3 +1,5 @@
+use core::num::NonZeroUsize;
+
 use gdbstub::arch::RegId;
 
 /// FPU register identifier.
@@ -115,10 +117,10 @@ pub enum X86CoreRegId {
 }
 
 impl RegId for X86CoreRegId {
-    fn from_raw_id(id: usize) -> Option<(Self, usize)> {
+    fn from_raw_id(id: usize) -> Option<(Self, Option<NonZeroUsize>)> {
         use self::X86CoreRegId::*;
 
-        let r = match id {
+        let (r, sz): (X86CoreRegId, usize) = match id {
             0 => (Eax, 4),
             1 => (Ecx, 4),
             2 => (Edx, 4),
@@ -136,7 +138,8 @@ impl RegId for X86CoreRegId {
             40 => (Mxcsr, 4),
             _ => return None,
         };
-        Some(r)
+
+        Some((r, Some(NonZeroUsize::new(sz)?)))
     }
 }
 
@@ -167,10 +170,10 @@ pub enum X86_64CoreRegId {
 }
 
 impl RegId for X86_64CoreRegId {
-    fn from_raw_id(id: usize) -> Option<(Self, usize)> {
+    fn from_raw_id(id: usize) -> Option<(Self, Option<NonZeroUsize>)> {
         use self::X86_64CoreRegId::*;
 
-        let r = match id {
+        let (r, sz): (X86_64CoreRegId, usize) = match id {
             0..=15 => (Gpr(id as u8), 8),
             16 => (Rip, 8),
             17 => (Eflags, 4),
@@ -181,7 +184,8 @@ impl RegId for X86_64CoreRegId {
             56 => (Mxcsr, 4),
             _ => return None,
         };
-        Some(r)
+
+        Some((r, Some(NonZeroUsize::new(sz)?)))
     }
 }
 
@@ -208,7 +212,7 @@ mod tests {
         let mut i = 0;
         let mut sum_reg_sizes = 0;
         while let Some((_, size)) = RId::from_raw_id(i) {
-            sum_reg_sizes += size;
+            sum_reg_sizes += size.unwrap().get();
             i += 1;
         }
 

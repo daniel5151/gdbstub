@@ -37,6 +37,15 @@ fn cpu_reg_id(id: ArmCoreRegId) -> Option<u8> {
     }
 }
 
+/// Copy all bytes of `data` to `buf`.
+/// Return the size of data copied.
+pub fn copy_to_buf(data: &[u8], buf: &mut [u8]) -> usize {
+    let len = data.len();
+    let buf = &mut buf[..len];
+    buf.copy_from_slice(data);
+    len
+}
+
 /// Copy a range of `data` (start at `offset` with a size of `length`) to `buf`.
 /// Return the size of data copied. Returns 0 if `offset >= buf.len()`.
 ///
@@ -48,9 +57,7 @@ pub fn copy_range_to_buf(data: &[u8], offset: u64, length: usize, buf: &mut [u8]
     };
     let len = data.len();
     let data = &data[len.min(offset)..len.min(offset + length)];
-    let buf = &mut buf[..data.len()];
-    buf.copy_from_slice(data);
-    data.len()
+    copy_to_buf(data, buf)
 }
 
 impl Target for Emu {
@@ -262,31 +269,31 @@ impl target::ext::base::SingleRegisterAccess<()> for Emu {
         &mut self,
         _tid: (),
         reg_id: custom_arch::ArmCoreRegIdCustom,
-        dst: &mut [u8],
-    ) -> TargetResult<(), Self> {
+        buf: &mut [u8],
+    ) -> TargetResult<usize, Self> {
         match reg_id {
             custom_arch::ArmCoreRegIdCustom::Core(reg_id) => {
                 if let Some(i) = cpu_reg_id(reg_id) {
                     let w = self.cpu.reg_get(self.cpu.mode(), i);
-                    dst.copy_from_slice(&w.to_le_bytes());
-                    Ok(())
+                    buf.copy_from_slice(&w.to_le_bytes());
+                    Ok(buf.len())
                 } else {
                     Err(().into())
                 }
             }
             custom_arch::ArmCoreRegIdCustom::Custom => {
-                dst.copy_from_slice(&self.custom_reg.to_le_bytes());
-                Ok(())
+                buf.copy_from_slice(&self.custom_reg.to_le_bytes());
+                Ok(buf.len())
             }
             custom_arch::ArmCoreRegIdCustom::Time => {
-                dst.copy_from_slice(
+                buf.copy_from_slice(
                     &(std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
                         .unwrap()
                         .as_millis() as u32)
                         .to_le_bytes(),
                 );
-                Ok(())
+                Ok(buf.len())
             }
         }
     }
@@ -368,6 +375,8 @@ impl target::ext::base::singlethread::SingleThreadRangeStepping for Emu {
 }
 
 mod custom_arch {
+    use core::num::NonZeroUsize;
+
     use gdbstub::arch::{Arch, RegId, Registers};
 
     use gdbstub_arch::arm::reg::id::ArmCoreRegId;
@@ -452,7 +461,7 @@ mod custom_arch {
     }
 
     impl RegId for ArmCoreRegIdCustom {
-        fn from_raw_id(id: usize) -> Option<(Self, usize)> {
+        fn from_raw_id(id: usize) -> Option<(Self, Option<NonZeroUsize>)> {
             let reg = match id {
                 26 => Self::Custom,
                 27 => Self::Time,
@@ -461,7 +470,7 @@ mod custom_arch {
                     return Some((Self::Core(reg), size));
                 }
             };
-            Some((reg, 4))
+            Some((reg, Some(NonZeroUsize::new(4)?)))
         }
     }
 

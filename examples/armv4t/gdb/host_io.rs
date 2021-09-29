@@ -5,7 +5,7 @@ use gdbstub::target::ext::host_io::{
     FsKind, HostIoErrno, HostIoError, HostIoOpenFlags, HostIoOpenMode, HostIoResult, HostIoStat,
 };
 
-use super::copy_range_to_buf;
+use super::{copy_range_to_buf, copy_to_buf};
 use crate::emu::Emu;
 use crate::TEST_PROGRAM_ELF;
 
@@ -246,11 +246,11 @@ impl target::ext::host_io::HostIoReadlink for Emu {
         if filename == b"/proc/1/exe" {
             // Support `info proc exe` command
             let exe = b"/test.elf";
-            return Ok(copy_range_to_buf(exe, 0, exe.len(), buf));
+            return Ok(copy_to_buf(exe, buf));
         } else if filename == b"/proc/1/cwd" {
             // Support `info proc cwd` command
             let cwd = b"/";
-            return Ok(copy_range_to_buf(cwd, 0, cwd.len(), buf));
+            return Ok(copy_to_buf(cwd, buf));
         } else if filename.starts_with(b"/proc") {
             return Err(HostIoError::Errno(HostIoErrno::ENOENT));
         }
@@ -263,7 +263,7 @@ impl target::ext::host_io::HostIoReadlink for Emu {
             .ok_or(HostIoError::Errno(HostIoErrno::ENOENT))?
             .as_bytes();
         if data.len() <= buf.len() {
-            Ok(copy_range_to_buf(data, 0, data.len(), buf))
+            Ok(copy_to_buf(data, buf))
         } else {
             Err(HostIoError::Errno(HostIoErrno::ENAMETOOLONG))
         }

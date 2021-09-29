@@ -1,3 +1,5 @@
+use core::num::NonZeroUsize;
+
 use gdbstub::arch::RegId;
 
 /// TI-MSP430 register identifier.
@@ -21,7 +23,7 @@ pub enum Msp430RegId<U> {
     _Size(U),
 }
 
-fn from_raw_id<U>(id: usize) -> Option<(Msp430RegId<U>, usize)> {
+fn from_raw_id<U>(id: usize) -> Option<(Msp430RegId<U>, Option<NonZeroUsize>)> {
     let reg = match id {
         0 => Msp430RegId::Pc,
         1 => Msp430RegId::Sp,
@@ -32,17 +34,17 @@ fn from_raw_id<U>(id: usize) -> Option<(Msp430RegId<U>, usize)> {
     };
 
     let ptrsize = core::mem::size_of::<U>();
-    Some((reg, ptrsize))
+    Some((reg, Some(NonZeroUsize::new(ptrsize)?)))
 }
 
 impl RegId for Msp430RegId<u16> {
-    fn from_raw_id(id: usize) -> Option<(Self, usize)> {
+    fn from_raw_id(id: usize) -> Option<(Self, Option<NonZeroUsize>)> {
         from_raw_id::<u16>(id)
     }
 }
 
 impl RegId for Msp430RegId<u32> {
-    fn from_raw_id(id: usize) -> Option<(Self, usize)> {
+    fn from_raw_id(id: usize) -> Option<(Self, Option<NonZeroUsize>)> {
         from_raw_id::<u32>(id)
     }
 }
@@ -65,13 +67,13 @@ mod tests {
 
         // The `Msp430Regs` implementation does not increment the size for
         // the CG register since it will always be the constant zero.
-        serialized_data_len += RId::from_raw_id(3).unwrap().1;
+        serialized_data_len += RId::from_raw_id(3).unwrap().1.unwrap().get();
 
         // Accumulate register sizes returned by `from_raw_id`.
         let mut i = 0;
         let mut sum_reg_sizes = 0;
         while let Some((_, size)) = RId::from_raw_id(i) {
-            sum_reg_sizes += size;
+            sum_reg_sizes += size.unwrap().get();
             i += 1;
         }
 

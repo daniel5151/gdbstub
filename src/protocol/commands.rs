@@ -202,7 +202,7 @@ commands! {
     }
 
     single_register_access use 'a {
-        "p" => _p::p,
+        "p" => _p::p<'a>,
         "P" => _p_upcase::P<'a>,
     }
 
