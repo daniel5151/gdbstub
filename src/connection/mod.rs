@@ -67,5 +67,8 @@ pub trait ConnectionExt: Connection {
 
     /// Peek a single byte. This MUST be a **non-blocking** operation, returning
     /// `None` if no byte is available.
+    ///
+    /// Returns a byte (if one is available) without removing that byte from the
+    /// queue. Subsequent calls to `peek` MUST return the same byte.
     fn peek(&mut self) -> Result<Option<u8>, Self::Error>;
 }
