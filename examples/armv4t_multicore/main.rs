@@ -3,7 +3,9 @@ use std::net::{TcpListener, TcpStream};
 #[cfg(unix)]
 use std::os::unix::net::{UnixListener, UnixStream};
 
-use gdbstub::{ConnectionExt, DisconnectReason, GdbStub};
+use gdbstub::gdbstub_run_blocking;
+use gdbstub::target::ext::base::multithread::ThreadStopReason;
+use gdbstub::{target::Target, ConnectionExt, DisconnectReason, GdbStub};
 
 pub type DynResult<T> = Result<T, Box<dyn std::error::Error>>;
 
@@ -43,6 +45,98 @@ fn wait_for_uds(path: &str) -> DynResult<UnixStream> {
     Ok(stream)
 }
 
+enum EmuGdbEventLoop {}
+
+impl gdbstub::gdbstub_run_blocking::BlockingEventLoop for EmuGdbEventLoop {
+    type Target = emu::Emu;
+    type Connection = Box<dyn ConnectionExt<Error = std::io::Error>>;
+
+    fn wait_for_stop_reason(
+        target: &mut emu::Emu,
+        conn: &mut Self::Connection,
+    ) -> Result<
+        gdbstub_run_blocking::Event<u32>,
+        gdbstub_run_blocking::WaitForStopReasonError<
+            <Self::Target as Target>::Error,
+            std::io::Error,
+        >,
+    > {
+        // The `armv4t_multicore` example runs the emulator in the same thread as the
+        // GDB state machine loop. As such, it uses a simple poll-based model to
+        // check for interrupt events, whereby the emulator will check if there
+        // is any incoming data over the connection, and pause execution with a
+        // synthetic `RunEvent::IncomingData` event.
+        //
+        // In more complex integrations, the target will probably be running in a
+        // separate thread, and instead of using a poll-based model to check for
+        // incoming data, you'll want to use some kind of "select" based model to
+        // simultaneously wait for incoming GDB data coming over the connection, along
+        // with any target-reported stop events.
+        //
+        // The specifics of how this "select" mechanism work + how the target reports
+        // stop events will entirely depend on your project's architecture.
+        //
+        // Some ideas on how to implement this `select` mechanism:
+        //
+        // - A mpsc channel
+        // - epoll/kqueue
+        // - Running the target + stopping every so often to peek the connection
+        // - Driving `GdbStub` from various interrupt handlers
+
+        let poll_incoming_data = || {
+            // gdbstub takes ownership of the underlying connection, so the `borrow_conn`
+            // method is used to borrow the underlying connection back from the stub to
+            // check for incoming data.
+            conn.peek().map(|b| b.is_some()).unwrap_or(true)
+        };
+
+        match target.run(poll_incoming_data) {
+            emu::RunEvent::IncomingData => {
+                let byte = conn
+                    .read()
+                    .map_err(gdbstub_run_blocking::WaitForStopReasonError::Connection)?;
+                Ok(gdbstub_run_blocking::Event::IncomingData(byte))
+            }
+            emu::RunEvent::Event(event, cpuid) => {
+                use gdbstub::target::ext::breakpoints::WatchKind;
+
+                // translate emulator stop reason into GDB stop reason
+                let tid = gdb::cpuid_to_tid(cpuid);
+                let stop_reason = match event {
+                    emu::Event::DoneStep => ThreadStopReason::DoneStep,
+                    emu::Event::Halted => ThreadStopReason::Terminated(17), // SIGSTOP
+                    emu::Event::Break => ThreadStopReason::SwBreak(tid),
+                    emu::Event::WatchWrite(addr) => ThreadStopReason::Watch {
+                        tid,
+                        kind: WatchKind::Write,
+                        addr,
+                    },
+                    emu::Event::WatchRead(addr) => ThreadStopReason::Watch {
+                        tid,
+                        kind: WatchKind::Read,
+                        addr,
+                    },
+                };
+
+                Ok(gdbstub_run_blocking::Event::TargetStopped(stop_reason))
+            }
+        }
+    }
+
+    fn on_interrupt(
+        _target: &mut emu::Emu,
+    ) -> Result<
+        Option<gdbstub::target::ext::base::multithread::ThreadStopReason<u32>>,
+        <emu::Emu as Target>::Error,
+    > {
+        // Because this emulator runs as part of the GDB stub loop, there isn't any
+        // special action that needs to be taken to interrupt the underlying target. It
+        // is implicitly paused whenever the stub isn't within the
+        // `wait_for_stop_reason` callback.
+        Ok(Some(ThreadStopReason::GdbCtrlCInterrupt))
+    }
+}
+
 fn main() -> DynResult<()> {
     pretty_env_logger::init();
 
@@ -63,27 +157,31 @@ fn main() -> DynResult<()> {
         }
     };
 
-    // hook-up debugger
-    let mut debugger = GdbStub::new(connection);
+    let gdb = GdbStub::new(connection);
 
-    // use quickstart run method
-    match debugger.run(&mut emu, ConnectionExt::read)? {
-        DisconnectReason::Disconnect => {
-            // run to completion
-            while emu.step() != Some((emu::Event::Halted, emu::CpuId::Cpu)) {}
+    match gdb.run_blocking::<EmuGdbEventLoop>(&mut emu) {
+        Ok(disconnect_reason) => match disconnect_reason {
+            DisconnectReason::Disconnect => {
+                // run to completion
+                while emu.step() != Some((emu::Event::Halted, emu::CpuId::Cpu)) {}
+                let ret = emu.cpu.reg_get(armv4t_emu::Mode::User, 0);
+                println!("Program completed. Return value: {}", ret)
+            }
+            DisconnectReason::TargetExited(code) => {
+                println!("Target exited with code {}!", code)
+            }
+            DisconnectReason::TargetTerminated(sig) => {
+                println!("Target terminated with signal {}!", sig)
+            }
+            DisconnectReason::Kill => println!("GDB sent a kill command!"),
+        },
+        Err(gdbstub::GdbStubError::TargetError(e)) => {
+            println!("target encountered a fatal error: {}", e)
         }
-        DisconnectReason::TargetExited(code) => println!("Target exited with code {}!", code),
-        DisconnectReason::TargetTerminated(sig) => {
-            println!("Target terminated with signal {}!", sig)
-        }
-        DisconnectReason::Kill => {
-            println!("GDB sent a kill command!");
-            return Ok(());
+        Err(e) => {
+            println!("gdbstub encountered a fatal error: {}", e)
         }
     }
-
-    let ret = emu.cpu.reg_get(armv4t_emu::Mode::User, 0);
-    println!("Program completed. Return value: {}", ret);
 
     Ok(())
 }

@@ -8,9 +8,9 @@
 //! `gdbstub`, and walks though the basic steps required to integrate `gdbstub`
 //! into a project.
 //!
-//! At a high level, there are only two things that are required to get up and
-//! running with `gdbstub`: a [`Connection`](#the-connection-trait), and a
-//! [`Target`](#the-target-trait)
+//! At a high level, there are only three things that are required to get up and
+//! running with `gdbstub`: a [`Connection`](#the-connection-trait), a
+//! [`Target`](#the-target-trait), and a [event loop](#the-event-loop).
 //!
 //! > _Note:_ I _highly recommended_ referencing some of the
 //! [examples](https://github.com/daniel5151/gdbstub/blob/master/README.md#examples)
@@ -78,11 +78,13 @@
 //! instructions on how to implement [`Target`](target::Target) for a particular
 //! platform.
 //!
-//! ### Starting the debugging session using `GdbStub`
+//! ## The Event Loop
 //!
 //! Once a [`Connection`](#the-connection-trait) has been established and
 //! [`Target`](#the-target-trait) has been all wired up, all that's left is to
-//! hand things off to [`gdbstub::GdbStub`](GdbStub) and let it do the rest!
+//! wire things up, and decide what kind of event loop to use!
+//!
+//! First things first, let's get an instance of `GdbStub` ready to run:
 //!
 //! ```rust,ignore
 //! // Set-up a valid `Target`
@@ -93,25 +95,38 @@
 //!
 //! // Create a new `gdbstub::GdbStub` using the established `Connection`.
 //! let mut debugger = gdbstub::GdbStub::new(connection);
-//!
-//! // Instead of taking ownership of the system, `GdbStub` takes a &mut, yielding
-//! // ownership back to the caller once the debugging session is closed.
-//! match debugger.run(&mut target) {
-//!     Ok(disconnect_reason) => match disconnect_reason {
-//!         DisconnectReason::Disconnect => println!("GDB client disconnected."),
-//!         DisconnectReason::TargetHalted => println!("Target halted!"),
-//!         DisconnectReason::Kill => println!("GDB client sent a kill command!"),
-//!     }
-//!     // Handle any target-specific errors
-//!     Err(GdbStubError::TargetError(e)) => {
-//!         println!("Target raised a fatal error: {:?}", e);
-//!         // `gdbstub` will not immediate close the debugging session if a
-//!         // fatal error occurs, enabling "post mortem" debugging if required.
-//!         debugger.run(&mut target)?;
-//!     }
-//!     Err(e) => return Err(e.into())
-//! }
 //! ```
+//!
+//! Cool, but how do you actually start the debugging session?
+//!
+//! ### `GdbStub::run`: The quick and easy way to get up and running with
+//! `gdbstub`
+//!
+//! TODO: MORE DOCS
+//!
+//! ### `GdbStubStateMachine`: Driving `gdbstub` in an async event loop / via
+//! interrupt handlers
+//!
+//! `GdbStub::run` requires that the target implement the
+//! [`TargetRun`](gdbstub_run::TargetRun) trait, which consists of a handful of
+//! _blocking_ methods. Blocking the thread is a totally reasonable approach in
+//! most implementations, as one can simply spin up a separate thread to run the
+//! GDB stub (or in certain emulator implementations, run the emulator as part
+//! of the `wait_for_stop_reason` method).
+//!
+//! Unfortunately, this blocking behavior can be a non-starter when integrating
+//! `gdbstub` in projects that don't support / wish to avoid the traditional
+//! thread-based execution model, such as projects using `async/await`, or
+//! bare-metal, `no_std` projects running on embedded hardware.
+//!
+//! In these cases, `gdbstub` provides the
+//! [`GdbStubStateMachine`](state_machine::GdbStubStateMachine) API, which lifts
+//! the GDB stub "event loop" out of `GdbStub::run`. This API realies on
+//! the implementation calling various lifecycle methods whenever new data
+//! becomes available (e.g: when a UART interrupt handler receives a byte, when
+//! the target hits a breakpoint, etc...)
+//!
+//! TODO: MORE DOCS
 //!
 //! ## Feature flags
 //!

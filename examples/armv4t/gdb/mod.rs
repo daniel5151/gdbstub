@@ -3,14 +3,12 @@ use core::convert::{TryFrom, TryInto};
 use armv4t_emu::{reg, Memory};
 use gdbstub::target;
 use gdbstub::target::ext::base::singlethread::{
-    GdbInterrupt, ResumeAction, SingleThreadOps, SingleThreadReverseContOps,
-    SingleThreadReverseStepOps, StopReason,
+    ResumeAction, SingleThreadOps, SingleThreadReverseContOps, SingleThreadReverseStepOps,
 };
-use gdbstub::target::ext::breakpoints::WatchKind;
 use gdbstub::target::{Target, TargetError, TargetResult};
 use gdbstub_arch::arm::reg::id::ArmCoreRegId;
 
-use crate::emu::{Emu, Event};
+use crate::emu::{Emu, ExecMode};
 
 // Additional GDB extensions
 
@@ -137,57 +135,28 @@ impl Target for Emu {
     }
 }
 
-impl Emu {
-    fn inner_resume(
-        &mut self,
-        action: ResumeAction,
-        mut check_gdb_interrupt: impl FnMut() -> bool,
-    ) -> Result<Option<StopReason<u32>>, &'static str> {
-        let event = match action {
-            ResumeAction::Step => match self.step() {
-                Some(e) => e,
-                None => return Ok(Some(StopReason::DoneStep)),
-            },
-            ResumeAction::Continue => {
-                let mut cycles = 0;
-                loop {
-                    if let Some(event) = self.step() {
-                        break event;
-                    };
+impl SingleThreadOps for Emu {
+    fn resume(&mut self, action: ResumeAction) -> Result<(), Self::Error> {
+        // Upon returning from the `resume` method, the target being debugged should be
+        // configured to run according to whatever resume actions the GDB client has
+        // specified (as specified by `set_resume_action`, `resume_range_step`,
+        // `reverse_{step, continue}`, etc...)
+        //
+        // In this basic `armv4t` example, the `resume` method simply sets the exec mode
+        // of the emulator's interpreter loop and returns.
+        //
+        // In more complex implementations, it's likely that the target being debugged
+        // will be running in another thread / process, and will require some kind of
+        // external "orchestration" to set it's execution mode (e.g: modifying the
+        // target's process state via platform specific debugging syscalls).
 
-                    // check for GDB interrupt every 1024 instructions
-                    cycles += 1;
-                    if cycles % 1024 == 0 && check_gdb_interrupt() {
-                        return Ok(None);
-                    }
-                }
-            }
+        self.exec_mode = match action {
+            ResumeAction::Continue => ExecMode::Continue,
+            ResumeAction::Step => ExecMode::Step,
             _ => return Err("cannot resume with signal"),
         };
 
-        Ok(Some(match event {
-            Event::Halted => StopReason::Terminated(17), // SIGSTOP
-            Event::Break => StopReason::SwBreak,
-            Event::WatchWrite(addr) => StopReason::Watch {
-                kind: WatchKind::Write,
-                addr,
-            },
-            Event::WatchRead(addr) => StopReason::Watch {
-                kind: WatchKind::Read,
-                addr,
-            },
-        }))
-    }
-}
-
-impl SingleThreadOps for Emu {
-    fn resume(
-        &mut self,
-        action: ResumeAction,
-        gdb_interrupt: GdbInterrupt<'_>,
-    ) -> Result<Option<StopReason<u32>>, Self::Error> {
-        let mut gdb_interrupt = gdb_interrupt.no_async();
-        self.inner_resume(action, || gdb_interrupt.pending())
+        Ok(())
     }
 
     fn read_registers(
@@ -328,49 +297,31 @@ impl target::ext::base::SingleRegisterAccess<()> for Emu {
 }
 
 impl target::ext::base::singlethread::SingleThreadReverseCont for Emu {
-    fn reverse_cont(
-        &mut self,
-        gdb_interrupt: GdbInterrupt<'_>,
-    ) -> Result<Option<StopReason<u32>>, Self::Error> {
+    fn reverse_cont(&mut self) -> Result<(), Self::Error> {
         // FIXME: actually implement reverse step
         eprintln!(
             "FIXME: Not actually reverse-continuing. Performing forwards continue instead..."
         );
-        self.resume(ResumeAction::Continue, gdb_interrupt)
+        self.exec_mode = ExecMode::Continue;
+        Ok(())
     }
 }
 
 impl target::ext::base::singlethread::SingleThreadReverseStep for Emu {
-    fn reverse_step(
-        &mut self,
-        gdb_interrupt: GdbInterrupt<'_>,
-    ) -> Result<Option<StopReason<u32>>, Self::Error> {
+    fn reverse_step(&mut self) -> Result<(), Self::Error> {
         // FIXME: actually implement reverse step
         eprintln!(
             "FIXME: Not actually reverse-stepping. Performing single forwards step instead..."
         );
-        self.resume(ResumeAction::Step, gdb_interrupt)
+        self.exec_mode = ExecMode::Step;
+        Ok(())
     }
 }
 
 impl target::ext::base::singlethread::SingleThreadRangeStepping for Emu {
-    fn resume_range_step(
-        &mut self,
-        start: u32,
-        end: u32,
-        gdb_interrupt: GdbInterrupt<'_>,
-    ) -> Result<Option<StopReason<u32>>, Self::Error> {
-        let mut gdb_interrupt = gdb_interrupt.no_async();
-        loop {
-            match self.inner_resume(ResumeAction::Step, || gdb_interrupt.pending())? {
-                Some(StopReason::DoneStep) => {}
-                stop_reason => return Ok(stop_reason),
-            }
-
-            if !(start..end).contains(&self.cpu.reg_get(self.cpu.mode(), reg::PC)) {
-                return Ok(Some(StopReason::DoneStep));
-            }
-        }
+    fn resume_range_step(&mut self, start: u32, end: u32) -> Result<(), Self::Error> {
+        self.exec_mode = ExecMode::RangeStep(start, end);
+        Ok(())
     }
 }
 

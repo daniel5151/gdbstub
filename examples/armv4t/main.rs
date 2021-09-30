@@ -3,8 +3,8 @@ use std::net::{TcpListener, TcpStream};
 #[cfg(unix)]
 use std::os::unix::net::{UnixListener, UnixStream};
 
-use gdbstub::state_machine::{Event, GdbStubStateMachine};
-use gdbstub::target::ext::base::multithread::ThreadStopReason;
+use gdbstub::gdbstub_run_blocking;
+use gdbstub::target::ext::base::singlethread::StopReason;
 use gdbstub::{target::Target, ConnectionExt, DisconnectReason, GdbStub};
 
 pub type DynResult<T> = Result<T, Box<dyn std::error::Error>>;
@@ -45,69 +45,94 @@ fn wait_for_uds(path: &str) -> DynResult<UnixStream> {
     Ok(stream)
 }
 
-fn run_debugger<T: Target, C: ConnectionExt>(
-    emu: &mut T,
-    gdb: GdbStub<'_, T, C>,
-) -> Result<DisconnectReason, gdbstub::GdbStubError<T::Error, C::Error>> {
-    let mut gdb = gdb.run_state_machine()?;
-    loop {
-        gdb = match gdb {
-            GdbStubStateMachine::Pump(mut gdb) => {
-                let byte = gdb
-                    .borrow_conn()
-                    .read()
-                    .map_err(gdbstub::GdbStubError::ConnectionRead)?;
+enum EmuGdbEventLoop {}
 
-                let (gdb, disconnect_reason) = gdb.pump(emu, byte)?;
-                if let Some(disconnect_reason) = disconnect_reason {
-                    break Ok(disconnect_reason);
-                }
-                gdb
+impl gdbstub::gdbstub_run_blocking::BlockingEventLoop for EmuGdbEventLoop {
+    type Target = emu::Emu;
+    type Connection = Box<dyn ConnectionExt<Error = std::io::Error>>;
+
+    fn wait_for_stop_reason(
+        target: &mut emu::Emu,
+        conn: &mut Self::Connection,
+    ) -> Result<
+        gdbstub_run_blocking::Event<u32>,
+        gdbstub_run_blocking::WaitForStopReasonError<
+            <Self::Target as Target>::Error,
+            std::io::Error,
+        >,
+    > {
+        // The `armv4t` example runs the emulator in the same thread as the GDB state
+        // machine loop. As such, it uses a simple poll-based model to check for
+        // interrupt events, whereby the emulator will check if there is any incoming
+        // data over the connection, and pause execution with a synthetic
+        // `RunEvent::IncomingData` event.
+        //
+        // In more complex integrations, the target will probably be running in a
+        // separate thread, and instead of using a poll-based model to check for
+        // incoming data, you'll want to use some kind of "select" based model to
+        // simultaneously wait for incoming GDB data coming over the connection, along
+        // with any target-reported stop events.
+        //
+        // The specifics of how this "select" mechanism work + how the target reports
+        // stop events will entirely depend on your project's architecture.
+        //
+        // Some ideas on how to implement this `select` mechanism:
+        //
+        // - A mpsc channel
+        // - epoll/kqueue
+        // - Running the target + stopping every so often to peek the connection
+        // - Driving `GdbStub` from various interrupt handlers
+
+        let poll_incoming_data = || {
+            // gdbstub takes ownership of the underlying connection, so the `borrow_conn`
+            // method is used to borrow the underlying connection back from the stub to
+            // check for incoming data.
+            conn.peek().map(|b| b.is_some()).unwrap_or(true)
+        };
+
+        match target.run(poll_incoming_data) {
+            emu::RunEvent::IncomingData => {
+                let byte = conn
+                    .read()
+                    .map_err(gdbstub_run_blocking::WaitForStopReasonError::Connection)?;
+                Ok(gdbstub_run_blocking::Event::IncomingData(byte))
             }
+            emu::RunEvent::Event(event) => {
+                use gdbstub::target::ext::breakpoints::WatchKind;
 
-            GdbStubStateMachine::DeferredStopReason(mut gdb) => {
-                // Note that the `armv4t` example doesn't use actually leverage deferred stop
-                // reasons, and simply runs the emulator inline as part of the `resume` logic.
-                //
-                // Nonetheless, as a way to demonstrate the state-machine API, I've tweaked the
-                // target's `resume` implementation to return `StopReason::Defer` if it peeks an
-                // interrupt packet.
-                //
-                // An implementation that uses stop reasons would need to "select" on both the
-                // data coming over the connection (which gets passed to `pump`) and whatever
-                // mechanism it is using to detect stop events.
-                //
-                // The specifics of how this "select" mechanism might work will depends on where
-                // `gdbstub` is being used.
-                //
-                // - A mpsc channel
-                // - epoll/kqueue
-                // - Running the target + stopping every so often to peek the connection
-                // - Driving `GdbStub` from various interrupt handlers
+                // translate emulator stop reason into GDB stop reason
+                let stop_reason = match event {
+                    emu::Event::DoneStep => StopReason::DoneStep,
+                    emu::Event::Halted => StopReason::Terminated(17), // SIGSTOP
+                    emu::Event::Break => StopReason::SwBreak,
+                    emu::Event::WatchWrite(addr) => StopReason::Watch {
+                        kind: WatchKind::Write,
+                        addr,
+                    },
+                    emu::Event::WatchRead(addr) => StopReason::Watch {
+                        kind: WatchKind::Read,
+                        addr,
+                    },
+                };
 
-                let byte = gdb
-                    .borrow_conn()
-                    .read()
-                    .map_err(gdbstub::GdbStubError::ConnectionRead)?;
-
-                let (gdb, event) = gdb.pump(emu, byte)?;
-                match event {
-                    Event::None => gdb,
-                    Event::Disconnect(disconnect_reason) => break Ok(disconnect_reason),
-                    Event::CtrlCInterrupt => {
-                        // when an interrupt is received, report the `GdbInterrupt` stop reason.
-                        if let GdbStubStateMachine::DeferredStopReason(gdb) = gdb {
-                            match gdb.deferred_stop_reason(emu, ThreadStopReason::GdbInterrupt)? {
-                                (_, Some(disconnect_reason)) => break Ok(disconnect_reason),
-                                (gdb, None) => gdb,
-                            }
-                        } else {
-                            gdb
-                        }
-                    }
-                }
+                Ok(gdbstub_run_blocking::Event::TargetStopped(
+                    stop_reason.into(),
+                ))
             }
         }
+    }
+
+    fn on_interrupt(
+        _target: &mut emu::Emu,
+    ) -> Result<
+        Option<gdbstub::target::ext::base::multithread::ThreadStopReason<u32>>,
+        <emu::Emu as Target>::Error,
+    > {
+        // Because this emulator runs as part of the GDB stub loop, there isn't any
+        // special action that needs to be taken to interrupt the underlying target. It
+        // is implicitly paused whenever the stub isn't within the
+        // `wait_for_stop_reason` callback.
+        Ok(Some(StopReason::GdbCtrlCInterrupt.into()))
     }
 }
 
@@ -133,7 +158,7 @@ fn main() -> DynResult<()> {
 
     let gdb = GdbStub::new(connection);
 
-    match run_debugger(&mut emu, gdb) {
+    match gdb.run_blocking::<EmuGdbEventLoop>(&mut emu) {
         Ok(disconnect_reason) => match disconnect_reason {
             DisconnectReason::Disconnect => {
                 // run to completion

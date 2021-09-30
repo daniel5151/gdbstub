@@ -28,7 +28,7 @@ Why use `gdbstub`?
 -   **`#![no_std]` Ready & Size Optimized**
     -   `gdbstub` is a **`no_std` first** library, whereby all protocol features are required to be `no_std` compatible.
     -   `gdbstub` does not require _any_ dynamic memory allocation, and can be configured to use fixed-size, pre-allocated buffers. This enables `gdbstub` to be used on even the most resource constrained, no-[`alloc`](https://doc.rust-lang.org/alloc/) platforms.
-    -   `gdbstub` is entirely **panic free** (when compiled in release mode, without the `paranoid_unsafe` cargo feature).
+    -   `gdbstub` is entirely **panic free** in most minimal configurations (when compiled in release mode, without the `paranoid_unsafe` cargo feature).
         -   Validated by inspecting the asm output of the in-tree `example_no_std`.
     -   `gdbstub` is transport-layer agnostic, and uses a basic [`Connection`](https://docs.rs/gdbstub/latest/gdbstub/trait.Connection.html) interface to communicate with the GDB server. As long as target has some method of performing in-order, serial, byte-wise I/O (e.g: putchar/getchar over UART), it's possible to run `gdbstub` on it!
     -   "You don't pay for what you don't use": All code related to parsing/handling protocol extensions is guaranteed to be dead-code-eliminated from an optimized binary if left unimplemented! See the [Zero-overhead Protocol Extensions](#zero-overhead-protocol-extensions) section below for more details.

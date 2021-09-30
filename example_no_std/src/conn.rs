@@ -50,6 +50,24 @@ impl TcpConnection {
             Ok(buf[0])
         }
     }
+
+    #[allow(dead_code)]
+    pub fn peek(&mut self) -> Result<Option<u8>, &'static str> {
+        let mut buf = [0];
+        let ret = unsafe {
+            libc::recv(
+                self.fd,
+                buf.as_mut_ptr() as *mut _,
+                buf.len(),
+                libc::MSG_PEEK,
+            )
+        };
+        if ret == -1 || ret != 1 {
+            Err("socket peek failed")
+        } else {
+            Ok(Some(buf[0]))
+        }
+    }
 }
 
 impl Drop for TcpConnection {
@@ -71,23 +89,6 @@ impl Connection for TcpConnection {
             Err("socket write failed")
         } else {
             Ok(())
-        }
-    }
-
-    fn peek(&mut self) -> Result<Option<u8>, &'static str> {
-        let mut buf = [0];
-        let ret = unsafe {
-            libc::recv(
-                self.fd,
-                buf.as_mut_ptr() as *mut _,
-                buf.len(),
-                libc::MSG_PEEK,
-            )
-        };
-        if ret == -1 || ret != 1 {
-            Err("socket peek failed")
-        } else {
-            Ok(Some(buf[0]))
         }
     }
 

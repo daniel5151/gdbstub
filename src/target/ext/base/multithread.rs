@@ -9,7 +9,7 @@ use crate::target::{Target, TargetResult};
 use super::{ReplayLogPosition, SingleRegisterAccessOps};
 
 // Convenient re-exports
-pub use super::{GdbInterrupt, ResumeAction};
+pub use super::ResumeAction;
 
 /// Base debugging operations for multi threaded targets.
 pub trait MultiThreadOps: Target {
@@ -19,32 +19,12 @@ pub trait MultiThreadOps: Target {
     /// followed by zero or more calls to `set_resume_action`, specifying any
     /// thread-specific resume actions.
     ///
-    /// The `default_action` parameter specifies the "fallback" resume action
-    /// for any threads that did not have a specific resume action set via
-    /// `set_resume_action`. The GDB client typically sets this to
-    /// `ResumeAction::Continue`, though this is not guaranteed.
+    /// Upon returning from the `resume` method, the target being debugged
+    /// should be configured to run according to whatever resume actions the
+    /// GDB client had specified using any of the `set_resume_action`,
+    /// `set_resume_range_step`, `set_reverse_{step, continue}`, etc... methods
     ///
-    /// # Checking for Ctrl-C interrupts
-    ///
-    /// The `gdb_interrupt` callback provides a conceptually simple, albeit
-    /// inefficient way check if GDB sent an Ctrl-C interrupt packet. It's
-    /// recommended to invoke this callback every-so-often while the system
-    /// is running (e.g: every X cycles/milliseconds), and returning a
-    /// `StopReason::GdbInterrupt` if an interrupt is encountered.
-    ///
-    /// Periodically checking for incoming interrupt packets is _not_ required,
-    /// but it is _recommended_.
-    ///
-    /// Note: targets using [deferred stop reasons](#Deferred-Stop-Reason)
-    /// should bypass the `gdb_interrupt` API, and check for GDB interrupts as
-    /// part of the
-    /// [`GdbStubStateMachine`](crate::state_machine::GdbStubStateMachine)
-    /// event loop.
-    ///
-    /// # Implementation requirements
-    ///
-    /// These requirements cannot be satisfied by `gdbstub` internally, and must
-    /// be handled on a per-target basis.
+    /// # Additional Considerations
     ///
     /// ### Adjusting PC after a breakpoint is hit
     ///
@@ -58,9 +38,7 @@ pub trait MultiThreadOps: Target {
     /// > address.
     ///
     /// Omitting PC adjustment may result in unexpected execution flow and/or
-    /// breakpoints not working correctly.
-    ///
-    /// # Additional Considerations
+    /// breakpoints not appearing to work correctly.
     ///
     /// ### Bare-Metal Targets
     ///
@@ -78,11 +56,7 @@ pub trait MultiThreadOps: Target {
     /// ["All-Stop" mode](https://sourceware.org/gdb/current/onlinedocs/gdb/All_002dStop-Mode.html),
     /// whereby _all_ threads must be stopped when returning from `resume`
     /// (not just the thread associated with the `ThreadStopReason`).
-    fn resume(
-        &mut self,
-        default_resume_action: ResumeAction,
-        gdb_interrupt: GdbInterrupt<'_>,
-    ) -> Result<Option<ThreadStopReason<<Self::Arch as Arch>::Usize>>, Self::Error>;
+    fn resume(&mut self) -> Result<(), Self::Error>;
 
     /// Clear all previously set resume actions.
     fn clear_resume_actions(&mut self) -> Result<(), Self::Error>;
@@ -90,8 +64,8 @@ pub trait MultiThreadOps: Target {
     /// Specify what action each thread should take when
     /// [`resume`](Self::resume) is called.
     ///
-    /// A simple implementation of this method would simply update an internal
-    /// `HashMap<Tid, ResumeAction>`.
+    /// See the [`resume`](Self::resume) docs for information on when this is
+    /// called.
     ///
     /// Aside from the four "base" resume actions handled by this method (i.e:
     /// `Step`, `Continue`, `StepWithSignal`, and `ContinueWithSignal`),
@@ -223,10 +197,7 @@ pub trait MultiThreadOps: Target {
 /// [Reverse continue]: https://sourceware.org/gdb/current/onlinedocs/gdb/Reverse-Execution.html
 pub trait MultiThreadReverseCont: Target + MultiThreadOps {
     /// Reverse-continue the target.
-    fn reverse_cont(
-        &mut self,
-        gdb_interrupt: GdbInterrupt<'_>,
-    ) -> Result<Option<ThreadStopReason<<Self::Arch as Arch>::Usize>>, Self::Error>;
+    fn reverse_cont(&mut self) -> Result<(), Self::Error>;
 }
 
 define_ext!(MultiThreadReverseContOps, MultiThreadReverseCont);
@@ -238,11 +209,7 @@ define_ext!(MultiThreadReverseContOps, MultiThreadReverseCont);
 /// [Reverse stepping]: https://sourceware.org/gdb/current/onlinedocs/gdb/Reverse-Execution.html
 pub trait MultiThreadReverseStep: Target + MultiThreadOps {
     /// Reverse-step the specified [`Tid`].
-    fn reverse_step(
-        &mut self,
-        tid: Tid,
-        gdb_interrupt: GdbInterrupt<'_>,
-    ) -> Result<Option<ThreadStopReason<<Self::Arch as Arch>::Usize>>, Self::Error>;
+    fn reverse_step(&mut self, tid: Tid) -> Result<(), Self::Error>;
 }
 
 define_ext!(MultiThreadReverseStepOps, MultiThreadReverseStep);
@@ -279,7 +246,7 @@ define_ext!(MultiThreadRangeSteppingOps, MultiThreadRangeStepping);
 /// Describes why a thread stopped.
 ///
 /// Targets MUST only respond with stop reasons that correspond to IDETs that
-/// target has implemented.
+/// target has implemented. Not doing so will result in a runtime error.
 ///
 /// e.g: A target which has not implemented the [`HwBreakpoint`] IDET must not
 /// return a `HwBreak` stop reason. While this is not enforced at compile time,
@@ -291,8 +258,8 @@ define_ext!(MultiThreadRangeSteppingOps, MultiThreadRangeStepping);
 pub enum ThreadStopReason<U> {
     /// Completed the single-step request.
     DoneStep,
-    /// `check_gdb_interrupt` returned `true`.
-    GdbInterrupt,
+    /// Detected a GDB Ctrl-C interrupt. Equivalent to `Signal(5)` (SIGTRAP)
+    GdbCtrlCInterrupt,
     /// The process exited with the specified exit status.
     Exited(u8),
     /// The process terminated with the specified signal number.

@@ -18,7 +18,7 @@ use crate::DynResult;
 
 const HLE_RETURN_ADDR: u32 = 0x12345678;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CpuId {
     Cpu,
     Cop,
@@ -26,10 +26,16 @@ pub enum CpuId {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Event {
+    DoneStep,
     Halted,
     Break,
     WatchWrite(u32),
     WatchRead(u32),
+}
+
+pub enum ExecMode {
+    Step,
+    Continue,
 }
 
 /// incredibly barebones armv4t-based emulator
@@ -38,8 +44,7 @@ pub struct Emu {
     pub(crate) cop: Cpu,
     pub(crate) mem: ExampleMem,
 
-    // FIXME: properly handle multiple actions
-    pub(crate) resume_action_is_step: Option<bool>,
+    pub(crate) exec_mode: HashMap<CpuId, ExecMode>,
 
     pub(crate) watchpoints: Vec<u32>,
     /// (read, write)
@@ -92,7 +97,7 @@ impl Emu {
             cop,
             mem,
 
-            resume_action_is_step: None,
+            exec_mode: HashMap::new(),
 
             watchpoints: Vec::new(),
             watchpoint_kind: HashMap::new(),
@@ -188,4 +193,50 @@ impl Emu {
 
         evt
     }
+
+    pub fn run(&mut self, mut poll_incoming_data: impl FnMut() -> bool) -> RunEvent {
+        // the underlying armv4t_multicore emulator runs both cores in lock step, so
+        // when GDB requests a specific core to single-step, all we need to do is jot
+        // down that we want to single-step the system, as there is no way to
+        // single-step a single core while the other runs.
+        //
+        // In more complex emulators / implementations, this simplification is _not_
+        // valid, and you should track which specific TID the GDB client requested to be
+        // single-stepped, and run them appropriately.
+
+        let should_single_step = matches!(
+            self.exec_mode
+                .get(&CpuId::Cpu)
+                .or_else(|| self.exec_mode.get(&CpuId::Cop)),
+            Some(&ExecMode::Step)
+        );
+
+        match should_single_step {
+            true => match self.step() {
+                Some((event, id)) => RunEvent::Event(event, id),
+                None => RunEvent::Event(Event::DoneStep, CpuId::Cpu),
+            },
+            false => {
+                let mut cycles = 0;
+                loop {
+                    if cycles % 1024 == 0 {
+                        // poll for incoming data
+                        if poll_incoming_data() {
+                            break RunEvent::IncomingData;
+                        }
+                    }
+                    cycles += 1;
+
+                    if let Some((event, id)) = self.step() {
+                        break RunEvent::Event(event, id);
+                    };
+                }
+            }
+        }
+    }
+}
+
+pub enum RunEvent {
+    Event(Event, CpuId),
+    IncomingData,
 }
