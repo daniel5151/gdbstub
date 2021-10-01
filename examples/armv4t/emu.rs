@@ -7,10 +7,17 @@ const HLE_RETURN_ADDR: u32 = 0x12345678;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Event {
+    DoneStep,
     Halted,
     Break,
     WatchWrite(u32),
     WatchRead(u32),
+}
+
+pub enum ExecMode {
+    Step,
+    Continue,
+    RangeStep(u32, u32),
 }
 
 /// incredibly barebones armv4t-based emulator
@@ -19,6 +26,8 @@ pub struct Emu {
 
     // example custom register. only read/written to from the GDB client
     pub(crate) custom_reg: u32,
+
+    pub(crate) exec_mode: ExecMode,
 
     pub(crate) cpu: Cpu,
     pub(crate) mem: ExampleMem,
@@ -68,6 +77,8 @@ impl Emu {
 
             custom_reg: 0x12345678,
 
+            exec_mode: ExecMode::Continue,
+
             cpu,
             mem,
 
@@ -84,6 +95,7 @@ impl Emu {
         self.cpu.reg_set(Mode::User, reg::CPSR, 0x10);
     }
 
+    /// single-step the interpreter
     pub fn step(&mut self) -> Option<Event> {
         let mut hit_watchpoint = None;
 
@@ -114,4 +126,57 @@ impl Emu {
 
         None
     }
+
+    /// run the emulator in accordance with the currently set `ExecutionMode`.
+    ///
+    /// since the emulator runs in the same thread as the GDB loop, the emulator
+    /// will use the provided callback to poll the connection for incoming data
+    /// every 1024 steps.
+    pub fn run(&mut self, mut poll_incoming_data: impl FnMut() -> bool) -> RunEvent {
+        match self.exec_mode {
+            ExecMode::Step => RunEvent::Event(self.step().unwrap_or(Event::DoneStep)),
+            ExecMode::Continue => {
+                let mut cycles = 0;
+                loop {
+                    if cycles % 1024 == 0 {
+                        // poll for incoming data
+                        if poll_incoming_data() {
+                            break RunEvent::IncomingData;
+                        }
+                    }
+                    cycles += 1;
+
+                    if let Some(event) = self.step() {
+                        break RunEvent::Event(event);
+                    };
+                }
+            }
+            // just continue, but with an extra PC check
+            ExecMode::RangeStep(start, end) => {
+                let mut cycles = 0;
+                loop {
+                    if cycles % 1024 == 0 {
+                        // poll for incoming data
+                        if poll_incoming_data() {
+                            break RunEvent::IncomingData;
+                        }
+                    }
+                    cycles += 1;
+
+                    if let Some(event) = self.step() {
+                        break RunEvent::Event(event);
+                    };
+
+                    if !(start..end).contains(&self.cpu.reg_get(self.cpu.mode(), reg::PC)) {
+                        break RunEvent::Event(Event::DoneStep);
+                    }
+                }
+            }
+        }
+    }
+}
+
+pub enum RunEvent {
+    IncomingData,
+    Event(Event),
 }

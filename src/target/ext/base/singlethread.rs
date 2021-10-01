@@ -8,51 +8,22 @@ use crate::target::{Target, TargetResult};
 use super::{ReplayLogPosition, SingleRegisterAccessOps};
 
 // Convenient re-exports
-pub use super::{GdbInterrupt, ResumeAction};
+pub use super::ResumeAction;
 
 /// Base debugging operations for single threaded targets.
 pub trait SingleThreadOps: Target {
     /// Resume execution on the target.
     ///
-    /// `action` specifies how the target should be resumed (i.e: step or
-    /// continue).
+    /// `action` specifies how the target should be resumed
+    /// (i.e: step or continue).
     ///
-    /// # Checking for Ctrl-C interrupts
+    /// Upon returning from the `resume` method, the target being debugged
+    /// should be configured to run according to whatever resume actions the
+    /// GDB client has specified (as specified by the provided `action`, or
+    /// if extended resume actions are being used, the `set_resume_range_step`,
+    /// `set_reverse_{step, continue}`, etc... methods)
     ///
-    /// The `gdb_interrupt` callback provides a conceptually simple, albeit
-    /// inefficient way check if GDB sent an Ctrl-C interrupt packet. It's
-    /// recommended to invoke this callback every-so-often while the system
-    /// is running (e.g: every X cycles/milliseconds), and returning a
-    /// `StopReason::GdbInterrupt` if an interrupt is encountered.
-    ///
-    /// Periodically checking for incoming interrupt packets is _not_ required,
-    /// but it is _recommended_.
-    ///
-    /// Note: targets using [deferred stop reasons](#Deferred-Stop-Reason)
-    /// should bypass the `gdb_interrupt` API, and check for GDB interrupts as
-    /// part of the
-    /// [`GdbStubStateMachine`](crate::state_machine::GdbStubStateMachine)
-    /// event loop.
-    ///
-    /// # Deferred Stop Reason
-    ///
-    /// If the target is running under the more advanced
-    /// [`GdbStubStateMachine`](crate::state_machine::GdbStubStateMachine) API,
-    /// it is possible to "defer" reporting a stop reason to some point outside
-    /// of the `resume` implementation by returning `None`.
-    ///
-    /// Returning `None` will immediately yield control back to
-    /// `GdbStubStateMachine`'s callee, while the target continues to run in the
-    /// background.
-    ///
-    /// Deferred stop reasons also allow an implementation to bypass the
-    /// conceptually simple `gdb_interrupt` API, and use whatever efficient
-    /// waiting mechanism
-    ///
-    /// # Implementation requirements
-    ///
-    /// These requirements cannot be satisfied by `gdbstub` internally, and must
-    /// be handled on a per-target basis.
+    /// # Additional Considerations
     ///
     /// ### Adjusting PC after a breakpoint is hit
     ///
@@ -67,11 +38,7 @@ pub trait SingleThreadOps: Target {
     ///
     /// Omitting PC adjustment may result in unexpected execution flow and/or
     /// breakpoints not appearing to work correctly.
-    fn resume(
-        &mut self,
-        action: ResumeAction,
-        gdb_interrupt: GdbInterrupt<'_>,
-    ) -> Result<Option<StopReason<<Self::Arch as Arch>::Usize>>, Self::Error>;
+    fn resume(&mut self, action: ResumeAction) -> Result<(), Self::Error>;
 
     /// Support for the optimized [range stepping] resume action.
     ///
@@ -150,10 +117,7 @@ pub trait SingleThreadOps: Target {
 /// [Reverse continue]: https://sourceware.org/gdb/current/onlinedocs/gdb/Reverse-Execution.html
 pub trait SingleThreadReverseCont: Target + SingleThreadOps {
     /// Reverse-continue the target.
-    fn reverse_cont(
-        &mut self,
-        gdb_interrupt: GdbInterrupt<'_>,
-    ) -> Result<Option<StopReason<<Self::Arch as Arch>::Usize>>, Self::Error>;
+    fn reverse_cont(&mut self) -> Result<(), Self::Error>;
 }
 
 define_ext!(SingleThreadReverseContOps, SingleThreadReverseCont);
@@ -165,10 +129,7 @@ define_ext!(SingleThreadReverseContOps, SingleThreadReverseCont);
 /// [Reverse stepping]: https://sourceware.org/gdb/current/onlinedocs/gdb/Reverse-Execution.html
 pub trait SingleThreadReverseStep: Target + SingleThreadOps {
     /// Reverse-step the target.
-    fn reverse_step(
-        &mut self,
-        gdb_interrupt: GdbInterrupt<'_>,
-    ) -> Result<Option<StopReason<<Self::Arch as Arch>::Usize>>, Self::Error>;
+    fn reverse_step(&mut self) -> Result<(), Self::Error>;
 }
 
 define_ext!(SingleThreadReverseStepOps, SingleThreadReverseStep);
@@ -196,16 +157,15 @@ pub trait SingleThreadRangeStepping: Target + SingleThreadOps {
         &mut self,
         start: <Self::Arch as Arch>::Usize,
         end: <Self::Arch as Arch>::Usize,
-        gdb_interrupt: GdbInterrupt<'_>,
-    ) -> Result<Option<StopReason<<Self::Arch as Arch>::Usize>>, Self::Error>;
+    ) -> Result<(), Self::Error>;
 }
 
 define_ext!(SingleThreadRangeSteppingOps, SingleThreadRangeStepping);
 
-/// Describes why the target stopped.
+/// Describes why the single-threaded target stopped.
 ///
 /// Targets MUST only respond with stop reasons that correspond to IDETs that
-/// target has implemented.
+/// target has implemented. Not doing so will result in a runtime error.
 ///
 /// e.g: A target which has not implemented the [`HwBreakpoint`] IDET must not
 /// return a `HwBreak` stop reason. While this is not enforced at compile time,
@@ -219,8 +179,8 @@ define_ext!(SingleThreadRangeSteppingOps, SingleThreadRangeStepping);
 pub enum StopReason<U> {
     /// Completed the single-step request.
     DoneStep,
-    /// `check_gdb_interrupt` returned `true`.
-    GdbInterrupt,
+    /// Detected a GDB Ctrl-C interrupt. Equivalent to `Signal(5)` (SIGTRAP)
+    GdbCtrlCInterrupt,
     /// The process exited with the specified exit status.
     Exited(u8),
     /// The process terminated with the specified signal number.
@@ -273,4 +233,30 @@ pub enum StopReason<U> {
         /// The location the event occured at.
         position: CatchSyscallPosition,
     },
+}
+
+use crate::target::ext::base::multithread::ThreadStopReason;
+use crate::SINGLE_THREAD_TID;
+
+impl<U> From<StopReason<U>> for ThreadStopReason<U> {
+    fn from(st_stop_reason: StopReason<U>) -> ThreadStopReason<U> {
+        match st_stop_reason {
+            StopReason::DoneStep => ThreadStopReason::DoneStep,
+            StopReason::GdbCtrlCInterrupt => ThreadStopReason::GdbCtrlCInterrupt,
+            StopReason::Exited(code) => ThreadStopReason::Exited(code),
+            StopReason::Terminated(sig) => ThreadStopReason::Terminated(sig),
+            StopReason::SwBreak => ThreadStopReason::SwBreak(SINGLE_THREAD_TID),
+            StopReason::HwBreak => ThreadStopReason::HwBreak(SINGLE_THREAD_TID),
+            StopReason::Watch { kind, addr } => ThreadStopReason::Watch {
+                tid: SINGLE_THREAD_TID,
+                kind,
+                addr,
+            },
+            StopReason::Signal(sig) => ThreadStopReason::Signal(sig),
+            StopReason::ReplayLog(pos) => ThreadStopReason::ReplayLog(pos),
+            StopReason::CatchSyscall { number, position } => {
+                ThreadStopReason::CatchSyscall { number, position }
+            }
+        }
+    }
 }

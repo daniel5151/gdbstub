@@ -4,7 +4,7 @@ use crate::protocol::commands::ext::Base;
 use crate::arch::{Arch, Registers};
 use crate::protocol::{IdKind, SpecificIdKind, SpecificThreadId};
 use crate::target::ext::base::multithread::ThreadStopReason;
-use crate::target::ext::base::{BaseOps, GdbInterrupt, ReplayLogPosition, ResumeAction};
+use crate::target::ext::base::{BaseOps, ReplayLogPosition, ResumeAction};
 use crate::{FAKE_PID, SINGLE_THREAD_TID};
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
@@ -307,7 +307,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         }
                         HandlerStatus::Handled
                     }
-                    vCont::Actions(actions) => self.do_vcont(res, target, actions)?,
+                    vCont::Actions(actions) => self.do_vcont(target, actions)?,
                 }
             }
             // TODO?: support custom resume addr in 'c' and 's'
@@ -333,7 +333,6 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 use crate::protocol::commands::_vCont::Actions;
 
                 self.do_vcont(
-                    res,
                     target,
                     Actions::new_continue(SpecificThreadId {
                         pid: None,
@@ -345,7 +344,6 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 use crate::protocol::commands::_vCont::Actions;
 
                 self.do_vcont(
-                    res,
                     target,
                     Actions::new_step(SpecificThreadId {
                         pid: None,
@@ -446,21 +444,9 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             Arch = T::Arch,
             Error = T::Error,
         >,
-        res: &mut ResponseWriter<C>,
         actions: &crate::protocol::commands::_vCont::Actions,
-    ) -> Result<Option<ThreadStopReason<<T::Arch as Arch>::Usize>>, Error<T::Error, C::Error>> {
+    ) -> Result<(), Error<T::Error, C::Error>> {
         use crate::protocol::commands::_vCont::VContKind;
-
-        let mut err = Ok(());
-        let mut check_gdb_interrupt = || match res.as_conn().peek() {
-            Ok(Some(0x03)) => true, // 0x03 is the interrupt byte
-            Ok(Some(_)) => false,   // it's nothing that can't wait...
-            Ok(None) => false,
-            Err(e) => {
-                err = Err(Error::ConnectionRead(e));
-                true // break ASAP if a connection error occurred
-            }
-        };
 
         let mut actions = actions.iter();
         let first_action = actions
@@ -498,12 +484,9 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     let start = start.decode().map_err(|_| Error::TargetMismatch)?;
                     let end = end.decode().map_err(|_| Error::TargetMismatch)?;
 
-                    let ret = ops
-                        .resume_range_step(start, end, GdbInterrupt::new(&mut check_gdb_interrupt))
-                        .map_err(Error::TargetError)?
-                        .map(Into::into);
-                    err?;
-                    return Ok(ret);
+                    ops.resume_range_step(start, end)
+                        .map_err(Error::TargetError)?;
+                    return Ok(());
                 } else {
                     return Err(Error::PacketUnexpected);
                 }
@@ -512,12 +495,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             VContKind::Stop => return Err(Error::PacketUnexpected),
         };
 
-        let ret = ops
-            .resume(action, GdbInterrupt::new(&mut check_gdb_interrupt))
-            .map_err(Error::TargetError)?
-            .map(Into::into);
-        err?;
-        Ok(ret)
+        ops.resume(action).map_err(Error::TargetError)
     }
 
     fn do_vcont_multi_thread(
@@ -525,12 +503,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             Arch = T::Arch,
             Error = T::Error,
         >,
-        res: &mut ResponseWriter<C>,
         actions: &crate::protocol::commands::_vCont::Actions,
-    ) -> Result<Option<ThreadStopReason<<T::Arch as Arch>::Usize>>, Error<T::Error, C::Error>> {
-        // this is a pretty arbitrary choice, but it seems reasonable for most cases.
-        let mut default_resume_action = ResumeAction::Continue;
-
+    ) -> Result<(), Error<T::Error, C::Error>> {
         ops.clear_resume_actions().map_err(Error::TargetError)?;
 
         for action in actions.iter() {
@@ -573,53 +547,32 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
             match action.thread.map(|thread| thread.tid) {
                 // An action with no thread-id matches all threads
-                None | Some(SpecificIdKind::All) => default_resume_action = resume_action,
+                None | Some(SpecificIdKind::All) => {
+                    if !matches!(resume_action, ResumeAction::Continue) {
+                        error!("GDB client sent default resume action that wasn't 'Continue'");
+                        return Err(Error::PacketUnexpected);
+                    }
+                }
                 Some(SpecificIdKind::WithId(tid)) => ops
                     .set_resume_action(tid, resume_action)
                     .map_err(Error::TargetError)?,
             };
         }
 
-        let mut err = Ok(());
-        let mut check_gdb_interrupt = || match res.as_conn().peek() {
-            Ok(Some(0x03)) => true, // 0x03 is the interrupt byte
-            Ok(Some(_)) => false,   // it's nothing that can't wait...
-            Ok(None) => false,
-            Err(e) => {
-                err = Err(Error::ConnectionRead(e));
-                true // break ASAP if a connection error occurred
-            }
-        };
-
-        let ret = ops
-            .resume(
-                default_resume_action,
-                GdbInterrupt::new(&mut check_gdb_interrupt),
-            )
-            .map_err(Error::TargetError)?;
-
-        err?;
-
-        Ok(ret)
+        ops.resume().map_err(Error::TargetError)
     }
 
     fn do_vcont(
         &mut self,
-        res: &mut ResponseWriter<C>,
         target: &mut T,
         actions: crate::protocol::commands::_vCont::Actions,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
-        let stop_reason = match target.base_ops() {
-            BaseOps::SingleThread(ops) => Self::do_vcont_single_thread(ops, res, &actions)?,
-            BaseOps::MultiThread(ops) => Self::do_vcont_multi_thread(ops, res, &actions)?,
+        match target.base_ops() {
+            BaseOps::SingleThread(ops) => Self::do_vcont_single_thread(ops, &actions)?,
+            BaseOps::MultiThread(ops) => Self::do_vcont_multi_thread(ops, &actions)?,
         };
 
-        match stop_reason {
-            None => Ok(HandlerStatus::DeferredStopReason),
-            Some(stop_reason) => self
-                .finish_exec(res, target, stop_reason)
-                .map(|x| x.into_handler_status()),
-        }
+        Ok(HandlerStatus::DeferredStopReason)
     }
 
     fn write_break_common(
@@ -677,7 +630,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         }
 
         let status = match stop_reason {
-            ThreadStopReason::DoneStep | ThreadStopReason::GdbInterrupt => {
+            ThreadStopReason::DoneStep | ThreadStopReason::GdbCtrlCInterrupt => {
                 res.write_str("S05")?;
                 FinishExecStatus::Handled
             }
@@ -772,37 +725,4 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 pub(crate) enum FinishExecStatus {
     Handled,
     Disconnect(DisconnectReason),
-}
-
-impl FinishExecStatus {
-    pub(super) fn into_handler_status(self) -> HandlerStatus {
-        match self {
-            FinishExecStatus::Disconnect(status) => HandlerStatus::Disconnect(status),
-            FinishExecStatus::Handled => HandlerStatus::Handled,
-        }
-    }
-}
-
-use crate::target::ext::base::singlethread::StopReason;
-impl<U> From<StopReason<U>> for ThreadStopReason<U> {
-    fn from(st_stop_reason: StopReason<U>) -> ThreadStopReason<U> {
-        match st_stop_reason {
-            StopReason::DoneStep => ThreadStopReason::DoneStep,
-            StopReason::GdbInterrupt => ThreadStopReason::GdbInterrupt,
-            StopReason::Exited(code) => ThreadStopReason::Exited(code),
-            StopReason::Terminated(sig) => ThreadStopReason::Terminated(sig),
-            StopReason::SwBreak => ThreadStopReason::SwBreak(SINGLE_THREAD_TID),
-            StopReason::HwBreak => ThreadStopReason::HwBreak(SINGLE_THREAD_TID),
-            StopReason::Watch { kind, addr } => ThreadStopReason::Watch {
-                tid: SINGLE_THREAD_TID,
-                kind,
-                addr,
-            },
-            StopReason::Signal(sig) => ThreadStopReason::Signal(sig),
-            StopReason::ReplayLog(pos) => ThreadStopReason::ReplayLog(pos),
-            StopReason::CatchSyscall { number, position } => {
-                ThreadStopReason::CatchSyscall { number, position }
-            }
-        }
-    }
 }

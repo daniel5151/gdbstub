@@ -4,6 +4,7 @@
 extern crate libc;
 
 use gdbstub::state_machine::GdbStubStateMachine;
+use gdbstub::target::ext::base::multithread::ThreadStopReason;
 use gdbstub::{DisconnectReason, GdbStubBuilder, GdbStubError};
 
 mod conn;
@@ -18,8 +19,6 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 }
 
 fn rust_main() -> Result<(), i32> {
-    // pretty_env_logger::init();
-
     let mut target = gdb::DummyTarget::new();
 
     let conn = match conn::TcpConnection::new_localhost(9001) {
@@ -41,34 +40,39 @@ fn rust_main() -> Result<(), i32> {
 
     let mut gdb = gdb.run_state_machine().map_err(|_| 1)?;
 
-    loop {
+    let res = loop {
         gdb = match gdb {
             GdbStubStateMachine::Pump(mut gdb) => {
                 let byte = gdb.borrow_conn().read().map_err(|_| 1)?;
                 match gdb.pump(&mut target, byte) {
-                    Ok((_, Some(disconnect_reason))) => {
-                        match disconnect_reason {
-                            DisconnectReason::Disconnect => print_str("GDB Disconnected"),
-                            DisconnectReason::TargetExited(_) => print_str("Target exited"),
-                            DisconnectReason::TargetTerminated(_) => print_str("Target halted"),
-                            DisconnectReason::Kill => print_str("GDB sent a kill command"),
-                        }
-                        break;
-                    }
+                    Ok((_, Some(disconnect_reason))) => break Ok(disconnect_reason),
                     Ok((gdb, None)) => gdb,
-                    Err(GdbStubError::TargetError(_e)) => {
-                        print_str("Target raised a fatal error");
-                        break;
-                    }
-                    Err(_e) => {
-                        print_str("gdbstub internal error");
-                        break;
-                    }
+                    Err(e) => break Err(e),
                 }
             }
 
-            // example_no_std stubs out resume, so this will never happen
-            GdbStubStateMachine::DeferredStopReason(_) => return Err(-1),
+            GdbStubStateMachine::DeferredStopReason(gdb) => {
+                match gdb.deferred_stop_reason(&mut target, ThreadStopReason::DoneStep) {
+                    Ok((_, Some(disconnect_reason))) => break Ok(disconnect_reason),
+                    Ok((gdb, None)) => gdb,
+                    Err(e) => break Err(e),
+                }
+            }
+        }
+    };
+
+    match res {
+        Ok(disconnect_reason) => match disconnect_reason {
+            DisconnectReason::Disconnect => print_str("GDB Disconnected"),
+            DisconnectReason::TargetExited(_) => print_str("Target exited"),
+            DisconnectReason::TargetTerminated(_) => print_str("Target halted"),
+            DisconnectReason::Kill => print_str("GDB sent a kill command"),
+        },
+        Err(GdbStubError::TargetError(_e)) => {
+            print_str("Target raised a fatal error");
+        }
+        Err(_e) => {
+            print_str("gdbstub internal error");
         }
     }
 
