@@ -86,10 +86,8 @@ pub mod gdbstub_run_blocking {
         /// `None` if the interrupt should be ignored.
         ///
         /// _Suggestion_: If you're unsure which stop reason you should report,
-        /// [`ThreadStopReason::GdbCtrlCInterrupt`] is a reasonable default.
-        /// Under the hood, this is equivalent to returning
-        /// [`ThreadStopReason::Signal(5)`](ThreadStopReason::Signal), or a
-        /// SIGTRAP.
+        /// [`ThreadStopReason::Signal(5)`](ThreadStopReason::Signal)
+        /// (i.e: SIGTRAP) is a reasonable default.
         ///
         /// # Single threaded targets
         ///

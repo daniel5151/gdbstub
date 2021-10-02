@@ -179,8 +179,6 @@ define_ext!(SingleThreadRangeSteppingOps, SingleThreadRangeStepping);
 pub enum StopReason<U> {
     /// Completed the single-step request.
     DoneStep,
-    /// Detected a GDB Ctrl-C interrupt. Equivalent to `Signal(5)` (SIGTRAP)
-    GdbCtrlCInterrupt,
     /// The process exited with the specified exit status.
     Exited(u8),
     /// The process terminated with the specified signal number.
@@ -242,7 +240,6 @@ impl<U> From<StopReason<U>> for ThreadStopReason<U> {
     fn from(st_stop_reason: StopReason<U>) -> ThreadStopReason<U> {
         match st_stop_reason {
             StopReason::DoneStep => ThreadStopReason::DoneStep,
-            StopReason::GdbCtrlCInterrupt => ThreadStopReason::GdbCtrlCInterrupt,
             StopReason::Exited(code) => ThreadStopReason::Exited(code),
             StopReason::Terminated(sig) => ThreadStopReason::Terminated(sig),
             StopReason::SwBreak => ThreadStopReason::SwBreak(SINGLE_THREAD_TID),

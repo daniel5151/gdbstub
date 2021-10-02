@@ -630,7 +630,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         }
 
         let status = match stop_reason {
-            ThreadStopReason::DoneStep | ThreadStopReason::GdbCtrlCInterrupt => {
+            ThreadStopReason::DoneStep => {
                 res.write_str("S05")?;
                 FinishExecStatus::Handled
             }

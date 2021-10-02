@@ -258,8 +258,6 @@ define_ext!(MultiThreadRangeSteppingOps, MultiThreadRangeStepping);
 pub enum ThreadStopReason<U> {
     /// Completed the single-step request.
     DoneStep,
-    /// Detected a GDB Ctrl-C interrupt. Equivalent to `Signal(5)` (SIGTRAP)
-    GdbCtrlCInterrupt,
     /// The process exited with the specified exit status.
     Exited(u8),
     /// The process terminated with the specified signal number.

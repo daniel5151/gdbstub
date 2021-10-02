@@ -133,7 +133,7 @@ impl gdbstub::gdbstub_run_blocking::BlockingEventLoop for EmuGdbEventLoop {
         // special action that needs to be taken to interrupt the underlying target. It
         // is implicitly paused whenever the stub isn't within the
         // `wait_for_stop_reason` callback.
-        Ok(Some(ThreadStopReason::GdbCtrlCInterrupt))
+        Ok(Some(ThreadStopReason::Signal(5)))
     }
 }
 
