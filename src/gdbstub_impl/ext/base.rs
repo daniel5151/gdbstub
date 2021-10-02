@@ -692,14 +692,6 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                 FinishExecStatus::Handled
             }
-            // Explicitly avoid using `_ =>` to handle the "unguarded" variants, as doing so would
-            // squelch the useful compiler error that crops up whenever stop reasons are added.
-            ThreadStopReason::SwBreak(_)
-            | ThreadStopReason::HwBreak(_)
-            | ThreadStopReason::Watch { .. }
-            | ThreadStopReason::ReplayLog(_) => {
-                return Err(Error::UnsupportedStopReason);
-            }
             ThreadStopReason::CatchSyscall { number, position } if guard_catch_syscall!() => {
                 crate::__dead_code_marker!("catch_syscall", "stop_reason");
 
@@ -715,7 +707,15 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                 FinishExecStatus::Handled
             }
-            _ => return Err(Error::UnsupportedStopReason),
+            // Explicitly avoid using `_ =>` to handle the "unguarded" variants, as doing so would
+            // squelch the useful compiler error that crops up whenever stop reasons are added.
+            ThreadStopReason::SwBreak(_)
+            | ThreadStopReason::HwBreak(_)
+            | ThreadStopReason::Watch { .. }
+            | ThreadStopReason::ReplayLog(_)
+            | ThreadStopReason::CatchSyscall { .. } => {
+                return Err(Error::UnsupportedStopReason);
+            }
         };
 
         Ok(status)
