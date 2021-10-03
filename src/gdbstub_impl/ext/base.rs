@@ -4,7 +4,7 @@ use crate::protocol::commands::ext::Base;
 use crate::arch::{Arch, Registers};
 use crate::protocol::{IdKind, SpecificIdKind, SpecificThreadId};
 use crate::target::ext::base::multithread::ThreadStopReason;
-use crate::target::ext::base::{BaseOps, ReplayLogPosition, ResumeAction};
+use crate::target::ext::base::{BaseOps, ReplayLogPosition};
 use crate::{FAKE_PID, SINGLE_THREAD_TID};
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
@@ -298,13 +298,25 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 use crate::protocol::commands::_vCont::vCont;
                 match cmd {
                     vCont::Query => {
-                        res.write_str("vCont;c;C;s;S")?;
+                        // Continue is part of the base protocol
+                        res.write_str("vCont;c;C")?;
+
+                        // Single stepping is optional
                         if match target.base_ops() {
-                            BaseOps::SingleThread(ops) => ops.support_resume_range_step().is_some(),
+                            BaseOps::SingleThread(ops) => ops.support_single_step().is_some(),
+                            BaseOps::MultiThread(ops) => ops.support_single_step().is_some(),
+                        } {
+                            res.write_str(";s;S")?;
+                        }
+
+                        // Range stepping is optional
+                        if match target.base_ops() {
+                            BaseOps::SingleThread(ops) => ops.support_range_step().is_some(),
                             BaseOps::MultiThread(ops) => ops.support_range_step().is_some(),
                         } {
                             res.write_str(";r")?;
                         }
+
                         HandlerStatus::Handled
                     }
                     vCont::Actions(actions) => self.do_vcont(target, actions)?,
@@ -312,23 +324,11 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             }
             // TODO?: support custom resume addr in 'c' and 's'
             //
-            // unfortunately, this wouldn't be a particularly easy thing to implement, since the
-            // vCont packet doesn't natively support custom resume addresses. This leaves a few
-            // options for the implementation:
+            // vCont doesn't have a notion of "resume addr", and since the implementation of these
+            // packets reuse vCont infrastructure, supporting this obscure feature will be a bit
+            // annoying...
             //
-            // 1. Adding new ResumeActions (i.e: ContinueWithAddr(U) and StepWithAddr(U))
-            // 2. Automatically calling `read_registers`, updating the `pc`, and calling
-            //    `write_registers` prior to resuming.
-            //    - will require adding some sort of `get_pc_mut` method to the `Registers` trait.
-            //
-            // Option 1 is easier to implement, but puts more burden on the implementor. Option 2
-            // will require more effort to implement (and will be less performant), but it will hide
-            // this protocol wart from the end user.
-            //
-            // Oh, one more thought - there's a subtle pitfall to watch out for if implementing
-            // Option 1: if the target is using conditional breakpoints, `do_vcont` has to be
-            // modified to only pass the resume with address variants on the _first_ iteration
-            // through the loop.
+            // TODO: add `support_legacy_s_c_packets` flag (similar to `use_X_packet`)
             Base::c(_) => {
                 use crate::protocol::commands::_vCont::Actions;
 
@@ -474,28 +474,41 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             return Err(Error::PacketUnexpected);
         }
 
-        let action = match first_action.kind {
-            VContKind::Step => ResumeAction::Step,
-            VContKind::Continue => ResumeAction::Continue,
-            VContKind::StepWithSig(sig) => ResumeAction::StepWithSignal(sig),
-            VContKind::ContinueWithSig(sig) => ResumeAction::ContinueWithSignal(sig),
-            VContKind::RangeStep(start, end) => {
-                if let Some(ops) = ops.support_resume_range_step() {
-                    let start = start.decode().map_err(|_| Error::TargetMismatch)?;
-                    let end = end.decode().map_err(|_| Error::TargetMismatch)?;
+        match first_action.kind {
+            VContKind::Continue | VContKind::ContinueWithSig(_) => {
+                let signal = match first_action.kind {
+                    VContKind::ContinueWithSig(sig) => Some(sig),
+                    _ => None,
+                };
 
-                    ops.resume_range_step(start, end)
-                        .map_err(Error::TargetError)?;
-                    return Ok(());
-                } else {
-                    return Err(Error::PacketUnexpected);
-                }
+                ops.resume(signal).map_err(Error::TargetError)?;
+                Ok(())
+            }
+            VContKind::Step | VContKind::StepWithSig(_) if ops.support_single_step().is_some() => {
+                let ops = ops.support_single_step().unwrap();
+
+                let signal = match first_action.kind {
+                    VContKind::StepWithSig(sig) => Some(sig),
+                    _ => None,
+                };
+
+                ops.step(signal).map_err(Error::TargetError)?;
+                Ok(())
+            }
+            VContKind::RangeStep(start, end) if ops.support_range_step().is_some() => {
+                let ops = ops.support_range_step().unwrap();
+
+                let start = start.decode().map_err(|_| Error::TargetMismatch)?;
+                let end = end.decode().map_err(|_| Error::TargetMismatch)?;
+
+                ops.resume_range_step(start, end)
+                    .map_err(Error::TargetError)?;
+                Ok(())
             }
             // TODO: update this case when non-stop mode is implemented
-            VContKind::Stop => return Err(Error::PacketUnexpected),
-        };
-
-        ops.resume(action).map_err(Error::TargetError)
+            VContKind::Stop => Err(Error::PacketUnexpected),
+            _ => Err(Error::PacketUnexpected),
+        }
     }
 
     fn do_vcont_multi_thread(
@@ -514,49 +527,69 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 crate::protocol::PacketParseError::MalformedCommand,
             ))?;
 
-            let resume_action = match action.kind {
-                VContKind::Step => ResumeAction::Step,
-                VContKind::Continue => ResumeAction::Continue,
-                // there seems to be a GDB bug where it doesn't use `vCont` unless
-                // `vCont?` returns support for resuming with a signal.
-                VContKind::StepWithSig(sig) => ResumeAction::StepWithSignal(sig),
-                VContKind::ContinueWithSig(sig) => ResumeAction::ContinueWithSignal(sig),
-                VContKind::RangeStep(start, end) => {
-                    if let Some(ops) = ops.support_range_step() {
-                        match action.thread.map(|thread| thread.tid) {
-                            // An action with no thread-id matches all threads
-                            None | Some(SpecificIdKind::All) => {
-                                return Err(Error::PacketUnexpected)
-                            }
-                            Some(SpecificIdKind::WithId(tid)) => {
-                                let start = start.decode().map_err(|_| Error::TargetMismatch)?;
-                                let end = end.decode().map_err(|_| Error::TargetMismatch)?;
+            match action.kind {
+                VContKind::Continue | VContKind::ContinueWithSig(_) => {
+                    let signal = match action.kind {
+                        VContKind::ContinueWithSig(sig) => Some(sig),
+                        _ => None,
+                    };
 
-                                ops.set_resume_action_range_step(tid, start, end)
-                                    .map_err(Error::TargetError)?;
-                                continue;
-                            }
-                        };
-                    } else {
-                        return Err(Error::PacketUnexpected);
+                    match action.thread.map(|thread| thread.tid) {
+                        // An action with no thread-id matches all threads
+                        None | Some(SpecificIdKind::All) => {
+                            // Target API contract specifies that the default
+                            // resume action for all threads is continue.
+                        }
+                        Some(SpecificIdKind::WithId(tid)) => ops
+                            .set_resume_action_continue(tid, signal)
+                            .map_err(Error::TargetError)?,
                     }
+                }
+                VContKind::Step | VContKind::StepWithSig(_)
+                    if ops.support_single_step().is_some() =>
+                {
+                    let ops = ops.support_single_step().unwrap();
+
+                    let signal = match action.kind {
+                        VContKind::StepWithSig(sig) => Some(sig),
+                        _ => None,
+                    };
+
+                    match action.thread.map(|thread| thread.tid) {
+                        // An action with no thread-id matches all threads
+                        None | Some(SpecificIdKind::All) => {
+                            error!("GDB client sent 'step' as default resume action");
+                            return Err(Error::PacketUnexpected);
+                        }
+                        Some(SpecificIdKind::WithId(tid)) => {
+                            ops.set_resume_action_step(tid, signal)
+                                .map_err(Error::TargetError)?;
+                        }
+                    };
+                }
+
+                VContKind::RangeStep(start, end) if ops.support_range_step().is_some() => {
+                    let ops = ops.support_range_step().unwrap();
+
+                    match action.thread.map(|thread| thread.tid) {
+                        // An action with no thread-id matches all threads
+                        None | Some(SpecificIdKind::All) => {
+                            error!("GDB client sent 'range step' as default resume action");
+                            return Err(Error::PacketUnexpected);
+                        }
+                        Some(SpecificIdKind::WithId(tid)) => {
+                            let start = start.decode().map_err(|_| Error::TargetMismatch)?;
+                            let end = end.decode().map_err(|_| Error::TargetMismatch)?;
+
+                            ops.set_resume_action_range_step(tid, start, end)
+                                .map_err(Error::TargetError)?;
+                        }
+                    };
                 }
                 // TODO: update this case when non-stop mode is implemented
                 VContKind::Stop => return Err(Error::PacketUnexpected),
-            };
-
-            match action.thread.map(|thread| thread.tid) {
-                // An action with no thread-id matches all threads
-                None | Some(SpecificIdKind::All) => {
-                    if !matches!(resume_action, ResumeAction::Continue) {
-                        error!("GDB client sent default resume action that wasn't 'Continue'");
-                        return Err(Error::PacketUnexpected);
-                    }
-                }
-                Some(SpecificIdKind::WithId(tid)) => ops
-                    .set_resume_action(tid, resume_action)
-                    .map_err(Error::TargetError)?,
-            };
+                _ => return Err(Error::PacketUnexpected),
+            }
         }
 
         ops.resume().map_err(Error::TargetError)

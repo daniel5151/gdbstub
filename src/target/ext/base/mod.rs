@@ -20,29 +20,6 @@ pub enum BaseOps<'a, A, E> {
     MultiThread(&'a mut dyn multithread::MultiThreadOps<Arch = A, Error = E>),
 }
 
-/// Describes how the target should be resumed.
-///
-/// Due to a quirk / bug in the mainline GDB client, targets are required to
-/// handle the `WithSignal` variants of `Step` and `Continue` regardless of
-/// whether or not they have a concept of "signals".
-///
-/// If your target does not support signals (e.g: the target is a bare-metal
-/// microcontroller / emulator), the recommended behavior is to either return a
-/// target-specific fatal error, or to handle `{Step,Continue}WithSignal` the
-/// same way as their non-`WithSignal` variants.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ResumeAction {
-    /// Continue execution, stopping once a
-    /// [`StopReason`](singlethread::StopReason) occurs.
-    Continue,
-    /// Step execution.
-    Step,
-    /// Continue with signal.
-    ContinueWithSignal(u8),
-    /// Step with signal.
-    StepWithSignal(u8),
-}
-
 /// Describes the point reached in a replay log for the corresponding stop
 /// reason.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
