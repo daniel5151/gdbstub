@@ -35,6 +35,12 @@ pub enum GdbStubError<T, C> {
     /// Target didn't report any active threads when there should have been at
     /// least one running.
     NoActiveThreads,
+    /// The target has not opted into using implicit software breakpoints.
+    /// See [`Target::use_implicit_sw_breakpoints`] for more information.
+    ///
+    /// [`Target::use_implicit_sw_breakpoints`]:
+    /// crate::target::Target::use_implicit_sw_breakpoints
+    ImplicitSwBreakpoints,
 
     /// Internal - A non-fatal error occurred (with errno-style error code)
     ///
@@ -75,7 +81,9 @@ where
             TargetError(e) => write!(f, "Target threw a fatal error: {:?}", e),
             UnsupportedStopReason => write!(f, "Target responded with an unsupported stop reason."),
             NoActiveThreads => write!(f, "Target didn't report any active threads when there should have been at least one running."),
-            NonFatalError(_) => write!(f, "Internal - A non-fatal error occurred (with errno-style error code)"),
+            ImplicitSwBreakpoints => write!(f, "The target has not opted into using implicit software breakpoints. See [`Target::use_implicit_sw_breakpoints`] for more information."),
+
+            NonFatalError(_) => write!(f, "Internal non-fatal error. End users should never see this! Please file an issue if you do!"),
         }
     }
 }

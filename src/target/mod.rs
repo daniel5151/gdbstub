@@ -326,6 +326,49 @@ pub trait Target {
         true
     }
 
+    /// The target has decided not to implement an explicit software breakpoint
+    /// handler, and acknowledges that the GDB client may set "implicit"
+    /// software breakpoints within the target prior to calling `resume`.
+    ///
+    /// An "implicit" software breakpoint is set by the GDB client by manually
+    /// writing a software breakpoint instruction into target memory via the
+    /// target's `write_addrs` implementation. i.e: the GDB client will
+    /// overwrite the target's instruction stream with a software breakpoint
+    /// instruction, with the expectation that the target has a implemented a
+    /// breakpoint exception handler.
+    ///
+    /// Unfortunately, there are many `gdbstub` implementations that do _not_
+    /// implement "software breakpoints" by naively rewriting the target's
+    /// instruction stream.
+    ///
+    /// - e.g: a `gdbstub` implemented in an emulator is unlikely to implement
+    ///   "software breakpoints" by hooking into the emulated hardware's
+    ///   breakpoint handler, and would likely implement "breakpoints" by
+    ///   maintaining a list of addresses to stop at as part of its core
+    ///   interpreter loop.
+    /// - e.g: a `gdbstub` implemented in a hypervisor would require special
+    ///   coordination with the guest kernel to support software breakpoints, as
+    ///   there would need to be some way to distinguish between "in-guest"
+    ///   debugging, and "hypervisor" debugging.
+    ///
+    /// As such, `gdbstub` includes `use_implicit_sw_breakpoints` a "guard rail"
+    /// to prevent implementors from accidentally opting into this implicit
+    /// breakpoint functionality, and being exceptionally confused as to why
+    /// their target is acting weird.
+    ///
+    /// If `gdbstub` detects that the target has not implemented a software
+    /// breakpoint handler, it will check if `use_implicit_sw_breakpoints()` has
+    /// been enabled, and if it has not, it will trigger a runtime error
+    /// pointing at this very documentation.
+    ///
+    /// Targets that wish to use the GDB client's implicit software breakpoint
+    /// handler must _explicitly opt-in_ to this somewhat surprising GDB feature
+    /// by overriding this method to return `true`.
+    #[inline(always)]
+    fn use_implicit_sw_breakpoints(&self) -> bool {
+        false
+    }
+
     /// Set/Remove software breakpoints.
     #[inline(always)]
     fn breakpoints(&mut self) -> Option<ext::breakpoints::BreakpointsOps<Self>> {

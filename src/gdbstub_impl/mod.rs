@@ -463,6 +463,22 @@ pub mod state_machine {
             (GdbStubStateMachine<'a, T, C>, Option<DisconnectReason>),
             Error<T::Error, C::Error>,
         > {
+            // There isn't really a great place to put this check, but this is as good of
+            // a place as any. After all - it's guaranteed to be hit by all target
+            // implementations.
+            //
+            // Monomorphized targets should have this check entirely optimized out.
+            {
+                let support_software_breakpoints = target
+                    .breakpoints()
+                    .map(|ops| ops.sw_breakpoint().is_some())
+                    .unwrap_or(false);
+
+                if !support_software_breakpoints && !target.use_implicit_sw_breakpoints() {
+                    return Err(Error::ImplicitSwBreakpoints);
+                }
+            }
+
             let mut res = ResponseWriter::new(&mut self.conn);
             let event = match self.inner.finish_exec(&mut res, target, reason)? {
                 ext::FinishExecStatus::Handled => None,
