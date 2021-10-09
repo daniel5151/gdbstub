@@ -54,10 +54,7 @@ impl RecvPacketStateMachine {
 
         if matches!(self.state, State::Ready) {
             #[cfg(feature = "trace-pkt")]
-            trace!(
-                "<-- {}",
-                core::str::from_utf8(buf.as_slice()).unwrap_or("<invalid packet>")
-            );
+            trace!("<-- {}", String::from_utf8_lossy(buf.as_slice()));
 
             Ok(Some(packet_buffer))
         } else {
