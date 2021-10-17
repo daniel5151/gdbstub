@@ -193,7 +193,7 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
         C: ConnectionExt,
         E: gdbstub_run_blocking::BlockingEventLoop<Target = T, Connection = C>,
     {
-        let mut gdb = self.run_state_machine()?;
+        let mut gdb = self.run_state_machine(target)?;
         loop {
             gdb = match gdb {
                 GdbStubStateMachine::Pump(mut gdb) => {
@@ -270,15 +270,42 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
     /// `GdbStub` into a
     /// [`GdbStubStateMachine`](state_machine::GdbStubStateMachine) that is
     /// ready to receive data.
-    ///
-    /// Note: This method will invoke `Connection::on_session_start`, and
-    /// as such, it may return a [`GdbStubError::ConnectionRead`].
     pub fn run_state_machine(
         mut self,
+        target: &mut T,
     ) -> Result<state_machine::GdbStubStateMachine<'a, T, C>, Error<T::Error, C::Error>> {
-        self.conn
-            .on_session_start()
-            .map_err(Error::ConnectionRead)?;
+        // Check if the target hasn't explicitly opted into implicit sw breakpoints
+        {
+            let support_software_breakpoints = target
+                .breakpoints()
+                .map(|ops| ops.sw_breakpoint().is_some())
+                .unwrap_or(false);
+
+            if !support_software_breakpoints && !target.use_implicit_sw_breakpoints() {
+                return Err(Error::ImplicitSwBreakpoints);
+            }
+        }
+
+        // Check if the target supports single stepping as an optional feature
+        {
+            use crate::target::ext::base::BaseOps;
+
+            let support_single_step = match target.base_ops() {
+                BaseOps::SingleThread(ops) => ops.support_single_step().is_some(),
+                BaseOps::MultiThread(ops) => ops.support_single_step().is_some(),
+            };
+
+            if !support_single_step && !target.use_optional_single_step() {
+                return Err(Error::UnconditionalSingleStep);
+            }
+        }
+
+        // Perform any connection initialization
+        {
+            self.conn
+                .on_session_start()
+                .map_err(Error::ConnectionInit)?;
+        }
 
         Ok(state_machine::GdbStubStateMachineInner::from_plain_gdbstub(self).into())
     }
@@ -463,22 +490,6 @@ pub mod state_machine {
             (GdbStubStateMachine<'a, T, C>, Option<DisconnectReason>),
             Error<T::Error, C::Error>,
         > {
-            // There isn't really a great place to put this check, but this is as good of
-            // a place as any. After all - it's guaranteed to be hit by all target
-            // implementations.
-            //
-            // Monomorphized targets should have this check entirely optimized out.
-            {
-                let support_software_breakpoints = target
-                    .breakpoints()
-                    .map(|ops| ops.sw_breakpoint().is_some())
-                    .unwrap_or(false);
-
-                if !support_software_breakpoints && !target.use_implicit_sw_breakpoints() {
-                    return Err(Error::ImplicitSwBreakpoints);
-                }
-            }
-
             let mut res = ResponseWriter::new(&mut self.conn);
             let event = match self.inner.finish_exec(&mut res, target, reason)? {
                 ext::FinishExecStatus::Handled => None,

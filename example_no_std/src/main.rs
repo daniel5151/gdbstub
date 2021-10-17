@@ -38,7 +38,7 @@ fn rust_main() -> Result<(), i32> {
 
     print_str("Starting GDB session...");
 
-    let mut gdb = gdb.run_state_machine().map_err(|_| 1)?;
+    let mut gdb = gdb.run_state_machine(&mut target).map_err(|_| 1)?;
 
     let res = loop {
         gdb = match gdb {

@@ -461,5 +461,13 @@ mod custom_arch {
         fn target_description_xml() -> Option<&'static str> {
             Some("never gets returned")
         }
+
+        // armv4t supports optional single stepping.
+        //
+        // notably, x86 is an example of an arch that does _not_ support
+        // optional single stepping.
+        fn supports_optional_single_step() -> bool {
+            true
+        }
     }
 }

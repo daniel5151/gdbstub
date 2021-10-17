@@ -507,7 +507,11 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             }
             // TODO: update this case when non-stop mode is implemented
             VContKind::Stop => Err(Error::PacketUnexpected),
-            _ => Err(Error::PacketUnexpected),
+
+            // Instead of using `_ =>`, explicitly list out any remaining unguarded cases.
+            VContKind::RangeStep(..) | VContKind::Step | VContKind::StepWithSig(..) => {
+                Err(Error::PacketUnexpected)
+            }
         }
     }
 
@@ -588,7 +592,11 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 }
                 // TODO: update this case when non-stop mode is implemented
                 VContKind::Stop => return Err(Error::PacketUnexpected),
-                _ => return Err(Error::PacketUnexpected),
+
+                // Instead of using `_ =>`, explicitly list out any remaining unguarded cases.
+                VContKind::RangeStep(..) | VContKind::Step | VContKind::StepWithSig(..) => {
+                    return Err(Error::PacketUnexpected)
+                }
             }
         }
 

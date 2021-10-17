@@ -156,4 +156,56 @@ pub trait Arch {
     fn target_description_xml() -> Option<&'static str> {
         None
     }
+
+    /// Return `true` if the mainline GDB client implementation respects
+    /// optional single stepping for this architecture.
+    ///
+    /// # Context
+    ///
+    /// According to the spec, GDB _should_ treat single stepping as an optional
+    /// feature for _all_ architectures, as single stepping can be emulated
+    /// using temporary breakpoints + regular "continue" resumption.
+    ///
+    /// Unfortunately, it seems that on certain architectures, GDB
+    /// _unconditionally_ assumes single-step support, regardless whether or not
+    /// the target implements supports it.
+    ///
+    /// This is a bug, and has been reported at
+    /// https://sourceware.org/bugzilla/show_bug.cgi?id=28440
+    ///
+    /// Unfortunately, even if this bug is fixed, it will be quite a while until
+    /// the typical user's distro-provided GDB client includes this bugfix, and
+    /// as such, `gdbstub` has included an extra "guard rail" to detect
+    /// instances of this bug, and provide an explanation to the user.
+    ///
+    /// # Implementation
+    ///
+    /// To check whether or not a particular architecture exhibits this
+    /// behavior, an implementation should temporarily override this method to
+    /// return `true`, and observe the behavior of the GDB client after invoking
+    /// `stepi`.
+    ///
+    /// If the client sends a `vCont` packet with a `s` resume action, then this
+    /// architecture _does not_ support optional single stepping, and this
+    /// method should return `false`.
+    ///
+    /// If the client instead attempts to set a temporary breakpoint (using the
+    /// `z` packet), and sends a `vCont` packet with a `c` resume action, then
+    /// this architecture _does_ support optional single stepping, and this
+    /// method should return `true`.
+    ///
+    /// # Default implementation
+    ///
+    /// This method includes a default implementation that returns `false`.
+    ///
+    /// **If you are using an architecture that does not yet include an explicit
+    /// `supports_optional_single_step` implementation, please consider checking
+    /// if optional single stepping is supported by that arch, and upstreaming
+    /// an explicit implementation!**
+    ///
+    /// Even if that implementation also returns `false`, it would help in
+    /// documenting which architectures are affected by this bug.
+    fn supports_optional_single_step() -> bool {
+        false
+    }
 }
