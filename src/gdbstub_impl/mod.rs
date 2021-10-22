@@ -86,8 +86,8 @@ pub mod gdbstub_run_blocking {
         /// `None` if the interrupt should be ignored.
         ///
         /// _Suggestion_: If you're unsure which stop reason you should report,
-        /// [`ThreadStopReason::Signal(5)`](ThreadStopReason::Signal)
-        /// (i.e: SIGTRAP) is a reasonable default.
+        /// [`ThreadStopReason::Signal(2)`](ThreadStopReason::Signal)
+        /// (i.e: SIGINT) is a sensible default.
         ///
         /// # Single threaded targets
         ///
@@ -196,62 +196,38 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
         let mut gdb = self.run_state_machine(target)?;
         loop {
             gdb = match gdb {
-                GdbStubStateMachine::Pump(mut gdb) => {
+                GdbStubStateMachine::Idle(mut gdb) => {
                     // needs more data, so perform a blocking read on the connection
                     let byte = gdb.borrow_conn().read().map_err(Error::ConnectionRead)?;
-
-                    let (gdb, disconnect_reason) = gdb.pump(target, byte)?;
-
-                    if let Some(disconnect_reason) = disconnect_reason {
-                        break Ok(disconnect_reason);
-                    }
-
-                    gdb
+                    gdb.incoming_data(target, byte)?
                 }
 
-                GdbStubStateMachine::DeferredStopReason(mut gdb) => {
+                GdbStubStateMachine::Disconnected(gdb) => {
+                    // run_blocking keeps things simple, and doesn't expose a way to re-use the
+                    // state machine
+                    break Ok(gdb.get_reason());
+                }
+
+                GdbStubStateMachine::CtrlCInterrupt(gdb) => {
+                    // defer to the implementation on how it wants to handle the interrupt
+                    let stop_reason = E::on_interrupt(target).map_err(Error::TargetError)?;
+                    gdb.interrupt_handled(target, stop_reason)?
+                }
+
+                GdbStubStateMachine::Running(mut gdb) => {
                     use gdbstub_run_blocking::{
                         Event as BlockingEventLoopEvent, WaitForStopReasonError,
                     };
-                    use state_machine::Event;
 
                     // block waiting for the target to return a stop reason
                     let event = E::wait_for_stop_reason(target, gdb.borrow_conn());
                     match event {
                         Ok(BlockingEventLoopEvent::TargetStopped(stop_reason)) => {
-                            match gdb.deferred_stop_reason(target, stop_reason)? {
-                                (_, Some(disconnect_reason)) => break Ok(disconnect_reason),
-                                (gdb, None) => gdb,
-                            }
+                            gdb.report_stop(target, stop_reason)?
                         }
 
                         Ok(BlockingEventLoopEvent::IncomingData(byte)) => {
-                            let (gdb, event) = gdb.pump(target, byte)?;
-
-                            match event {
-                                Event::None => gdb.into(),
-                                Event::Disconnect(disconnect_reason) => {
-                                    break Ok(disconnect_reason)
-                                }
-                                Event::CtrlCInterrupt => {
-                                    // defer to the implementation on how it wants to handle the
-                                    // interrupt...
-                                    let stop_reason =
-                                        E::on_interrupt(target).map_err(Error::TargetError)?;
-                                    // if the target wants to handle the interrupt, report the
-                                    // stop reason
-                                    if let Some(stop_reason) = stop_reason {
-                                        match gdb.deferred_stop_reason(target, stop_reason)? {
-                                            (_, Some(disconnect_reason)) => {
-                                                break Ok(disconnect_reason)
-                                            }
-                                            (gdb, None) => gdb,
-                                        }
-                                    } else {
-                                        gdb.into()
-                                    }
-                                }
-                            }
+                            gdb.incoming_data(target, byte)?
                         }
 
                         Err(WaitForStopReasonError::Target(e)) => {
@@ -321,8 +297,7 @@ pub mod state_machine {
 
     use crate::protocol::recv_packet::RecvPacketStateMachine;
 
-    /// State-machine interface to `GdbStub`, supporting advanced features such
-    /// as deferred stop reasons and incremental packet processing.
+    /// State-machine interface to `GdbStub`.
     ///
     /// See the [module level documentation](self) for more details.
     pub enum GdbStubStateMachine<'a, T, C>
@@ -332,47 +307,72 @@ pub mod state_machine {
     {
         /// The target is completely stopped, and the GDB stub is waiting for
         /// additional input.
-        Pump(GdbStubStateMachineInner<'a, state::Pump, T, C>),
+        Idle(GdbStubStateMachineInner<'a, state::Idle<T>, T, C>),
         /// The target is currently running, and the GDB client is waiting for
         /// the target to report a stop reason.
         ///
         /// Note that the client may still send packets to the target
         /// (e.g: to trigger a Ctrl-C interrupt).
-        DeferredStopReason(GdbStubStateMachineInner<'a, state::DeferredStopReason, T, C>),
+        Running(GdbStubStateMachineInner<'a, state::Running, T, C>),
+        /// The GDB client has sent a Ctrl-C interrupt to the target.
+        CtrlCInterrupt(GdbStubStateMachineInner<'a, state::CtrlCInterrupt, T, C>),
+        /// The GDB client has disconnected.
+        Disconnected(GdbStubStateMachineInner<'a, state::Disconnected, T, C>),
     }
 
-    /// Zero-sized typestates.
+    /// State machine typestates.
     ///
     /// The types in this module are used to parameterize instances of
     /// `GdbStubStateMachineInner`, thereby enforcing that certain API methods
     /// can only be called while the stub is in a certain state.
     pub mod state {
-        /// ZST typestate corresponding to the "Pump" state.
-        pub enum Pump {}
+        use super::*;
 
-        /// ZST typestate corresponding to the "DeferredStopReason" state.
-        pub enum DeferredStopReason {}
+        /// Typestate corresponding to the "Idle" state.
+        #[non_exhaustive]
+        pub struct Idle<T: Target> {
+            pub(crate) deferred_ctrlc_stop_reason:
+                Option<ThreadStopReason<<<T as Target>::Arch as Arch>::Usize>>,
+        }
+
+        /// Typestate corresponding to the "Running" state.
+        #[non_exhaustive]
+        pub struct Running {}
+
+        /// Typestate corresponding to the "CtrlCInterrupt" state.
+        #[non_exhaustive]
+        pub struct CtrlCInterrupt {
+            pub(crate) from_idle: bool,
+        }
+
+        /// Typestate corresponding to the "Disconnected" state.
+        #[non_exhaustive]
+        pub struct Disconnected {
+            pub(crate) reason: DisconnectReason,
+        }
     }
 
     /// Internal helper macro to convert between a particular inner state into
     /// its corresponding `GdbStubStateMachine` variant.
     macro_rules! impl_from_inner {
-        ($state:ident) => {
-            impl<'a, T, C> From<GdbStubStateMachineInner<'a, state::$state, T, C>>
+        ($state:ident $($tt:tt)*) => {
+            impl<'a, T, C> From<GdbStubStateMachineInner<'a, state::$state $($tt)*, T, C>>
                 for GdbStubStateMachine<'a, T, C>
             where
                 T: Target,
                 C: Connection,
             {
-                fn from(inner: GdbStubStateMachineInner<'a, state::$state, T, C>) -> Self {
+                fn from(inner: GdbStubStateMachineInner<'a, state::$state $($tt)*, T, C>) -> Self {
                     GdbStubStateMachine::$state(inner)
                 }
             }
         };
     }
 
-    impl_from_inner!(Pump);
-    impl_from_inner!(DeferredStopReason);
+    impl_from_inner!(Idle<T>);
+    impl_from_inner!(Running);
+    impl_from_inner!(CtrlCInterrupt);
+    impl_from_inner!(Disconnected);
 
     /// Internal helper trait to cut down on boilerplate required to transition
     /// between states.
@@ -381,7 +381,7 @@ pub mod state_machine {
         T: Target,
         C: Connection,
     {
-        fn transition<S>(self) -> GdbStubStateMachineInner<'a, S, T, C>;
+        fn transition<S>(self, state: S) -> GdbStubStateMachineInner<'a, S, T, C>;
     }
 
     impl<'a, S1, T, C> Transition<'a, T, C> for GdbStubStateMachineInner<'a, S1, T, C>
@@ -390,13 +390,18 @@ pub mod state_machine {
         C: Connection,
     {
         #[inline(always)]
-        fn transition<S>(self) -> GdbStubStateMachineInner<'a, S, T, C> {
+        fn transition<S>(self, state: S) -> GdbStubStateMachineInner<'a, S, T, C> {
+            log::trace!(
+                "transitioning from {:?} to {:?}",
+                core::any::type_name::<S1>(),
+                core::any::type_name::<S>()
+            );
             GdbStubStateMachineInner {
                 conn: self.conn,
                 packet_buffer: self.packet_buffer,
                 recv_packet: self.recv_packet,
                 inner: self.inner,
-                _state: PhantomData,
+                state,
             }
         }
     }
@@ -409,7 +414,8 @@ pub mod state_machine {
         packet_buffer: ManagedSlice<'a, u8>,
         recv_packet: RecvPacketStateMachine,
         inner: GdbStubImpl<T, C>,
-        _state: PhantomData<S>,
+
+        state: S,
     }
 
     /// Methods which can be called regardless of the current state.
@@ -420,56 +426,63 @@ pub mod state_machine {
         }
     }
 
-    /// Methods which can only be called from the [`GdbStubStateMachine::Pump`]
+    /// Methods which can only be called from the [`GdbStubStateMachine::Idle`]
     /// state.
-    impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::Pump, T, C> {
+    impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::Idle<T>, T, C> {
+        /// Internal entrypoint into the state machine.
         pub(crate) fn from_plain_gdbstub(
             stub: GdbStub<'a, T, C>,
-        ) -> GdbStubStateMachineInner<'a, state::Pump, T, C> {
+        ) -> GdbStubStateMachineInner<'a, state::Idle<T>, T, C> {
             GdbStubStateMachineInner {
                 conn: stub.conn,
                 packet_buffer: stub.packet_buffer,
                 recv_packet: RecvPacketStateMachine::new(),
                 inner: stub.inner,
-                _state: PhantomData,
+                state: state::Idle {
+                    deferred_ctrlc_stop_reason: None,
+                },
             }
         }
 
         /// Pass a byte to the GDB stub.
-        pub fn pump(
+        pub fn incoming_data(
             mut self,
             target: &mut T,
             byte: u8,
-        ) -> Result<
-            (GdbStubStateMachine<'a, T, C>, Option<DisconnectReason>),
-            Error<T::Error, C::Error>,
-        > {
+        ) -> Result<GdbStubStateMachine<'a, T, C>, Error<T::Error, C::Error>> {
             let packet_buffer = match self.recv_packet.pump(&mut self.packet_buffer, byte)? {
                 Some(buf) => buf,
-                None => return Ok((self.into(), None)),
+                None => return Ok(self.into()),
             };
 
             let packet = Packet::from_buf(target, packet_buffer).map_err(Error::PacketParse)?;
             let state = self.inner.handle_packet(target, &mut self.conn, packet)?;
-            match state {
-                State::Pump => Ok((self.into(), None)),
-                State::Disconnect(reason) => Ok((self.into(), Some(reason))),
+            Ok(match state {
+                State::Pump => self.into(),
+                State::Disconnect(reason) => self.transition(state::Disconnected { reason }).into(),
                 State::DeferredStopReason => {
-                    Ok((self.transition::<state::DeferredStopReason>().into(), None))
+                    match self.state.deferred_ctrlc_stop_reason {
+                        // if we were interrupted while idle, immediately report the deferred stop
+                        // reason after transitioning into the running state
+                        Some(reason) => {
+                            return self
+                                .transition(state::Running {})
+                                .report_stop(target, reason)
+                        }
+                        // otherwise, just transition into the running state as usual
+                        None => self.transition(state::Running {}).into(),
+                    }
                 }
-                // This arm will never get hit, as client will only ever send interrupt packets when
-                // the target is running.
-                State::CtrlCInterrupt => {
-                    log::error!("Unexpected interrupt packet!");
-                    Err(Error::PacketUnexpected)
-                }
-            }
+                State::CtrlCInterrupt => self
+                    .transition(state::CtrlCInterrupt { from_idle: true })
+                    .into(),
+            })
         }
     }
 
     /// Methods which can only be called from the
-    /// [`GdbStubStateMachine::DeferredStopReason`] state.
-    impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::DeferredStopReason, T, C> {
+    /// [`GdbStubStateMachine::Running`] state.
+    impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::Running, T, C> {
         /// Report a target stop reason back to GDB.
         ///
         /// # Single threaded targets
@@ -482,76 +495,119 @@ pub mod state_machine {
         ///
         /// In the future, this API might be changed to avoid exposing this
         /// internal implementation detail.
-        pub fn deferred_stop_reason(
+        pub fn report_stop(
             mut self,
             target: &mut T,
             reason: ThreadStopReason<<T::Arch as Arch>::Usize>,
-        ) -> Result<
-            (GdbStubStateMachine<'a, T, C>, Option<DisconnectReason>),
-            Error<T::Error, C::Error>,
-        > {
+        ) -> Result<GdbStubStateMachine<'a, T, C>, Error<T::Error, C::Error>> {
             let mut res = ResponseWriter::new(&mut self.conn);
-            let event = match self.inner.finish_exec(&mut res, target, reason)? {
-                ext::FinishExecStatus::Handled => None,
-                ext::FinishExecStatus::Disconnect(reason) => Some(reason),
-            };
+            let event = self.inner.finish_exec(&mut res, target, reason)?;
             res.flush()?;
 
-            Ok((self.transition::<state::Pump>().into(), event))
+            Ok(match event {
+                ext::FinishExecStatus::Handled => self
+                    .transition(state::Idle {
+                        deferred_ctrlc_stop_reason: None,
+                    })
+                    .into(),
+                ext::FinishExecStatus::Disconnect(reason) => {
+                    self.transition(state::Disconnected { reason }).into()
+                }
+            })
         }
 
         /// Pass a byte to the GDB stub.
         ///
-        /// NOTE: unlike the `pump` method in the `state::Pump` state, this
-        /// method does not perform any state transitions, and will  return a
-        /// `GdbStubStateMachineInner` in the `state::DeferredStopReason` state.
-        pub fn pump(
+        /// NOTE: unlike the `incoming_data` method in the `state::Idle` state,
+        /// this method does not perform any state transitions, and will
+        /// return a `GdbStubStateMachineInner` in the `state::Running`
+        /// state.
+        pub fn incoming_data(
             mut self,
             target: &mut T,
             byte: u8,
-        ) -> Result<(Self, Event), Error<T::Error, C::Error>> {
+        ) -> Result<GdbStubStateMachine<'a, T, C>, Error<T::Error, C::Error>> {
             let packet_buffer = match self.recv_packet.pump(&mut self.packet_buffer, byte)? {
                 Some(buf) => buf,
-                None => return Ok((self, Event::None)),
+                None => return Ok(self.into()),
             };
 
             let packet = Packet::from_buf(target, packet_buffer).map_err(Error::PacketParse)?;
             let state = self.inner.handle_packet(target, &mut self.conn, packet)?;
-            match state {
-                State::Pump => Ok((self, Event::None)),
-                State::Disconnect(reason) => Ok((self, Event::Disconnect(reason))),
-                State::DeferredStopReason => Ok((self, Event::None)),
-                State::CtrlCInterrupt => Ok((self, Event::CtrlCInterrupt)),
+            Ok(match state {
+                State::Pump => self.transition(state::Running {}).into(),
+                State::Disconnect(reason) => self.transition(state::Disconnected { reason }).into(),
+                State::DeferredStopReason => self.transition(state::Running {}).into(),
+                State::CtrlCInterrupt => self
+                    .transition(state::CtrlCInterrupt { from_idle: false })
+                    .into(),
+            })
+        }
+    }
+
+    /// Methods which can only be called from the
+    /// [`GdbStubStateMachine::CtrlCInterrupt`] state.
+    impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::CtrlCInterrupt, T, C> {
+        /// The target has acknowledged the clients Ctrl-C interrupt, and taken
+        /// any appropriate actions to fulfil the interrupt request.
+        ///
+        /// Some notes on handling Ctrl-C interrupts:
+        ///
+        /// - Stubs are not required to recognize these interrupt mechanisms,
+        ///   and the precise meaning associated with receipt of the interrupt
+        ///   is implementation defined.
+        ///   - Passing `None` as the `stop_reason` will ignore the Ctrl-C
+        ///     interrupt, and return the state machine to whatever state it was
+        ///     in before being interrupted.
+        /// - If the target supports debugging of multiple threads and/or
+        ///   processes, it should attempt to interrupt all currently-executing
+        ///   threads and processes.
+        /// - If the stub is successful at interrupting the running program, it
+        ///   should send one of the stop reply packets (see Stop Reply Packets)
+        ///   to GDB as a result of successfully stopping the program
+        pub fn interrupt_handled(
+            self,
+            target: &mut T,
+            stop_reason: Option<ThreadStopReason<<T::Arch as Arch>::Usize>>,
+        ) -> Result<GdbStubStateMachine<'a, T, C>, Error<T::Error, C::Error>> {
+            if self.state.from_idle {
+                // target is stopped - we cannot report the stop reason yet
+                Ok(self
+                    .transition(state::Idle {
+                        deferred_ctrlc_stop_reason: stop_reason,
+                    })
+                    .into())
+            } else {
+                // target is running - we can immediately report the stop reason
+                match stop_reason {
+                    Some(reason) => self
+                        .transition(state::Running {})
+                        .report_stop(target, reason),
+                    None => Ok(self
+                        .transition(state::Idle {
+                            deferred_ctrlc_stop_reason: None,
+                        })
+                        .into()),
+                }
             }
         }
     }
 
-    /// Events which may occur after calling `pump()` on a
-    /// [`GdbStubStateMachine::DeferredStopReason`].
-    pub enum Event {
-        /// Nothing happened.
-        None,
-        /// The client has triggered a disconnect.
-        Disconnect(DisconnectReason),
-        /// The client has sent a Ctrl-C interrupt.
-        ///
-        /// Please note the following GDB docs:
-        ///
-        /// > Stubs are not required to recognize these interrupt mechanisms and
-        /// the precise meaning associated with receipt of the interrupt is
-        /// implementation defined.
-        /// >
-        /// > If the target supports debugging of multiple threads and/or
-        /// processes, it should attempt to interrupt all currently-executing
-        /// threads and processes. If the stub is successful at interrupting the
-        /// running program, it should send one of the stop reply packets (see
-        /// Stop Reply Packets) to GDB as a result of successfully stopping the
-        /// program in all-stop mode, and a stop reply for each stopped thread
-        /// in non-stop mode.
-        /// >
-        /// > Interrupts received while the program is stopped are queued and
-        /// the program will be interrupted when it is resumed next time.
-        CtrlCInterrupt,
+    /// Methods which can only be called from the
+    /// [`GdbStubStateMachine::Disconnected`] state.
+    impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::Disconnected, T, C> {
+        /// Inspect why the GDB client disconnected.
+        pub fn get_reason(&self) -> DisconnectReason {
+            self.state.reason
+        }
+
+        /// Reuse the existing state machine instance, reentering the idle loop.
+        pub fn return_to_idle(self) -> GdbStubStateMachine<'a, T, C> {
+            self.transition(state::Idle {
+                deferred_ctrlc_stop_reason: None,
+            })
+            .into()
+        }
     }
 }
 

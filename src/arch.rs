@@ -119,7 +119,7 @@ impl BreakpointKind for usize {
 /// explicitly instantiated.
 pub trait Arch {
     /// The architecture's pointer size (e.g: `u32` on a 32-bit system).
-    type Usize: FromPrimitive + PrimInt + Unsigned + BeBytes + LeBytes;
+    type Usize: Debug + FromPrimitive + PrimInt + Unsigned + BeBytes + LeBytes;
 
     /// The architecture's register file. See [`Registers`] for more details.
     type Registers: Registers<ProgramCounter = Self::Usize>;

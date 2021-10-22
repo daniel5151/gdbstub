@@ -42,22 +42,26 @@ fn rust_main() -> Result<(), i32> {
 
     let res = loop {
         gdb = match gdb {
-            GdbStubStateMachine::Pump(mut gdb) => {
+            GdbStubStateMachine::Idle(mut gdb) => {
                 let byte = gdb.borrow_conn().read().map_err(|_| 1)?;
-                match gdb.pump(&mut target, byte) {
-                    Ok((_, Some(disconnect_reason))) => break Ok(disconnect_reason),
-                    Ok((gdb, None)) => gdb,
+                match gdb.incoming_data(&mut target, byte) {
+                    Ok(gdb) => gdb,
                     Err(e) => break Err(e),
                 }
             }
-
-            GdbStubStateMachine::DeferredStopReason(gdb) => {
-                match gdb.deferred_stop_reason(&mut target, ThreadStopReason::DoneStep) {
-                    Ok((_, Some(disconnect_reason))) => break Ok(disconnect_reason),
-                    Ok((gdb, None)) => gdb,
+            GdbStubStateMachine::Running(gdb) => {
+                match gdb.report_stop(&mut target, ThreadStopReason::DoneStep) {
+                    Ok(gdb) => gdb,
                     Err(e) => break Err(e),
                 }
             }
+            GdbStubStateMachine::CtrlCInterrupt(gdb) => {
+                match gdb.interrupt_handled(&mut target, None) {
+                    Ok(gdb) => gdb,
+                    Err(e) => break Err(e),
+                }
+            }
+            GdbStubStateMachine::Disconnected(gdb) => break Ok(gdb.get_reason()),
         }
     };
 
