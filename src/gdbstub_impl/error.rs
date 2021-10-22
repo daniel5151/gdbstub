@@ -22,7 +22,7 @@ pub enum GdbStubError<T, C> {
     /// Could not parse the packet into a valid command.
     PacketParse(PacketParseError),
     /// GDB client sent an unexpected packet. This should never happen!
-    /// Please file an issue at https://github.com/daniel5151/gdbstub/issues
+    /// Please file an issue at <https://github.com/daniel5151/gdbstub/issues>
     PacketUnexpected,
     /// GDB client sent a packet with too much data for the given target.
     TargetMismatch,
@@ -50,7 +50,7 @@ pub enum GdbStubError<T, C> {
     ///
     /// If you encountered this error while using an `Arch` implementation
     /// defined in `gdbstub_arch` and believe this is incorrect, please file an
-    /// issue at https://github.com/daniel5151/gdbstub/issues.
+    /// issue at <https://github.com/daniel5151/gdbstub/issues>.
     ///
     /// [`Target::use_optional_single_step`]:
     /// crate::target::Target::use_optional_single_step

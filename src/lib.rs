@@ -99,32 +99,34 @@
 //!
 //! Cool, but how do you actually start the debugging session?
 //!
-//! ### `GdbStub::run`: The quick and easy way to get up and running with
-//! `gdbstub`
+//! ### `GdbStub::run_blocking`: The quick and easy way to get up and running
+//! with `gdbstub`
 //!
 //! TODO: MORE DOCS
+// use an explicit doc attribute to avoid automatic rustfmt wrapping
+#![doc = "### `GdbStubStateMachine`: Driving `gdbstub` in an async event loop / via interrupt handlers"]
 //!
-//! ### `GdbStubStateMachine`: Driving `gdbstub` in an async event loop / via
-//! interrupt handlers
-//!
-//! `GdbStub::run` requires that the target implement the
-//! [`TargetRun`](gdbstub_run::TargetRun) trait, which consists of a handful of
-//! _blocking_ methods. Blocking the thread is a totally reasonable approach in
-//! most implementations, as one can simply spin up a separate thread to run the
-//! GDB stub (or in certain emulator implementations, run the emulator as part
-//! of the `wait_for_stop_reason` method).
+//! `GdbStub::run_blocking` requires that the target implement the
+//! [`BlockingEventLoop`](crate::gdbstub_run_blocking::BlockingEventLoop) trait,
+//! which as the name implies, uses _blocking_ IO when handling certain events.
+//! Blocking the thread is a totally reasonable approach in most
+//! implementations, as one can simply spin up a separate thread to run the GDB
+//! stub (or in certain emulator implementations, run the emulator as part of
+//! the `wait_for_stop_reason` method).
 //!
 //! Unfortunately, this blocking behavior can be a non-starter when integrating
 //! `gdbstub` in projects that don't support / wish to avoid the traditional
 //! thread-based execution model, such as projects using `async/await`, or
 //! bare-metal, `no_std` projects running on embedded hardware.
 //!
-//! In these cases, `gdbstub` provides the
-//! [`GdbStubStateMachine`](state_machine::GdbStubStateMachine) API, which lifts
-//! the GDB stub "event loop" out of `GdbStub::run`. This API realies on
-//! the implementation calling various lifecycle methods whenever new data
-//! becomes available (e.g: when a UART interrupt handler receives a byte, when
-//! the target hits a breakpoint, etc...)
+//! In these cases, `gdbstub` provides access to the underlying
+//! [`GdbStubStateMachine`](state_machine::GdbStubStateMachine) API, which gives
+//! implementations full control over the GDB stub's "event loop". This API
+//! requires implementations to "push" data to the `gdbstub` implementation
+//! whenever new data becomes available (e.g: when a UART interrupt handler
+//! receives a byte, when the target hits a breakpoint, etc...), as opposed to
+//! the `GdbStub::run_blocking` API, which "pulls" these events in a blocking
+//! manner.
 //!
 //! TODO: MORE DOCS
 //!

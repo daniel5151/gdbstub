@@ -105,7 +105,7 @@ pub enum FsKind {
 /// Errno values for Host I/O operations.
 ///
 /// Extracted from the GDB documentation at
-/// [Errno Values]: https://sourceware.org/gdb/onlinedocs/gdb/Errno-Values.html
+/// <https://sourceware.org/gdb/onlinedocs/gdb/Errno-Values.html>
 #[derive(Debug)]
 pub enum HostIoErrno {
     /// Operation not permitted (POSIX.1-2001).
@@ -165,11 +165,12 @@ pub enum HostIoError<E> {
     /// A target-specific fatal error.
     ///
     /// **WARNING:** Returning this error will immediately halt the target's
-    /// execution and return a `GdbStubError::TargetError` from `GdbStub::run`!
+    /// execution and return a `GdbStubError::TargetError`!
     ///
-    /// Note that the debugging session will will _not_ be terminated, and can
-    /// be resumed by calling `GdbStub::run` after resolving the error and/or
-    /// setting up a post-mortem debugging environment.
+    /// Note that returning this error will _not_ notify the GDB client that the
+    /// debugging session has been terminated, making it possible to resume
+    /// execution after resolving the error and/or setting up a post-mortem
+    /// debugging environment.
     Fatal(E),
 }
 

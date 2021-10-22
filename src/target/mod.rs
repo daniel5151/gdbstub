@@ -239,11 +239,12 @@ pub enum TargetError<E> {
     /// A target-specific fatal error.
     ///
     /// **WARNING:** Returning this error will immediately halt the target's
-    /// execution and return a `GdbStubError::TargetError` from `GdbStub::run`!
+    /// execution and return a `GdbStubError::TargetError`!
     ///
-    /// Note that the debugging session will will _not_ be terminated, and can
-    /// be resumed by calling `GdbStub::run` after resolving the error and/or
-    /// setting up a post-mortem debugging environment.
+    /// Note that returning this error will _not_ notify the GDB client that the
+    /// debugging session has been terminated, making it possible to resume
+    /// execution after resolving the error and/or setting up a post-mortem
+    /// debugging environment.
     Fatal(E),
 }
 

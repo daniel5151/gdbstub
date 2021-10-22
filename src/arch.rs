@@ -171,7 +171,7 @@ pub trait Arch {
     /// the target implements supports it.
     ///
     /// This is a bug, and has been reported at
-    /// https://sourceware.org/bugzilla/show_bug.cgi?id=28440
+    /// <https://sourceware.org/bugzilla/show_bug.cgi?id=28440>
     ///
     /// Unfortunately, even if this bug is fixed, it will be quite a while until
     /// the typical user's distro-provided GDB client includes this bugfix, and

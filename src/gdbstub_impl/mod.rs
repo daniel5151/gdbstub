@@ -36,14 +36,14 @@ pub enum DisconnectReason {
     Kill,
 }
 
-/// Types and traits related to the [`GdbStub::run`] interface.
+/// Types and traits related to the [`GdbStub::run_blocking`] interface.
 pub mod gdbstub_run_blocking {
     use super::*;
 
     use crate::connection::ConnectionExt;
 
     /// A set of user-provided methods required to run a GDB debugging session
-    /// using the [`GdbStub::run`](super::GdbStub::run) method.
+    /// using the [`GdbStub::run_blocking`] method.
     ///
     /// Reminder: to use `gdbstub` in a non-blocking manner (e.g: via
     /// async/await, unix polling, from an interrupt handler, etc...) you will
@@ -107,20 +107,8 @@ pub mod gdbstub_run_blocking {
         >;
     }
 
-    /// Exnteds [`Target`] with a few additional methods required by the
-    /// `GdbStub::run` method.
-    ///
-    /// If you are interested in using `gdbstub` without blocking (e.g: via
-    /// async/await, unix polling, from an interrupt handler, etc...) you'll
-    /// need to interface with the
-    /// [`GdbStubStateMachine`](super::GdbStubStateMachine) API directly.
-    pub trait TargetRun: Target {
-        /// Connection being used to drive the target.
-        type Connection: ConnectionExt;
-    }
-
     /// Returned by the `wait_for_stop_reason` closure in
-    /// [`GdbStub::run`](super::GdbStub::run)
+    /// [`GdbStub::run_blocking`]
     pub enum Event<U> {
         /// GDB Client sent data while the target was running.
         IncomingData(u8),
@@ -129,7 +117,7 @@ pub mod gdbstub_run_blocking {
     }
 
     /// Error value returned by the `wait_for_stop_reason` closure in
-    /// [`GdbStub::run`](super::GdbStub::run)
+    /// [`GdbStub::run_blocking`]
     pub enum WaitForStopReasonError<T, C> {
         /// A fatal target error has occurred.
         Target(T),
@@ -177,8 +165,8 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
     /// [`gdbstub_run_blocking::BlockingEventLoop`], which is a simplified set
     /// of methods describing how to drive the target.
     ///
-    /// `GdbStub::run` returns once the GDB client closes the debugging session,
-    /// or if the target halts.
+    /// `GdbStub::run_blocking` returns once the GDB client closes the debugging
+    /// session, or if the target triggers a disconnect.
     ///
     /// Note that this implementation is **blocking**, which many not be
     /// preferred (or suitable) in all cases. To use `gdbstub` in a non-blocking
@@ -328,6 +316,9 @@ pub mod state_machine {
     pub mod state {
         use super::*;
 
+        // used internally when logging state transitions
+        pub(crate) const MODULE_PATH: &str = concat!(module_path!(), "::");
+
         /// Typestate corresponding to the "Idle" state.
         #[non_exhaustive]
         pub struct Idle<T: Target> {
@@ -381,7 +372,8 @@ pub mod state_machine {
         T: Target,
         C: Connection,
     {
-        fn transition<S>(self, state: S) -> GdbStubStateMachineInner<'a, S, T, C>;
+        /// Transition between different state machine states
+        fn transition<S2>(self, state: S2) -> GdbStubStateMachineInner<'a, S2, T, C>;
     }
 
     impl<'a, S1, T, C> Transition<'a, T, C> for GdbStubStateMachineInner<'a, S1, T, C>
@@ -390,31 +382,35 @@ pub mod state_machine {
         C: Connection,
     {
         #[inline(always)]
-        fn transition<S>(self, state: S) -> GdbStubStateMachineInner<'a, S, T, C> {
-            log::trace!(
-                "transitioning from {:?} to {:?}",
-                core::any::type_name::<S1>(),
-                core::any::type_name::<S>()
-            );
-            GdbStubStateMachineInner {
-                conn: self.conn,
-                packet_buffer: self.packet_buffer,
-                recv_packet: self.recv_packet,
-                inner: self.inner,
-                state,
+        fn transition<S2>(self, state: S2) -> GdbStubStateMachineInner<'a, S2, T, C> {
+            if log::log_enabled!(log::Level::Trace) {
+                let s1 = core::any::type_name::<S1>();
+                let s2 = core::any::type_name::<S2>();
+                log::trace!(
+                    "transition: {:?} --> {:?}",
+                    s1.strip_prefix(state::MODULE_PATH).unwrap_or(s1),
+                    s2.strip_prefix(state::MODULE_PATH).unwrap_or(s2)
+                );
             }
+            GdbStubStateMachineInner { i: self.i, state }
         }
     }
 
-    /// Core state machine implementation which is parameterized by various
-    /// [states](state). Can be converted back into the appropriate
-    /// [`GdbStubStateMachine`] variant via [`Into::into`].
-    pub struct GdbStubStateMachineInner<'a, S, T: Target, C: Connection> {
+    // split off `GdbStubStateMachineInner`'s non state-dependant data into separate
+    // struct for code bloat optimization (i.e: `transition` will generate better
+    // code when the struct is cleaved this way).
+    struct GdbStubStateMachineReallyInner<'a, T: Target, C: Connection> {
         conn: C,
         packet_buffer: ManagedSlice<'a, u8>,
         recv_packet: RecvPacketStateMachine,
         inner: GdbStubImpl<T, C>,
+    }
 
+    /// Core state machine implementation that is parameterized by various
+    /// [states](state). Can be converted back into the appropriate
+    /// [`GdbStubStateMachine`] variant via [`Into::into`].
+    pub struct GdbStubStateMachineInner<'a, S, T: Target, C: Connection> {
+        i: GdbStubStateMachineReallyInner<'a, T, C>,
         state: S,
     }
 
@@ -422,7 +418,7 @@ pub mod state_machine {
     impl<'a, S, T: Target, C: Connection> GdbStubStateMachineInner<'a, S, T, C> {
         /// Return a mutable reference to the underlying connection.
         pub fn borrow_conn(&mut self) -> &mut C {
-            &mut self.conn
+            &mut self.i.conn
         }
     }
 
@@ -434,10 +430,12 @@ pub mod state_machine {
             stub: GdbStub<'a, T, C>,
         ) -> GdbStubStateMachineInner<'a, state::Idle<T>, T, C> {
             GdbStubStateMachineInner {
-                conn: stub.conn,
-                packet_buffer: stub.packet_buffer,
-                recv_packet: RecvPacketStateMachine::new(),
-                inner: stub.inner,
+                i: GdbStubStateMachineReallyInner {
+                    conn: stub.conn,
+                    packet_buffer: stub.packet_buffer,
+                    recv_packet: RecvPacketStateMachine::new(),
+                    inner: stub.inner,
+                },
                 state: state::Idle {
                     deferred_ctrlc_stop_reason: None,
                 },
@@ -450,13 +448,16 @@ pub mod state_machine {
             target: &mut T,
             byte: u8,
         ) -> Result<GdbStubStateMachine<'a, T, C>, Error<T::Error, C::Error>> {
-            let packet_buffer = match self.recv_packet.pump(&mut self.packet_buffer, byte)? {
+            let packet_buffer = match self.i.recv_packet.pump(&mut self.i.packet_buffer, byte)? {
                 Some(buf) => buf,
                 None => return Ok(self.into()),
             };
 
             let packet = Packet::from_buf(target, packet_buffer).map_err(Error::PacketParse)?;
-            let state = self.inner.handle_packet(target, &mut self.conn, packet)?;
+            let state = self
+                .i
+                .inner
+                .handle_packet(target, &mut self.i.conn, packet)?;
             Ok(match state {
                 State::Pump => self.into(),
                 State::Disconnect(reason) => self.transition(state::Disconnected { reason }).into(),
@@ -500,8 +501,8 @@ pub mod state_machine {
             target: &mut T,
             reason: ThreadStopReason<<T::Arch as Arch>::Usize>,
         ) -> Result<GdbStubStateMachine<'a, T, C>, Error<T::Error, C::Error>> {
-            let mut res = ResponseWriter::new(&mut self.conn);
-            let event = self.inner.finish_exec(&mut res, target, reason)?;
+            let mut res = ResponseWriter::new(&mut self.i.conn);
+            let event = self.i.inner.finish_exec(&mut res, target, reason)?;
             res.flush()?;
 
             Ok(match event {
@@ -520,20 +521,22 @@ pub mod state_machine {
         ///
         /// NOTE: unlike the `incoming_data` method in the `state::Idle` state,
         /// this method does not perform any state transitions, and will
-        /// return a `GdbStubStateMachineInner` in the `state::Running`
-        /// state.
+        /// return a `GdbStubStateMachineInner` in the `state::Running` state.
         pub fn incoming_data(
             mut self,
             target: &mut T,
             byte: u8,
         ) -> Result<GdbStubStateMachine<'a, T, C>, Error<T::Error, C::Error>> {
-            let packet_buffer = match self.recv_packet.pump(&mut self.packet_buffer, byte)? {
+            let packet_buffer = match self.i.recv_packet.pump(&mut self.i.packet_buffer, byte)? {
                 Some(buf) => buf,
                 None => return Ok(self.into()),
             };
 
             let packet = Packet::from_buf(target, packet_buffer).map_err(Error::PacketParse)?;
-            let state = self.inner.handle_packet(target, &mut self.conn, packet)?;
+            let state = self
+                .i
+                .inner
+                .handle_packet(target, &mut self.i.conn, packet)?;
             Ok(match state {
                 State::Pump => self.transition(state::Running {}).into(),
                 State::Disconnect(reason) => self.transition(state::Disconnected { reason }).into(),

@@ -53,7 +53,7 @@ pub trait Connection {
 /// Extends [`Connection`] with `read` and `peek` methods.
 ///
 /// This trait is used as part of `gdbstub`'s quickstart
-/// [`GdbStub::run`](crate::GdbStub::run) API.
+/// [`GdbStub::run_blocking`](crate::GdbStub::run_blocking) API.
 ///
 /// When the `std` feature is enabled, this trait is automatically implemented
 /// for [`TcpStream`](std::net::TcpStream) and
