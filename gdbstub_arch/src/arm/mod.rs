@@ -42,4 +42,8 @@ impl Arch for Armv4t {
     fn target_description_xml() -> Option<&'static str> {
         Some(r#"<target version="1.0"><architecture>armv4t</architecture></target>"#)
     }
+
+    fn supports_optional_single_step() -> bool {
+        true
+    }
 }

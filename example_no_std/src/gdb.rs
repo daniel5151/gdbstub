@@ -1,6 +1,6 @@
 use gdbstub::common::Tid;
 use gdbstub::target;
-use gdbstub::target::ext::base::multithread::{MultiThreadOps, ResumeAction};
+use gdbstub::target::ext::base::multithread::MultiThreadOps;
 use gdbstub::target::{Target, TargetResult};
 
 use crate::print_str::print_str;
@@ -52,8 +52,12 @@ impl MultiThreadOps for DummyTarget {
     }
 
     #[inline(never)]
-    fn set_resume_action(&mut self, _tid: Tid, _action: ResumeAction) -> Result<(), Self::Error> {
-        print_str("> set_resume_action");
+    fn set_resume_action_continue(
+        &mut self,
+        _tid: Tid,
+        _signal: Option<u8>,
+    ) -> Result<(), Self::Error> {
+        print_str("> set_resume_action_continue");
         Ok(())
     }
 

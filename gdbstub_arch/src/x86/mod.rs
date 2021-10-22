@@ -26,6 +26,11 @@ impl<RegIdImpl: RegId> Arch for X86_64_SSE<RegIdImpl> {
             r#"<target version="1.0"><architecture>i386:x86-64</architecture><feature name="org.gnu.gdb.i386.sse"></feature></target>"#,
         )
     }
+
+    /// GDB clients unconditionally assume x86 targets support single-stepping
+    fn supports_optional_single_step() -> bool {
+        false
+    }
 }
 
 /// Implements `Arch` for 32-bit x86 + SSE Extensions.
@@ -48,5 +53,10 @@ impl<RegIdImpl: RegId> Arch for X86_SSE<RegIdImpl> {
         Some(
             r#"<target version="1.0"><architecture>i386:intel</architecture><feature name="org.gnu.gdb.i386.sse"></feature></target>"#,
         )
+    }
+
+    /// GDB clients unconditionally assume x86 targets support single-stepping
+    fn supports_optional_single_step() -> bool {
+        false
     }
 }

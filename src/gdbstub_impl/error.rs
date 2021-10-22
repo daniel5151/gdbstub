@@ -7,10 +7,13 @@ use crate::util::managed_vec::CapacityError;
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum GdbStubError<T, C> {
+    /// Connection Error while initializing the session.
+    ConnectionInit(C),
     /// Connection Error while reading request.
     ConnectionRead(C),
     /// Connection Error while writing response.
     ConnectionWrite(C),
+
     /// Client nack'd the last packet, but `gdbstub` doesn't implement
     /// re-transmission.
     ClientSentNack,
@@ -35,18 +38,29 @@ pub enum GdbStubError<T, C> {
     /// Target didn't report any active threads when there should have been at
     /// least one running.
     NoActiveThreads,
+
     /// The target has not opted into using implicit software breakpoints.
     /// See [`Target::use_implicit_sw_breakpoints`] for more information.
     ///
     /// [`Target::use_implicit_sw_breakpoints`]:
     /// crate::target::Target::use_implicit_sw_breakpoints
     ImplicitSwBreakpoints,
-
-    /// Internal - A non-fatal error occurred (with errno-style error code)
+    /// The target has not indicated support for optional single stepping. See
+    /// [`Target::use_optional_single_step`] for more information.
     ///
-    /// This "dummy" error is required as part of the internal
-    /// `TargetResultExt::handle_error()` machinery, and will never be
-    /// propagated up to the end user.
+    /// If you encountered this error while using an `Arch` implementation
+    /// defined in `gdbstub_arch` and believe this is incorrect, please file an
+    /// issue at https://github.com/daniel5151/gdbstub/issues.
+    ///
+    /// [`Target::use_optional_single_step`]:
+    /// crate::target::Target::use_optional_single_step
+    UnconditionalSingleStep,
+
+    // Internal - A non-fatal error occurred (with errno-style error code)
+    //
+    // This "dummy" error is required as part of the internal
+    // `TargetResultExt::handle_error()` machinery, and will never be
+    // propagated up to the end user.
     #[doc(hidden)]
     NonFatalError(u8),
 }
@@ -71,6 +85,7 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use self::GdbStubError::*;
         match self {
+            ConnectionInit(e) => write!(f, "Connection Error while initializing the session: {:?}", e),
             ConnectionRead(e) => write!(f, "Connection Error while reading request: {:?}", e),
             ConnectionWrite(e) => write!(f, "Connection Error while writing response: {:?}", e),
             ClientSentNack => write!(f, "Client nack'd the last packet, but `gdbstub` doesn't implement re-transmission."),
@@ -81,7 +96,8 @@ where
             TargetError(e) => write!(f, "Target threw a fatal error: {:?}", e),
             UnsupportedStopReason => write!(f, "Target responded with an unsupported stop reason."),
             NoActiveThreads => write!(f, "Target didn't report any active threads when there should have been at least one running."),
-            ImplicitSwBreakpoints => write!(f, "The target has not opted into using implicit software breakpoints. See [`Target::use_implicit_sw_breakpoints`] for more information."),
+            ImplicitSwBreakpoints => write!(f, "The target has not opted into using implicit software breakpoints. See `Target::use_implicit_sw_breakpoints` for more information."),
+            UnconditionalSingleStep => write!(f, "The target has not indicated support for optional single stepping. See `Target::use_optional_single_step` for more information."),
 
             NonFatalError(_) => write!(f, "Internal non-fatal error. End users should never see this! Please file an issue if you do!"),
         }

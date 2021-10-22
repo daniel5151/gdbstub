@@ -2,9 +2,7 @@ use core::convert::{TryFrom, TryInto};
 
 use armv4t_emu::{reg, Memory};
 use gdbstub::target;
-use gdbstub::target::ext::base::singlethread::{
-    ResumeAction, SingleThreadOps, SingleThreadReverseContOps, SingleThreadReverseStepOps,
-};
+use gdbstub::target::ext::base::singlethread::SingleThreadOps;
 use gdbstub::target::{Target, TargetError, TargetResult};
 use gdbstub_arch::arm::reg::id::ArmCoreRegId;
 
@@ -136,7 +134,7 @@ impl Target for Emu {
 }
 
 impl SingleThreadOps for Emu {
-    fn resume(&mut self, action: ResumeAction) -> Result<(), Self::Error> {
+    fn resume(&mut self, signal: Option<u8>) -> Result<(), Self::Error> {
         // Upon returning from the `resume` method, the target being debugged should be
         // configured to run according to whatever resume actions the GDB client has
         // specified (as specified by `set_resume_action`, `resume_range_step`,
@@ -150,11 +148,11 @@ impl SingleThreadOps for Emu {
         // external "orchestration" to set it's execution mode (e.g: modifying the
         // target's process state via platform specific debugging syscalls).
 
-        self.exec_mode = match action {
-            ResumeAction::Continue => ExecMode::Continue,
-            ResumeAction::Step => ExecMode::Step,
-            _ => return Err("cannot resume with signal"),
-        };
+        if signal.is_some() {
+            return Err("no support for continuing with signal");
+        }
+
+        self.exec_mode = ExecMode::Continue;
 
         Ok(())
     }
@@ -216,20 +214,43 @@ impl SingleThreadOps for Emu {
     }
 
     #[inline(always)]
-    fn support_reverse_cont(&mut self) -> Option<SingleThreadReverseContOps<Self>> {
+    fn support_reverse_cont(
+        &mut self,
+    ) -> Option<target::ext::base::singlethread::SingleThreadReverseContOps<Self>> {
         Some(self)
     }
 
     #[inline(always)]
-    fn support_reverse_step(&mut self) -> Option<SingleThreadReverseStepOps<Self>> {
+    fn support_reverse_step(
+        &mut self,
+    ) -> Option<target::ext::base::singlethread::SingleThreadReverseStepOps<Self>> {
         Some(self)
     }
 
     #[inline(always)]
-    fn support_resume_range_step(
+    fn support_single_step(
+        &mut self,
+    ) -> Option<target::ext::base::singlethread::SingleThreadSingleStepOps<Self>> {
+        Some(self)
+    }
+
+    #[inline(always)]
+    fn support_range_step(
         &mut self,
     ) -> Option<target::ext::base::singlethread::SingleThreadRangeSteppingOps<Self>> {
         Some(self)
+    }
+}
+
+impl target::ext::base::singlethread::SingleThreadSingleStep for Emu {
+    fn step(&mut self, signal: Option<u8>) -> Result<(), Self::Error> {
+        if signal.is_some() {
+            return Err("no support for stepping with signal");
+        }
+
+        self.exec_mode = ExecMode::Step;
+
+        Ok(())
     }
 }
 
@@ -439,6 +460,14 @@ mod custom_arch {
         // in an actual implementation, you'll want to return an actual string here!
         fn target_description_xml() -> Option<&'static str> {
             Some("never gets returned")
+        }
+
+        // armv4t supports optional single stepping.
+        //
+        // notably, x86 is an example of an arch that does _not_ support
+        // optional single stepping.
+        fn supports_optional_single_step() -> bool {
+            true
         }
     }
 }

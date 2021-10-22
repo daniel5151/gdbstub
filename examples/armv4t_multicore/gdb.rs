@@ -2,7 +2,7 @@ use armv4t_emu::{reg, Memory};
 
 use gdbstub::common::Tid;
 use gdbstub::target;
-use gdbstub::target::ext::base::multithread::{MultiThreadOps, ResumeAction};
+use gdbstub::target::ext::base::multithread::MultiThreadOps;
 use gdbstub::target::ext::breakpoints::WatchKind;
 use gdbstub::target::{Target, TargetError, TargetResult};
 
@@ -62,14 +62,24 @@ impl MultiThreadOps for Emu {
         Ok(())
     }
 
-    fn set_resume_action(&mut self, tid: Tid, action: ResumeAction) -> Result<(), Self::Error> {
-        match action {
-            ResumeAction::Step => self.exec_mode.insert(tid_to_cpuid(tid)?, ExecMode::Step),
-            ResumeAction::Continue => self
-                .exec_mode
-                .insert(tid_to_cpuid(tid)?, ExecMode::Continue),
-            _ => return Err("no support for resuming with signal"),
-        };
+    #[inline(always)]
+    fn support_single_step(
+        &mut self,
+    ) -> Option<target::ext::base::multithread::MultiThreadSingleStepOps<Self>> {
+        Some(self)
+    }
+
+    fn set_resume_action_continue(
+        &mut self,
+        tid: Tid,
+        signal: Option<u8>,
+    ) -> Result<(), Self::Error> {
+        if signal.is_some() {
+            return Err("no support for continuing with signal");
+        }
+
+        self.exec_mode
+            .insert(tid_to_cpuid(tid)?, ExecMode::Continue);
 
         Ok(())
     }
@@ -150,6 +160,18 @@ impl MultiThreadOps for Emu {
     ) -> Result<(), Self::Error> {
         register_thread(cpuid_to_tid(CpuId::Cpu));
         register_thread(cpuid_to_tid(CpuId::Cop));
+        Ok(())
+    }
+}
+
+impl target::ext::base::multithread::MultiThreadSingleStep for Emu {
+    fn set_resume_action_step(&mut self, tid: Tid, signal: Option<u8>) -> Result<(), Self::Error> {
+        if signal.is_some() {
+            return Err("no support for stepping with signal");
+        }
+
+        self.exec_mode.insert(tid_to_cpuid(tid)?, ExecMode::Step);
+
         Ok(())
     }
 }

@@ -7,21 +7,12 @@ use crate::target::{Target, TargetResult};
 
 use super::{ReplayLogPosition, SingleRegisterAccessOps};
 
-// Convenient re-exports
-pub use super::ResumeAction;
-
 /// Base debugging operations for single threaded targets.
 pub trait SingleThreadOps: Target {
     /// Resume execution on the target.
     ///
-    /// `action` specifies how the target should be resumed
-    /// (i.e: step or continue).
-    ///
-    /// Upon returning from the `resume` method, the target being debugged
-    /// should be configured to run according to whatever resume actions the
-    /// GDB client has specified (as specified by the provided `action`, or
-    /// if extended resume actions are being used, the `set_resume_range_step`,
-    /// `set_reverse_{step, continue}`, etc... methods)
+    /// The GDB client may also include a `signal` which should be passed to the
+    /// target.
     ///
     /// # Additional Considerations
     ///
@@ -38,13 +29,21 @@ pub trait SingleThreadOps: Target {
     ///
     /// Omitting PC adjustment may result in unexpected execution flow and/or
     /// breakpoints not appearing to work correctly.
-    fn resume(&mut self, action: ResumeAction) -> Result<(), Self::Error>;
+    fn resume(&mut self, signal: Option<u8>) -> Result<(), Self::Error>;
 
-    /// Support for the optimized [range stepping] resume action.
+    /// Support for optimized [single stepping].
+    ///
+    /// [single stepping]: https://sourceware.org/gdb/current/onlinedocs/gdb/Continuing-and-Stepping.html#index-stepi
+    #[inline(always)]
+    fn support_single_step(&mut self) -> Option<SingleThreadSingleStepOps<Self>> {
+        None
+    }
+
+    /// Support for optimized [range stepping].
     ///
     /// [range stepping]: https://sourceware.org/gdb/current/onlinedocs/gdb/Continuing-and-Stepping.html#range-stepping
     #[inline(always)]
-    fn support_resume_range_step(&mut self) -> Option<SingleThreadRangeSteppingOps<Self>> {
+    fn support_range_step(&mut self) -> Option<SingleThreadRangeSteppingOps<Self>> {
         None
     }
 
@@ -109,50 +108,69 @@ pub trait SingleThreadOps: Target {
     ) -> TargetResult<(), Self>;
 }
 
-/// Target Extension - [Reverse continue] for single threaded targets.
-///
-/// Reverse continue allows the target to run backwards until it reaches the end
-/// of the replay log.
-///
-/// [Reverse continue]: https://sourceware.org/gdb/current/onlinedocs/gdb/Reverse-Execution.html
+/// Target Extension - Reverse continue for single threaded targets.
+/// See [`SingleThreadOps::support_reverse_cont`].
 pub trait SingleThreadReverseCont: Target + SingleThreadOps {
-    /// Reverse-continue the target.
+    /// [Reverse continue] the target.
+    ///
+    /// Reverse continue allows the target to run backwards until it reaches the
+    /// end of the replay log.
+    ///
+    /// [Reverse continue]: https://sourceware.org/gdb/current/onlinedocs/gdb/Reverse-Execution.html
     fn reverse_cont(&mut self) -> Result<(), Self::Error>;
 }
 
 define_ext!(SingleThreadReverseContOps, SingleThreadReverseCont);
 
-/// Target Extension - [Reverse stepping] for single threaded targets.
-///
-/// Reverse stepping allows the target to run backwards by one step.
-///
-/// [Reverse stepping]: https://sourceware.org/gdb/current/onlinedocs/gdb/Reverse-Execution.html
+/// Target Extension - Reverse stepping for single threaded targets.
+/// See [`SingleThreadOps::support_reverse_step`].
 pub trait SingleThreadReverseStep: Target + SingleThreadOps {
-    /// Reverse-step the target.
+    /// [Reverse step] the target.
+    ///
+    /// Reverse stepping allows the target to run backwards by one step -
+    /// typically a single instruction.
+    ///
+    /// [Reverse step]: https://sourceware.org/gdb/current/onlinedocs/gdb/Reverse-Execution.html
     fn reverse_step(&mut self) -> Result<(), Self::Error>;
 }
 
 define_ext!(SingleThreadReverseStepOps, SingleThreadReverseStep);
 
-/// Target Extension - Optimized [range stepping] for single threaded targets.
-/// See [`SingleThreadOps::support_resume_range_step`].
-///
-/// Range Stepping will step the target once, and keep stepping the target as
-/// long as execution remains between the specified start (inclusive) and end
-/// (exclusive) addresses, or another stop condition is met (e.g: a breakpoint
-/// it hit).
-///
-/// If the range is empty (`start` == `end`), then the action becomes
-/// equivalent to the ‘s’ action. In other words, single-step once, and
-/// report the stop (even if the stepped instruction jumps to start).
-///
-/// _Note:_ A stop reply may be sent at any point even if the PC is still
-/// within the stepping range; for example, it is valid to implement range
-/// stepping in a degenerate way as a single instruction step operation.
-///
-/// [range stepping]: https://sourceware.org/gdb/current/onlinedocs/gdb/Continuing-and-Stepping.html#range-stepping
+/// Target Extension - Optimized [single stepping] for single threaded targets.
+/// See [`SingleThreadOps::support_single_step`].
+pub trait SingleThreadSingleStep: Target + SingleThreadOps {
+    /// [Single step] the target.
+    ///
+    /// Single stepping will step the target a single "step" - typically a
+    /// single instruction.
+    /// The GDB client may also include a `signal` which should be passed to the
+    /// target.
+    ///
+    /// [Single step]: https://sourceware.org/gdb/current/onlinedocs/gdb/Continuing-and-Stepping.html#index-stepi
+    fn step(&mut self, signal: Option<u8>) -> Result<(), Self::Error>;
+}
+
+define_ext!(SingleThreadSingleStepOps, SingleThreadSingleStep);
+
+/// Target Extension - Optimized range stepping for single threaded targets.
+/// See [`SingleThreadOps::support_range_step`].
 pub trait SingleThreadRangeStepping: Target + SingleThreadOps {
-    /// See [`SingleThreadOps::resume`].
+    /// [Range step] the target.
+    ///
+    /// Range Stepping will step the target once, and keep stepping the target
+    /// as long as execution remains between the specified start (inclusive)
+    /// and end (exclusive) addresses, or another stop condition is met
+    /// (e.g: a breakpoint it hit).
+    ///
+    /// If the range is empty (`start` == `end`), then the action becomes
+    /// equivalent to the ‘s’ action. In other words, single-step once, and
+    /// report the stop (even if the stepped instruction jumps to start).
+    ///
+    /// _Note:_ A stop reply may be sent at any point even if the PC is still
+    /// within the stepping range; for example, it is valid to implement range
+    /// stepping in a degenerate way as a single instruction step operation.
+    ///
+    /// [Range step]: https://sourceware.org/gdb/current/onlinedocs/gdb/Continuing-and-Stepping.html#range-stepping
     fn resume_range_step(
         &mut self,
         start: <Self::Arch as Arch>::Usize,

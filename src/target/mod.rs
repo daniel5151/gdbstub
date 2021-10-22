@@ -82,7 +82,7 @@
 //! use gdbstub::target::{Target, TargetResult};
 //! use gdbstub::target::ext::base::BaseOps;
 //! use gdbstub::target::ext::base::singlethread::SingleThreadOps;
-//! use gdbstub::target::ext::base::singlethread::{ResumeAction, StopReason};
+//! use gdbstub::target::ext::base::singlethread::{StopReason};
 //!
 //! struct MyTarget;
 //!
@@ -98,7 +98,7 @@
 //! impl SingleThreadOps for MyTarget {
 //!     fn resume(
 //!         &mut self,
-//!         action: ResumeAction,
+//!         signal: Option<u8>,
 //!     ) -> Result<(), ()> { todo!() }
 //!
 //!     fn read_registers(
@@ -358,15 +358,49 @@ pub trait Target {
     ///
     /// If `gdbstub` detects that the target has not implemented a software
     /// breakpoint handler, it will check if `use_implicit_sw_breakpoints()` has
-    /// been enabled, and if it has not, it will trigger a runtime error
-    /// pointing at this very documentation.
+    /// been enabled, and if it has not, it will trigger a runtime
+    /// [`GdbStubError::ImplicitSwBreakpoints`] error pointing at this very
+    /// documentation.
     ///
     /// Targets that wish to use the GDB client's implicit software breakpoint
     /// handler must _explicitly opt-in_ to this somewhat surprising GDB feature
     /// by overriding this method to return `true`.
+    ///
+    /// [`GdbStubError::ImplicitSwBreakpoints`]:
+    /// crate::GdbStubError::ImplicitSwBreakpoints
     #[inline(always)]
     fn use_implicit_sw_breakpoints(&self) -> bool {
         false
+    }
+
+    /// Whether or not this target supports single-stepping as an optional
+    /// feature.
+    ///
+    /// If you are reading these docs after having encountered a
+    /// [`GdbStubError::UnconditionalSingleStep`] error, you will most likely
+    /// have to implement support for single-stepping.
+    ///
+    /// # Details
+    ///
+    /// This method is a workaround for a bug in the mainline GDB client
+    /// implementation. For more information, see the documentation for
+    /// [`Arch::supports_optional_single_step`].
+    ///
+    /// By default, this method returns the value specified by
+    /// [`Arch::supports_optional_single_step`].
+    ///
+    /// To reiterate: unless you _really_ know what you're doing (e.g: working
+    /// on a dynamic target implementation, attempting to fix the underlying
+    /// bug, etc...), you should **not** override this method.
+    ///
+    /// Overriding this method to return `true` on unsupported architectures
+    /// will lead to "unexpected packet" runtime errors!
+    ///
+    /// [`GdbStubError::UnconditionalSingleStep`]:
+    /// crate::GdbStubError::UnconditionalSingleStep
+    #[inline(always)]
+    fn use_optional_single_step(&self) -> bool {
+        <Self::Arch as Arch>::supports_optional_single_step()
     }
 
     /// Set/Remove software breakpoints.
@@ -443,6 +477,16 @@ macro_rules! impl_dyn_target {
             #[inline(always)]
             fn base_ops(&mut self) -> ext::base::BaseOps<Self::Arch, Self::Error> {
                 (**self).base_ops()
+            }
+
+            #[inline(always)]
+            fn use_implicit_sw_breakpoints(&self) -> bool {
+                (**self).use_implicit_sw_breakpoints()
+            }
+
+            #[inline(always)]
+            fn use_optional_single_step(&self) -> bool {
+                (**self).use_optional_single_step()
             }
 
             #[inline(always)]
