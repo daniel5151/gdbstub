@@ -8,7 +8,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         target: &mut T,
         command: Auxv,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
-        let ops = match target.auxv() {
+        let ops = match target.support_auxv() {
             Some(ops) => ops,
             None => return Ok(HandlerStatus::Handled),
         };

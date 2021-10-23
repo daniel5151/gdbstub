@@ -202,44 +202,51 @@ pub type HostIoResult<T, Tgt> = Result<T, HostIoError<<Tgt as Target>::Error>>;
 
 /// Target Extension - Perform I/O operations on host
 pub trait HostIo: Target {
-    /// Enable open operation.
+    /// Support `open` operation.
     #[inline(always)]
-    fn enable_open(&mut self) -> Option<HostIoOpenOps<Self>> {
+    fn support_open(&mut self) -> Option<HostIoOpenOps<Self>> {
         None
     }
-    /// Enable close operation.
+
+    /// Support `close` operation.
     #[inline(always)]
-    fn enable_close(&mut self) -> Option<HostIoCloseOps<Self>> {
+    fn support_close(&mut self) -> Option<HostIoCloseOps<Self>> {
         None
     }
-    /// Enable pread operation.
+
+    /// Support `pread` operation.
     #[inline(always)]
-    fn enable_pread(&mut self) -> Option<HostIoPreadOps<Self>> {
+    fn support_pread(&mut self) -> Option<HostIoPreadOps<Self>> {
         None
     }
-    /// Enable pwrite operation.
+
+    /// Support `pwrite` operation.
     #[inline(always)]
-    fn enable_pwrite(&mut self) -> Option<HostIoPwriteOps<Self>> {
+    fn support_pwrite(&mut self) -> Option<HostIoPwriteOps<Self>> {
         None
     }
-    /// Enable fstat operation.
+
+    /// Support `fstat` operation.
     #[inline(always)]
-    fn enable_fstat(&mut self) -> Option<HostIoFstatOps<Self>> {
+    fn support_fstat(&mut self) -> Option<HostIoFstatOps<Self>> {
         None
     }
-    /// Enable unlink operation.
+
+    /// Support `unlink` operation.
     #[inline(always)]
-    fn enable_unlink(&mut self) -> Option<HostIoUnlinkOps<Self>> {
+    fn support_unlink(&mut self) -> Option<HostIoUnlinkOps<Self>> {
         None
     }
-    /// Enable readlink operation.
+
+    /// Support `readlink` operation.
     #[inline(always)]
-    fn enable_readlink(&mut self) -> Option<HostIoReadlinkOps<Self>> {
+    fn support_readlink(&mut self) -> Option<HostIoReadlinkOps<Self>> {
         None
     }
-    /// Enable setfs operation.
+
+    /// Support `setfs` operation.
     #[inline(always)]
-    fn enable_setfs(&mut self) -> Option<HostIoSetfsOps<Self>> {
+    fn support_setfs(&mut self) -> Option<HostIoSetfsOps<Self>> {
         None
     }
 }

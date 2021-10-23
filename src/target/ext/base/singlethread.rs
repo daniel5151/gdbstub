@@ -82,7 +82,7 @@ pub trait SingleThreadOps: Target {
     /// implement it when possible, as it can significantly improve performance
     /// on certain architectures.
     #[inline(always)]
-    fn single_register_access(&mut self) -> Option<SingleRegisterAccessOps<(), Self>> {
+    fn support_single_register_access(&mut self) -> Option<SingleRegisterAccessOps<(), Self>> {
         None
     }
 

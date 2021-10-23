@@ -82,27 +82,27 @@ macro_rules! commands {
                 // that aren't top-level `Target` IDETs to split-up the packet
                 // parsing code.
                 trait Hack {
-                    fn base(&mut self) -> Option<()>;
-                    fn single_register_access(&mut self) -> Option<()>;
-                    fn reverse_step(&mut self) -> Option<()>;
-                    fn reverse_cont(&mut self) -> Option<()>;
-                    fn x_upcase_packet(&mut self) -> Option<()>;
+                    fn support_base(&mut self) -> Option<()>;
+                    fn support_single_register_access(&mut self) -> Option<()>;
+                    fn support_reverse_step(&mut self) -> Option<()>;
+                    fn support_reverse_cont(&mut self) -> Option<()>;
+                    fn support_x_upcase_packet(&mut self) -> Option<()>;
                 }
 
                 impl<T: Target> Hack for T {
-                    fn base(&mut self) -> Option<()> {
+                    fn support_base(&mut self) -> Option<()> {
                         Some(())
                     }
 
-                    fn single_register_access(&mut self) -> Option<()> {
+                    fn support_single_register_access(&mut self) -> Option<()> {
                         use crate::target::ext::base::BaseOps;
                         match self.base_ops() {
-                            BaseOps::SingleThread(ops) => ops.single_register_access().map(drop),
-                            BaseOps::MultiThread(ops) => ops.single_register_access().map(drop),
+                            BaseOps::SingleThread(ops) => ops.support_single_register_access().map(drop),
+                            BaseOps::MultiThread(ops) => ops.support_single_register_access().map(drop),
                         }
                     }
 
-                    fn reverse_step(&mut self) -> Option<()> {
+                    fn support_reverse_step(&mut self) -> Option<()> {
                         use crate::target::ext::base::BaseOps;
                         match self.base_ops() {
                             BaseOps::SingleThread(ops) => ops.support_reverse_step().map(drop),
@@ -110,7 +110,7 @@ macro_rules! commands {
                         }
                     }
 
-                    fn reverse_cont(&mut self) -> Option<()> {
+                    fn support_reverse_cont(&mut self) -> Option<()> {
                         use crate::target::ext::base::BaseOps;
                         match self.base_ops() {
                             BaseOps::SingleThread(ops) => ops.support_reverse_cont().map(drop),
@@ -118,7 +118,7 @@ macro_rules! commands {
                         }
                     }
 
-                    fn x_upcase_packet(&mut self) -> Option<()> {
+                    fn support_x_upcase_packet(&mut self) -> Option<()> {
                         if self.use_x_upcase_packet() {
                             Some(())
                         } else {
@@ -131,7 +131,7 @@ macro_rules! commands {
 
                 $(
                 #[allow(clippy::string_lit_as_bytes)]
-                if target.$ext().is_some() {
+                if target.[< support_ $ext >]().is_some() {
                     $(
                     if buf.strip_prefix($name.as_bytes()) {
                         crate::__dead_code_marker!($name, "prefix_match");
@@ -148,7 +148,7 @@ macro_rules! commands {
                 }
                 )*
 
-                if let Some(_breakpoint_ops) = target.breakpoints() {
+                if let Some(_breakpoint_ops) = target.support_breakpoints() {
                     use breakpoint::{BasicBreakpoint, BytecodeBreakpoint};
 
                     if buf.strip_prefix(b"z") {

@@ -33,7 +33,7 @@ impl Target for Emu {
     }
 
     #[inline(always)]
-    fn breakpoints(&mut self) -> Option<target::ext::breakpoints::BreakpointsOps<Self>> {
+    fn support_breakpoints(&mut self) -> Option<target::ext::breakpoints::BreakpointsOps<Self>> {
         Some(self)
     }
 }
@@ -181,11 +181,11 @@ impl target::ext::base::multithread::MultiThreadSingleStep for Emu {
 }
 
 impl target::ext::breakpoints::Breakpoints for Emu {
-    fn sw_breakpoint(&mut self) -> Option<target::ext::breakpoints::SwBreakpointOps<Self>> {
+    fn support_sw_breakpoint(&mut self) -> Option<target::ext::breakpoints::SwBreakpointOps<Self>> {
         Some(self)
     }
 
-    fn hw_watchpoint(&mut self) -> Option<target::ext::breakpoints::HwWatchpointOps<Self>> {
+    fn support_hw_watchpoint(&mut self) -> Option<target::ext::breakpoints::HwWatchpointOps<Self>> {
         Some(self)
     }
 }

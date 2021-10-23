@@ -28,23 +28,23 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         }
 
         let supported = match cmd.type_ {
-            0 if ops.sw_breakpoint().is_some() => {
-                let ops = ops.sw_breakpoint().unwrap();
+            0 if ops.support_sw_breakpoint().is_some() => {
+                let ops = ops.support_sw_breakpoint().unwrap();
                 let bp_kind = bp_kind!();
                 match cmd_kind {
                     CmdKind::Add => ops.add_sw_breakpoint(addr, bp_kind),
                     CmdKind::Remove => ops.remove_sw_breakpoint(addr, bp_kind),
                 }
             }
-            1 if ops.hw_breakpoint().is_some() => {
-                let ops = ops.hw_breakpoint().unwrap();
+            1 if ops.support_hw_breakpoint().is_some() => {
+                let ops = ops.support_hw_breakpoint().unwrap();
                 let bp_kind = bp_kind!();
                 match cmd_kind {
                     CmdKind::Add => ops.add_hw_breakpoint(addr, bp_kind),
                     CmdKind::Remove => ops.remove_hw_breakpoint(addr, bp_kind),
                 }
             }
-            2 | 3 | 4 if ops.hw_watchpoint().is_some() => {
+            2 | 3 | 4 if ops.support_hw_watchpoint().is_some() => {
                 use crate::target::ext::breakpoints::WatchKind;
                 let kind = match cmd.type_ {
                     2 => WatchKind::Write,
@@ -54,7 +54,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 };
                 let len = <T::Arch as Arch>::Usize::from_be_bytes(cmd.kind)
                     .ok_or(Error::TargetMismatch)?;
-                let ops = ops.hw_watchpoint().unwrap();
+                let ops = ops.support_hw_watchpoint().unwrap();
                 match cmd_kind {
                     CmdKind::Add => ops.add_hw_watchpoint(addr, len, kind),
                     CmdKind::Remove => ops.remove_hw_watchpoint(addr, len, kind),
@@ -80,7 +80,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         target: &mut T,
         command: Breakpoints<'a>,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
-        let ops = match target.breakpoints() {
+        let ops = match target.support_breakpoints() {
             Some(ops) => ops,
             None => return Ok(HandlerStatus::Handled),
         };

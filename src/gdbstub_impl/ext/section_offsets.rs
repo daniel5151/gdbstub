@@ -8,7 +8,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         target: &mut T,
         command: SectionOffsets,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
-        let ops = match target.section_offsets() {
+        let ops = match target.support_section_offsets() {
             Some(ops) => ops,
             None => return Ok(HandlerStatus::Handled),
         };

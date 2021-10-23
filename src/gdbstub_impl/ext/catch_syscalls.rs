@@ -12,7 +12,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         target: &mut T,
         command: CatchSyscalls,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
-        let ops = match target.catch_syscalls() {
+        let ops = match target.support_catch_syscalls() {
             Some(ops) => ops,
             None => return Ok(HandlerStatus::Handled),
         };

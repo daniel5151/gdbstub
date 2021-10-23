@@ -81,27 +81,31 @@ impl Target for Emu {
     }
 
     #[inline(always)]
-    fn breakpoints(&mut self) -> Option<target::ext::breakpoints::BreakpointsOps<Self>> {
+    fn support_breakpoints(&mut self) -> Option<target::ext::breakpoints::BreakpointsOps<Self>> {
         Some(self)
     }
 
     #[inline(always)]
-    fn extended_mode(&mut self) -> Option<target::ext::extended_mode::ExtendedModeOps<Self>> {
+    fn support_extended_mode(
+        &mut self,
+    ) -> Option<target::ext::extended_mode::ExtendedModeOps<Self>> {
         Some(self)
     }
 
     #[inline(always)]
-    fn monitor_cmd(&mut self) -> Option<target::ext::monitor_cmd::MonitorCmdOps<Self>> {
+    fn support_monitor_cmd(&mut self) -> Option<target::ext::monitor_cmd::MonitorCmdOps<Self>> {
         Some(self)
     }
 
     #[inline(always)]
-    fn section_offsets(&mut self) -> Option<target::ext::section_offsets::SectionOffsetsOps<Self>> {
+    fn support_section_offsets(
+        &mut self,
+    ) -> Option<target::ext::section_offsets::SectionOffsetsOps<Self>> {
         Some(self)
     }
 
     #[inline(always)]
-    fn target_description_xml_override(
+    fn support_target_description_xml_override(
         &mut self,
     ) -> Option<target::ext::target_description_xml_override::TargetDescriptionXmlOverrideOps<Self>>
     {
@@ -109,27 +113,29 @@ impl Target for Emu {
     }
 
     #[inline(always)]
-    fn memory_map(&mut self) -> Option<target::ext::memory_map::MemoryMapOps<Self>> {
+    fn support_memory_map(&mut self) -> Option<target::ext::memory_map::MemoryMapOps<Self>> {
         Some(self)
     }
 
     #[inline(always)]
-    fn catch_syscalls(&mut self) -> Option<target::ext::catch_syscalls::CatchSyscallsOps<Self>> {
+    fn support_catch_syscalls(
+        &mut self,
+    ) -> Option<target::ext::catch_syscalls::CatchSyscallsOps<Self>> {
         Some(self)
     }
 
     #[inline(always)]
-    fn host_io(&mut self) -> Option<target::ext::host_io::HostIoOps<Self>> {
+    fn support_host_io(&mut self) -> Option<target::ext::host_io::HostIoOps<Self>> {
         Some(self)
     }
 
     #[inline(always)]
-    fn exec_file(&mut self) -> Option<target::ext::exec_file::ExecFileOps<Self>> {
+    fn support_exec_file(&mut self) -> Option<target::ext::exec_file::ExecFileOps<Self>> {
         Some(self)
     }
 
     #[inline(always)]
-    fn auxv(&mut self) -> Option<target::ext::auxv::AuxvOps<Self>> {
+    fn support_auxv(&mut self) -> Option<target::ext::auxv::AuxvOps<Self>> {
         Some(self)
     }
 }
@@ -208,7 +214,7 @@ impl SingleThreadOps for Emu {
     }
 
     #[inline(always)]
-    fn single_register_access(
+    fn support_single_register_access(
         &mut self,
     ) -> Option<target::ext::base::SingleRegisterAccessOps<(), Self>> {
         Some(self)

@@ -241,8 +241,8 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
         // Check if the target hasn't explicitly opted into implicit sw breakpoints
         {
             let support_software_breakpoints = target
-                .breakpoints()
-                .map(|ops| ops.sw_breakpoint().is_some())
+                .support_breakpoints()
+                .map(|ops| ops.support_sw_breakpoint().is_some())
                 .unwrap_or(false);
 
             if !support_software_breakpoints && !target.use_implicit_sw_breakpoints() {
@@ -708,7 +708,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 // every response needs to be flushed, _except_ for the response to a kill
                 // packet, but ONLY when extended mode is NOT implemented.
                 let is_kill = matches!(disconnect_reason, Some(DisconnectReason::Kill));
-                if !(target.extended_mode().is_none() && is_kill) {
+                if !(target.support_extended_mode().is_none() && is_kill) {
                     res.flush()?;
                 }
 

@@ -13,42 +13,42 @@ const FD_RESERVED: u32 = 1;
 
 impl target::ext::host_io::HostIo for Emu {
     #[inline(always)]
-    fn enable_open(&mut self) -> Option<target::ext::host_io::HostIoOpenOps<Self>> {
+    fn support_open(&mut self) -> Option<target::ext::host_io::HostIoOpenOps<Self>> {
         Some(self)
     }
 
     #[inline(always)]
-    fn enable_close(&mut self) -> Option<target::ext::host_io::HostIoCloseOps<Self>> {
+    fn support_close(&mut self) -> Option<target::ext::host_io::HostIoCloseOps<Self>> {
         Some(self)
     }
 
     #[inline(always)]
-    fn enable_pread(&mut self) -> Option<target::ext::host_io::HostIoPreadOps<Self>> {
+    fn support_pread(&mut self) -> Option<target::ext::host_io::HostIoPreadOps<Self>> {
         Some(self)
     }
 
     #[inline(always)]
-    fn enable_pwrite(&mut self) -> Option<target::ext::host_io::HostIoPwriteOps<Self>> {
+    fn support_pwrite(&mut self) -> Option<target::ext::host_io::HostIoPwriteOps<Self>> {
         Some(self)
     }
 
     #[inline(always)]
-    fn enable_fstat(&mut self) -> Option<target::ext::host_io::HostIoFstatOps<Self>> {
+    fn support_fstat(&mut self) -> Option<target::ext::host_io::HostIoFstatOps<Self>> {
         Some(self)
     }
 
     #[inline(always)]
-    fn enable_unlink(&mut self) -> Option<target::ext::host_io::HostIoUnlinkOps<Self>> {
+    fn support_unlink(&mut self) -> Option<target::ext::host_io::HostIoUnlinkOps<Self>> {
         Some(self)
     }
 
     #[inline(always)]
-    fn enable_readlink(&mut self) -> Option<target::ext::host_io::HostIoReadlinkOps<Self>> {
+    fn support_readlink(&mut self) -> Option<target::ext::host_io::HostIoReadlinkOps<Self>> {
         Some(self)
     }
 
     #[inline(always)]
-    fn enable_setfs(&mut self) -> Option<target::ext::host_io::HostIoSetfsOps<Self>> {
+    fn support_setfs(&mut self) -> Option<target::ext::host_io::HostIoSetfsOps<Self>> {
         Some(self)
     }
 }

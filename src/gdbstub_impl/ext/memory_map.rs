@@ -8,7 +8,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         target: &mut T,
         command: MemoryMap,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
-        let ops = match target.memory_map() {
+        let ops = match target.support_memory_map() {
             Some(ops) => ops,
             None => return Ok(HandlerStatus::Handled),
         };

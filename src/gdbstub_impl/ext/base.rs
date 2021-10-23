@@ -71,55 +71,57 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     res.write_str(";ReverseStep+")?;
                 }
 
-                if let Some(ops) = target.extended_mode() {
-                    if ops.configure_aslr().is_some() {
+                if let Some(ops) = target.support_extended_mode() {
+                    if ops.support_configure_aslr().is_some() {
                         res.write_str(";QDisableRandomization+")?;
                     }
 
-                    if ops.configure_env().is_some() {
+                    if ops.support_configure_env().is_some() {
                         res.write_str(";QEnvironmentHexEncoded+")?;
                         res.write_str(";QEnvironmentUnset+")?;
                         res.write_str(";QEnvironmentReset+")?;
                     }
 
-                    if ops.configure_startup_shell().is_some() {
+                    if ops.support_configure_startup_shell().is_some() {
                         res.write_str(";QStartupWithShell+")?;
                     }
 
-                    if ops.configure_working_dir().is_some() {
+                    if ops.support_configure_working_dir().is_some() {
                         res.write_str(";QSetWorkingDir+")?;
                     }
                 }
 
-                if let Some(ops) = target.breakpoints() {
-                    if ops.sw_breakpoint().is_some() {
+                if let Some(ops) = target.support_breakpoints() {
+                    if ops.support_sw_breakpoint().is_some() {
                         res.write_str(";swbreak+")?;
                     }
 
-                    if ops.hw_breakpoint().is_some() || ops.hw_watchpoint().is_some() {
+                    if ops.support_hw_breakpoint().is_some()
+                        || ops.support_hw_watchpoint().is_some()
+                    {
                         res.write_str(";hwbreak+")?;
                     }
                 }
 
-                if target.catch_syscalls().is_some() {
+                if target.support_catch_syscalls().is_some() {
                     res.write_str(";QCatchSyscalls+")?;
                 }
 
                 if T::Arch::target_description_xml().is_some()
-                    || target.target_description_xml_override().is_some()
+                    || target.support_target_description_xml_override().is_some()
                 {
                     res.write_str(";qXfer:features:read+")?;
                 }
 
-                if target.memory_map().is_some() {
+                if target.support_memory_map().is_some() {
                     res.write_str(";qXfer:memory-map:read+")?;
                 }
 
-                if target.exec_file().is_some() {
+                if target.support_exec_file().is_some() {
                     res.write_str(";qXfer:exec-file:read+")?;
                 }
 
-                if target.auxv().is_some() {
+                if target.support_auxv().is_some() {
                     res.write_str(";qXfer:auxv:read+")?;
                 }
 
@@ -130,7 +132,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 HandlerStatus::NeedsOk
             }
             Base::qXferFeaturesRead(cmd) => {
-                let ret = if let Some(ops) = target.target_description_xml_override() {
+                let ret = if let Some(ops) = target.support_target_description_xml_override() {
                     ops.target_description_xml(cmd.offset, cmd.length, cmd.buf)
                         .handle_error()?
                 } else if let Some(xml) = T::Arch::target_description_xml() {
@@ -173,7 +175,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 HandlerStatus::Handled
             }
             Base::qAttached(cmd) => {
-                let is_attached = match target.extended_mode() {
+                let is_attached = match target.support_extended_mode() {
                     // when _not_ running in extended mode, just report that we're attaching to an
                     // existing process.
                     None => true, // assume attached to an existing process
@@ -266,7 +268,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 HandlerStatus::NeedsOk
             }
             Base::k(_) | Base::vKill(_) => {
-                match target.extended_mode() {
+                match target.support_extended_mode() {
                     // When not running in extended mode, stop the `GdbStub` and disconnect.
                     None => HandlerStatus::Disconnect(DisconnectReason::Kill),
 
@@ -660,13 +662,16 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
         macro_rules! guard_break {
             ($op:ident) => {
-                target.breakpoints().and_then(|ops| ops.$op()).is_some()
+                target
+                    .support_breakpoints()
+                    .and_then(|ops| ops.$op())
+                    .is_some()
             };
         }
 
         macro_rules! guard_catch_syscall {
             () => {
-                target.catch_syscalls().is_some()
+                target.support_catch_syscalls().is_some()
             };
         }
 
@@ -690,21 +695,21 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 res.write_num(sig as u8)?;
                 FinishExecStatus::Disconnect(DisconnectReason::TargetTerminated(sig))
             }
-            ThreadStopReason::SwBreak(tid) if guard_break!(sw_breakpoint) => {
+            ThreadStopReason::SwBreak(tid) if guard_break!(support_sw_breakpoint) => {
                 crate::__dead_code_marker!("sw_breakpoint", "stop_reason");
 
                 self.write_break_common(res, tid)?;
                 res.write_str("swbreak:;")?;
                 FinishExecStatus::Handled
             }
-            ThreadStopReason::HwBreak(tid) if guard_break!(hw_breakpoint) => {
+            ThreadStopReason::HwBreak(tid) if guard_break!(support_hw_breakpoint) => {
                 crate::__dead_code_marker!("hw_breakpoint", "stop_reason");
 
                 self.write_break_common(res, tid)?;
                 res.write_str("hwbreak:;")?;
                 FinishExecStatus::Handled
             }
-            ThreadStopReason::Watch { tid, kind, addr } if guard_break!(hw_watchpoint) => {
+            ThreadStopReason::Watch { tid, kind, addr } if guard_break!(support_hw_watchpoint) => {
                 crate::__dead_code_marker!("hw_watchpoint", "stop_reason");
 
                 self.write_break_common(res, tid)?;

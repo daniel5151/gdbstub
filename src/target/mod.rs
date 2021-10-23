@@ -126,24 +126,30 @@
 //! }
 //! ```
 //!
-//! ## Optional Methods (Protocol Extensions)
+//! ## Optional Protocol Extensions
 //!
 //! The GDB protocol is _massive_, and there are plenty of optional protocol
 //! extensions that targets can implement to enhance the base debugging
 //! experience. These protocol extensions range from relatively mundane things
 //! such as setting/removing breakpoints or reading/writing individual
-//! registers, but also include fancy things such as  support for time travel
+//! registers, but also include fancy things such as support for time travel
 //! debugging, running shell commands remotely, or even performing file IO on
 //! the target!
 //!
-//! As a starting point, consider implementing some of the breakpoint related
-//! extensions under [`breakpoints`](crate::target::ext::breakpoints). While
-//! setting/removing breakpoints is technically an "optional" part of the GDB
-//! protocol, I'm sure you'd be hard pressed to find a debugger that doesn't
-//! support breakpoints.
+//! `gdbstub` uses a somewhat unique approach to exposing these many features,
+//! called **Inlinable Dyn Extension Traits (IDETs)**. While this might sound a
+//! bit daunting, the API is actually quite straightforward, and described in
+//! great detail under the [`ext` module's documentation](ext).
 //!
-//! Please make sure to read and understand [the documentation](ext) regarding
-//! how IDETs work!
+//! As you being working on your `gdbstub` integration, take a moment to skim
+//! through and familiarize yourself with the many different protocol extensions
+//! that `gdbstub` implements!
+//!
+//! As a suggestion on where to start, consider implementing some of the
+//! breakpoint related extensions under
+//! [`breakpoints`](crate::target::ext::breakpoints). While setting/removing
+//! breakpoints is technically an "optional" part of the GDB protocol, I'm sure
+//! you'd be hard pressed to find a debugger that doesn't support breakpoints.
 //!
 //! ### Note: Missing Protocol Extensions
 //!
@@ -405,64 +411,67 @@ pub trait Target {
         <Self::Arch as Arch>::supports_optional_single_step()
     }
 
-    /// Set/Remove software breakpoints.
+    /// Support for setting / removing breakpoints.
     #[inline(always)]
-    fn breakpoints(&mut self) -> Option<ext::breakpoints::BreakpointsOps<Self>> {
+    fn support_breakpoints(&mut self) -> Option<ext::breakpoints::BreakpointsOps<Self>> {
         None
     }
 
-    /// Handle custom GDB `monitor` commands.
+    /// Support for handling custom GDB `monitor` commands.
     #[inline(always)]
-    fn monitor_cmd(&mut self) -> Option<ext::monitor_cmd::MonitorCmdOps<Self>> {
+    fn support_monitor_cmd(&mut self) -> Option<ext::monitor_cmd::MonitorCmdOps<Self>> {
         None
     }
 
     /// Support for Extended Mode operations.
     #[inline(always)]
-    fn extended_mode(&mut self) -> Option<ext::extended_mode::ExtendedModeOps<Self>> {
+    fn support_extended_mode(&mut self) -> Option<ext::extended_mode::ExtendedModeOps<Self>> {
         None
     }
 
-    /// Handle requests to get the target's current section (or segment)
-    /// offsets.
+    /// Support for handling requests to get the target's current section (or
+    /// segment) offsets.
     #[inline(always)]
-    fn section_offsets(&mut self) -> Option<ext::section_offsets::SectionOffsetsOps<Self>> {
+    fn support_section_offsets(&mut self) -> Option<ext::section_offsets::SectionOffsetsOps<Self>> {
         None
     }
 
-    /// Override the target description XML specified by `Target::Arch`.
+    /// Support for overriding the target description XML specified by
+    /// `Target::Arch`.
     #[inline(always)]
-    fn target_description_xml_override(
+    fn support_target_description_xml_override(
         &mut self,
     ) -> Option<ext::target_description_xml_override::TargetDescriptionXmlOverrideOps<Self>> {
         None
     }
 
-    /// Provide a target memory map.
+    /// Support for reading a target memory map.
     #[inline(always)]
-    fn memory_map(&mut self) -> Option<ext::memory_map::MemoryMapOps<Self>> {
+    fn support_memory_map(&mut self) -> Option<ext::memory_map::MemoryMapOps<Self>> {
         None
     }
 
-    /// Set/Remove syscall catchpoints.
+    /// Support for setting / removing syscall catchpoints.
     #[inline(always)]
-    fn catch_syscalls(&mut self) -> Option<ext::catch_syscalls::CatchSyscallsOps<Self>> {
+    fn support_catch_syscalls(&mut self) -> Option<ext::catch_syscalls::CatchSyscallsOps<Self>> {
         None
     }
 
-    /// Support Host I/O operations.
+    /// Support for Host I/O operations.
     #[inline(always)]
-    fn host_io(&mut self) -> Option<ext::host_io::HostIoOps<Self>> {
+    fn support_host_io(&mut self) -> Option<ext::host_io::HostIoOps<Self>> {
         None
     }
 
-    /// Provide exec-file
-    fn exec_file(&mut self) -> Option<ext::exec_file::ExecFileOps<Self>> {
+    /// Support for reading the current exec-file
+    #[inline(always)]
+    fn support_exec_file(&mut self) -> Option<ext::exec_file::ExecFileOps<Self>> {
         None
     }
 
-    /// Provide auxv
-    fn auxv(&mut self) -> Option<ext::auxv::AuxvOps<Self>> {
+    /// Support for reading the target's Auxillary Vector
+    #[inline(always)]
+    fn support_auxv(&mut self) -> Option<ext::auxv::AuxvOps<Self>> {
         None
     }
 }
@@ -476,72 +485,65 @@ macro_rules! impl_dyn_target {
             type Arch = A;
             type Error = E;
 
-            #[inline(always)]
             fn base_ops(&mut self) -> ext::base::BaseOps<Self::Arch, Self::Error> {
                 (**self).base_ops()
             }
 
-            #[inline(always)]
             fn use_implicit_sw_breakpoints(&self) -> bool {
                 (**self).use_implicit_sw_breakpoints()
             }
 
-            #[inline(always)]
             fn use_optional_single_step(&self) -> bool {
                 (**self).use_optional_single_step()
             }
 
-            #[inline(always)]
-            fn breakpoints(&mut self) -> Option<ext::breakpoints::BreakpointsOps<Self>> {
-                (**self).breakpoints()
+            fn support_breakpoints(&mut self) -> Option<ext::breakpoints::BreakpointsOps<Self>> {
+                (**self).support_breakpoints()
             }
 
-            #[inline(always)]
-            fn catch_syscalls(&mut self) -> Option<ext::catch_syscalls::CatchSyscallsOps<Self>> {
-                (**self).catch_syscalls()
+            fn support_monitor_cmd(&mut self) -> Option<ext::monitor_cmd::MonitorCmdOps<Self>> {
+                (**self).support_monitor_cmd()
             }
 
-            #[inline(always)]
-            fn monitor_cmd(&mut self) -> Option<ext::monitor_cmd::MonitorCmdOps<Self>> {
-                (**self).monitor_cmd()
+            fn support_extended_mode(
+                &mut self,
+            ) -> Option<ext::extended_mode::ExtendedModeOps<Self>> {
+                (**self).support_extended_mode()
             }
 
-            #[inline(always)]
-            fn exec_file(&mut self) -> Option<ext::exec_file::ExecFileOps<Self>> {
-                (**self).exec_file()
+            fn support_section_offsets(
+                &mut self,
+            ) -> Option<ext::section_offsets::SectionOffsetsOps<Self>> {
+                (**self).support_section_offsets()
             }
 
-            #[inline(always)]
-            fn extended_mode(&mut self) -> Option<ext::extended_mode::ExtendedModeOps<Self>> {
-                (**self).extended_mode()
-            }
-
-            #[inline(always)]
-            fn host_io(&mut self) -> Option<ext::host_io::HostIoOps<Self>> {
-                (**self).host_io()
-            }
-
-            #[inline(always)]
-            fn memory_map(&mut self) -> Option<ext::memory_map::MemoryMapOps<Self>> {
-                (**self).memory_map()
-            }
-
-            #[inline(always)]
-            fn auxv(&mut self) -> Option<ext::auxv::AuxvOps<Self>> {
-                (**self).auxv()
-            }
-
-            #[inline(always)]
-            fn section_offsets(&mut self) -> Option<ext::section_offsets::SectionOffsetsOps<Self>> {
-                (**self).section_offsets()
-            }
-
-            #[inline(always)]
-            fn target_description_xml_override(
+            fn support_target_description_xml_override(
                 &mut self,
             ) -> Option<ext::target_description_xml_override::TargetDescriptionXmlOverrideOps<Self>>
             {
-                (**self).target_description_xml_override()
+                (**self).support_target_description_xml_override()
+            }
+
+            fn support_memory_map(&mut self) -> Option<ext::memory_map::MemoryMapOps<Self>> {
+                (**self).support_memory_map()
+            }
+
+            fn support_catch_syscalls(
+                &mut self,
+            ) -> Option<ext::catch_syscalls::CatchSyscallsOps<Self>> {
+                (**self).support_catch_syscalls()
+            }
+
+            fn support_host_io(&mut self) -> Option<ext::host_io::HostIoOps<Self>> {
+                (**self).support_host_io()
+            }
+
+            fn support_exec_file(&mut self) -> Option<ext::exec_file::ExecFileOps<Self>> {
+                (**self).support_exec_file()
+            }
+
+            fn support_auxv(&mut self) -> Option<ext::auxv::AuxvOps<Self>> {
+                (**self).support_auxv()
             }
         }
     };

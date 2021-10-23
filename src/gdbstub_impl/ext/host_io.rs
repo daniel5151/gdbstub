@@ -11,7 +11,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         target: &mut T,
         command: HostIo,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
-        let ops = match target.host_io() {
+        let ops = match target.support_host_io() {
             Some(ops) => ops,
             None => return Ok(HandlerStatus::Handled),
         };
@@ -32,8 +32,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         }
 
         let handler_status = match command {
-            HostIo::vFileOpen(cmd) if ops.enable_open().is_some() => {
-                let ops = ops.enable_open().unwrap();
+            HostIo::vFileOpen(cmd) if ops.support_open().is_some() => {
+                let ops = ops.support_open().unwrap();
                 handle_hostio_result! {
                     if let Ok(fd) = ops.open(cmd.filename, cmd.flags, cmd.mode) => {
                         res.write_str("F")?;
@@ -42,8 +42,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 }
                 HandlerStatus::Handled
             }
-            HostIo::vFileClose(cmd) if ops.enable_close().is_some() => {
-                let ops = ops.enable_close().unwrap();
+            HostIo::vFileClose(cmd) if ops.support_close().is_some() => {
+                let ops = ops.support_close().unwrap();
                 handle_hostio_result! {
                     if let Ok(()) = ops.close(cmd.fd) => {
                         res.write_str("F0")?;
@@ -51,8 +51,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 }
                 HandlerStatus::Handled
             }
-            HostIo::vFilePread(cmd) if ops.enable_pread().is_some() => {
-                let ops = ops.enable_pread().unwrap();
+            HostIo::vFilePread(cmd) if ops.support_pread().is_some() => {
+                let ops = ops.support_pread().unwrap();
                 handle_hostio_result! {
                     if let Ok(ret) = ops.pread(cmd.fd, cmd.count, cmd.offset, cmd.buf) => {
                         res.write_str("F")?;
@@ -64,10 +64,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                 HandlerStatus::Handled
             }
-            HostIo::vFilePwrite(cmd) if ops.enable_pwrite().is_some() => {
+            HostIo::vFilePwrite(cmd) if ops.support_pwrite().is_some() => {
                 let offset = <T::Arch as Arch>::Usize::from_be_bytes(cmd.offset)
                     .ok_or(Error::TargetMismatch)?;
-                let ops = ops.enable_pwrite().unwrap();
+                let ops = ops.support_pwrite().unwrap();
                 handle_hostio_result! {
                     if let Ok(ret) = ops.pwrite(cmd.fd, offset, cmd.data) => {
                         res.write_str("F")?;
@@ -76,8 +76,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 };
                 HandlerStatus::Handled
             }
-            HostIo::vFileFstat(cmd) if ops.enable_fstat().is_some() => {
-                let ops = ops.enable_fstat().unwrap();
+            HostIo::vFileFstat(cmd) if ops.support_fstat().is_some() => {
+                let ops = ops.support_fstat().unwrap();
                 handle_hostio_result! {
                     if let Ok(stat) = ops.fstat(cmd.fd) => {
                         let size = core::mem::size_of::<HostIoStat>();
@@ -101,8 +101,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 };
                 HandlerStatus::Handled
             }
-            HostIo::vFileUnlink(cmd) if ops.enable_unlink().is_some() => {
-                let ops = ops.enable_unlink().unwrap();
+            HostIo::vFileUnlink(cmd) if ops.support_unlink().is_some() => {
+                let ops = ops.support_unlink().unwrap();
                 handle_hostio_result! {
                     if let Ok(()) = ops.unlink(cmd.filename) => {
                         res.write_str("F0")?;
@@ -110,8 +110,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 };
                 HandlerStatus::Handled
             }
-            HostIo::vFileReadlink(cmd) if ops.enable_readlink().is_some() => {
-                let ops = ops.enable_readlink().unwrap();
+            HostIo::vFileReadlink(cmd) if ops.support_readlink().is_some() => {
+                let ops = ops.support_readlink().unwrap();
                 handle_hostio_result! {
                     if let Ok(ret) = ops.readlink(cmd.filename, cmd.buf) => {
                         res.write_str("F")?;
@@ -123,8 +123,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                 HandlerStatus::Handled
             }
-            HostIo::vFileSetfs(cmd) if ops.enable_setfs().is_some() => {
-                let ops = ops.enable_setfs().unwrap();
+            HostIo::vFileSetfs(cmd) if ops.support_setfs().is_some() => {
+                let ops = ops.support_setfs().unwrap();
                 handle_hostio_result! {
                     if let Ok(()) = ops.setfs(cmd.fs) => {
                         res.write_str("F0")?;

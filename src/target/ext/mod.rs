@@ -110,7 +110,7 @@
 //!
 //!     // Optional extension
 //!     #[inline(always)]
-//!     fn get_protocol_ext(&mut self) -> Option<ProtocolExtOps<Self>> {
+//!     fn support_protocol_ext(&mut self) -> Option<ProtocolExtOps<Self>> {
 //!         // disabled by default
 //!         None
 //!     }
@@ -140,14 +140,14 @@
 //! ```
 //!
 //! - (user) Implements the base `Protocol` trait, overriding the
-//!   `get_protocol_ext` method to return `Some(self)`, which will effectively
-//!   "enable" the extension.
+//!   `support_protocol_ext` method to return `Some(self)`, which will
+//!   effectively "enable" the extension.
 //!
 //! ```rust,ignore
 //! impl Protocol for MyTarget {
 //!     // Optional extension
 //!     #[inline(always)]
-//!     fn get_protocol_ext(&mut self) -> Option<ProtocolExtOps<Self>> {
+//!     fn support_protocol_ext(&mut self) -> Option<ProtocolExtOps<Self>> {
 //!         Some(self) // will not compile unless `MyTarget` also implements `ProtocolExt`
 //!     }
 //!
@@ -166,8 +166,8 @@
 //!
 //! Now, here's where IDETs really shine: If the user didn't implement
 //! `ProtocolExt`, but _did_ try to enable the feature by overriding
-//! `get_protocol_ext` to return `Some(self)`, they'll get a compile-time error
-//! that looks something like this:
+//! `support_protocol_ext` to return `Some(self)`, they'll get a compile-time
+//! error that looks something like this:
 //!
 //! ```text
 //! error[E0277]: the trait bound `MyTarget: ProtocolExt` is not satisfied
@@ -187,7 +187,7 @@
 //!
 //! ```rust,ignore
 //! fn execute_protocol(mut target: impl Target) {
-//!     match target.get_protocol_ext() {
+//!     match target.support_protocol_ext() {
 //!         Some(ops) => ops.foo(),
 //!         None => { /* fallback when not enabled */ }
 //!     }
@@ -197,11 +197,12 @@
 //! This is already pretty cool, but what's _even cooler_ is that if you take a
 //! look at the generated assembly of a monomorphized `execute_protocol` method
 //! (e.g: using godbolt.org), you'll find that the compiler is able to
-//! efficiently inline and devirtualize _all_ the calls to `get_protocol_ext`
-//! method, which in-turn allows the dead-code-eliminator to work its magic, and
-//! remove the unused branches from the generated code! i.e: If a target
-//! implemention didn't implement the `ProtocolExt` extension, then that `match`
-//! statement in `execute_protocol` would simply turn into a noop!
+//! efficiently inline and devirtualize _all_ the calls to
+//! `support_protocol_ext` method, which in-turn allows the dead-code-eliminator
+//! to work its magic, and remove the unused branches from the generated code!
+//! i.e: If a target implemention didn't implement the `ProtocolExt` extension,
+//! then that `match` statement in `execute_protocol` would simply turn into a
+//! noop!
 //!
 //! If IDETs are something you're interested in, consider checking out
 //! [daniel5151/optional-trait-methods](https://github.com/daniel5151/optional-trait-methods)
@@ -233,9 +234,9 @@
 //!      "flipping" between the two at runtime. Nonetheless, it serves as a good
 //!      guardrail.
 //! - **Enforce dead-code-elimination _without_ `cargo` feature flags**
-//!     - This is a really awesome trick: by wrapping code in a `if
-//!       target.get_protocol_ext().is_some()` block, it's possible to specify
-//!       _arbitrary_ blocks of code to be feature-dependent!
+//!     - This is a really awesome trick: by wrapping code in an `if
+//!       target.support_protocol_ext().is_some()` block, it's possible to
+//!       specify _arbitrary_ blocks of code to be feature-dependent!
 //!     - This is used to great effect in `gdbstub` to optimize-out any packet
 //!       parsing / handler code for unimplemented protocol extensions.
 

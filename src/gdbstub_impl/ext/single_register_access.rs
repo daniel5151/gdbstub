@@ -59,11 +59,11 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         command: SingleRegisterAccess<'a>,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
         match target.base_ops() {
-            BaseOps::SingleThread(ops) => match ops.single_register_access() {
+            BaseOps::SingleThread(ops) => match ops.support_single_register_access() {
                 None => Ok(HandlerStatus::Handled),
                 Some(ops) => Self::inner(res, ops, command, ()),
             },
-            BaseOps::MultiThread(ops) => match ops.single_register_access() {
+            BaseOps::MultiThread(ops) => match ops.support_single_register_access() {
                 None => Ok(HandlerStatus::Handled),
                 Some(ops) => Self::inner(res, ops, command, self.current_mem_tid),
             },

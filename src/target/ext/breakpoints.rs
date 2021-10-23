@@ -5,21 +5,21 @@ use crate::target::{Target, TargetResult};
 
 /// Target Extension - Set/Remove Breakpoints.
 pub trait Breakpoints: Target {
-    /// Set/Remote software breakpoints.
+    /// Support for setting / removing software breakpoints.
     #[inline(always)]
-    fn sw_breakpoint(&mut self) -> Option<SwBreakpointOps<Self>> {
+    fn support_sw_breakpoint(&mut self) -> Option<SwBreakpointOps<Self>> {
         None
     }
 
-    /// Set/Remote hardware breakpoints.
+    /// Support for setting / removing hardware breakpoints.
     #[inline(always)]
-    fn hw_breakpoint(&mut self) -> Option<HwBreakpointOps<Self>> {
+    fn support_hw_breakpoint(&mut self) -> Option<HwBreakpointOps<Self>> {
         None
     }
 
-    /// Set/Remote hardware watchpoints.
+    /// Support for setting / removing hardware watchpoints.
     #[inline(always)]
-    fn hw_watchpoint(&mut self) -> Option<HwWatchpointOps<Self>> {
+    fn support_hw_watchpoint(&mut self) -> Option<HwWatchpointOps<Self>> {
         None
     }
 }

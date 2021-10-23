@@ -29,7 +29,7 @@ impl Target for DummyTarget {
     }
 
     #[inline(always)]
-    fn breakpoints(&mut self) -> Option<target::ext::breakpoints::BreakpointsOps<Self>> {
+    fn support_breakpoints(&mut self) -> Option<target::ext::breakpoints::BreakpointsOps<Self>> {
         Some(self)
     }
 }
@@ -118,7 +118,7 @@ impl MultiThreadOps for DummyTarget {
 
 impl target::ext::breakpoints::Breakpoints for DummyTarget {
     #[inline(always)]
-    fn sw_breakpoint(&mut self) -> Option<target::ext::breakpoints::SwBreakpointOps<Self>> {
+    fn support_sw_breakpoint(&mut self) -> Option<target::ext::breakpoints::SwBreakpointOps<Self>> {
         Some(self)
     }
 }
