@@ -1,6 +1,7 @@
 use core::convert::{TryFrom, TryInto};
 
 use armv4t_emu::{reg, Memory};
+use gdbstub::common::Signal;
 use gdbstub::target;
 use gdbstub::target::ext::base::singlethread::SingleThreadOps;
 use gdbstub::target::{Target, TargetError, TargetResult};
@@ -134,7 +135,7 @@ impl Target for Emu {
 }
 
 impl SingleThreadOps for Emu {
-    fn resume(&mut self, signal: Option<u8>) -> Result<(), Self::Error> {
+    fn resume(&mut self, signal: Option<Signal>) -> Result<(), Self::Error> {
         // Upon returning from the `resume` method, the target being debugged should be
         // configured to run according to whatever resume actions the GDB client has
         // specified (as specified by `set_resume_action`, `resume_range_step`,
@@ -243,7 +244,7 @@ impl SingleThreadOps for Emu {
 }
 
 impl target::ext::base::singlethread::SingleThreadSingleStep for Emu {
-    fn step(&mut self, signal: Option<u8>) -> Result<(), Self::Error> {
+    fn step(&mut self, signal: Option<Signal>) -> Result<(), Self::Error> {
         if signal.is_some() {
             return Err("no support for stepping with signal");
         }

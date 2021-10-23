@@ -3,7 +3,7 @@ use core::marker::PhantomData;
 use managed::ManagedSlice;
 
 use crate::arch::Arch;
-use crate::common::*;
+use crate::common::{Signal, Tid};
 use crate::connection::{Connection, ConnectionExt};
 use crate::protocol::commands::Command;
 use crate::protocol::{Packet, ResponseWriter, SpecificIdKind};
@@ -29,7 +29,7 @@ pub enum DisconnectReason {
     /// Target exited with given status code
     TargetExited(u8),
     /// Target terminated with given signal
-    TargetTerminated(u8),
+    TargetTerminated(Signal),
     /// GDB issued a disconnect command
     Disconnect,
     /// GDB issued a kill command
@@ -86,8 +86,8 @@ pub mod gdbstub_run_blocking {
         /// `None` if the interrupt should be ignored.
         ///
         /// _Suggestion_: If you're unsure which stop reason you should report,
-        /// [`ThreadStopReason::Signal(2)`](ThreadStopReason::Signal)
-        /// (i.e: SIGINT) is a sensible default.
+        /// [`ThreadStopReason::Signal(Signal::SIGINT)`](ThreadStopReason) is a
+        /// sensible default.
         ///
         /// # Single threaded targets
         ///

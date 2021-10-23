@@ -82,7 +82,8 @@
 //! use gdbstub::target::{Target, TargetResult};
 //! use gdbstub::target::ext::base::BaseOps;
 //! use gdbstub::target::ext::base::singlethread::SingleThreadOps;
-//! use gdbstub::target::ext::base::singlethread::{StopReason};
+//! use gdbstub::target::ext::base::singlethread::StopReason;
+//! use gdbstub::common::Signal;
 //!
 //! struct MyTarget;
 //!
@@ -98,7 +99,7 @@
 //! impl SingleThreadOps for MyTarget {
 //!     fn resume(
 //!         &mut self,
-//!         signal: Option<u8>,
+//!         signal: Option<Signal>,
 //!     ) -> Result<(), ()> { todo!() }
 //!
 //!     fn read_registers(

@@ -1,4 +1,4 @@
-use gdbstub::common::Tid;
+use gdbstub::common::{Signal, Tid};
 use gdbstub::target;
 use gdbstub::target::ext::base::multithread::MultiThreadOps;
 use gdbstub::target::{Target, TargetResult};
@@ -55,7 +55,7 @@ impl MultiThreadOps for DummyTarget {
     fn set_resume_action_continue(
         &mut self,
         _tid: Tid,
-        _signal: Option<u8>,
+        _signal: Option<Signal>,
     ) -> Result<(), Self::Error> {
         print_str("> set_resume_action_continue");
         Ok(())

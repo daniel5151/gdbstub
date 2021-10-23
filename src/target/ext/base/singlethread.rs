@@ -1,6 +1,7 @@
 //! Base debugging operations for single threaded targets.
 
 use crate::arch::Arch;
+use crate::common::Signal;
 use crate::target::ext::breakpoints::WatchKind;
 use crate::target::ext::catch_syscalls::CatchSyscallPosition;
 use crate::target::{Target, TargetResult};
@@ -29,7 +30,7 @@ pub trait SingleThreadOps: Target {
     ///
     /// Omitting PC adjustment may result in unexpected execution flow and/or
     /// breakpoints not appearing to work correctly.
-    fn resume(&mut self, signal: Option<u8>) -> Result<(), Self::Error>;
+    fn resume(&mut self, signal: Option<Signal>) -> Result<(), Self::Error>;
 
     /// Support for optimized [single stepping].
     ///
@@ -147,7 +148,7 @@ pub trait SingleThreadSingleStep: Target + SingleThreadOps {
     /// target.
     ///
     /// [Single step]: https://sourceware.org/gdb/current/onlinedocs/gdb/Continuing-and-Stepping.html#index-stepi
-    fn step(&mut self, signal: Option<u8>) -> Result<(), Self::Error>;
+    fn step(&mut self, signal: Option<Signal>) -> Result<(), Self::Error>;
 }
 
 define_ext!(SingleThreadSingleStepOps, SingleThreadSingleStep);
@@ -200,9 +201,9 @@ pub enum StopReason<U> {
     /// The process exited with the specified exit status.
     Exited(u8),
     /// The process terminated with the specified signal number.
-    Terminated(u8),
+    Terminated(Signal),
     /// The program received a signal.
-    Signal(u8),
+    Signal(Signal),
     /// Hit a software breakpoint (e.g. due to a trap instruction).
     ///
     /// Requires: [`SwBreakpoint`].

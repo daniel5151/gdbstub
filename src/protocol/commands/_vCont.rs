@@ -89,10 +89,10 @@ pub struct VContAction<'a> {
 #[derive(Debug, Copy, Clone)]
 pub enum VContKind<'a> {
     Continue,
-    ContinueWithSig(u8),
+    ContinueWithSig(Signal),
     RangeStep(HexString<'a>, HexString<'a>),
     Step,
-    StepWithSig(u8),
+    StepWithSig(Signal),
     Stop,
 }
 
@@ -104,8 +104,8 @@ impl<'a> VContKind<'a> {
             [b'c'] => Continue,
             [b's'] => Step,
             [b't'] => Stop,
-            [b'C', sig @ ..] => ContinueWithSig(decode_hex(sig).ok()?),
-            [b'S', sig @ ..] => StepWithSig(decode_hex(sig).ok()?),
+            [b'C', sig @ ..] => ContinueWithSig(Signal::from_protocol_u8(decode_hex(sig).ok()?)),
+            [b'S', sig @ ..] => StepWithSig(Signal::from_protocol_u8(decode_hex(sig).ok()?)),
             [b'r', range @ ..] => {
                 let mut range = range.split(|b| *b == b',');
                 RangeStep(HexString(range.next()?), HexString(range.next()?))

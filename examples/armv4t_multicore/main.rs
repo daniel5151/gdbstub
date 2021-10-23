@@ -3,9 +3,11 @@ use std::net::{TcpListener, TcpStream};
 #[cfg(unix)]
 use std::os::unix::net::{UnixListener, UnixStream};
 
+use gdbstub::common::Signal;
 use gdbstub::gdbstub_run_blocking;
 use gdbstub::target::ext::base::multithread::ThreadStopReason;
-use gdbstub::{target::Target, ConnectionExt, DisconnectReason, GdbStub};
+use gdbstub::target::Target;
+use gdbstub::{ConnectionExt, DisconnectReason, GdbStub};
 
 pub type DynResult<T> = Result<T, Box<dyn std::error::Error>>;
 
@@ -104,7 +106,7 @@ impl gdbstub::gdbstub_run_blocking::BlockingEventLoop for EmuGdbEventLoop {
                 let tid = gdb::cpuid_to_tid(cpuid);
                 let stop_reason = match event {
                     emu::Event::DoneStep => ThreadStopReason::DoneStep,
-                    emu::Event::Halted => ThreadStopReason::Terminated(17), // SIGSTOP
+                    emu::Event::Halted => ThreadStopReason::Terminated(Signal::SIGSTOP),
                     emu::Event::Break => ThreadStopReason::SwBreak(tid),
                     emu::Event::WatchWrite(addr) => ThreadStopReason::Watch {
                         tid,
@@ -133,7 +135,7 @@ impl gdbstub::gdbstub_run_blocking::BlockingEventLoop for EmuGdbEventLoop {
         // special action that needs to be taken to interrupt the underlying target. It
         // is implicitly paused whenever the stub isn't within the
         // `wait_for_stop_reason` callback.
-        Ok(Some(ThreadStopReason::Signal(2)))
+        Ok(Some(ThreadStopReason::Signal(Signal::SIGINT)))
     }
 }
 

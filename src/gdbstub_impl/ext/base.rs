@@ -677,7 +677,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             }
             ThreadStopReason::Signal(sig) => {
                 res.write_str("S")?;
-                res.write_num(sig)?;
+                res.write_num(sig as u8)?;
                 FinishExecStatus::Handled
             }
             ThreadStopReason::Exited(code) => {
@@ -687,7 +687,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             }
             ThreadStopReason::Terminated(sig) => {
                 res.write_str("X")?;
-                res.write_num(sig)?;
+                res.write_num(sig as u8)?;
                 FinishExecStatus::Disconnect(DisconnectReason::TargetTerminated(sig))
             }
             ThreadStopReason::SwBreak(tid) if guard_break!(sw_breakpoint) => {

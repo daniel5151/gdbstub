@@ -165,7 +165,8 @@ If you happen to stumble across this crate and end up using it to debug some bar
 
 -   When the `paranoid_unsafe` feature is enabled, the following `unsafe` code is _removed_:
     -   `src/protocol/packet.rs`: Swaps a couple slice-index methods in `PacketBuf` to use `get_unchecked_mut`. The public API of struct ensures that the bounds used to index into the array remain in-bounds.
-    -   `src/protocol/common/hex`: Use an alternate implementation of `decode_hex_buf`/`decode_bin_buf` which uses unsafe slice indexing.
+    -   `src/protocol/common/hex.rs`: Use an alternate implementation of `decode_hex_buf`/`decode_bin_buf` which uses unsafe slice indexing.
+    -   `src/common.rs`: Use a checked transmute to convert a `u8` to a `Signal`
 
 -   When the `std` feature is enabled:
     -   `src/connection/impls/unixstream.rs`: An implementation of `UnixStream::peek` which uses `libc::recv`. This manual implementation will be removed once [rust-lang/rust#76923](https://github.com/rust-lang/rust/issues/76923) is stabilized.

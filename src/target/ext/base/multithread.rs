@@ -1,6 +1,7 @@
 //! Base debugging operations for multi threaded targets.
 
 use crate::arch::Arch;
+use crate::common::Signal;
 use crate::common::*;
 use crate::target::ext::breakpoints::WatchKind;
 use crate::target::ext::catch_syscalls::CatchSyscallPosition;
@@ -82,7 +83,7 @@ pub trait MultiThreadOps: Target {
     fn set_resume_action_continue(
         &mut self,
         tid: Tid,
-        signal: Option<u8>,
+        signal: Option<Signal>,
     ) -> Result<(), Self::Error>;
 
     /// Support for optimized [single stepping].
@@ -243,7 +244,11 @@ pub trait MultiThreadSingleStep: Target + MultiThreadOps {
     /// target-specific fatal error
     ///
     /// [Single step]: https://sourceware.org/gdb/current/onlinedocs/gdb/Continuing-and-Stepping.html#index-stepi
-    fn set_resume_action_step(&mut self, tid: Tid, signal: Option<u8>) -> Result<(), Self::Error>;
+    fn set_resume_action_step(
+        &mut self,
+        tid: Tid,
+        signal: Option<Signal>,
+    ) -> Result<(), Self::Error>;
 }
 
 define_ext!(MultiThreadSingleStepOps, MultiThreadSingleStep);
@@ -295,9 +300,9 @@ pub enum ThreadStopReason<U> {
     /// The process exited with the specified exit status.
     Exited(u8),
     /// The process terminated with the specified signal number.
-    Terminated(u8),
+    Terminated(Signal),
     /// The program received a signal.
-    Signal(u8),
+    Signal(Signal),
     /// A thread hit a software breakpoint (e.g. due to a trap instruction).
     ///
     /// Requires: [`SwBreakpoint`].

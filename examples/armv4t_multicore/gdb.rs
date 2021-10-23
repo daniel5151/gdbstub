@@ -1,6 +1,6 @@
 use armv4t_emu::{reg, Memory};
 
-use gdbstub::common::Tid;
+use gdbstub::common::{Signal, Tid};
 use gdbstub::target;
 use gdbstub::target::ext::base::multithread::MultiThreadOps;
 use gdbstub::target::ext::breakpoints::WatchKind;
@@ -72,7 +72,7 @@ impl MultiThreadOps for Emu {
     fn set_resume_action_continue(
         &mut self,
         tid: Tid,
-        signal: Option<u8>,
+        signal: Option<Signal>,
     ) -> Result<(), Self::Error> {
         if signal.is_some() {
             return Err("no support for continuing with signal");
@@ -165,7 +165,11 @@ impl MultiThreadOps for Emu {
 }
 
 impl target::ext::base::multithread::MultiThreadSingleStep for Emu {
-    fn set_resume_action_step(&mut self, tid: Tid, signal: Option<u8>) -> Result<(), Self::Error> {
+    fn set_resume_action_step(
+        &mut self,
+        tid: Tid,
+        signal: Option<Signal>,
+    ) -> Result<(), Self::Error> {
         if signal.is_some() {
             return Err("no support for stepping with signal");
         }
