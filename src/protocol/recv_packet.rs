@@ -1,3 +1,6 @@
+#[cfg(feature = "trace-pkt")]
+use alloc::string::String;
+
 use managed::ManagedSlice;
 
 use crate::util::managed_vec::{CapacityError, ManagedVec};
