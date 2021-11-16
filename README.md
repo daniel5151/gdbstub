@@ -2,6 +2,7 @@
 
 [![](https://img.shields.io/crates/v/gdbstub.svg)](https://crates.io/crates/gdbstub)
 [![](https://docs.rs/gdbstub/badge.svg)](https://docs.rs/gdbstub)
+[![](https://img.shields.io/badge/license-MIT%2FApache-blue.svg)](./LICENSE)
 
 An ergonomic and easy-to-integrate implementation of the [GDB Remote Serial Protocol](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Protocol.html#Remote-Protocol) in Rust, with full `#![no_std]` support.
 
@@ -200,3 +201,14 @@ Additionally, while not strict "blockers" to `1.0.0`, it would be good to explor
 -   [ ] Supporting multi-arch debugging via a single target
     -   e.g: debugging both x86 and x64 processes when running in extended mode
 -   [ ] Proper handling of client "nack" packets for spotty connections.
+
+## License
+
+gdbstub is free and open source! All code in this repository is dual-licensed under either:
+
+* MIT License ([LICENSE-MIT](docs/LICENSE-MIT) or [http://opensource.org/licenses/MIT](http://opensource.org/licenses/MIT))
+* Apache License, Version 2.0 ([LICENSE-APACHE](docs/LICENSE-APACHE) or [http://www.apache.org/licenses/LICENSE-2.0](http://www.apache.org/licenses/LICENSE-2.0))
+
+at your option. This means you can select the license you prefer! This dual-licensing approach is the de-facto standard in the Rust ecosystem and there are [very good reasons](https://github.com/daniel5151/gdbstub/issues/68) to include both.
+
+Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.

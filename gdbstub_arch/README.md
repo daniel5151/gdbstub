@@ -2,6 +2,7 @@
 
 [![](https://img.shields.io/crates/v/gdbstub_arch.svg)](https://crates.io/crates/gdbstub_arch)
 [![](https://docs.rs/gdbstub_arch/badge.svg)](https://docs.rs/gdbstub_arch)
+[![](https://img.shields.io/badge/license-MIT%2FApache-blue.svg)](./LICENSE)
 
 Community-contributed implementations of `gdbstub::arch::Arch` for various
 architectures.
