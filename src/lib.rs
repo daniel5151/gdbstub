@@ -2,6 +2,29 @@
 //! [GDB Remote Serial Protocol](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Protocol.html#Remote-Protocol)
 //! in Rust, with full `#![no_std]` support.
 //!
+//! ## Feature flags
+//!
+//! By default, both the `std` and `alloc` features are enabled.
+//!
+//! When using `gdbstub` in `#![no_std]` contexts, make sure to set
+//! `default-features = false`.
+//!
+//! - `alloc`
+//!     - Implement `Connection` for `Box<dyn Connection>`.
+//!     - Log outgoing packets via `log::trace!` using a heap-allocated output
+//!       buffer.
+//!     - Provide built-in implementations for certain protocol features:
+//!         - Use a heap-allocated packet buffer in `GdbStub` (if none is
+//!           provided via `GdbStubBuilder::with_packet_buffer`).
+//!         - (Monitor Command) Use a heap-allocated output buffer in
+//!           `ConsoleOutput`.
+//! - `std` (implies `alloc`)
+//!     - Implement `Connection` for [`TcpStream`](std::net::TcpStream) and
+//!       [`UnixStream`](std::os::unix::net::UnixStream).
+//!     - Implement [`std::error::Error`] for `gdbstub::Error`.
+//!     - Add a `TargetError::Io` error variant to simplify I/O Error handling
+//!       from `Target` methods.
+//!
 //! ## Getting Started
 //!
 //! This section provides a brief overview of the key traits and types used in
@@ -102,7 +125,101 @@
 //! ### `GdbStub::run_blocking`: The quick and easy way to get up and running
 //! with `gdbstub`
 //!
-//! TODO: MORE DOCS
+//! If you're running on a hosted system with threads to spare, the quickest way
+//! to get up and running with `gdbstub` is by using the
+//! [`GdbStub::run_blocking`] API alongside the
+//! [`BlockingEventLoop`](crate::gdbstub_run_blocking::BlockingEventLoop) trait.
+//!
+//! A basic integration might look something like this:
+//!
+//! ```rust,ignore
+//! use gdbstub::gdbstub_run_blocking;
+//! use gdbstub::ConnectionExt; // note the use of `ConnectionExt` vs. `Connection`
+//! use gdbstub::target::ext::base::multithread::ThreadStopReason;
+//! use gdbstub::target::ext::base::singlethread::StopReason;
+//!
+//! enum MyGdbBlockingEventLoop {}
+//!
+//! impl gdbstub_run_blocking::BlockingEventLoop for MyGdbBlockingEventLoop {
+//!     type Target = MyTarget;
+//!     type Connection = Box<dyn ConnectionExt<Error = std::io::Error>>;
+//!
+//!     /// Invoked immediately after the target's `resume` method has been
+//!     /// called. The implementation should block until either the target
+//!     /// reports a stop reason, or if new data was sent over the connection.
+//!     fn wait_for_stop_reason(
+//!         target: &mut MyTarget,
+//!         conn: &mut Self::Connection,
+//!     ) -> Result<
+//!         gdbstub_run_blocking::Event<u32>,
+//!         gdbstub_run_blocking::WaitForStopReasonError<
+//!             <Self::Target as Target>::Error,
+//!             std::io::Error,
+//!         >,
+//!     > {
+//!         // the specific mechanism to "select" between incoming data and target
+//!         // events will depend on your project's architecture.
+//!         //
+//!         // some examples of how you might implement this method include: `epoll`,
+//!         // `select!` across multiple event channels, periodic polling, etc...
+//!         let event = match target.run_and_check_for_incoming_data(conn) {
+//!             MyTargetEvent::IncomingData => {
+//!                 let byte = conn
+//!                     .read() // method provided by the `ConnectionExt` trait
+//!                     .map_err(gdbstub_run_blocking::WaitForStopReasonError::Connection)?;
+//!
+//!                 gdbstub_run_blocking::Event::IncomingData(byte)
+//!             }
+//!             MyTargetEvent::StopReason(reason) => {
+//!                 gdbstub_run_blocking::Event::TargetStopped(
+//!                     target_event_to_gdb_event(reason)
+//!                 )
+//!             }
+//!         };
+//!
+//!         Ok(event)
+//!     }
+//!
+//!     /// Invoked when the GDB client sends a Ctrl-C interrupt. The
+//!     /// implementation should handle the interrupt request + return an
+//!     /// appropriate stop reason to report back to the GDB client, or return
+//!     /// `None` if the interrupt should be ignored.
+//!     fn on_interrupt(
+//!         target: &mut MyTarget,
+//!     ) -> Result<Option<ThreadStopReason<u32>>, <MyTarget as Target>::Error> {
+//!         target.stop_in_response_to_ctrl_c_interrupt()?;
+//!         // a pretty typical stop reason in response to a Ctrl-C interrupt is to
+//!         // report a "Signal::SIGINT".
+//!         Ok(Some(StopReason::Signal(Signal::SIGINT).into()))
+//!     }
+//! }
+//!
+//! fn gdb_event_loop_thread(
+//!     debugger: gdbstub::GdbStub<MyTarget, Box<dyn ConnectionExt<Error = std::io::Error>>>,
+//!     mut target: MyTarget
+//! ) {
+//!     match debugger.run_blocking::<MyGdbBlockingEventLoop>(&mut target) {
+//!         Ok(disconnect_reason) => match disconnect_reason {
+//!             DisconnectReason::Disconnect => {
+//!                 println!("Client disconnected")
+//!             }
+//!             DisconnectReason::TargetExited(code) => {
+//!                 println!("Target exited with code {}", code)
+//!             }
+//!             DisconnectReason::TargetTerminated(sig) => {
+//!                 println!("Target terminated with signal {}", sig)
+//!             }
+//!             DisconnectReason::Kill => println!("GDB sent a kill command"),
+//!         },
+//!         Err(gdbstub::GdbStubError::TargetError(e)) => {
+//!             println!("target encountered a fatal error: {}", e)
+//!         }
+//!         Err(e) => {
+//!             println!("gdbstub encountered a fatal error: {}", e)
+//!         }
+//!     }
+//! }
+//! ```
 // use an explicit doc attribute to avoid automatic rustfmt wrapping
 #![doc = "### `GdbStubStateMachine`: Driving `gdbstub` in an async event loop / via interrupt handlers"]
 //!
@@ -128,30 +245,8 @@
 //! the `GdbStub::run_blocking` API, which "pulls" these events in a blocking
 //! manner.
 //!
-//! TODO: MORE DOCS
-//!
-//! ## Feature flags
-//!
-//! By default, both the `std` and `alloc` features are enabled.
-//!
-//! When using `gdbstub` in `#![no_std]` contexts, make sure to set
-//! `default-features = false`.
-//!
-//! - `alloc`
-//!     - Implement `Connection` for `Box<dyn Connection>`.
-//!     - Log outgoing packets via `log::trace!` (uses a heap-allocated output
-//!       buffer).
-//!     - Provide built-in implementations for certain protocol features:
-//!         - Use a heap-allocated packet buffer in `GdbStub` (if none is
-//!           provided via `GdbStubBuilder::with_packet_buffer`).
-//!         - (Monitor Command) Use a heap-allocated output buffer in
-//!           `ConsoleOutput`.
-//! - `std` (implies `alloc`)
-//!     - Implement `Connection` for [`TcpStream`](std::net::TcpStream) and
-//!       [`UnixStream`](std::os::unix::net::UnixStream).
-//!     - Implement [`std::error::Error`] for `gdbstub::Error`.
-//!     - Add a `TargetError::Io` error variant to simplify I/O Error handling
-//!       from `Target` methods.
+//! See the [`GdbStubStateMachine`](state_machine::GdbStubStateMachine) docs for
+//! more details on how to use this API.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![deny(missing_docs)]

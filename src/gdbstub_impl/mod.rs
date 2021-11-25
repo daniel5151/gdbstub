@@ -56,9 +56,12 @@ pub mod gdbstub_run_blocking {
         type Connection: ConnectionExt;
 
         /// Invoked immediately after the target's `resume` method has been
-        /// called. The implementation should block until the target reports a
-        /// stop reason, or if detects that the GDB client has sent additional
-        /// data over the connection.
+        /// called. The implementation should block until either the target
+        /// reports a stop reason, or if new data was sent over the connection.
+        ///
+        /// The specific mechanism to "select" between these two events is
+        /// implementation specific. Some examples might include: `epoll`,
+        /// `select!` across multiple event channels, periodic polling, etc...
         ///
         /// # Single threaded targets
         ///
@@ -81,11 +84,12 @@ pub mod gdbstub_run_blocking {
             >,
         >;
 
-        /// Invoked when the GDB client sends a Ctrl-C interrupt. Returns the
-        /// stop reason that should be reported back to the GDB client, or
+        /// Invoked when the GDB client sends a Ctrl-C interrupt. The
+        /// implementation should handle the interrupt request + return an
+        /// appropriate stop reason to report back to the GDB client, or return
         /// `None` if the interrupt should be ignored.
         ///
-        /// _Suggestion_: If you're unsure which stop reason you should report,
+        /// _Suggestion_: If you're unsure which stop reason to report,
         /// [`ThreadStopReason::Signal(Signal::SIGINT)`](ThreadStopReason) is a
         /// sensible default.
         ///
@@ -277,9 +281,35 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
 
 /// State-machine interface to `GdbStub`.
 ///
-/// TODO: more docs. provide an example of how to use this API.
+/// TODO: write some proper documentation + examples of how to interface with
+/// this API.
 ///
-/// TODO: add docs to top-level `lib.rs` that point folks at this API.
+/// # Hey, what gives? Where are all the docs!?
+///
+/// Sorry about that!
+///
+/// `gdbstub` 0.6 turned out ot be a pretty massive release, and documenting
+/// everything has proven to be a gargantuan task.
+///
+/// There are quite a few folks asking that I publish 0.6 to crates.io, so to
+/// avoid blocking the release any further, I've decided to leave this bit of
+/// the API sparsely documented...
+///
+/// If you're interested in using this API directly (e.g: to integrate `gdbstub`
+/// into a `no_std` project, or to use `gdbstub` in a non-blocking manner
+/// alongside `async/await` / a project specific event loop), your best bet
+/// would be to review the following bits of code to get a feel for the API:
+///
+/// - The implementation of [`GdbStub::run_blocking`]
+/// - Implementations of
+///   [`BlockingEventLoop`](gdbstub_run_blocking::BlockingEventLoop) used
+///   alongside `GdbStub::run_blocking` (e.g: the in-tree `armv4t` /
+///   `armv4t_multicore` examples)
+/// - Real-world projects using the API
+///     - The best example of this (at the time of writing) is the code at [`vmware-labs/node-replicated-kernel`](https://github.com/vmware-labs/node-replicated-kernel/blob/4326704aaf3c0052e614dcde2a788a8483224394/kernel/src/arch/x86_64/gdb/mod.rs#L106)
+///
+/// If you have any questions, feel free to open a discussion thread over at the
+/// `gdbstub` [GitHub repo](https://github.com/daniel5151/gdbstub/discussions)
 pub mod state_machine {
     use super::*;
 
@@ -311,8 +341,10 @@ pub mod state_machine {
     /// State machine typestates.
     ///
     /// The types in this module are used to parameterize instances of
-    /// `GdbStubStateMachineInner`, thereby enforcing that certain API methods
+    /// [`GdbStubStateMachineInner`], thereby enforcing that certain API methods
     /// can only be called while the stub is in a certain state.
+    // As an internal implementation detail, they _also_ carry state-specific
+    // payloads, which are used when transitioning between states.
     pub mod state {
         use super::*;
 

@@ -18,8 +18,6 @@ pub struct Error<C>(pub C);
 /// A wrapper around [`Connection`] that computes the single-byte checksum of
 /// incoming / outgoing data.
 pub struct ResponseWriter<'a, C: Connection + 'a> {
-    // TODO: add `write_all` method to Connection, and allow user to optionally pass outgoing
-    // packet buffer? This could improve performance (instead of writing a single byte at a time)
     inner: &'a mut C,
     started: bool,
     checksum: u8,

@@ -2,6 +2,80 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+# 0.6.0
+
+After over a half-year of development, `gdbstub` 0.6 is ready for release!
+
+This is a huge release, delivering a slew of new protocol extensions, internal improvements, and API features!
+
+Some highlights of this release:
+
+- The new `GdbStubStateMachine` API makes it possible to drive `gdbstub` on `no_std` platforms directly via interrupt handlers! This is already being used in several Rust kernel projects, such as [`vmware-labs/node-replicated-kernel`](https://github.com/vmware-labs/node-replicated-kernel/tree/4326704/kernel/src/arch/x86_64/gdb) and [`betrusted-io/xous-core`](https://github.com/betrusted-io/xous-core/blob/7d3d710/kernel/src/debug/gdb_server.rs) to enable in-kernel debugging.
+- `gdbstub` is now entirely **panic free** in release builds!
+  - \* subject to `rustc`'s compiler optimizations
+  - This was a painstaking manual effort, but the end result is a substantial reduction in binary size on `no_std` platforms.
+- Support for tons of new and exciting protocol extensions!
+- Relicensed the project from just MIT to MIT OR Apache-2.0
+
+While this release does introduce quite a few breaking changes, porting code from `0.5.x` to `0.6` should be relatively straightforward. Check out [`transition_guide.md`](./docs/transition_guide.md) for guidance on upgrading from `0.5.x` to `0.6`.
+
+#### New Features
+
+- The new `GdbStubStateMachine` API gives users the power and flexibility to integrate `gdbstub` into their project-specific event loop infrastructure.
+  - e.g: A global instance of `GdbStubStateMachine` can be driven directly from bare-metal interrupt handlers in `no_std` environments
+  - e.g: A project using `async`/`await` can wrap `GdbStubStateMachine` in a task, yielding execution while waiting for the target to resume / new data to arrive down the `Connection`
+- Added several new "guard rails" to avoid common integration footguns:
+  - `use_implicit_sw_breakpoints` - guards against the GDB client silently overriding target instructions with breakpoints if `SwBreakpoints` hasn't been implemented.
+  - `optional_single_step` - guards against GDB client bug, where optional single step support is not respected on certain platforms (e.g: `x86`)
+- Removed all panicking code from `gdbstub`!
+  - See the [commit message](https://github.com/daniel5151/gdbstub/commit/ecbbaf72e01293b410ef3bc5970d18aa81e45599) for more details on how this was achieved.
+- Introduce strongly-typed enum for protocol defined signal numbers (instead of using bare `u8`s)
+- Relicense `gdbstub` under MIT OR Apache-2.0 [\#68](https://github.com/daniel5151/gdbstub/pull/68)
+
+#### New Protocol Extensions
+
+- `MemoryMap` - Get memory map XML file from the target. [\#54](https://github.com/daniel5151/gdbstub/pull/54) ([Tiwalun](https://github.com/Tiwalun))
+- `CatchSyscalls` - Enable and disable catching syscalls from the inferior process. [\#57](https://github.com/daniel5151/gdbstub/pull/57) ([mchesser](https://github.com/mchesser))
+- `HostIo` - Perform I/O operations on host. [\#66](https://github.com/daniel5151/gdbstub/pull/66) ([bet4it](https://github.com/bet4it))
+  - Support for all Host I/O operations: `open`, `close`, `pread`, `pwrite`, `fstat`, `unlink`, `readlink`, `setfs`
+- `ExecFile` - Get full absolute path of the file that was executed to create a process running on the remote system. [\#69](https://github.com/daniel5151/gdbstub/pull/69) ([bet4it](https://github.com/bet4it))
+- Implement X packet (for more efficient binary writes to memory). [\#82](https://github.com/daniel5151/gdbstub/pull/82) ([gz](https://github.com/gz))
+- `Auxv` - Access the target’s auxiliary vector. [\#86](https://github.com/daniel5151/gdbstub/pull/86) ([bet4it](https://github.com/bet4it))
+
+#### Breaking API Changes
+
+- `Connection` API:
+  - Removed the `read` and `peek` methods from `Connection`
+    - These have been moved to the new `ConnectionExt` trait, which is used in the new `GdbStub::run_blocking` API
+- `Arch` API:
+  - Dynamic read_register + RegId support. [\#85](https://github.com/daniel5151/gdbstub/pull/85) ([bet4it](https://github.com/bet4it))
+- `Target` APIs:
+  - prefix all IDET methods with `support_`
+    - _makes it far easier to tell at-a-glance whether a method is an IDET, or an actual handler method.
+  - Introduce strongly-typed enum for protocol defined signal numbers (instead of using bare `u8`s)
+  - `Base` API:
+    - Make single-stepping optional [\#92](https://github.com/daniel5151/gdbstub/pull/92)
+    - Remove `GdbInterrupt` type (interrupt handling lifted to higher-level APIs)
+    - Remove `ResumeAction` type (in favor of separate methods for various resume types)
+  - `Breakpoints` API:
+    - `HwWatchpoint`: Plumb watchpoint `length` parameter to public API
+  - Pass `PacketBuf`-backed `&mut [u8]` as a response buffer to various APIs [\#72](https://github.com/daniel5151/gdbstub/pull/72) ([bet4it](https://github.com/bet4it))
+    - _Note:_ only a compat hazard for the existing `TargetXmlOverride` API
+    - Improvement over the callback-based approach.
+    - This change is possible thanks to a clause in the GDB spec that specifies that responses will never exceed the size of the `PacketBuf`.
+    - Also see [\#70](https://github.com/daniel5151/gdbstub/pull/70), which tracks some other methods that might be refactored to use this approach in the future.
+
+
+#### Internal Improvements
+
+- Documentation
+  - Fix crates.io badges [\#71](https://github.com/daniel5151/gdbstub/pull/71) ([atouchet](https://github.com/atouchet))
+  - Add `uhyve` to real-world examples [\#73](https://github.com/daniel5151/gdbstub/pull/73) ([mkroening](https://github.com/mkroening))
+- Use stable `clippy` in CI
+- Enable logging for responses with only alloc [\#78](https://github.com/daniel5151/gdbstub/pull/78) ([gz](https://github.com/gz))
+
+#### Bugfixes
+
 # 0.5.0
 
 While the overall structure of the API has remained the same, `0.5.0` does introduce a few breaking API changes that require some attention. That being said, it should not be a difficult migration, and updating to `0.5.0` from `0.4` shouldn't take more than 10 mins of refactoring.

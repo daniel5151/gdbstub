@@ -13,7 +13,7 @@ An ergonomic and easy-to-integrate implementation of the [GDB Remote Serial Prot
 -   [Documentation (gdbstub)](https://docs.rs/gdbstub)
 -   [Documentation (gdbstub_arch)](https://docs.rs/gdbstub_arch)
 -   [Changelog](CHANGELOG.md)
--   [0.4 to 0.5 Transition Guide](docs/transition_guide.md)
+-   [0.5 to 0.6 Transition Guide](docs/transition_guide.md)
 
 Why use `gdbstub`?
 
@@ -123,6 +123,9 @@ When using `gdbstub` in `#![no_std]` contexts, make sure to set `default-feature
     -   [crosvm](https://chromium.googlesource.com/chromiumos/platform/crosvm/+/refs/heads/main#gdb-support) - The Chrome OS Virtual Machine Monitor (x64)
     -   [Firecracker](https://firecracker-microvm.github.io/) - A lightweight VMM developed by AWS - feature is in [PR](https://github.com/firecracker-microvm/firecracker/pull/2168)
     -   [uhyve](https://github.com/hermitcore/uhyve) - A minimal hypervisor for [RustyHermit](https://github.com/hermitcore/rusty-hermit)
+-   OS Kernels
+    -   [`vmware-labs/node-replicated-kernel`](https://github.com/vmware-labs/node-replicated-kernel/tree/4326704/kernel/src/arch/x86_64/gdb) - An (experimental) research OS kernel for x86-64 (amd64) machines
+    -   [`betrusted-io/xous-core`](https://github.com/betrusted-io/xous-core/blob/7d3d710/kernel/src/debug/gdb_server.rs) - The Xous microkernel operating system
 -   Emulators (x64)
     -   [clicky](https://github.com/daniel5151/clicky/) - An emulator for classic clickwheel iPods (dual-core ARMv4T SoC)
     -   [rustyboyadvance-ng](https://github.com/michelhe/rustboyadvance-ng/) - Nintendo GameBoy Advance emulator and debugger (ARMv4T)
@@ -130,7 +133,7 @@ When using `gdbstub` in `#![no_std]` contexts, make sure to set `default-feature
     -   [ts7200](https://github.com/daniel5151/ts7200/) - An emulator for the TS-7200, a somewhat bespoke embedded ARMv4t platform
     -   [microcorruption-emu](https://github.com/sapir/microcorruption-emu) - msp430 emulator for the microcorruption.com ctf
 -   Other
-    -   [memflow](https://github.com/memflow/memflow-cli) - A physical memory introspection framework (part of `memflow-cli`) (64)
+    -   [memflow](https://github.com/memflow/memflow-cli) - A physical memory introspection framework (part of `memflow-cli`)
 
 While some of these projects may use older versions of `gdbstub`, they can nonetheless serve as useful examples of what a typical `gdbstub` integration might look like.
 
