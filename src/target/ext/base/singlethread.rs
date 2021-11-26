@@ -8,8 +8,61 @@ use crate::target::{Target, TargetResult};
 
 use super::{ReplayLogPosition, SingleRegisterAccessOps};
 
-/// Base debugging operations for single threaded targets.
-pub trait SingleThreadOps: Target {
+/// Base required debugging operations for single threaded targets.
+pub trait SingleThreadBase: Target {
+    /// Read the target's registers.
+    fn read_registers(
+        &mut self,
+        regs: &mut <Self::Arch as Arch>::Registers,
+    ) -> TargetResult<(), Self>;
+
+    /// Write the target's registers.
+    fn write_registers(&mut self, regs: &<Self::Arch as Arch>::Registers)
+        -> TargetResult<(), Self>;
+
+    /// Support for single-register access.
+    /// See [`SingleRegisterAccess`](super::SingleRegisterAccess) for more
+    /// details.
+    ///
+    /// While this is an optional feature, it is **highly recommended** to
+    /// implement it when possible, as it can significantly improve performance
+    /// on certain architectures.
+    #[inline(always)]
+    fn support_single_register_access(&mut self) -> Option<SingleRegisterAccessOps<(), Self>> {
+        None
+    }
+
+    /// Read bytes from the specified address range.
+    ///
+    /// If the requested address range could not be accessed (e.g: due to
+    /// MMU protection, unhanded page fault, etc...), an appropriate
+    /// non-fatal error should be returned.
+    fn read_addrs(
+        &mut self,
+        start_addr: <Self::Arch as Arch>::Usize,
+        data: &mut [u8],
+    ) -> TargetResult<(), Self>;
+
+    /// Write bytes to the specified address range.
+    ///
+    /// If the requested address range could not be accessed (e.g: due to
+    /// MMU protection, unhanded page fault, etc...), an appropriate
+    /// non-fatal error should be returned.
+    fn write_addrs(
+        &mut self,
+        start_addr: <Self::Arch as Arch>::Usize,
+        data: &[u8],
+    ) -> TargetResult<(), Self>;
+
+    /// Support for resuming the target (e.g: via `continue` or `step`)
+    #[inline(always)]
+    fn support_resume(&mut self) -> Option<SingleThreadResumeOps<Self>> {
+        None
+    }
+}
+
+/// Target extension - support for resuming single threaded targets.
+pub trait SingleThreadResume: Target {
     /// Resume execution on the target.
     ///
     /// The GDB client may also include a `signal` which should be passed to the
@@ -63,55 +116,13 @@ pub trait SingleThreadOps: Target {
     fn support_reverse_cont(&mut self) -> Option<SingleThreadReverseContOps<Self>> {
         None
     }
-
-    /// Read the target's registers.
-    fn read_registers(
-        &mut self,
-        regs: &mut <Self::Arch as Arch>::Registers,
-    ) -> TargetResult<(), Self>;
-
-    /// Write the target's registers.
-    fn write_registers(&mut self, regs: &<Self::Arch as Arch>::Registers)
-        -> TargetResult<(), Self>;
-
-    /// Support for single-register access.
-    /// See [`SingleRegisterAccess`](super::SingleRegisterAccess) for more
-    /// details.
-    ///
-    /// While this is an optional feature, it is **highly recommended** to
-    /// implement it when possible, as it can significantly improve performance
-    /// on certain architectures.
-    #[inline(always)]
-    fn support_single_register_access(&mut self) -> Option<SingleRegisterAccessOps<(), Self>> {
-        None
-    }
-
-    /// Read bytes from the specified address range.
-    ///
-    /// If the requested address range could not be accessed (e.g: due to
-    /// MMU protection, unhanded page fault, etc...), an appropriate
-    /// non-fatal error should be returned.
-    fn read_addrs(
-        &mut self,
-        start_addr: <Self::Arch as Arch>::Usize,
-        data: &mut [u8],
-    ) -> TargetResult<(), Self>;
-
-    /// Write bytes to the specified address range.
-    ///
-    /// If the requested address range could not be accessed (e.g: due to
-    /// MMU protection, unhanded page fault, etc...), an appropriate
-    /// non-fatal error should be returned.
-    fn write_addrs(
-        &mut self,
-        start_addr: <Self::Arch as Arch>::Usize,
-        data: &[u8],
-    ) -> TargetResult<(), Self>;
 }
 
+define_ext!(SingleThreadResumeOps, SingleThreadResume);
+
 /// Target Extension - Reverse continue for single threaded targets.
-/// See [`SingleThreadOps::support_reverse_cont`].
-pub trait SingleThreadReverseCont: Target + SingleThreadOps {
+/// See [`SingleThreadResume::support_reverse_cont`].
+pub trait SingleThreadReverseCont: Target + SingleThreadResume {
     /// [Reverse continue] the target.
     ///
     /// Reverse continue allows the target to run backwards until it reaches the
@@ -124,8 +135,8 @@ pub trait SingleThreadReverseCont: Target + SingleThreadOps {
 define_ext!(SingleThreadReverseContOps, SingleThreadReverseCont);
 
 /// Target Extension - Reverse stepping for single threaded targets.
-/// See [`SingleThreadOps::support_reverse_step`].
-pub trait SingleThreadReverseStep: Target + SingleThreadOps {
+/// See [`SingleThreadResume::support_reverse_step`].
+pub trait SingleThreadReverseStep: Target + SingleThreadResume {
     /// [Reverse step] the target.
     ///
     /// Reverse stepping allows the target to run backwards by one step -
@@ -138,8 +149,8 @@ pub trait SingleThreadReverseStep: Target + SingleThreadOps {
 define_ext!(SingleThreadReverseStepOps, SingleThreadReverseStep);
 
 /// Target Extension - Optimized [single stepping] for single threaded targets.
-/// See [`SingleThreadOps::support_single_step`].
-pub trait SingleThreadSingleStep: Target + SingleThreadOps {
+/// See [`SingleThreadResume::support_single_step`].
+pub trait SingleThreadSingleStep: Target + SingleThreadResume {
     /// [Single step] the target.
     ///
     /// Single stepping will step the target a single "step" - typically a
@@ -154,8 +165,8 @@ pub trait SingleThreadSingleStep: Target + SingleThreadOps {
 define_ext!(SingleThreadSingleStepOps, SingleThreadSingleStep);
 
 /// Target Extension - Optimized range stepping for single threaded targets.
-/// See [`SingleThreadOps::support_range_step`].
-pub trait SingleThreadRangeStepping: Target + SingleThreadOps {
+/// See [`SingleThreadResume::support_range_step`].
+pub trait SingleThreadRangeStepping: Target + SingleThreadResume {
     /// [Range step] the target.
     ///
     /// Range Stepping will step the target once, and keep stepping the target

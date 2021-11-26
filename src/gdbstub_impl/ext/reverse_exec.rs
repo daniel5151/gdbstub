@@ -5,17 +5,47 @@ use crate::arch::Arch;
 use crate::protocol::SpecificIdKind;
 use crate::target::ext::base::multithread::{MultiThreadReverseCont, MultiThreadReverseStep};
 use crate::target::ext::base::singlethread::{SingleThreadReverseCont, SingleThreadReverseStep};
-use crate::target::ext::base::BaseOps;
+use crate::target::ext::base::ResumeOps;
 
-enum ReverseContOps<'a, A: Arch, E> {
-    SingleThread(&'a mut dyn SingleThreadReverseCont<Arch = A, Error = E>),
-    MultiThread(&'a mut dyn MultiThreadReverseCont<Arch = A, Error = E>),
+macro_rules! defn_ops {
+    ($name:ident, $st_trait:ident, $mt_trait:ident, $f:ident) => {
+        enum $name<'a, A: Arch, E> {
+            SingleThread(&'a mut dyn $st_trait<Arch = A, Error = E>),
+            MultiThread(&'a mut dyn $mt_trait<Arch = A, Error = E>),
+        }
+
+        impl<'a, A, E> $name<'a, A, E>
+        where
+            A: Arch,
+        {
+            #[inline(always)]
+            fn from_target<T>(target: &mut T) -> Option<$name<T::Arch, T::Error>>
+            where
+                T: Target,
+            {
+                let ops = match target.base_ops().resume_ops()? {
+                    ResumeOps::MultiThread(ops) => $name::MultiThread(ops.$f()?),
+                    ResumeOps::SingleThread(ops) => $name::SingleThread(ops.$f()?),
+                };
+                Some(ops)
+            }
+        }
+    };
 }
 
-enum ReverseStepOps<'a, A: Arch, E> {
-    SingleThread(&'a mut dyn SingleThreadReverseStep<Arch = A, Error = E>),
-    MultiThread(&'a mut dyn MultiThreadReverseStep<Arch = A, Error = E>),
-}
+defn_ops!(
+    ReverseContOps,
+    SingleThreadReverseCont,
+    MultiThreadReverseCont,
+    support_reverse_cont
+);
+
+defn_ops!(
+    ReverseStepOps,
+    SingleThreadReverseStep,
+    MultiThreadReverseStep,
+    support_reverse_step
+);
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     pub(crate) fn handle_reverse_cont(
@@ -24,15 +54,9 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         target: &mut T,
         command: ReverseCont,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
-        let ops = match target.base_ops() {
-            BaseOps::MultiThread(ops) => match ops.support_reverse_cont() {
-                Some(ops) => ReverseContOps::MultiThread(ops),
-                None => return Ok(HandlerStatus::Handled),
-            },
-            BaseOps::SingleThread(ops) => match ops.support_reverse_cont() {
-                Some(ops) => ReverseContOps::SingleThread(ops),
-                None => return Ok(HandlerStatus::Handled),
-            },
+        let ops = match ReverseContOps::<'_, T::Arch, T::Error>::from_target(target) {
+            Some(ops) => ops,
+            None => return Ok(HandlerStatus::Handled),
         };
 
         crate::__dead_code_marker!("reverse_cont", "impl");
@@ -62,15 +86,9 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         target: &mut T,
         command: ReverseStep,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
-        let ops = match target.base_ops() {
-            BaseOps::MultiThread(ops) => match ops.support_reverse_step() {
-                Some(ops) => ReverseStepOps::MultiThread(ops),
-                None => return Ok(HandlerStatus::Handled),
-            },
-            BaseOps::SingleThread(ops) => match ops.support_reverse_step() {
-                Some(ops) => ReverseStepOps::SingleThread(ops),
-                None => return Ok(HandlerStatus::Handled),
-            },
+        let ops = match ReverseStepOps::<'_, T::Arch, T::Error>::from_target(target) {
+            Some(ops) => ops,
+            None => return Ok(HandlerStatus::Handled),
         };
 
         crate::__dead_code_marker!("reverse_step", "impl");

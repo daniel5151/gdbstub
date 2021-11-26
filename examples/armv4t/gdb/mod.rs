@@ -3,7 +3,7 @@ use core::convert::{TryFrom, TryInto};
 use armv4t_emu::{reg, Memory};
 use gdbstub::common::Signal;
 use gdbstub::target;
-use gdbstub::target::ext::base::singlethread::SingleThreadOps;
+use gdbstub::target::ext::base::singlethread::{SingleThreadBase, SingleThreadResume};
 use gdbstub::target::{Target, TargetError, TargetResult};
 use gdbstub_arch::arm::reg::id::ArmCoreRegId;
 
@@ -140,30 +140,7 @@ impl Target for Emu {
     }
 }
 
-impl SingleThreadOps for Emu {
-    fn resume(&mut self, signal: Option<Signal>) -> Result<(), Self::Error> {
-        // Upon returning from the `resume` method, the target being debugged should be
-        // configured to run according to whatever resume actions the GDB client has
-        // specified (as specified by `set_resume_action`, `resume_range_step`,
-        // `reverse_{step, continue}`, etc...)
-        //
-        // In this basic `armv4t` example, the `resume` method simply sets the exec mode
-        // of the emulator's interpreter loop and returns.
-        //
-        // In more complex implementations, it's likely that the target being debugged
-        // will be running in another thread / process, and will require some kind of
-        // external "orchestration" to set it's execution mode (e.g: modifying the
-        // target's process state via platform specific debugging syscalls).
-
-        if signal.is_some() {
-            return Err("no support for continuing with signal");
-        }
-
-        self.exec_mode = ExecMode::Continue;
-
-        Ok(())
-    }
-
+impl SingleThreadBase for Emu {
     fn read_registers(
         &mut self,
         regs: &mut custom_arch::ArmCoreRegsCustom,
@@ -199,6 +176,13 @@ impl SingleThreadOps for Emu {
         Ok(())
     }
 
+    #[inline(always)]
+    fn support_single_register_access(
+        &mut self,
+    ) -> Option<target::ext::base::SingleRegisterAccessOps<(), Self>> {
+        Some(self)
+    }
+
     fn read_addrs(&mut self, start_addr: u32, data: &mut [u8]) -> TargetResult<(), Self> {
         for (addr, val) in (start_addr..).zip(data.iter_mut()) {
             *val = self.mem.r8(addr)
@@ -214,10 +198,35 @@ impl SingleThreadOps for Emu {
     }
 
     #[inline(always)]
-    fn support_single_register_access(
+    fn support_resume(
         &mut self,
-    ) -> Option<target::ext::base::SingleRegisterAccessOps<(), Self>> {
+    ) -> Option<target::ext::base::singlethread::SingleThreadResumeOps<Self>> {
         Some(self)
+    }
+}
+
+impl SingleThreadResume for Emu {
+    fn resume(&mut self, signal: Option<Signal>) -> Result<(), Self::Error> {
+        // Upon returning from the `resume` method, the target being debugged should be
+        // configured to run according to whatever resume actions the GDB client has
+        // specified (as specified by `set_resume_action`, `resume_range_step`,
+        // `reverse_{step, continue}`, etc...)
+        //
+        // In this basic `armv4t` example, the `resume` method simply sets the exec mode
+        // of the emulator's interpreter loop and returns.
+        //
+        // In more complex implementations, it's likely that the target being debugged
+        // will be running in another thread / process, and will require some kind of
+        // external "orchestration" to set it's execution mode (e.g: modifying the
+        // target's process state via platform specific debugging syscalls).
+
+        if signal.is_some() {
+            return Err("no support for continuing with signal");
+        }
+
+        self.exec_mode = ExecMode::Continue;
+
+        Ok(())
     }
 
     #[inline(always)]

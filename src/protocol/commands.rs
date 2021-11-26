@@ -83,6 +83,7 @@ macro_rules! commands {
                 // parsing code.
                 trait Hack {
                     fn support_base(&mut self) -> Option<()>;
+                    fn support_resume(&mut self) -> Option<()>;
                     fn support_single_register_access(&mut self) -> Option<()>;
                     fn support_reverse_step(&mut self) -> Option<()>;
                     fn support_reverse_cont(&mut self) -> Option<()>;
@@ -94,6 +95,10 @@ macro_rules! commands {
                         Some(())
                     }
 
+                    fn support_resume(&mut self) -> Option<()> {
+                        self.base_ops().resume_ops().map(drop)
+                    }
+
                     fn support_single_register_access(&mut self) -> Option<()> {
                         use crate::target::ext::base::BaseOps;
                         match self.base_ops() {
@@ -103,18 +108,18 @@ macro_rules! commands {
                     }
 
                     fn support_reverse_step(&mut self) -> Option<()> {
-                        use crate::target::ext::base::BaseOps;
-                        match self.base_ops() {
-                            BaseOps::SingleThread(ops) => ops.support_reverse_step().map(drop),
-                            BaseOps::MultiThread(ops) => ops.support_reverse_step().map(drop),
+                        use crate::target::ext::base::ResumeOps;
+                        match self.base_ops().resume_ops()? {
+                            ResumeOps::SingleThread(ops) => ops.support_reverse_step().map(drop),
+                            ResumeOps::MultiThread(ops) => ops.support_reverse_step().map(drop),
                         }
                     }
 
                     fn support_reverse_cont(&mut self) -> Option<()> {
-                        use crate::target::ext::base::BaseOps;
-                        match self.base_ops() {
-                            BaseOps::SingleThread(ops) => ops.support_reverse_cont().map(drop),
-                            BaseOps::MultiThread(ops) => ops.support_reverse_cont().map(drop),
+                        use crate::target::ext::base::ResumeOps;
+                        match self.base_ops().resume_ops()? {
+                            ResumeOps::SingleThread(ops) => ops.support_reverse_cont().map(drop),
+                            ResumeOps::MultiThread(ops) => ops.support_reverse_cont().map(drop),
                         }
                     }
 
@@ -177,7 +182,6 @@ macro_rules! commands {
 commands! {
     base use 'a {
         "?" => question_mark::QuestionMark,
-        "c" => _c::c<'a>,
         "D" => _d_upcase::D,
         "g" => _g::g,
         "G" => _g_upcase::G<'a>,
@@ -191,10 +195,14 @@ commands! {
         "qsThreadInfo" => _qsThreadInfo::qsThreadInfo,
         "qSupported" => _qSupported::qSupported<'a>,
         "qXfer:features:read" => _qXfer_features_read::qXferFeaturesRead<'a>,
-        "s" => _s::s<'a>,
         "T" => _t_upcase::T,
-        "vCont" => _vCont::vCont<'a>,
         "vKill" => _vKill::vKill,
+    }
+
+    resume use 'a {
+        "c" => _c::c<'a>,
+        "s" => _s::s<'a>,
+        "vCont" => _vCont::vCont<'a>,
     }
 
     x_upcase_packet use 'a {

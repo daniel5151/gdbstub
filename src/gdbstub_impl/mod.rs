@@ -256,15 +256,17 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
 
         // Check if the target supports single stepping as an optional feature
         {
-            use crate::target::ext::base::BaseOps;
+            use crate::target::ext::base::ResumeOps;
 
-            let support_single_step = match target.base_ops() {
-                BaseOps::SingleThread(ops) => ops.support_single_step().is_some(),
-                BaseOps::MultiThread(ops) => ops.support_single_step().is_some(),
-            };
+            if let Some(ops) = target.base_ops().resume_ops() {
+                let support_single_step = match ops {
+                    ResumeOps::SingleThread(ops) => ops.support_single_step().is_some(),
+                    ResumeOps::MultiThread(ops) => ops.support_single_step().is_some(),
+                };
 
-            if !support_single_step && !target.use_optional_single_step() {
-                return Err(Error::UnconditionalSingleStep);
+                if !support_single_step && !target.use_optional_single_step() {
+                    return Err(Error::UnconditionalSingleStep);
+                }
             }
         }
 
@@ -767,6 +769,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             }
             // `handle_X` methods are defined in the `ext` module
             Command::Base(cmd) => self.handle_base(res, target, cmd),
+            Command::Resume(cmd) => self.handle_stop_resume(res, target, cmd),
             Command::XUpcasePacket(cmd) => self.handle_x_upcase_packet(res, target, cmd),
             Command::SingleRegisterAccess(cmd) => {
                 self.handle_single_register_access(res, target, cmd)

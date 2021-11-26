@@ -1,6 +1,6 @@
 use gdbstub::common::{Signal, Tid};
 use gdbstub::target;
-use gdbstub::target::ext::base::multithread::MultiThreadOps;
+use gdbstub::target::ext::base::multithread::{MultiThreadBase, MultiThreadResume};
 use gdbstub::target::{Target, TargetResult};
 
 use crate::print_str::print_str;
@@ -34,33 +34,12 @@ impl Target for DummyTarget {
     }
 }
 
-// NOTE: to try and make this a more realistic example, methods are marked as
+// NOTE: to try and make this a marginally more realistic estimate of
+// `gdbstub`'s library overhead, non-IDET methods are marked as
 // `#[inline(never)]` to prevent the optimizer from too aggressively coalescing
 // the stubbed implementations.
 
-impl MultiThreadOps for DummyTarget {
-    #[inline(never)]
-    fn resume(&mut self) -> Result<(), Self::Error> {
-        print_str("> resume");
-        Ok(())
-    }
-
-    #[inline(never)]
-    fn clear_resume_actions(&mut self) -> Result<(), Self::Error> {
-        print_str("> clear_resume_actions");
-        Ok(())
-    }
-
-    #[inline(never)]
-    fn set_resume_action_continue(
-        &mut self,
-        _tid: Tid,
-        _signal: Option<Signal>,
-    ) -> Result<(), Self::Error> {
-        print_str("> set_resume_action_continue");
-        Ok(())
-    }
-
+impl MultiThreadBase for DummyTarget {
     #[inline(never)]
     fn read_registers(
         &mut self,
@@ -112,6 +91,38 @@ impl MultiThreadOps for DummyTarget {
         print_str("> list_active_threads");
         register_thread(Tid::new(1).unwrap());
         register_thread(Tid::new(2).unwrap());
+        Ok(())
+    }
+
+    #[inline(always)]
+    fn support_resume(
+        &mut self,
+    ) -> Option<target::ext::base::multithread::MultiThreadResumeOps<Self>> {
+        Some(self)
+        // None
+    }
+}
+
+impl MultiThreadResume for DummyTarget {
+    #[inline(never)]
+    fn resume(&mut self) -> Result<(), Self::Error> {
+        print_str("> resume");
+        Ok(())
+    }
+
+    #[inline(never)]
+    fn clear_resume_actions(&mut self) -> Result<(), Self::Error> {
+        print_str("> clear_resume_actions");
+        Ok(())
+    }
+
+    #[inline(never)]
+    fn set_resume_action_continue(
+        &mut self,
+        _tid: Tid,
+        _signal: Option<Signal>,
+    ) -> Result<(), Self::Error> {
+        print_str("> set_resume_action_continue");
         Ok(())
     }
 }

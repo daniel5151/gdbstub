@@ -137,7 +137,13 @@ impl target::ext::target_description_xml_override::TargetDescriptionXmlOverride 
 
 ##### Updates to `{Single,Multi}ThreadOps::resume` API
 
-`0.6` includes two fairly major behavioral changes to the `resume` method:
+`0.6` includes three fairly major behavioral changes to the `resume` method:
+
+###### Support for `resume` is now entirely optional
+
+There are quite a few use cases where it might make sense to debug a target that does _not_ support resumption, e.g: a post-mortem debugging session, or when debugging crash dumps. In these cases, past version of `gdbstub` would force the user to nonetheless implement "stub" methods for resuming these targets, along with forcing users to pay the "cost" of including all the handler code related to resumption (of which there is quite a bit.)
+
+In `0.6`, all resume-related functionality has been extracted out of `{Single,Multi}ThreadBase`, and split into new `{Singe,Multi}ThreadResume` IDETs.
 
 ###### Removing `ResumeAction`, and making single-step support optional
 
@@ -166,7 +172,7 @@ Much of the code contained within methods such as `block_until_stop_reason_or_in
 ```rust
 // ==== 0.5.x ==== //
 
-impl SingleThreadOps for Emu {
+impl SingleThreadBase for Emu {
     fn resume(
         &mut self,
         action: ResumeAction,
@@ -182,7 +188,18 @@ impl SingleThreadOps for Emu {
 
 // ==== 0.6.0 ==== //
 
-impl SingleThreadOps for Emu {
+impl SingleThreadBase for Emu {
+    // resume has been split into a separate IDET
+    #[inline(always)]
+    fn support_resume(
+        &mut self
+    ) -> Option<SingleThreadResumeOps<Self>> {
+        Some(self)
+    }
+}
+
+
+impl SingleThreadResume for Emu {
     fn resume(
         &mut self,
         signal: Option<Signal>,
@@ -199,6 +216,8 @@ impl SingleThreadOps for Emu {
         Ok(())
     }
 
+    // single-step support has been split into a separate IDET
+    #[inline(always)]
     fn support_single_step(
         &mut self
     ) -> Option<SingleThreadSingleStepOps<'_, Self>> {
@@ -216,7 +235,6 @@ impl SingleThreadSingleStep for Emu {
         Ok(())
     }
 }
-
 ```
 
 ##### Moving from `GdbStub::run` to `GdbStub::run_blocking`
@@ -302,14 +320,14 @@ Porting from `0.4` to `0.5` should be as simple as:
 ```rust
 // ==== 0.4.x ==== //
 
-impl SingleThreadOps for Emu {
+impl SingleThreadResume for Emu {
     fn read_register(&mut self, reg_id: arch::arm::reg::id::ArmCoreRegId, dst: &mut [u8]) -> TargetResult<(), Self> { ... }
     fn write_register(&mut self, reg_id: arch::arm::reg::id::ArmCoreRegId, val: &[u8]) -> TargetResult<(), Self> { ... }
 }
 
 // ==== 0.5.0 ==== //
 
-impl SingleThreadOps for Emu {
+impl SingleThreadResume for Emu {
     // (New Method) //
     fn single_register_access(&mut self) -> Option<target::ext::base::SingleRegisterAccessOps<(), Self>> {
         Some(self)

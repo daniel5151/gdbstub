@@ -2,7 +2,7 @@ use armv4t_emu::{reg, Memory};
 
 use gdbstub::common::{Signal, Tid};
 use gdbstub::target;
-use gdbstub::target::ext::base::multithread::MultiThreadOps;
+use gdbstub::target::ext::base::multithread::{MultiThreadBase, MultiThreadResume};
 use gdbstub::target::ext::breakpoints::WatchKind;
 use gdbstub::target::{Target, TargetError, TargetResult};
 
@@ -38,52 +38,7 @@ impl Target for Emu {
     }
 }
 
-impl MultiThreadOps for Emu {
-    fn resume(&mut self) -> Result<(), Self::Error> {
-        // Upon returning from the `resume` method, the target being debugged should be
-        // configured to run according to whatever resume actions the GDB client has
-        // specified (as specified by `set_resume_action`, `set_resume_range_step`,
-        // `set_reverse_{step, continue}`, etc...)
-        //
-        // In this basic `armv4t_multicore` example, the `resume` method is actually a
-        // no-op, as the execution mode of the emulator's interpreter loop has already
-        // been modified via the various `set_X` methods.
-        //
-        // In more complex implementations, it's likely that the target being debugged
-        // will be running in another thread / process, and will require some kind of
-        // external "orchestration" to set it's execution mode (e.g: modifying the
-        // target's process state via platform specific debugging syscalls).
-
-        Ok(())
-    }
-
-    fn clear_resume_actions(&mut self) -> Result<(), Self::Error> {
-        self.exec_mode.clear();
-        Ok(())
-    }
-
-    #[inline(always)]
-    fn support_single_step(
-        &mut self,
-    ) -> Option<target::ext::base::multithread::MultiThreadSingleStepOps<Self>> {
-        Some(self)
-    }
-
-    fn set_resume_action_continue(
-        &mut self,
-        tid: Tid,
-        signal: Option<Signal>,
-    ) -> Result<(), Self::Error> {
-        if signal.is_some() {
-            return Err("no support for continuing with signal");
-        }
-
-        self.exec_mode
-            .insert(tid_to_cpuid(tid)?, ExecMode::Continue);
-
-        Ok(())
-    }
-
+impl MultiThreadBase for Emu {
     fn read_registers(
         &mut self,
         regs: &mut gdbstub_arch::arm::reg::ArmCoreRegs,
@@ -160,6 +115,60 @@ impl MultiThreadOps for Emu {
     ) -> Result<(), Self::Error> {
         register_thread(cpuid_to_tid(CpuId::Cpu));
         register_thread(cpuid_to_tid(CpuId::Cop));
+        Ok(())
+    }
+
+    #[inline(always)]
+    fn support_resume(
+        &mut self,
+    ) -> Option<target::ext::base::multithread::MultiThreadResumeOps<Self>> {
+        Some(self)
+    }
+}
+
+impl MultiThreadResume for Emu {
+    fn resume(&mut self) -> Result<(), Self::Error> {
+        // Upon returning from the `resume` method, the target being debugged should be
+        // configured to run according to whatever resume actions the GDB client has
+        // specified (as specified by `set_resume_action`, `set_resume_range_step`,
+        // `set_reverse_{step, continue}`, etc...)
+        //
+        // In this basic `armv4t_multicore` example, the `resume` method is actually a
+        // no-op, as the execution mode of the emulator's interpreter loop has already
+        // been modified via the various `set_X` methods.
+        //
+        // In more complex implementations, it's likely that the target being debugged
+        // will be running in another thread / process, and will require some kind of
+        // external "orchestration" to set it's execution mode (e.g: modifying the
+        // target's process state via platform specific debugging syscalls).
+
+        Ok(())
+    }
+
+    fn clear_resume_actions(&mut self) -> Result<(), Self::Error> {
+        self.exec_mode.clear();
+        Ok(())
+    }
+
+    #[inline(always)]
+    fn support_single_step(
+        &mut self,
+    ) -> Option<target::ext::base::multithread::MultiThreadSingleStepOps<Self>> {
+        Some(self)
+    }
+
+    fn set_resume_action_continue(
+        &mut self,
+        tid: Tid,
+        signal: Option<Signal>,
+    ) -> Result<(), Self::Error> {
+        if signal.is_some() {
+            return Err("no support for continuing with signal");
+        }
+
+        self.exec_mode
+            .insert(tid_to_cpuid(tid)?, ExecMode::Continue);
+
         Ok(())
     }
 }

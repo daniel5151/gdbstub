@@ -6,7 +6,7 @@
 
 An ergonomic and easy-to-integrate implementation of the [GDB Remote Serial Protocol](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Protocol.html#Remote-Protocol) in Rust, with full `#![no_std]` support.
 
-`gdbstub`  makes it easy to integrate powerful guest debugging support to your emulator/hypervisor/debugger/embedded project. By implementing just a few basic methods of the [`gdbstub::Target`](https://docs.rs/gdbstub/latest/gdbstub/target/ext/base/singlethread/trait.SingleThreadOps.html) trait, you can have a rich GDB debugging session up and running in no time!
+`gdbstub`  makes it easy to integrate powerful guest debugging support to your emulator/hypervisor/debugger/embedded project. By implementing just a few basic methods of the [`gdbstub::Target`](https://docs.rs/gdbstub/latest/gdbstub/target/ext/base/singlethread/trait.SingleThreadResume.html) trait, you can have a rich GDB debugging session up and running in no time!
 
 **If you're looking for a quick snippet of example code to see what a typical `gdbstub` integration might look like, check out [examples/armv4t/gdb/mod.rs](https://github.com/daniel5151/gdbstub/blob/master/examples/armv4t/gdb/mod.rs)**
 

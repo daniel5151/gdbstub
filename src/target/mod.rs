@@ -70,19 +70,20 @@
 //! [`Target::base_ops`](trait.Target.html#tymethod.base_ops). This method is
 //! used to select which set of [`base`](crate::target::ext::base)
 //! debugging operations will be used to control the target. These are
-//! fundamental operations such as starting/stopping execution, reading/writing
-//! memory, etc...
+//! fundamental operations such as reading/writing memory, etc...
 //!
 //! All other methods are entirely optional! Check out the
 //! [`ext`] module for a full list of currently supported protocol extensions.
 //!
-//! ### Example: A Bare-Minimum Single Threaded `Target`
+//! ### Example: A minimal Single Threaded `Target`
 //!
 //! ```rust
 //! use gdbstub::target::{Target, TargetResult};
 //! use gdbstub::target::ext::base::BaseOps;
-//! use gdbstub::target::ext::base::singlethread::SingleThreadOps;
-//! use gdbstub::target::ext::base::singlethread::StopReason;
+//! use gdbstub::target::ext::base::singlethread::{
+//!     SingleThreadBase, SingleThreadResume, SingleThreadResumeOps, SingleThreadSingleStep,
+//!     SingleThreadSingleStepOps, StopReason,
+//! };
 //! use gdbstub::common::Signal;
 //!
 //! struct MyTarget;
@@ -96,12 +97,7 @@
 //!     }
 //! }
 //!
-//! impl SingleThreadOps for MyTarget {
-//!     fn resume(
-//!         &mut self,
-//!         signal: Option<Signal>,
-//!     ) -> Result<(), ()> { todo!() }
-//!
+//! impl SingleThreadBase for MyTarget {
 //!     fn read_registers(
 //!         &mut self,
 //!         regs: &mut gdbstub_arch::arm::reg::ArmCoreRegs,
@@ -123,6 +119,37 @@
 //!         start_addr: u32,
 //!         data: &[u8],
 //!     ) -> TargetResult<(), Self> { todo!() }
+//!
+//!     // you'll likely want support to support at resumption as well...
+//!
+//!     #[inline(always)]
+//!     fn support_resume(&mut self) -> Option<SingleThreadResumeOps<Self>> {
+//!         Some(self)
+//!     }
+//! }
+//!
+//! impl SingleThreadResume for MyTarget {
+//!     fn resume(
+//!         &mut self,
+//!         signal: Option<Signal>,
+//!     ) -> Result<(), ()> { todo!() }
+//!
+//!     // ...and if you support resumption, you'll likely want to support
+//!     // single-step resume as well
+//!
+//!     #[inline(always)]
+//!     fn support_single_step(
+//!         &mut self
+//!     ) -> Option<SingleThreadSingleStepOps<'_, Self>> {
+//!         Some(self)
+//!     }
+//! }
+//!
+//! impl SingleThreadSingleStep for MyTarget {
+//!     fn step(
+//!         &mut self,
+//!         signal: Option<Signal>,
+//!     ) -> Result<(), ()> { todo!() }
 //! }
 //! ```
 //!
@@ -307,9 +334,9 @@ pub trait Target {
     ///
     /// ```rust,ignore
     /// use gdbstub::target::Target;
-    /// use gdbstub::target::base::singlethread::SingleThreadOps;
+    /// use gdbstub::target::base::singlethread::SingleThreadBase;
     ///
-    /// impl SingleThreadOps for MyTarget {
+    /// impl SingleThreadBase for MyTarget {
     ///     // ...
     /// }
     ///

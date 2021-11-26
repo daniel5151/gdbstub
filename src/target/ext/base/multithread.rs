@@ -2,15 +2,105 @@
 
 use crate::arch::Arch;
 use crate::common::Signal;
-use crate::common::*;
+use crate::common::Tid;
 use crate::target::ext::breakpoints::WatchKind;
 use crate::target::ext::catch_syscalls::CatchSyscallPosition;
 use crate::target::{Target, TargetResult};
 
 use super::{ReplayLogPosition, SingleRegisterAccessOps};
 
-/// Base debugging operations for multi threaded targets.
-pub trait MultiThreadOps: Target {
+/// Base required debugging operations for multi threaded targets.
+pub trait MultiThreadBase: Target {
+    /// Read the target's registers.
+    ///
+    /// If the registers could not be accessed, an appropriate non-fatal error
+    /// should be returned.
+    fn read_registers(
+        &mut self,
+        regs: &mut <Self::Arch as Arch>::Registers,
+        tid: Tid,
+    ) -> TargetResult<(), Self>;
+
+    /// Write the target's registers.
+    ///
+    /// If the registers could not be accessed, an appropriate non-fatal error
+    /// should be returned.
+    fn write_registers(
+        &mut self,
+        regs: &<Self::Arch as Arch>::Registers,
+        tid: Tid,
+    ) -> TargetResult<(), Self>;
+
+    /// Support for single-register access.
+    /// See [`SingleRegisterAccess`](super::SingleRegisterAccess) for more
+    /// details.
+    ///
+    /// While this is an optional feature, it is **highly recommended** to
+    /// implement it when possible, as it can significantly improve performance
+    /// on certain architectures.
+    #[inline(always)]
+    fn support_single_register_access(&mut self) -> Option<SingleRegisterAccessOps<Tid, Self>> {
+        None
+    }
+
+    /// Read bytes from the specified address range.
+    ///
+    /// If the requested address range could not be accessed (e.g: due to
+    /// MMU protection, unhanded page fault, etc...), an appropriate non-fatal
+    /// error should be returned.
+    fn read_addrs(
+        &mut self,
+        start_addr: <Self::Arch as Arch>::Usize,
+        data: &mut [u8],
+        tid: Tid,
+    ) -> TargetResult<(), Self>;
+
+    /// Write bytes to the specified address range.
+    ///
+    /// If the requested address range could not be accessed (e.g: due to
+    /// MMU protection, unhanded page fault, etc...), an appropriate non-fatal
+    /// error should be returned.
+    fn write_addrs(
+        &mut self,
+        start_addr: <Self::Arch as Arch>::Usize,
+        data: &[u8],
+        tid: Tid,
+    ) -> TargetResult<(), Self>;
+
+    /// List all currently active threads.
+    ///
+    /// See [the section above](#bare-metal-targets) on implementing
+    /// thread-related methods on bare-metal (threadless) targets.
+    fn list_active_threads(
+        &mut self,
+        thread_is_active: &mut dyn FnMut(Tid),
+    ) -> Result<(), Self::Error>;
+
+    /// Check if the specified thread is alive.
+    ///
+    /// As a convenience, this method provides a default implementation which
+    /// uses `list_active_threads` to do a linear-search through all active
+    /// threads. On thread-heavy systems, it may be more efficient
+    /// to override this method with a more direct query.
+    fn is_thread_alive(&mut self, tid: Tid) -> Result<bool, Self::Error> {
+        let mut found = false;
+        self.list_active_threads(&mut |active_tid| {
+            if tid == active_tid {
+                found = true;
+            }
+        })?;
+        Ok(found)
+    }
+
+    /// Support for resuming the target (e.g: via `continue` or `step`)
+    #[inline(always)]
+    fn support_resume(&mut self) -> Option<MultiThreadResumeOps<Self>> {
+        None
+    }
+}
+
+/// Target extension - support for resuming multi threaded targets.
+pub trait MultiThreadResume: Target {
     /// Resume execution on the target.
     ///
     /// Prior to calling `resume`, `gdbstub` will call `clear_resume_actions`,
@@ -117,92 +207,13 @@ pub trait MultiThreadOps: Target {
     fn support_reverse_cont(&mut self) -> Option<MultiThreadReverseContOps<Self>> {
         None
     }
-
-    /// Read the target's registers.
-    ///
-    /// If the registers could not be accessed, an appropriate non-fatal error
-    /// should be returned.
-    fn read_registers(
-        &mut self,
-        regs: &mut <Self::Arch as Arch>::Registers,
-        tid: Tid,
-    ) -> TargetResult<(), Self>;
-
-    /// Write the target's registers.
-    ///
-    /// If the registers could not be accessed, an appropriate non-fatal error
-    /// should be returned.
-    fn write_registers(
-        &mut self,
-        regs: &<Self::Arch as Arch>::Registers,
-        tid: Tid,
-    ) -> TargetResult<(), Self>;
-
-    /// Support for single-register access.
-    /// See [`SingleRegisterAccess`](super::SingleRegisterAccess) for more
-    /// details.
-    ///
-    /// While this is an optional feature, it is **highly recommended** to
-    /// implement it when possible, as it can significantly improve performance
-    /// on certain architectures.
-    #[inline(always)]
-    fn support_single_register_access(&mut self) -> Option<SingleRegisterAccessOps<Tid, Self>> {
-        None
-    }
-
-    /// Read bytes from the specified address range.
-    ///
-    /// If the requested address range could not be accessed (e.g: due to
-    /// MMU protection, unhanded page fault, etc...), an appropriate non-fatal
-    /// error should be returned.
-    fn read_addrs(
-        &mut self,
-        start_addr: <Self::Arch as Arch>::Usize,
-        data: &mut [u8],
-        tid: Tid,
-    ) -> TargetResult<(), Self>;
-
-    /// Write bytes to the specified address range.
-    ///
-    /// If the requested address range could not be accessed (e.g: due to
-    /// MMU protection, unhanded page fault, etc...), an appropriate non-fatal
-    /// error should be returned.
-    fn write_addrs(
-        &mut self,
-        start_addr: <Self::Arch as Arch>::Usize,
-        data: &[u8],
-        tid: Tid,
-    ) -> TargetResult<(), Self>;
-
-    /// List all currently active threads.
-    ///
-    /// See [the section above](#bare-metal-targets) on implementing
-    /// thread-related methods on bare-metal (threadless) targets.
-    fn list_active_threads(
-        &mut self,
-        thread_is_active: &mut dyn FnMut(Tid),
-    ) -> Result<(), Self::Error>;
-
-    /// Check if the specified thread is alive.
-    ///
-    /// As a convenience, this method provides a default implementation which
-    /// uses `list_active_threads` to do a linear-search through all active
-    /// threads. On thread-heavy systems, it may be more efficient
-    /// to override this method with a more direct query.
-    fn is_thread_alive(&mut self, tid: Tid) -> Result<bool, Self::Error> {
-        let mut found = false;
-        self.list_active_threads(&mut |active_tid| {
-            if tid == active_tid {
-                found = true;
-            }
-        })?;
-        Ok(found)
-    }
 }
 
+define_ext!(MultiThreadResumeOps, MultiThreadResume);
+
 /// Target Extension - Reverse continue for multi threaded targets.
-/// See [`MultiThreadOps::support_reverse_cont`].
-pub trait MultiThreadReverseCont: Target + MultiThreadOps {
+/// See [`MultiThreadResume::support_reverse_cont`].
+pub trait MultiThreadReverseCont: Target + MultiThreadResume {
     /// [Reverse continue] the target.
     ///
     /// Reverse continue allows the target to run backwards until it reaches the
@@ -215,8 +226,8 @@ pub trait MultiThreadReverseCont: Target + MultiThreadOps {
 define_ext!(MultiThreadReverseContOps, MultiThreadReverseCont);
 
 /// Target Extension - Reverse stepping for multi threaded targets.
-/// See [`MultiThreadOps::support_reverse_step`].
-pub trait MultiThreadReverseStep: Target + MultiThreadOps {
+/// See [`MultiThreadResume::support_reverse_step`].
+pub trait MultiThreadReverseStep: Target + MultiThreadResume {
     /// [Reverse step] the specified [`Tid`].
     ///
     /// Reverse stepping allows the target to run backwards by one "step" -
@@ -229,8 +240,8 @@ pub trait MultiThreadReverseStep: Target + MultiThreadOps {
 define_ext!(MultiThreadReverseStepOps, MultiThreadReverseStep);
 
 /// Target Extension - Optimized single stepping for multi threaded targets.
-/// See [`MultiThreadOps::support_single_step`].
-pub trait MultiThreadSingleStep: Target + MultiThreadOps {
+/// See [`MultiThreadResume::support_single_step`].
+pub trait MultiThreadSingleStep: Target + MultiThreadResume {
     /// [Single step] the specified target thread.
     ///
     /// Single stepping will step the target a single "step" - typically a
@@ -254,8 +265,8 @@ pub trait MultiThreadSingleStep: Target + MultiThreadOps {
 define_ext!(MultiThreadSingleStepOps, MultiThreadSingleStep);
 
 /// Target Extension - Optimized range stepping for multi threaded targets.
-/// See [`MultiThreadOps::support_range_step`].
-pub trait MultiThreadRangeStepping: Target + MultiThreadOps {
+/// See [`MultiThreadResume::support_range_step`].
+pub trait MultiThreadRangeStepping: Target + MultiThreadResume {
     /// [Range step] the specified target thread.
     ///
     /// Range Stepping will step the target once, and keep stepping the target
