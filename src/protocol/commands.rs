@@ -25,13 +25,6 @@ pub trait ParseCommand<'a>: Sized {
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self>;
 }
 
-// Breakpoint packets are special-cased, as the "Z" packet is parsed differently
-// depending on whether or not the target implements the `Agent` extension.
-//
-// While it's entirely possible to eagerly parse the "Z" packet for bytecode,
-// doing so would unnecessary bloat implementations that do not support
-// evaluating agent expressions.
-
 macro_rules! commands {
     (
         $(
@@ -40,6 +33,21 @@ macro_rules! commands {
             }
         )*
     ) => {paste! {
+        // Most packets follow a consistent model of "only enabled when a
+        // particular IDET is implemented", but there are some exceptions to
+        // this rule that need to be special-cased:
+        //
+        // # Breakpoint packets (z, Z)
+        //
+        // Breakpoint packets are special-cased, as the "Z" packet is parsed
+        // differently depending on whether or not the target implements the
+        // `Agent` extension.
+        //
+        // While it's entirely possible to eagerly parse the "Z" packet for
+        // bytecode, doing so would unnecessary bloat implementations that do
+        // not support evaluating agent expressions.
+
+
         $($(
             #[allow(non_snake_case, non_camel_case_types)]
             pub mod $mod;

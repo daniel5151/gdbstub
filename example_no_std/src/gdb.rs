@@ -99,7 +99,6 @@ impl MultiThreadBase for DummyTarget {
         &mut self,
     ) -> Option<target::ext::base::multithread::MultiThreadResumeOps<Self>> {
         Some(self)
-        // None
     }
 }
 

@@ -763,10 +763,6 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         cmd: Command<'_>,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
         match cmd {
-            Command::Unknown(cmd) => {
-                info!("Unknown command: {:?}", core::str::from_utf8(cmd));
-                Ok(HandlerStatus::Handled)
-            }
             // `handle_X` methods are defined in the `ext` module
             Command::Base(cmd) => self.handle_base(res, target, cmd),
             Command::Resume(cmd) => self.handle_stop_resume(res, target, cmd),
@@ -785,6 +781,35 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             Command::HostIo(cmd) => self.handle_host_io(res, target, cmd),
             Command::ExecFile(cmd) => self.handle_exec_file(res, target, cmd),
             Command::Auxv(cmd) => self.handle_auxv(res, target, cmd),
+            // in the worst case, the command could not be parsed...
+            Command::Unknown(cmd) => {
+                // HACK: if the user accidentally sends a resume command to a
+                // target without resume support, inform them of their mistake +
+                // return a dummy stop reason.
+                if target.base_ops().resume_ops().is_none() && target.use_resume_stub() {
+                    let is_resume_pkt = cmd
+                        .get(0)
+                        .map(|c| matches!(c, b'c' | b'C' | b's' | b'S'))
+                        .unwrap_or(false);
+
+                    if is_resume_pkt {
+                        warn!("attempted to resume target without resume support!");
+
+                        // TODO: omit this message if non-stop mode is active
+                        {
+                            let mut res = ResponseWriter::new(res.as_conn());
+                            res.write_str("O")?;
+                            res.write_hex_buf(b"target has not implemented `support_resume()`\n")?;
+                            res.flush()?;
+                        }
+
+                        res.write_str("S05")?;
+                    }
+                }
+
+                info!("Unknown command: {:?}", core::str::from_utf8(cmd));
+                Ok(HandlerStatus::Handled)
+            }
         }
     }
 }

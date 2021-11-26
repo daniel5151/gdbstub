@@ -75,6 +75,44 @@
 //! All other methods are entirely optional! Check out the
 //! [`ext`] module for a full list of currently supported protocol extensions.
 //!
+//! ## Optional Protocol Extensions
+//!
+//! The GDB protocol is _massive_, and there are plenty of optional protocol
+//! extensions that targets can implement to enhance the base debugging
+//! experience. These protocol extensions range from relatively mundane things
+//! such as setting/removing breakpoints or reading/writing individual
+//! registers, but also include fancy things such as support for time travel
+//! debugging, running shell commands remotely, or even performing file IO on
+//! the target!
+//!
+//! `gdbstub` uses a somewhat unique approach to exposing these many features,
+//! called **Inlinable Dyn Extension Traits (IDETs)**. While this might sound a
+//! bit daunting, the API is actually quite straightforward, and described in
+//! great detail under the [`ext` module's documentation](ext).
+//!
+//! As you being working on your `gdbstub` integration, take a moment to skim
+//! through and familiarize yourself with the many different protocol extensions
+//! that `gdbstub` implements!
+//!
+//! As a suggestion on where to start, consider implementing some of the
+//! breakpoint related extensions under
+//! [`breakpoints`](crate::target::ext::breakpoints). While setting/removing
+//! breakpoints is technically an "optional" part of the GDB protocol, I'm sure
+//! you'd be hard pressed to find a debugger that doesn't support breakpoints.
+//!
+//! ### Note: Missing Protocol Extensions
+//!
+//! `gdbstub`'s development is guided by the needs of its contributors, with
+//! new features being added on an "as-needed" basis.
+//!
+//! If there's a GDB protocol extensions you're interested in that hasn't been
+//! implemented in `gdbstub` yet, (e.g: remote filesystem access, tracepoint
+//! support, etc...), consider opening an issue / filing a PR on GitHub!
+//!
+//! Check out the [GDB Remote Configuration Docs](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Configuration.html)
+//! for a table of GDB commands + their corresponding Remote Serial Protocol
+//! packets.
+//!
 //! ### Example: A minimal Single Threaded `Target`
 //!
 //! ```rust
@@ -152,44 +190,6 @@
 //!     ) -> Result<(), ()> { todo!() }
 //! }
 //! ```
-//!
-//! ## Optional Protocol Extensions
-//!
-//! The GDB protocol is _massive_, and there are plenty of optional protocol
-//! extensions that targets can implement to enhance the base debugging
-//! experience. These protocol extensions range from relatively mundane things
-//! such as setting/removing breakpoints or reading/writing individual
-//! registers, but also include fancy things such as support for time travel
-//! debugging, running shell commands remotely, or even performing file IO on
-//! the target!
-//!
-//! `gdbstub` uses a somewhat unique approach to exposing these many features,
-//! called **Inlinable Dyn Extension Traits (IDETs)**. While this might sound a
-//! bit daunting, the API is actually quite straightforward, and described in
-//! great detail under the [`ext` module's documentation](ext).
-//!
-//! As you being working on your `gdbstub` integration, take a moment to skim
-//! through and familiarize yourself with the many different protocol extensions
-//! that `gdbstub` implements!
-//!
-//! As a suggestion on where to start, consider implementing some of the
-//! breakpoint related extensions under
-//! [`breakpoints`](crate::target::ext::breakpoints). While setting/removing
-//! breakpoints is technically an "optional" part of the GDB protocol, I'm sure
-//! you'd be hard pressed to find a debugger that doesn't support breakpoints.
-//!
-//! ### Note: Missing Protocol Extensions
-//!
-//! `gdbstub`'s development is guided by the needs of its contributors, with
-//! new features being added on an "as-needed" basis.
-//!
-//! If there's a GDB protocol extensions you're interested in that hasn't been
-//! implemented in `gdbstub` yet, (e.g: remote filesystem access, tracepoint
-//! support, etc...), consider opening an issue / filing a PR on GitHub!
-//!
-//! Check out the [GDB Remote Configuration Docs](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Configuration.html)
-//! for a table of GDB commands + their corresponding Remote Serial Protocol
-//! packets.
 //!
 //! ## A note on error handling
 //!
@@ -436,6 +436,33 @@ pub trait Target {
     #[inline(always)]
     fn use_optional_single_step(&self) -> bool {
         <Self::Arch as Arch>::supports_optional_single_step()
+    }
+
+    /// Whether `gdbstub` should provide a "stub" `resume` implementation on
+    /// targets without support for resumption.
+    ///
+    /// At the time of writing, the mainline GDB client does not gracefully
+    /// handle targets that do not support support resumption, and will hang
+    /// indefinitely if a user inadvertently attempts to `continue` or `step`
+    /// such a target.
+    ///
+    /// To make the `gdbstub` user experience a bit better, the library includes
+    /// bit of "stub" code to gracefully handle these cases.
+    ///
+    /// If a user attempts to resume a target that hasn't implemented support
+    /// for resumption, `gdbstub` will write a brief message back to the GDB
+    /// client console, and will immediately return a "stopped with TRAP" stop
+    /// reason.
+    ///
+    /// This method controls whether or not this bt of behavior is enabled.
+    ///
+    /// _Author's note:_ Unless you're _really_ trying to squeeze `gdbstub` onto
+    /// a particularly resource-constrained platform, you may as well leave this
+    /// enabled. The resulting stub code is entirely optimized out on targets
+    /// that implement support for resumption.
+    #[inline(always)]
+    fn use_resume_stub(&self) -> bool {
+        true
     }
 
     /// Support for setting / removing breakpoints.
