@@ -4,7 +4,7 @@ name: ci
 
 jobs:
   test:
-    name: clippy + tests
+    name: clippy + tests + docs
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -27,6 +27,11 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
+          args: --workspace --features=std
+      - name: cargo doc
+        uses: actions-rs/cargo@v1
+        with:
+          command: doc
           args: --workspace --features=std
   rustfmt:
     name: rustfmt (nightly)
