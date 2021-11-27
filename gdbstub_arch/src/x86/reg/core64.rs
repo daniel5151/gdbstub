@@ -6,8 +6,8 @@ use super::{X86SegmentRegs, X87FpuInternalRegs, F80};
 
 /// 64-bit x86 core registers (+ SSE extensions).
 ///
-/// Source: https://github.com/bminor/binutils-gdb/blob/master/gdb/features/i386/64bit-core.xml
-/// Additionally: https://github.com/bminor/binutils-gdb/blob/master/gdb/features/i386/64bit-sse.xml
+/// Source: <https://github.com/bminor/binutils-gdb/blob/master/gdb/features/i386/64bit-core.xml>
+/// Additionally: <https://github.com/bminor/binutils-gdb/blob/master/gdb/features/i386/64bit-sse.xml>
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct X86_64CoreRegs {
     /// RAX, RBX, RCX, RDX, RSI, RDI, RBP, RSP, r8-r15

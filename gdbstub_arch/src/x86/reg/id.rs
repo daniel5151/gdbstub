@@ -79,8 +79,8 @@ impl X86SegmentRegId {
 
 /// 32-bit x86 core + SSE register identifier.
 ///
-/// Source: https://github.com/bminor/binutils-gdb/blob/master/gdb/features/i386/32bit-core.xml
-/// Additionally: https://github.com/bminor/binutils-gdb/blob/master/gdb/features/i386/32bit-sse.xml
+/// Source: <https://github.com/bminor/binutils-gdb/blob/master/gdb/features/i386/32bit-core.xml>
+/// Additionally: <https://github.com/bminor/binutils-gdb/blob/master/gdb/features/i386/32bit-sse.xml>
 #[derive(Debug, Clone, Copy)]
 #[non_exhaustive]
 pub enum X86CoreRegId {
@@ -145,8 +145,8 @@ impl RegId for X86CoreRegId {
 
 /// 64-bit x86 core + SSE register identifier.
 ///
-/// Source: https://github.com/bminor/binutils-gdb/blob/master/gdb/features/i386/64bit-core.xml
-/// Additionally: https://github.com/bminor/binutils-gdb/blob/master/gdb/features/i386/64bit-sse.xml
+/// Source: <https://github.com/bminor/binutils-gdb/blob/master/gdb/features/i386/64bit-core.xml>
+/// Additionally: <https://github.com/bminor/binutils-gdb/blob/master/gdb/features/i386/64bit-sse.xml>
 #[derive(Debug, Clone, Copy)]
 #[non_exhaustive]
 pub enum X86_64CoreRegId {

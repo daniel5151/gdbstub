@@ -91,7 +91,7 @@ impl Registers for X87FpuInternalRegs {
 
 /// x86 segment registers.
 ///
-/// Source: https://github.com/bminor/binutils-gdb/blob/master/gdb/features/i386/64bit-core.xml
+/// Source: <https://github.com/bminor/binutils-gdb/blob/master/gdb/features/i386/64bit-core.xml>
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct X86SegmentRegs {
     /// Code Segment

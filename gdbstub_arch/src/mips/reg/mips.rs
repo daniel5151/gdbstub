@@ -9,7 +9,7 @@ use gdbstub::internal::LeBytes;
 ///
 /// The register width is set to `u32` or `u64` based on the `<U>` type.
 ///
-/// Source: https://github.com/bminor/binutils-gdb/blob/master/gdb/features/mips-cpu.xml
+/// Source: <https://github.com/bminor/binutils-gdb/blob/master/gdb/features/mips-cpu.xml>
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct MipsCoreRegs<U> {
     /// General purpose registers (R0-R31)
@@ -28,7 +28,7 @@ pub struct MipsCoreRegs<U> {
 
 /// MIPS CP0 (coprocessor 0) registers.
 ///
-/// Source: https://github.com/bminor/binutils-gdb/blob/master/gdb/features/mips-cp0.xml
+/// Source: <https://github.com/bminor/binutils-gdb/blob/master/gdb/features/mips-cp0.xml>
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct MipsCp0Regs<U> {
     /// Status register (regnum 32)
@@ -41,7 +41,7 @@ pub struct MipsCp0Regs<U> {
 
 /// MIPS FPU registers.
 ///
-/// Source: https://github.com/bminor/binutils-gdb/blob/master/gdb/features/mips-fpu.xml
+/// Source: <https://github.com/bminor/binutils-gdb/blob/master/gdb/features/mips-fpu.xml>
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct MipsFpuRegs<U> {
     /// FP registers (F0-F31) starting at regnum 38
@@ -54,7 +54,7 @@ pub struct MipsFpuRegs<U> {
 
 /// MIPS DSP registers.
 ///
-/// Source: https://github.com/bminor/binutils-gdb/blob/master/gdb/features/mips-dsp.xml
+/// Source: <https://github.com/bminor/binutils-gdb/blob/master/gdb/features/mips-dsp.xml>
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct MipsDspRegs<U> {
     /// High 1 register (regnum 72)
@@ -71,7 +71,7 @@ pub struct MipsDspRegs<U> {
     pub lo3: U,
     /// DSP Control register (regnum 78)
     /// Note: This register will always be 32-bit regardless of the target
-    /// https://sourceware.org/gdb/current/onlinedocs/gdb/MIPS-Features.html#MIPS-Features
+    /// <https://sourceware.org/gdb/current/onlinedocs/gdb/MIPS-Features.html#MIPS-Features>
     pub dspctl: u32,
     /// Restart register (regnum 79)
     pub restart: U,
@@ -79,7 +79,7 @@ pub struct MipsDspRegs<U> {
 
 /// MIPS core and DSP registers.
 ///
-/// Source: https://github.com/bminor/binutils-gdb/blob/master/gdb/features/mips-dsp-linux.xml
+/// Source: <https://github.com/bminor/binutils-gdb/blob/master/gdb/features/mips-dsp-linux.xml>
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct MipsCoreRegsWithDsp<U> {
     /// Core registers

@@ -7,10 +7,10 @@ use core::convert::TryInto;
 /// 32-bit PowerPC core registers, FPU registers, and AltiVec SIMD registers.
 ///
 /// Sources:
-/// * https://github.com/bminor/binutils-gdb/blob/master/gdb/features/rs6000/powerpc-altivec32.xml
-/// * https://github.com/bminor/binutils-gdb/blob/master/gdb/features/rs6000/power-core.xml
-/// * https://github.com/bminor/binutils-gdb/blob/master/gdb/features/rs6000/power-fpu.xml
-/// * https://github.com/bminor/binutils-gdb/blob/master/gdb/features/rs6000/power-altivec.xml
+/// * <https://github.com/bminor/binutils-gdb/blob/master/gdb/features/rs6000/powerpc-altivec32.xml>
+/// * <https://github.com/bminor/binutils-gdb/blob/master/gdb/features/rs6000/power-core.xml>
+/// * <https://github.com/bminor/binutils-gdb/blob/master/gdb/features/rs6000/power-fpu.xml>
+/// * <https://github.com/bminor/binutils-gdb/blob/master/gdb/features/rs6000/power-altivec.xml>
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct PowerPcCommonRegs {
     /// General purpose registers

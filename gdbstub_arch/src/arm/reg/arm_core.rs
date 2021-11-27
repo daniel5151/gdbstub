@@ -2,7 +2,7 @@ use gdbstub::arch::Registers;
 
 /// 32-bit ARM core registers.
 ///
-/// Source: https://github.com/bminor/binutils-gdb/blob/master/gdb/features/arm/arm-core.xml
+/// Source: <https://github.com/bminor/binutils-gdb/blob/master/gdb/features/arm/arm-core.xml>
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct ArmCoreRegs {
     /// General purpose registers (R0-R12)
