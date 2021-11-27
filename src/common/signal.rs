@@ -1,11 +1,3 @@
-//! Common types and definitions.
-
-/// Thread ID
-pub type Tid = core::num::NonZeroUsize;
-
-/// Process ID
-pub type Pid = core::num::NonZeroUsize;
-
 /// Cross-platform signal numbers defined by the GDB Remote Serial Protocol.
 ///
 /// Transcribed from <https://github.com/bminor/binutils-gdb/blob/master/include/gdb/signals.def>
