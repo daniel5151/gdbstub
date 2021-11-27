@@ -1,5 +1,5 @@
-use crate::Connection;
-use crate::ConnectionExt;
+use crate::conn::Connection;
+use crate::conn::ConnectionExt;
 
 use alloc::boxed::Box;
 

@@ -3,8 +3,8 @@ use std::io;
 use std::os::unix::io::AsRawFd;
 use std::os::unix::net::UnixStream;
 
-use crate::Connection;
-use crate::ConnectionExt;
+use crate::conn::Connection;
+use crate::conn::ConnectionExt;
 
 // TODO: Remove PeekExt once rust-lang/rust#73761 is stabilized
 trait PeekExt {

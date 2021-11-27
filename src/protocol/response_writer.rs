@@ -5,9 +5,9 @@ use alloc::vec::Vec;
 
 use num_traits::PrimInt;
 
+use crate::conn::Connection;
 use crate::internal::BeBytes;
 use crate::protocol::{SpecificIdKind, SpecificThreadId};
-use crate::Connection;
 
 /// Newtype around a Connection error. Having a newtype allows implementing a
 /// `From<ResponseWriterError<C>> for crate::Error<T, C>`, which greatly

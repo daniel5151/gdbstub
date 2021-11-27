@@ -3,9 +3,9 @@
 
 extern crate libc;
 
-use gdbstub::state_machine::GdbStubStateMachine;
+use gdbstub::stub::state_machine::GdbStubStateMachine;
+use gdbstub::stub::{DisconnectReason, GdbStubBuilder, GdbStubError};
 use gdbstub::target::ext::base::multithread::ThreadStopReason;
-use gdbstub::{DisconnectReason, GdbStubBuilder, GdbStubError};
 
 mod conn;
 mod gdb;

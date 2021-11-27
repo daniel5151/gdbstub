@@ -113,16 +113,23 @@
 //! for a table of GDB commands + their corresponding Remote Serial Protocol
 //! packets.
 //!
-//! ### Example: A minimal Single Threaded `Target`
+//! ### Example: A fairly minimal Single Threaded `Target`
+//!
+//! This example includes a handful of required and optional target features,
+//! and shows off the basics of how to work with IDETs.
 //!
 //! ```rust
+//! use gdbstub::common::Signal;
 //! use gdbstub::target::{Target, TargetResult};
 //! use gdbstub::target::ext::base::BaseOps;
 //! use gdbstub::target::ext::base::singlethread::{
-//!     SingleThreadBase, SingleThreadResume, SingleThreadResumeOps, SingleThreadSingleStep,
-//!     SingleThreadSingleStepOps, StopReason,
+//!     SingleThreadResumeOps, SingleThreadSingleStepOps
 //! };
-//! use gdbstub::common::Signal;
+//! use gdbstub::target::ext::base::singlethread::{
+//!     SingleThreadBase, SingleThreadResume, SingleThreadSingleStep, StopReason,
+//! };
+//! use gdbstub::target::ext::breakpoints::{Breakpoints, SwBreakpoint};
+//! use gdbstub::target::ext::breakpoints::{BreakpointsOps, SwBreakpointOps};
 //!
 //! struct MyTarget;
 //!
@@ -130,8 +137,15 @@
 //!     type Error = ();
 //!     type Arch = gdbstub_arch::arm::Armv4t; // as an example
 //!
+//!     #[inline(always)]
 //!     fn base_ops(&mut self) -> BaseOps<Self::Arch, Self::Error> {
 //!         BaseOps::SingleThread(self)
+//!     }
+//!
+//!     // opt-in to support for setting/removing breakpoints
+//!     #[inline(always)]
+//!     fn support_breakpoints(&mut self) -> Option<BreakpointsOps<Self>> {
+//!         Some(self)
 //!     }
 //! }
 //!
@@ -158,7 +172,7 @@
 //!         data: &[u8],
 //!     ) -> TargetResult<(), Self> { todo!() }
 //!
-//!     // you'll likely want support to support at resumption as well...
+//!     // most targets will want to support at resumption as well...
 //!
 //!     #[inline(always)]
 //!     fn support_resume(&mut self) -> Option<SingleThreadResumeOps<Self>> {
@@ -170,9 +184,9 @@
 //!     fn resume(
 //!         &mut self,
 //!         signal: Option<Signal>,
-//!     ) -> Result<(), ()> { todo!() }
+//!     ) -> Result<(), Self::Error> { todo!() }
 //!
-//!     // ...and if you support resumption, you'll likely want to support
+//!     // ...and if the target supports resumption, it'll likely want to support
 //!     // single-step resume as well
 //!
 //!     #[inline(always)]
@@ -187,7 +201,29 @@
 //!     fn step(
 //!         &mut self,
 //!         signal: Option<Signal>,
-//!     ) -> Result<(), ()> { todo!() }
+//!     ) -> Result<(), Self::Error> { todo!() }
+//! }
+//!
+//! impl Breakpoints for MyTarget {
+//!     // there are several kinds of breakpoints - this target uses software breakpoints
+//!     #[inline(always)]
+//!     fn support_sw_breakpoint(&mut self) -> Option<SwBreakpointOps<Self>> {
+//!         Some(self)
+//!     }
+//! }
+//!
+//! impl SwBreakpoint for MyTarget {
+//!     fn add_sw_breakpoint(
+//!         &mut self,
+//!         addr: u32,
+//!         kind: gdbstub_arch::arm::ArmBreakpointKind,
+//!     ) -> TargetResult<bool, Self> { todo!() }
+//!
+//!     fn remove_sw_breakpoint(
+//!         &mut self,
+//!         addr: u32,
+//!         kind: gdbstub_arch::arm::ArmBreakpointKind,
+//!     ) -> TargetResult<bool, Self> { todo!() }
 //! }
 //! ```
 //!
@@ -197,17 +233,18 @@
 //! functions don't return a typical [`Result<T, Self::Error>`],
 //! and will instead return a [`TargetResult<T, Self>`].
 //!
-//! At first glance, this might look a bit strange, since it might look as
-//! though the `Err` variant of `TargetResult` is actually `Self` instead of
-//! `Self::Error`! Thankfully, there's a good reason for why that's the case,
-//! which you can read about as part of the [`TargetError`] documentation.
+//! At first glance this might look a bit strange, since it looks like the `Err`
+//! variant of `TargetResult` is `Self` instead of `Self::Error`!
 //!
-//! In a nutshell, `TargetResult` wraps a typical `Result<T, Self::Error>` with
-//! a few additional error types which can be reported back to the GDB client
-//! via the GDB RSP. For example, if the GDB client tried to read memory from
-//! invalid memory, instead of immediately terminating the entire debugging
-//! session, it's possible to simply return a `Err(TargetError::Errno(14)) //
-//! EFAULT`, which will notify the GDB client that the operation has failed.
+//! Thankfully, there's a good reason for why that's the case. In a nutshell,
+//! `TargetResult` wraps a typical `Result<T, Self::Error>` with a few
+//! additional error types which can be reported back to the GDB client via the
+//! GDB RSP.
+//!
+//! For example, if the GDB client tried to read memory from invalid memory,
+//! instead of immediately terminating the entire debugging session, it's
+//! possible to simply return a `Err(TargetError::Errno(14)) // EFAULT`, which
+//! will notify the GDB client that the operation has failed.
 
 use crate::arch::Arch;
 
@@ -402,7 +439,7 @@ pub trait Target {
     /// by overriding this method to return `true`.
     ///
     /// [`GdbStubError::ImplicitSwBreakpoints`]:
-    /// crate::GdbStubError::ImplicitSwBreakpoints
+    /// crate::stub::GdbStubError::ImplicitSwBreakpoints
     #[inline(always)]
     fn use_implicit_sw_breakpoints(&self) -> bool {
         false
@@ -432,7 +469,7 @@ pub trait Target {
     /// will lead to "unexpected packet" runtime errors!
     ///
     /// [`GdbStubError::UnconditionalSingleStep`]:
-    /// crate::GdbStubError::UnconditionalSingleStep
+    /// crate::stub::GdbStubError::UnconditionalSingleStep
     #[inline(always)]
     fn use_optional_single_step(&self) -> bool {
         <Self::Arch as Arch>::supports_optional_single_step()

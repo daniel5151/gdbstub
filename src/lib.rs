@@ -50,7 +50,7 @@
 //!
 //! First things first: `gdbstub` needs some way to communicate with a GDB
 //! client. To facilitate this communication, `gdbstub` uses a custom
-//! [`Connection`] trait.
+//! [`Connection`](conn::Connection) trait.
 //!
 //! `Connection` is automatically implemented for common `std` types such as
 //! [`TcpStream`](std::net::TcpStream) and
@@ -127,20 +127,20 @@
 //!
 //! If you're running on a hosted system with threads to spare, the quickest way
 //! to get up and running with `gdbstub` is by using the
-//! [`GdbStub::run_blocking`] API alongside the
-//! [`BlockingEventLoop`](crate::gdbstub_run_blocking::BlockingEventLoop) trait.
+//! [`GdbStub::run_blocking`](stub::run_blocking) API alongside the
+//! [`BlockingEventLoop`] trait.
 //!
 //! A basic integration might look something like this:
 //!
 //! ```rust,ignore
-//! use gdbstub::gdbstub_run_blocking;
-//! use gdbstub::ConnectionExt; // note the use of `ConnectionExt` vs. `Connection`
+//! use gdbstub::stub::run_blocking;
+//! use gdbstub::conn::ConnectionExt; // note the use of `ConnectionExt` vs. `Connection`
 //! use gdbstub::target::ext::base::multithread::ThreadStopReason;
 //! use gdbstub::target::ext::base::singlethread::StopReason;
 //!
 //! enum MyGdbBlockingEventLoop {}
 //!
-//! impl gdbstub_run_blocking::BlockingEventLoop for MyGdbBlockingEventLoop {
+//! impl run_blocking::BlockingEventLoop for MyGdbBlockingEventLoop {
 //!     type Target = MyTarget;
 //!     type Connection = Box<dyn ConnectionExt<Error = std::io::Error>>;
 //!
@@ -151,8 +151,8 @@
 //!         target: &mut MyTarget,
 //!         conn: &mut Self::Connection,
 //!     ) -> Result<
-//!         gdbstub_run_blocking::Event<u32>,
-//!         gdbstub_run_blocking::WaitForStopReasonError<
+//!         run_blocking::Event<u32>,
+//!         run_blocking::WaitForStopReasonError<
 //!             <Self::Target as Target>::Error,
 //!             std::io::Error,
 //!         >,
@@ -166,12 +166,12 @@
 //!             MyTargetEvent::IncomingData => {
 //!                 let byte = conn
 //!                     .read() // method provided by the `ConnectionExt` trait
-//!                     .map_err(gdbstub_run_blocking::WaitForStopReasonError::Connection)?;
+//!                     .map_err(run_blocking::WaitForStopReasonError::Connection)?;
 //!
-//!                 gdbstub_run_blocking::Event::IncomingData(byte)
+//!                 run_blocking::Event::IncomingData(byte)
 //!             }
 //!             MyTargetEvent::StopReason(reason) => {
-//!                 gdbstub_run_blocking::Event::TargetStopped(
+//!                 run_blocking::Event::TargetStopped(
 //!                     target_event_to_gdb_event(reason)
 //!                 )
 //!             }
@@ -224,12 +224,11 @@
 #![doc = "### `GdbStubStateMachine`: Driving `gdbstub` in an async event loop / via interrupt handlers"]
 //!
 //! `GdbStub::run_blocking` requires that the target implement the
-//! [`BlockingEventLoop`](crate::gdbstub_run_blocking::BlockingEventLoop) trait,
-//! which as the name implies, uses _blocking_ IO when handling certain events.
-//! Blocking the thread is a totally reasonable approach in most
-//! implementations, as one can simply spin up a separate thread to run the GDB
-//! stub (or in certain emulator implementations, run the emulator as part of
-//! the `wait_for_stop_reason` method).
+//! [`BlockingEventLoop`] trait, which as the name implies, uses _blocking_ IO
+//! when handling certain events. Blocking the thread is a totally reasonable
+//! approach in most implementations, as one can simply spin up a separate
+//! thread to run the GDB stub (or in certain emulator implementations, run the
+//! emulator as part of the `wait_for_stop_reason` method).
 //!
 //! Unfortunately, this blocking behavior can be a non-starter when integrating
 //! `gdbstub` in projects that don't support / wish to avoid the traditional
@@ -237,16 +236,18 @@
 //! bare-metal, `no_std` projects running on embedded hardware.
 //!
 //! In these cases, `gdbstub` provides access to the underlying
-//! [`GdbStubStateMachine`](state_machine::GdbStubStateMachine) API, which gives
-//! implementations full control over the GDB stub's "event loop". This API
-//! requires implementations to "push" data to the `gdbstub` implementation
-//! whenever new data becomes available (e.g: when a UART interrupt handler
-//! receives a byte, when the target hits a breakpoint, etc...), as opposed to
-//! the `GdbStub::run_blocking` API, which "pulls" these events in a blocking
-//! manner.
+//! [`GdbStubStateMachine`] API, which gives implementations full control over
+//! the GDB stub's "event loop". This API requires implementations to "push"
+//! data to the `gdbstub` implementation whenever new data becomes available
+//! (e.g: when a UART interrupt handler receives a byte, when the target hits a
+//! breakpoint, etc...), as opposed to the `GdbStub::run_blocking` API, which
+//! "pulls" these events in a blocking manner.
 //!
-//! See the [`GdbStubStateMachine`](state_machine::GdbStubStateMachine) docs for
-//! more details on how to use this API.
+//! See the [`GdbStubStateMachine`] docs for more details on how to use this
+//! API.
+//!
+//! [`GdbStubStateMachine`]: stub::state_machine::GdbStubStateMachine
+//! [`BlockingEventLoop`]: stub::run_blocking::BlockingEventLoop
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![deny(missing_docs)]
@@ -272,8 +273,6 @@ extern crate alloc;
 #[macro_use]
 extern crate log;
 
-mod connection;
-mod gdbstub_impl;
 mod protocol;
 mod util;
 
@@ -282,10 +281,9 @@ pub mod internal;
 
 pub mod arch;
 pub mod common;
+pub mod conn;
+pub mod stub;
 pub mod target;
-
-pub use connection::{Connection, ConnectionExt};
-pub use gdbstub_impl::*;
 
 /// (Internal) The fake Tid that's used when running in single-threaded mode.
 // SAFETY: 1 is clearly non-zero.

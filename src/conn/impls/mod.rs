@@ -10,8 +10,8 @@ mod tcpstream;
 #[cfg(all(feature = "std", unix))]
 mod unixstream;
 
-use crate::Connection;
-use crate::ConnectionExt;
+use crate::conn::Connection;
+use crate::conn::ConnectionExt;
 
 impl<E> Connection for &mut dyn Connection<Error = E> {
     type Error = E;

@@ -1,4 +1,4 @@
-use gdbstub::Connection;
+use gdbstub::conn::Connection;
 
 pub struct TcpConnection {
     sock: i32,

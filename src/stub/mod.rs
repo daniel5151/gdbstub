@@ -1,10 +1,13 @@
+//! The core [`GdbStub`] type, used to drive a GDB debugging session for a
+//! particular [`Target`] over a given [`Connection`].
+
 use core::marker::PhantomData;
 
 use managed::ManagedSlice;
 
 use crate::arch::Arch;
 use crate::common::{Signal, Tid};
-use crate::connection::{Connection, ConnectionExt};
+use crate::conn::{Connection, ConnectionExt};
 use crate::protocol::commands::Command;
 use crate::protocol::{Packet, ResponseWriter, SpecificIdKind};
 use crate::target::ext::base::multithread::ThreadStopReason;
@@ -37,10 +40,10 @@ pub enum DisconnectReason {
 }
 
 /// Types and traits related to the [`GdbStub::run_blocking`] interface.
-pub mod gdbstub_run_blocking {
+pub mod run_blocking {
     use super::*;
 
-    use crate::connection::ConnectionExt;
+    use crate::conn::ConnectionExt;
 
     /// A set of user-provided methods required to run a GDB debugging session
     /// using the [`GdbStub::run_blocking`] method.
@@ -166,7 +169,7 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
     /// based interface.
     ///
     /// Instead, an implementation simply needs to provide a implementation of
-    /// [`gdbstub_run_blocking::BlockingEventLoop`], which is a simplified set
+    /// [`run_blocking::BlockingEventLoop`], which is a simplified set
     /// of methods describing how to drive the target.
     ///
     /// `GdbStub::run_blocking` returns once the GDB client closes the debugging
@@ -183,7 +186,7 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
     ) -> Result<DisconnectReason, Error<T::Error, C::Error>>
     where
         C: ConnectionExt,
-        E: gdbstub_run_blocking::BlockingEventLoop<Target = T, Connection = C>,
+        E: run_blocking::BlockingEventLoop<Target = T, Connection = C>,
     {
         let mut gdb = self.run_state_machine(target)?;
         loop {
@@ -207,9 +210,7 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
                 }
 
                 GdbStubStateMachine::Running(mut gdb) => {
-                    use gdbstub_run_blocking::{
-                        Event as BlockingEventLoopEvent, WaitForStopReasonError,
-                    };
+                    use run_blocking::{Event as BlockingEventLoopEvent, WaitForStopReasonError};
 
                     // block waiting for the target to return a stop reason
                     let event = E::wait_for_stop_reason(target, gdb.borrow_conn());
@@ -281,7 +282,7 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
     }
 }
 
-/// State-machine interface to `GdbStub`.
+/// Low-level state-machine interface that underpins [`GdbStub`].
 ///
 /// TODO: write some proper documentation + examples of how to interface with
 /// this API.
@@ -303,9 +304,8 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
 /// would be to review the following bits of code to get a feel for the API:
 ///
 /// - The implementation of [`GdbStub::run_blocking`]
-/// - Implementations of
-///   [`BlockingEventLoop`](gdbstub_run_blocking::BlockingEventLoop) used
-///   alongside `GdbStub::run_blocking` (e.g: the in-tree `armv4t` /
+/// - Implementations of [`BlockingEventLoop`](run_blocking::BlockingEventLoop)
+///   used alongside `GdbStub::run_blocking` (e.g: the in-tree `armv4t` /
 ///   `armv4t_multicore` examples)
 /// - Real-world projects using the API
 ///     - The best example of this (at the time of writing) is the code at [`vmware-labs/node-replicated-kernel`](https://github.com/vmware-labs/node-replicated-kernel/blob/4326704aaf3c0052e614dcde2a788a8483224394/kernel/src/arch/x86_64/gdb/mod.rs#L106)

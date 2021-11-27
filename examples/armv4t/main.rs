@@ -4,10 +4,10 @@ use std::net::{TcpListener, TcpStream};
 use std::os::unix::net::{UnixListener, UnixStream};
 
 use gdbstub::common::Signal;
-use gdbstub::gdbstub_run_blocking;
+use gdbstub::conn::ConnectionExt;
+use gdbstub::stub::{run_blocking, DisconnectReason, GdbStub, GdbStubError};
 use gdbstub::target::ext::base::singlethread::StopReason;
 use gdbstub::target::Target;
-use gdbstub::{ConnectionExt, DisconnectReason, GdbStub};
 
 pub type DynResult<T> = Result<T, Box<dyn std::error::Error>>;
 
@@ -49,7 +49,7 @@ fn wait_for_uds(path: &str) -> DynResult<UnixStream> {
 
 enum EmuGdbEventLoop {}
 
-impl gdbstub::gdbstub_run_blocking::BlockingEventLoop for EmuGdbEventLoop {
+impl run_blocking::BlockingEventLoop for EmuGdbEventLoop {
     type Target = emu::Emu;
     type Connection = Box<dyn ConnectionExt<Error = std::io::Error>>;
 
@@ -57,11 +57,8 @@ impl gdbstub::gdbstub_run_blocking::BlockingEventLoop for EmuGdbEventLoop {
         target: &mut emu::Emu,
         conn: &mut Self::Connection,
     ) -> Result<
-        gdbstub_run_blocking::Event<u32>,
-        gdbstub_run_blocking::WaitForStopReasonError<
-            <Self::Target as Target>::Error,
-            std::io::Error,
-        >,
+        run_blocking::Event<u32>,
+        run_blocking::WaitForStopReasonError<<Self::Target as Target>::Error, std::io::Error>,
     > {
         // The `armv4t` example runs the emulator in the same thread as the GDB state
         // machine loop. As such, it uses a simple poll-based model to check for
@@ -96,8 +93,8 @@ impl gdbstub::gdbstub_run_blocking::BlockingEventLoop for EmuGdbEventLoop {
             emu::RunEvent::IncomingData => {
                 let byte = conn
                     .read()
-                    .map_err(gdbstub_run_blocking::WaitForStopReasonError::Connection)?;
-                Ok(gdbstub_run_blocking::Event::IncomingData(byte))
+                    .map_err(run_blocking::WaitForStopReasonError::Connection)?;
+                Ok(run_blocking::Event::IncomingData(byte))
             }
             emu::RunEvent::Event(event) => {
                 use gdbstub::target::ext::breakpoints::WatchKind;
@@ -117,9 +114,7 @@ impl gdbstub::gdbstub_run_blocking::BlockingEventLoop for EmuGdbEventLoop {
                     },
                 };
 
-                Ok(gdbstub_run_blocking::Event::TargetStopped(
-                    stop_reason.into(),
-                ))
+                Ok(run_blocking::Event::TargetStopped(stop_reason.into()))
             }
         }
     }
@@ -176,7 +171,7 @@ fn main() -> DynResult<()> {
             }
             DisconnectReason::Kill => println!("GDB sent a kill command!"),
         },
-        Err(gdbstub::GdbStubError::TargetError(e)) => {
+        Err(GdbStubError::TargetError(e)) => {
             println!("target encountered a fatal error: {}", e)
         }
         Err(e) => {

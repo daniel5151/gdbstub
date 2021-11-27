@@ -1,3 +1,5 @@
+//! Traits to perform in-order, serial, byte-wise I/O.
+
 mod impls;
 
 /// A trait to perform in-order, serial, byte-wise I/O.
@@ -53,7 +55,7 @@ pub trait Connection {
 /// Extends [`Connection`] with `read` and `peek` methods.
 ///
 /// This trait is used as part of `gdbstub`'s quickstart
-/// [`GdbStub::run_blocking`](crate::GdbStub::run_blocking) API.
+/// [`GdbStub::run_blocking`](crate::stub::GdbStub::run_blocking) API.
 ///
 /// When the `std` feature is enabled, this trait is automatically implemented
 /// for [`TcpStream`](std::net::TcpStream) and

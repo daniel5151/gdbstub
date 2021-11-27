@@ -1,5 +1,5 @@
+use crate::stub::GdbStubError;
 use crate::target::TargetError;
-use crate::GdbStubError;
 
 /// Extension trait to ease working with `TargetResult` in the GdbStub
 /// implementation.

@@ -1,4 +1,4 @@
-//! Common types and definitions.
+//! Common types and definitions used across `gdbstub`.
 
 mod signal;
 

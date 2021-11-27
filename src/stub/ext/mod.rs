@@ -1,6 +1,6 @@
 mod prelude {
     pub use crate::common::*;
-    pub use crate::connection::Connection;
+    pub use crate::conn::Connection;
     pub use crate::internal::*;
     pub use crate::target::Target;
 
