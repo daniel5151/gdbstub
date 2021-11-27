@@ -3,7 +3,11 @@ use core::marker::PhantomData;
 
 use managed::ManagedSlice;
 
-use super::{Connection, GdbStub, GdbStubImpl, Target};
+use crate::conn::Connection;
+use crate::target::Target;
+
+use super::core_impl::GdbStubImpl;
+use super::GdbStub;
 
 /// An error which may occur when building a [`GdbStub`].
 #[derive(Debug)]
