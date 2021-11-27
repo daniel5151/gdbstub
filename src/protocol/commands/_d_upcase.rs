@@ -1,5 +1,7 @@
 use super::prelude::*;
 
+use crate::common::Pid;
+
 #[derive(Debug)]
 pub struct D {
     pub pid: Option<Pid>,

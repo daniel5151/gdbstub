@@ -1,5 +1,7 @@
 use super::prelude::*;
 
+use crate::protocol::common::hex::decode_bin_buf;
+
 #[derive(Debug)]
 pub struct X<'a> {
     pub addr: &'a [u8],

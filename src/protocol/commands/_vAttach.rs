@@ -1,5 +1,7 @@
 use super::prelude::*;
 
+use crate::common::Pid;
+
 #[derive(Debug)]
 pub struct vAttach {
     pub pid: Pid,

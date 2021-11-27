@@ -1,6 +1,7 @@
 use super::prelude::*;
 
 use crate::common::Pid;
+use crate::protocol::common::qxfer::{ParseAnnex, QXferReadBase};
 
 pub type qXferExecFileRead<'a> = QXferReadBase<'a, ExecFileAnnex>;
 

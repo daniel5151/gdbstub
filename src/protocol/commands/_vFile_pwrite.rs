@@ -1,5 +1,7 @@
 use super::prelude::*;
 
+use crate::protocol::common::hex::decode_bin_buf;
+
 #[derive(Debug)]
 pub struct vFilePwrite<'a> {
     pub fd: u32,
@@ -21,7 +23,7 @@ impl<'a> ParseCommand<'a> for vFilePwrite<'a> {
                 let offset = decode_hex_buf(body.next()?).ok()?;
                 let data = decode_bin_buf(body.next()?).ok()?;
                 Some(vFilePwrite { fd, offset, data })
-            },
+            }
             _ => None,
         }
     }

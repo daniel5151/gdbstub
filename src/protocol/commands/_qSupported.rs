@@ -30,7 +30,7 @@ impl<'a> Features<'a> {
         self.0.split(|b| *b == b';').map(|s| match s.last() {
             None => None,
             Some(&c) if c == b'+' || c == b'-' || c == b'?' => Some(Feature {
-                name: s[..s.len() - 1].into(),
+                name: &s[..s.len() - 1],
                 val: None,
                 status: match c {
                     b'+' => FeatureSupported::Yes,
@@ -42,8 +42,8 @@ impl<'a> Features<'a> {
             Some(_) => {
                 let mut parts = s.split(|b| *b == b'=');
                 Some(Feature {
-                    name: parts.next()?.into(),
-                    val: Some(parts.next()?.into()),
+                    name: parts.next()?,
+                    val: Some(parts.next()?),
                     status: FeatureSupported::Yes,
                 })
             }
@@ -60,7 +60,7 @@ pub enum FeatureSupported {
 
 #[derive(Debug)]
 pub struct Feature<'a> {
-    name: Bstr<'a>,
-    val: Option<Bstr<'a>>,
+    name: &'a [u8],
+    val: Option<&'a [u8]>,
     status: FeatureSupported,
 }

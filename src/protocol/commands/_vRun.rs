@@ -1,9 +1,11 @@
 use super::prelude::*;
 
+use crate::protocol::common::lists::ArgListHex;
+
 #[derive(Debug)]
 pub struct vRun<'a> {
     pub filename: Option<&'a [u8]>,
-    pub args: lists::ArgListHex<'a>,
+    pub args: ArgListHex<'a>,
 }
 
 impl<'a> ParseCommand<'a> for vRun<'a> {
@@ -21,7 +23,7 @@ impl<'a> ParseCommand<'a> for vRun<'a> {
 
         Some(vRun {
             filename,
-            args: lists::ArgListHex::from_packet(args)?,
+            args: ArgListHex::from_packet(args)?,
         })
     }
 }

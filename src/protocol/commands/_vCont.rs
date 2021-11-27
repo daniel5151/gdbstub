@@ -1,5 +1,9 @@
 use super::prelude::*;
 
+use crate::common::Signal;
+use crate::protocol::common::hex::HexString;
+use crate::protocol::common::thread_id::{SpecificThreadId, ThreadId};
+
 // TODO?: instead of parsing lazily when invoked, parse the strings into a
 // compressed binary representations that can be stuffed back into the packet
 // buffer, and return an iterator over the binary data that's _guaranteed_ to be

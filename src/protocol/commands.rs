@@ -3,21 +3,16 @@ use paste::paste;
 use crate::protocol::packet::PacketBuf;
 use crate::target::Target;
 
+/// Common imports used by >50% of all packet parsers.
+///
+/// Do not clutter this prelude with types only used by a few packets.
 pub(self) mod prelude {
-    pub use super::ParseCommand;
-    pub use crate::common::*;
-    pub use crate::protocol::common::hex::{
-        decode_bin_buf, decode_hex, decode_hex_buf, is_hex, HexString,
-    };
-    pub use crate::protocol::common::lists;
-    pub use crate::protocol::common::qxfer::{ParseAnnex, QXferReadBase};
-    pub use crate::protocol::common::thread_id::{
-        IdKind, SpecificIdKind, SpecificThreadId, ThreadId,
-    };
-    pub use crate::protocol::common::Bstr;
+    pub use core::convert::{TryFrom, TryInto};
+
+    pub use crate::protocol::commands::ParseCommand;
+    pub use crate::protocol::common::hex::{decode_hex, decode_hex_buf};
     pub use crate::protocol::packet::PacketBuf;
     pub use crate::util::no_panic_iter::SliceExt;
-    pub use core::convert::{TryFrom, TryInto};
 }
 
 pub trait ParseCommand<'a>: Sized {

@@ -1,5 +1,7 @@
 use super::prelude::*;
 
+use crate::protocol::common::thread_id::ThreadId;
+
 #[derive(Debug)]
 pub struct T {
     pub thread: ThreadId,
