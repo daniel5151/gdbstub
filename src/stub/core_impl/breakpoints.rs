@@ -60,17 +60,18 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     CmdKind::Remove => ops.remove_hw_watchpoint(addr, len, kind),
                 }
             }
-            // only 5 types defined by the protocol
-            _ => return Ok(HandlerStatus::Handled),
+            // explicitly handle unguarded variants of known breakpoint types
+            0 | 1 | 2 | 3 | 4 => return Ok(HandlerStatus::Handled),
+            // warn if the GDB client ever sends a type outside the known types
+            other => {
+                warn!("unknown breakpoint type: {}", other);
+                return Ok(HandlerStatus::Handled);
+            }
         };
 
-        match supported {
-            Err(e) => {
-                Err(e).handle_error()?;
-                Ok(HandlerStatus::Handled)
-            }
-            Ok(true) => Ok(HandlerStatus::NeedsOk),
-            Ok(false) => Err(Error::NonFatalError(22)),
+        match supported.handle_error()? {
+            true => Ok(HandlerStatus::NeedsOk),
+            false => Err(Error::NonFatalError(22)),
         }
     }
 

@@ -15,8 +15,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             SingleRegisterAccess::p(p) => {
                 let reg = <T::Arch as Arch>::RegId::from_raw_id(p.reg_id);
                 let (reg_id, reg_size) = match reg {
-                    // empty packet indicates unrecognized query
-                    None => return Ok(HandlerStatus::Handled),
+                    None => {
+                        warn!("reg id {} does not map onto any known register", p.reg_id);
+                        return Ok(HandlerStatus::Handled);
+                    }
                     Some(v) => v,
                 };
                 let mut buf = p.buf;
