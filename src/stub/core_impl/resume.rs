@@ -5,8 +5,9 @@ use crate::arch::Arch;
 use crate::common::Tid;
 use crate::protocol::commands::_vCont::Actions;
 use crate::protocol::{SpecificIdKind, SpecificThreadId};
-use crate::target::ext::base::multithread::ThreadStopReason;
+use crate::stub::stop_reason::ThreadStopReason;
 use crate::target::ext::base::{ReplayLogPosition, ResumeOps};
+use crate::target::ext::catch_syscalls::CatchSyscallPosition;
 use crate::FAKE_PID;
 
 use super::DisconnectReason;
@@ -380,7 +381,6 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                 res.write_str("T05")?;
 
-                use crate::target::ext::catch_syscalls::CatchSyscallPosition;
                 res.write_str(match position {
                     CatchSyscallPosition::Entry => "syscall_entry:",
                     CatchSyscallPosition::Return => "syscall_return:",

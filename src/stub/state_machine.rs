@@ -38,7 +38,7 @@ use crate::conn::Connection;
 use crate::protocol::recv_packet::RecvPacketStateMachine;
 use crate::protocol::{Packet, ResponseWriter};
 use crate::stub::error::GdbStubError as Error;
-use crate::target::ext::base::multithread::ThreadStopReason;
+use crate::stub::stop_reason::ThreadStopReason;
 use crate::target::Target;
 
 use super::core_impl::{FinishExecStatus, GdbStubImpl, State};

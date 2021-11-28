@@ -4,9 +4,9 @@ use std::net::{TcpListener, TcpStream};
 use std::os::unix::net::{UnixListener, UnixStream};
 
 use gdbstub::common::Signal;
-use gdbstub::conn::ConnectionExt;
+use gdbstub::conn::{Connection, ConnectionExt};
+use gdbstub::stub::stop_reason::ThreadStopReason;
 use gdbstub::stub::{run_blocking, DisconnectReason, GdbStub, GdbStubError};
-use gdbstub::target::ext::base::multithread::ThreadStopReason;
 use gdbstub::target::Target;
 
 pub type DynResult<T> = Result<T, Box<dyn std::error::Error>>;
@@ -52,13 +52,18 @@ enum EmuGdbEventLoop {}
 impl run_blocking::BlockingEventLoop for EmuGdbEventLoop {
     type Target = emu::Emu;
     type Connection = Box<dyn ConnectionExt<Error = std::io::Error>>;
+    type StopReason = ThreadStopReason<u32>;
 
+    #[allow(clippy::type_complexity)]
     fn wait_for_stop_reason(
         target: &mut emu::Emu,
         conn: &mut Self::Connection,
     ) -> Result<
-        run_blocking::Event<u32>,
-        run_blocking::WaitForStopReasonError<<Self::Target as Target>::Error, std::io::Error>,
+        run_blocking::Event<Self::StopReason>,
+        run_blocking::WaitForStopReasonError<
+            <Self::Target as Target>::Error,
+            <Self::Connection as Connection>::Error,
+        >,
     > {
         // The `armv4t_multicore` example runs the emulator in the same thread as the
         // GDB state machine loop. As such, it uses a simple poll-based model to
@@ -124,10 +129,7 @@ impl run_blocking::BlockingEventLoop for EmuGdbEventLoop {
 
     fn on_interrupt(
         _target: &mut emu::Emu,
-    ) -> Result<
-        Option<gdbstub::target::ext::base::multithread::ThreadStopReason<u32>>,
-        <emu::Emu as Target>::Error,
-    > {
+    ) -> Result<Option<ThreadStopReason<u32>>, <emu::Emu as Target>::Error> {
         // Because this emulator runs as part of the GDB stub loop, there isn't any
         // special action that needs to be taken to interrupt the underlying target. It
         // is implicitly paused whenever the stub isn't within the

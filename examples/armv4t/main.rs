@@ -4,9 +4,9 @@ use std::net::{TcpListener, TcpStream};
 use std::os::unix::net::{UnixListener, UnixStream};
 
 use gdbstub::common::Signal;
-use gdbstub::conn::ConnectionExt;
+use gdbstub::conn::{Connection, ConnectionExt};
+use gdbstub::stub::stop_reason::StopReason;
 use gdbstub::stub::{run_blocking, DisconnectReason, GdbStub, GdbStubError};
-use gdbstub::target::ext::base::singlethread::StopReason;
 use gdbstub::target::Target;
 
 pub type DynResult<T> = Result<T, Box<dyn std::error::Error>>;
@@ -52,13 +52,18 @@ enum EmuGdbEventLoop {}
 impl run_blocking::BlockingEventLoop for EmuGdbEventLoop {
     type Target = emu::Emu;
     type Connection = Box<dyn ConnectionExt<Error = std::io::Error>>;
+    type StopReason = StopReason<u32>;
 
+    #[allow(clippy::type_complexity)]
     fn wait_for_stop_reason(
         target: &mut emu::Emu,
         conn: &mut Self::Connection,
     ) -> Result<
-        run_blocking::Event<u32>,
-        run_blocking::WaitForStopReasonError<<Self::Target as Target>::Error, std::io::Error>,
+        run_blocking::Event<StopReason<u32>>,
+        run_blocking::WaitForStopReasonError<
+            <Self::Target as Target>::Error,
+            <Self::Connection as Connection>::Error,
+        >,
     > {
         // The `armv4t` example runs the emulator in the same thread as the GDB state
         // machine loop. As such, it uses a simple poll-based model to check for
@@ -114,22 +119,19 @@ impl run_blocking::BlockingEventLoop for EmuGdbEventLoop {
                     },
                 };
 
-                Ok(run_blocking::Event::TargetStopped(stop_reason.into()))
+                Ok(run_blocking::Event::TargetStopped(stop_reason))
             }
         }
     }
 
     fn on_interrupt(
         _target: &mut emu::Emu,
-    ) -> Result<
-        Option<gdbstub::target::ext::base::multithread::ThreadStopReason<u32>>,
-        <emu::Emu as Target>::Error,
-    > {
+    ) -> Result<Option<StopReason<u32>>, <emu::Emu as Target>::Error> {
         // Because this emulator runs as part of the GDB stub loop, there isn't any
         // special action that needs to be taken to interrupt the underlying target. It
         // is implicitly paused whenever the stub isn't within the
         // `wait_for_stop_reason` callback.
-        Ok(Some(StopReason::Signal(Signal::SIGINT).into()))
+        Ok(Some(StopReason::Signal(Signal::SIGINT)))
     }
 }
 
