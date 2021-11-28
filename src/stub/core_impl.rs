@@ -8,15 +8,16 @@ use crate::stub::GdbStubError as Error;
 use crate::target::Target;
 use crate::SINGLE_THREAD_TID;
 
+/// Common imports used by >50% of all extensions.
+///
+/// Do not clutter this prelude with types only used by a few extensions.
 mod prelude {
-    pub(super) use crate::common::{Pid, Tid};
     pub(super) use crate::conn::Connection;
     pub(super) use crate::internal::BeBytes;
     pub(super) use crate::protocol::ResponseWriter;
     pub(super) use crate::stub::core_impl::target_result_ext::TargetResultExt;
     pub(super) use crate::stub::core_impl::{GdbStubImpl, HandlerStatus};
     pub(super) use crate::stub::error::GdbStubError as Error;
-    pub(super) use crate::stub::DisconnectReason;
     pub(super) use crate::target::Target;
 }
 
