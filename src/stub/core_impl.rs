@@ -160,16 +160,6 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         res.write_num(code)?;
                         None
                     }
-                    Err(Error::TargetError(e)) => {
-                        // unlike all other errors which are "unrecoverable" in the sense that
-                        // the GDB session cannot continue, there's still a chance that a target
-                        // might want to keep the debugging session alive to do a "post-mortem"
-                        // analysis. As such, we simply report a standard TRAP stop reason.
-                        let mut res = ResponseWriter::new(conn);
-                        res.write_str("S05")?;
-                        res.flush()?;
-                        return Err(Error::TargetError(e));
-                    }
                     Err(e) => return Err(e),
                 };
 
