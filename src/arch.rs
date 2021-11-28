@@ -183,8 +183,8 @@ pub trait Arch {
     ///
     /// To check whether or not a particular architecture exhibits this
     /// behavior, an implementation should temporarily override this method to
-    /// return `true`, and observe the behavior of the GDB client after invoking
-    /// `stepi`.
+    /// return `true`, disable support for single-stepping, and observe the
+    /// behavior of the GDB client after invoking `stepi`.
     ///
     /// If the client sends a `vCont` packet with a `s` resume action, then this
     /// architecture _does not_ support optional single stepping, and this

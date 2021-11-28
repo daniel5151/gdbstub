@@ -25,18 +25,6 @@
 //!     - Add a `TargetError::Io` variant to simplify `std::io::Error` handling
 //!       from Target methods.
 //! - `paranoid_unsafe`
-//!     - Enabling the `paranoid_unsafe` feature will swap out a handful of
-//!       unsafe `get_unchecked_mut` operations with their safe equivalents, at
-//!       the expense of introducing panicking code into `gdbstub`.
-//!         - `rustc` + LLVM do a pretty incredible job at eliding bounds
-//!           checks... most of the time. Unfortunately, there are a few places
-//!           in the code where the compiler is not smart enough to "prove" that
-//!           a bounds check isn't needed, and a bit of unsafe code is required
-//!           to remove those bounds checks.
-//!     - This feature is **disabled** by default, as the unsafe code has been
-//!       aggressively audited and tested for correctness. That said, if you're
-//!       particularly paranoid about the use of unsafe code, enabling this
-//!       feature may offer some piece of mind.
 //!     - Please refer to the [`unsafe` in `gdbstub`](https://github.com/daniel5151/gdbstub#unsafe-in-gdbstub)
 //!       section of the README.md for more details.
 //!
