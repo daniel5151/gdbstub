@@ -5,8 +5,9 @@ use crate::arch::Arch;
 use crate::common::Tid;
 use crate::protocol::commands::_vCont::Actions;
 use crate::protocol::{SpecificIdKind, SpecificThreadId};
-use crate::stub::stop_reason::ThreadStopReason;
-use crate::target::ext::base::{ReplayLogPosition, ResumeOps};
+use crate::stub::MultiThreadStopReason;
+use crate::target::ext::base::reverse_exec::ReplayLogPosition;
+use crate::target::ext::base::ResumeOps;
 use crate::target::ext::catch_syscalls::CatchSyscallPosition;
 use crate::FAKE_PID;
 
@@ -275,7 +276,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         &mut self,
         res: &mut ResponseWriter<C>,
         target: &mut T,
-        stop_reason: ThreadStopReason<<T::Arch as Arch>::Usize>,
+        stop_reason: MultiThreadStopReason<<T::Arch as Arch>::Usize>,
     ) -> Result<FinishExecStatus, Error<T::Error, C::Error>> {
         macro_rules! guard_reverse_exec {
             () => {{
@@ -314,40 +315,42 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         }
 
         let status = match stop_reason {
-            ThreadStopReason::DoneStep => {
+            MultiThreadStopReason::DoneStep => {
                 res.write_str("S05")?;
                 FinishExecStatus::Handled
             }
-            ThreadStopReason::Signal(sig) => {
+            MultiThreadStopReason::Signal(sig) => {
                 res.write_str("S")?;
                 res.write_num(sig as u8)?;
                 FinishExecStatus::Handled
             }
-            ThreadStopReason::Exited(code) => {
+            MultiThreadStopReason::Exited(code) => {
                 res.write_str("W")?;
                 res.write_num(code)?;
                 FinishExecStatus::Disconnect(DisconnectReason::TargetExited(code))
             }
-            ThreadStopReason::Terminated(sig) => {
+            MultiThreadStopReason::Terminated(sig) => {
                 res.write_str("X")?;
                 res.write_num(sig as u8)?;
                 FinishExecStatus::Disconnect(DisconnectReason::TargetTerminated(sig))
             }
-            ThreadStopReason::SwBreak(tid) if guard_break!(support_sw_breakpoint) => {
+            MultiThreadStopReason::SwBreak(tid) if guard_break!(support_sw_breakpoint) => {
                 crate::__dead_code_marker!("sw_breakpoint", "stop_reason");
 
                 self.write_break_common(res, tid)?;
                 res.write_str("swbreak:;")?;
                 FinishExecStatus::Handled
             }
-            ThreadStopReason::HwBreak(tid) if guard_break!(support_hw_breakpoint) => {
+            MultiThreadStopReason::HwBreak(tid) if guard_break!(support_hw_breakpoint) => {
                 crate::__dead_code_marker!("hw_breakpoint", "stop_reason");
 
                 self.write_break_common(res, tid)?;
                 res.write_str("hwbreak:;")?;
                 FinishExecStatus::Handled
             }
-            ThreadStopReason::Watch { tid, kind, addr } if guard_break!(support_hw_watchpoint) => {
+            MultiThreadStopReason::Watch { tid, kind, addr }
+                if guard_break!(support_hw_watchpoint) =>
+            {
                 crate::__dead_code_marker!("hw_watchpoint", "stop_reason");
 
                 self.write_break_common(res, tid)?;
@@ -362,7 +365,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 res.write_str(";")?;
                 FinishExecStatus::Handled
             }
-            ThreadStopReason::ReplayLog(pos) if guard_reverse_exec!() => {
+            MultiThreadStopReason::ReplayLog(pos) if guard_reverse_exec!() => {
                 crate::__dead_code_marker!("reverse_exec", "stop_reason");
 
                 res.write_str("T05")?;
@@ -376,7 +379,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                 FinishExecStatus::Handled
             }
-            ThreadStopReason::CatchSyscall { number, position } if guard_catch_syscall!() => {
+            MultiThreadStopReason::CatchSyscall { number, position } if guard_catch_syscall!() => {
                 crate::__dead_code_marker!("catch_syscall", "stop_reason");
 
                 res.write_str("T05")?;
@@ -392,11 +395,11 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             }
             // Explicitly avoid using `_ =>` to handle the "unguarded" variants, as doing so would
             // squelch the useful compiler error that crops up whenever stop reasons are added.
-            ThreadStopReason::SwBreak(_)
-            | ThreadStopReason::HwBreak(_)
-            | ThreadStopReason::Watch { .. }
-            | ThreadStopReason::ReplayLog(_)
-            | ThreadStopReason::CatchSyscall { .. } => {
+            MultiThreadStopReason::SwBreak(_)
+            | MultiThreadStopReason::HwBreak(_)
+            | MultiThreadStopReason::Watch { .. }
+            | MultiThreadStopReason::ReplayLog(_)
+            | MultiThreadStopReason::CatchSyscall { .. } => {
                 return Err(Error::UnsupportedStopReason);
             }
         };

@@ -9,14 +9,16 @@ use crate::target::Target;
 mod builder;
 mod core_impl;
 mod error;
+mod stop_reason;
 
 pub mod state_machine;
-pub mod stop_reason;
 
 pub use builder::{GdbStubBuilder, GdbStubBuilderError};
 pub use core_impl::DisconnectReason;
 pub use error::GdbStubError;
-pub use stop_reason::IntoStopReason;
+pub use stop_reason::{
+    BaseStopReason, IntoStopReason, MultiThreadStopReason, SingleThreadStopReason,
+};
 
 use GdbStubError as Error;
 
@@ -41,11 +43,11 @@ pub mod run_blocking {
         type Connection: ConnectionExt;
 
         /// Which variant of the `StopReason` type should be used. Single
-        /// threaded targets should use [`StopReason`], whereas multi threaded
-        /// targets should use [`ThreadStopReason`].
+        /// threaded targets should use [`SingleThreadStopReason`], whereas
+        /// multi threaded targets should use [`MultiThreadStopReason`].
         ///
-        /// [`StopReason`]: crate::stub::stop_reason::StopReason
-        /// [`ThreadStopReason`]: crate::stub::stop_reason::ThreadStopReason
+        /// [`SingleThreadStopReason`]: crate::stub::SingleThreadStopReason
+        /// [`MultiThreadStopReason`]: crate::stub::MultiThreadStopReason
         type StopReason: IntoStopReason<Self::Target>;
 
         /// Invoked immediately after the target's `resume` method has been
@@ -72,8 +74,11 @@ pub mod run_blocking {
         /// `None` if the interrupt should be ignored.
         ///
         /// _Suggestion_: If you're unsure which stop reason to report,
-        /// [`ThreadStopReason::Signal(Signal::SIGINT)`](ThreadStopReason) is a
-        /// sensible default.
+        /// [`BaseStopReason::Signal(Signal::SIGINT)`] is a sensible
+        /// default.
+        ///
+        /// [`BaseStopReason::Signal(Signal::SIGINT)`]:
+        /// crate::stub::BaseStopReason::Signal
         fn on_interrupt(
             target: &mut Self::Target,
         ) -> Result<Option<Self::StopReason>, <Self::Target as Target>::Error>;
@@ -172,7 +177,7 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
                 state_machine::GdbStubStateMachine::CtrlCInterrupt(gdb) => {
                     // defer to the implementation on how it wants to handle the interrupt
                     let stop_reason = E::on_interrupt(target).map_err(Error::TargetError)?;
-                    gdb.interrupt_handled(target, stop_reason.map(Into::into))?
+                    gdb.interrupt_handled(target, stop_reason)?
                 }
 
                 state_machine::GdbStubStateMachine::Running(mut gdb) => {
@@ -182,7 +187,7 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
                     let event = E::wait_for_stop_reason(target, gdb.borrow_conn());
                     match event {
                         Ok(BlockingEventLoopEvent::TargetStopped(stop_reason)) => {
-                            gdb.report_stop(target, stop_reason.into())?
+                            gdb.report_stop(target, stop_reason)?
                         }
 
                         Ok(BlockingEventLoopEvent::IncomingData(byte)) => {

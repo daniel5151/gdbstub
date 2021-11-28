@@ -3,22 +3,19 @@
 use crate::arch::Arch;
 use crate::common::Signal;
 use crate::common::Tid;
-use crate::target::ext::base::ReplayLogPosition;
+use crate::target::ext::base::reverse_exec::ReplayLogPosition;
 use crate::target::ext::breakpoints::WatchKind;
 use crate::target::ext::catch_syscalls::CatchSyscallPosition;
 use crate::target::Target;
 
-/// Implemented by the singlethread [`StopReason`] and multithread
-/// [`ThreadStopReason`].
-pub trait IntoStopReason<T: Target>:
-    Into<ThreadStopReason<<<T as Target>::Arch as Arch>::Usize>>
-{
-}
-
-impl<T: Target> IntoStopReason<T> for ThreadStopReason<<<T as Target>::Arch as Arch>::Usize> {}
-impl<T: Target> IntoStopReason<T> for StopReason<<<T as Target>::Arch as Arch>::Usize> {}
-
 /// Describes why a thread stopped.
+///
+/// Single threaded targets should set `Tid` to `()`, whereas multi threaded
+/// targets should set `Tid` to [`Tid`]. To make things easier, it is
+/// recommended to use the [`SingleThreadStopReason`] and
+/// [`MultiThreadStopReason`] when possible.
+///
+///
 ///
 /// Targets MUST only respond with stop reasons that correspond to IDETs that
 /// target has implemented. Not doing so will result in a runtime error.
@@ -30,7 +27,7 @@ impl<T: Target> IntoStopReason<T> for StopReason<<<T as Target>::Arch as Arch>::
 /// [`HwBreakpoint`]: crate::target::ext::breakpoints::HwBreakpoint
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum ThreadStopReason<U> {
+pub enum BaseStopReason<Tid, U> {
     /// Completed the single-step request.
     DoneStep,
     /// The process exited with the specified exit status.
@@ -69,12 +66,15 @@ pub enum ThreadStopReason<U> {
     },
     /// The program has reached the end of the logged replay events.
     ///
-    /// Requires: [`MultiThreadReverseCont`] or [`MultiThreadReverseStep`].
+    /// Requires: [`ReverseCont`] or [`ReverseStep`].
     ///
     /// This is used for GDB's reverse execution. When playing back a recording,
     /// you may hit the end of the buffer of recorded events, and as such no
     /// further execution can be done. This stop reason tells GDB that this has
     /// occurred.
+    ///
+    /// [`ReverseCont`]: crate::target::ext::base::reverse_exec::ReverseCont
+    /// [`ReverseStep`]: crate::target::ext::base::reverse_exec::ReverseStep
     ReplayLog(ReplayLogPosition),
     /// The program has reached a syscall entry or return location.
     ///
@@ -89,95 +89,52 @@ pub enum ThreadStopReason<U> {
     },
 }
 
-/// Describes why the single-threaded target stopped.
+/// A stop reason for a single threaded target.
 ///
-/// Targets MUST only respond with stop reasons that correspond to IDETs that
-/// target has implemented. Not doing so will result in a runtime error.
-///
-/// e.g: A target which has not implemented the [`HwBreakpoint`] IDET must not
-/// return a `HwBreak` stop reason. While this is not enforced at compile time,
-/// doing so will result in a runtime `UnsupportedStopReason` error.
-///
-/// [`HwBreakpoint`]: crate::target::ext::breakpoints::HwBreakpoint
-// NOTE: This is a simplified version of `multithread::ThreadStopReason` that omits any references
-// to Tid or threads. Internally, it is converted into multithread::ThreadStopReason.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum StopReason<U> {
-    /// Completed the single-step request.
-    DoneStep,
-    /// The process exited with the specified exit status.
-    Exited(u8),
-    /// The process terminated with the specified signal number.
-    Terminated(Signal),
-    /// The program received a signal.
-    Signal(Signal),
-    /// Hit a software breakpoint (e.g. due to a trap instruction).
-    ///
-    /// Requires: [`SwBreakpoint`].
-    ///
-    /// NOTE: This does not necessarily have to be a breakpoint configured by
-    /// the client/user of the current GDB session.
-    ///
-    /// [`SwBreakpoint`]: crate::target::ext::breakpoints::SwBreakpoint
-    SwBreak,
-    /// Hit a hardware breakpoint.
-    ///
-    /// Requires: [`HwBreakpoint`].
-    ///
-    /// [`HwBreakpoint`]: crate::target::ext::breakpoints::HwBreakpoint
-    HwBreak,
-    /// Hit a watchpoint.
-    ///
-    /// Requires: [`HwWatchpoint`].
-    ///
-    /// [`HwWatchpoint`]: crate::target::ext::breakpoints::HwWatchpoint
-    Watch {
-        /// Kind of watchpoint that was hit
-        kind: WatchKind,
-        /// Address of watched memory
-        addr: U,
-    },
-    /// The program has reached the end of the logged replay events.
-    ///
-    /// Requires: [`SingleThreadReverseCont`] or [`SingleThreadReverseStep`].
-    ///
-    /// This is used for GDB's reverse execution. When playing back a recording,
-    /// you may hit the end of the buffer of recorded events, and as such no
-    /// further execution can be done. This stop reason tells GDB that this has
-    /// occurred.
-    ReplayLog(ReplayLogPosition),
-    /// The program has reached a syscall entry or return location.
-    ///
-    /// Requires: [`CatchSyscalls`].
-    ///
-    /// [`CatchSyscalls`]: crate::target::ext::catch_syscalls::CatchSyscalls
-    CatchSyscall {
-        /// The syscall number.
-        number: U,
-        /// The location the event occured at.
-        position: CatchSyscallPosition,
-    },
-}
+/// Threads are identified using the unit type `()` (as there is only a single
+/// possible thread-id).
+pub type SingleThreadStopReason<U> = BaseStopReason<(), U>;
 
-impl<U> From<StopReason<U>> for ThreadStopReason<U> {
-    fn from(st_stop_reason: StopReason<U>) -> ThreadStopReason<U> {
+/// A stop reason for a multi threaded target.
+///
+/// Threads are identified using a [`Tid`].
+pub type MultiThreadStopReason<U> = BaseStopReason<Tid, U>;
+
+impl<U> From<BaseStopReason<(), U>> for BaseStopReason<Tid, U> {
+    fn from(st_stop_reason: BaseStopReason<(), U>) -> BaseStopReason<Tid, U> {
         match st_stop_reason {
-            StopReason::DoneStep => ThreadStopReason::DoneStep,
-            StopReason::Exited(code) => ThreadStopReason::Exited(code),
-            StopReason::Terminated(sig) => ThreadStopReason::Terminated(sig),
-            StopReason::SwBreak => ThreadStopReason::SwBreak(crate::SINGLE_THREAD_TID),
-            StopReason::HwBreak => ThreadStopReason::HwBreak(crate::SINGLE_THREAD_TID),
-            StopReason::Watch { kind, addr } => ThreadStopReason::Watch {
+            BaseStopReason::DoneStep => BaseStopReason::DoneStep,
+            BaseStopReason::Exited(code) => BaseStopReason::Exited(code),
+            BaseStopReason::Terminated(sig) => BaseStopReason::Terminated(sig),
+            BaseStopReason::SwBreak(_) => BaseStopReason::SwBreak(crate::SINGLE_THREAD_TID),
+            BaseStopReason::HwBreak(_) => BaseStopReason::HwBreak(crate::SINGLE_THREAD_TID),
+            BaseStopReason::Watch { kind, addr, tid: _ } => BaseStopReason::Watch {
                 tid: crate::SINGLE_THREAD_TID,
                 kind,
                 addr,
             },
-            StopReason::Signal(sig) => ThreadStopReason::Signal(sig),
-            StopReason::ReplayLog(pos) => ThreadStopReason::ReplayLog(pos),
-            StopReason::CatchSyscall { number, position } => {
-                ThreadStopReason::CatchSyscall { number, position }
+            BaseStopReason::Signal(sig) => BaseStopReason::Signal(sig),
+            BaseStopReason::ReplayLog(pos) => BaseStopReason::ReplayLog(pos),
+            BaseStopReason::CatchSyscall { number, position } => {
+                BaseStopReason::CatchSyscall { number, position }
             }
         }
     }
 }
+
+mod private {
+    pub trait Sealed {}
+
+    impl<U> Sealed for super::SingleThreadStopReason<U> {}
+    impl<U> Sealed for super::MultiThreadStopReason<U> {}
+}
+
+/// A marker trait implemented by [`SingleThreadStopReason`] and
+/// [`MultiThreadStopReason`].
+pub trait IntoStopReason<T: Target>:
+    private::Sealed + Into<MultiThreadStopReason<<<T as Target>::Arch as Arch>::Usize>>
+{
+}
+
+impl<T: Target> IntoStopReason<T> for SingleThreadStopReason<<<T as Target>::Arch as Arch>::Usize> {}
+impl<T: Target> IntoStopReason<T> for MultiThreadStopReason<<<T as Target>::Arch as Arch>::Usize> {}

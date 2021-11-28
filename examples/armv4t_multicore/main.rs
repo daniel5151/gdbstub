@@ -5,8 +5,7 @@ use std::os::unix::net::{UnixListener, UnixStream};
 
 use gdbstub::common::Signal;
 use gdbstub::conn::{Connection, ConnectionExt};
-use gdbstub::stub::stop_reason::ThreadStopReason;
-use gdbstub::stub::{run_blocking, DisconnectReason, GdbStub, GdbStubError};
+use gdbstub::stub::{run_blocking, DisconnectReason, GdbStub, GdbStubError, MultiThreadStopReason};
 use gdbstub::target::Target;
 
 pub type DynResult<T> = Result<T, Box<dyn std::error::Error>>;
@@ -52,7 +51,7 @@ enum EmuGdbEventLoop {}
 impl run_blocking::BlockingEventLoop for EmuGdbEventLoop {
     type Target = emu::Emu;
     type Connection = Box<dyn ConnectionExt<Error = std::io::Error>>;
-    type StopReason = ThreadStopReason<u32>;
+    type StopReason = MultiThreadStopReason<u32>;
 
     #[allow(clippy::type_complexity)]
     fn wait_for_stop_reason(
@@ -107,15 +106,15 @@ impl run_blocking::BlockingEventLoop for EmuGdbEventLoop {
                 // translate emulator stop reason into GDB stop reason
                 let tid = gdb::cpuid_to_tid(cpuid);
                 let stop_reason = match event {
-                    emu::Event::DoneStep => ThreadStopReason::DoneStep,
-                    emu::Event::Halted => ThreadStopReason::Terminated(Signal::SIGSTOP),
-                    emu::Event::Break => ThreadStopReason::SwBreak(tid),
-                    emu::Event::WatchWrite(addr) => ThreadStopReason::Watch {
+                    emu::Event::DoneStep => MultiThreadStopReason::DoneStep,
+                    emu::Event::Halted => MultiThreadStopReason::Terminated(Signal::SIGSTOP),
+                    emu::Event::Break => MultiThreadStopReason::SwBreak(tid),
+                    emu::Event::WatchWrite(addr) => MultiThreadStopReason::Watch {
                         tid,
                         kind: WatchKind::Write,
                         addr,
                     },
-                    emu::Event::WatchRead(addr) => ThreadStopReason::Watch {
+                    emu::Event::WatchRead(addr) => MultiThreadStopReason::Watch {
                         tid,
                         kind: WatchKind::Read,
                         addr,
@@ -129,12 +128,12 @@ impl run_blocking::BlockingEventLoop for EmuGdbEventLoop {
 
     fn on_interrupt(
         _target: &mut emu::Emu,
-    ) -> Result<Option<ThreadStopReason<u32>>, <emu::Emu as Target>::Error> {
+    ) -> Result<Option<MultiThreadStopReason<u32>>, <emu::Emu as Target>::Error> {
         // Because this emulator runs as part of the GDB stub loop, there isn't any
         // special action that needs to be taken to interrupt the underlying target. It
         // is implicitly paused whenever the stub isn't within the
         // `wait_for_stop_reason` callback.
-        Ok(Some(ThreadStopReason::Signal(Signal::SIGINT)))
+        Ok(Some(MultiThreadStopReason::Signal(Signal::SIGINT)))
     }
 }
 

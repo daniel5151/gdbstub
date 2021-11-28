@@ -1,20 +1,19 @@
-//! Base operations required to debug any target (read/write memory/registers,
-//! step/resume, etc...)
+//! Base operations required to debug most targets (e.g: read/write
+//! memory/registers, step/resume, etc...)
 //!
-//! It is recommended that single threaded targets implement the simplified
-//! `singlethread` API, as `gdbstub` includes optimized implementations of
-//! certain internal routines when operating in singlethreaded mode.
+//! It is **highly recommended** that single threaded targets implement the
+//! simplified `singlethread` API, as `gdbstub` includes optimized
+//! implementations of certain internal routines when operating in single
+//! threaded mode.
 
 use crate::arch::Arch;
 
 pub mod multithread;
+pub mod reverse_exec;
+pub mod single_register_access;
 pub mod singlethread;
 
-mod single_register_access;
-
-pub use single_register_access::{SingleRegisterAccess, SingleRegisterAccessOps};
-
-/// Core required operations for single/multi threaded targets.
+/// Base required operations for single/multi threaded targets.
 pub enum BaseOps<'a, A, E> {
     /// Single-threaded target
     SingleThread(&'a mut dyn singlethread::SingleThreadBase<Arch = A, Error = E>),
@@ -38,14 +37,4 @@ impl<'a, A: Arch, E> BaseOps<'a, A, E> {
         };
         Some(ret)
     }
-}
-
-/// Describes the point reached in a replay log for the corresponding stop
-/// reason.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ReplayLogPosition {
-    /// Reached the beginning of the replay log.
-    Begin,
-    /// Reached the end of the replay log.
-    End,
 }

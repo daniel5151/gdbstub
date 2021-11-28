@@ -8,7 +8,13 @@ This document does _not_ discuss any new features that might have been added bet
 
 ## `0.5` -> `0.6`
 
-`0.6` introduces quite a few breaking changes to various APIs, and will requires a bit more "hands on" porting than previous `gdbstub` upgrades.
+`0.6` introduces a large number of breaking changes to the public APIs, and will require quite a bit more more "hands on" porting than previous `gdbstub` upgrades.
+
+##### General API change - _lots_ of renaming + exported type reorganization
+
+Many types have been renamed, and many import paths have changed in `0.6`.
+
+Exhaustively listing them would be nearly impossible, but suffice it to say, you will need to tweak your imports.
 
 ##### `Connection` API changes
 

@@ -11,8 +11,8 @@
 //!
 //! - `alloc`
 //!     - Implement `Connection` for `Box<dyn Connection>`.
-//!     - Log outgoing packets via `log::trace!` using a heap-allocated output
-//!       buffer.
+//!     - Log outgoing packets via `log::trace!` (uses a heap-allocated output
+//!       buffer).
 //!     - Provide built-in implementations for certain protocol features:
 //!         - Use a heap-allocated packet buffer in `GdbStub` (if none is
 //!           provided via `GdbStubBuilder::with_packet_buffer`).
@@ -22,8 +22,23 @@
 //!     - Implement `Connection` for [`TcpStream`](std::net::TcpStream) and
 //!       [`UnixStream`](std::os::unix::net::UnixStream).
 //!     - Implement [`std::error::Error`] for `gdbstub::Error`.
-//!     - Add a `TargetError::Io` error variant to simplify I/O Error handling
-//!       from `Target` methods.
+//!     - Add a `TargetError::Io` variant to simplify `std::io::Error` handling
+//!       from Target methods.
+//! - `paranoid_unsafe`
+//!     - Enabling the `paranoid_unsafe` feature will swap out a handful of
+//!       unsafe `get_unchecked_mut` operations with their safe equivalents, at
+//!       the expense of introducing panicking code into `gdbstub`.
+//!         - `rustc` + LLVM do a pretty incredible job at eliding bounds
+//!           checks... most of the time. Unfortunately, there are a few places
+//!           in the code where the compiler is not smart enough to "prove" that
+//!           a bounds check isn't needed, and a bit of unsafe code is required
+//!           to remove those bounds checks.
+//!     - This feature is **disabled** by default, as the unsafe code has been
+//!       aggressively audited and tested for correctness. That said, if you're
+//!       particularly paranoid about the use of unsafe code, enabling this
+//!       feature may offer some piece of mind.
+//!     - Please refer to the [`unsafe` in `gdbstub`](https://github.com/daniel5151/gdbstub#unsafe-in-gdbstub)
+//!       section of the README.md for more details.
 //!
 //! ## Getting Started
 //!
@@ -103,9 +118,10 @@
 //!
 //! ## The Event Loop
 //!
-//! Once a [`Connection`](#the-connection-trait) has been established and
-//! [`Target`](#the-target-trait) has been all wired up, all that's left is to
-//! wire things up, and decide what kind of event loop to use!
+//! Once a [`Connection`](#the-connection-trait) has been established and the
+//! [`Target`](#the-target-trait) has been initialized, all that's left is to
+//! wire things up and decide what kind of event loop will be used to drive the
+//! debugging session!
 //!
 //! First things first, let's get an instance of `GdbStub` ready to run:
 //!
@@ -121,28 +137,63 @@
 //! ```
 //!
 //! Cool, but how do you actually start the debugging session?
+// use an explicit doc attribute to avoid automatic rustfmt wrapping
+#![doc = "### `GdbStub::run_blocking`: The quick and easy way to get up and running with `gdbstub`"]
 //!
-//! ### `GdbStub::run_blocking`: The quick and easy way to get up and running
-//! with `gdbstub`
-//!
-//! If you're running on a hosted system with threads to spare, the quickest way
-//! to get up and running with `gdbstub` is by using the
+//! If you're running on a hosted system and have an extra thread to spare, the
+//! quickest way to get up and running with `gdbstub` is by using the
 //! [`GdbStub::run_blocking`](stub::run_blocking) API alongside the
 //! [`BlockingEventLoop`] trait.
 //!
+//! If you are on a more resource constrained platform, and/or don't wish to
+//! dedicate an entire thread to `gdbstub`, feel free to skip ahead to the
+//! [following
+//! section](#gdbstubstatemachine-driving-gdbstub-in-an-async-event-loop--via-interrupt-handlers).
+//!
+//!
 //! A basic integration might look something like this:
 //!
-//! ```rust,ignore
-//! use gdbstub::stub::run_blocking;
-//! use gdbstub::conn::ConnectionExt; // note the use of `ConnectionExt` vs. `Connection`
-//! use gdbstub::target::ext::base::multithread::ThreadStopReason;
-//! use gdbstub::target::ext::base::singlethread::StopReason;
+//! ```rust
+//! # use gdbstub::target::ext::base::BaseOps;
+//! #
+//! # struct MyTarget;
+//! #
+//! # impl Target for MyTarget {
+//! #     type Error = &'static str;
+//! #     type Arch = gdbstub_arch::arm::Armv4t; // as an example
+//! #     fn base_ops(&mut self) -> BaseOps<Self::Arch, Self::Error> { todo!() }
+//! # }
+//! #
+//! # impl MyTarget {
+//! #     fn run_and_check_for_incoming_data(
+//! #         &mut self,
+//! #         conn: &mut impl Connection
+//! #     ) -> MyTargetEvent { todo!() }
+//! #
+//! #     fn stop_in_response_to_ctrl_c_interrupt(
+//! #         &mut self
+//! #     ) -> Result<(), &'static str> { todo!() }
+//! # }
+//! #
+//! # enum MyTargetEvent {
+//! #     IncomingData,
+//! #     StopReason(SingleThreadStopReason<u32>),
+//! # }
+//! #
+//! use gdbstub::common::Signal;
+//! use gdbstub::conn::{Connection, ConnectionExt}; // note the use of `ConnectionExt`
+//! use gdbstub::stub::{run_blocking, DisconnectReason, GdbStub, GdbStubError};
+//! use gdbstub::stub::SingleThreadStopReason;
+//! use gdbstub::target::Target;
 //!
 //! enum MyGdbBlockingEventLoop {}
 //!
 //! impl run_blocking::BlockingEventLoop for MyGdbBlockingEventLoop {
 //!     type Target = MyTarget;
 //!     type Connection = Box<dyn ConnectionExt<Error = std::io::Error>>;
+//!
+//!     // or MultiThreadStopReason on multi threaded targets
+//!     type StopReason = SingleThreadStopReason<u32>;
 //!
 //!     /// Invoked immediately after the target's `resume` method has been
 //!     /// called. The implementation should block until either the target
@@ -151,10 +202,10 @@
 //!         target: &mut MyTarget,
 //!         conn: &mut Self::Connection,
 //!     ) -> Result<
-//!         run_blocking::Event<u32>,
+//!         run_blocking::Event<SingleThreadStopReason<u32>>,
 //!         run_blocking::WaitForStopReasonError<
 //!             <Self::Target as Target>::Error,
-//!             std::io::Error,
+//!             <Self::Connection as Connection>::Error,
 //!         >,
 //!     > {
 //!         // the specific mechanism to "select" between incoming data and target
@@ -162,6 +213,9 @@
 //!         //
 //!         // some examples of how you might implement this method include: `epoll`,
 //!         // `select!` across multiple event channels, periodic polling, etc...
+//!         //
+//!         // in this example, lets assume the target has a magic method that handles
+//!         // this for us.
 //!         let event = match target.run_and_check_for_incoming_data(conn) {
 //!             MyTargetEvent::IncomingData => {
 //!                 let byte = conn
@@ -171,9 +225,7 @@
 //!                 run_blocking::Event::IncomingData(byte)
 //!             }
 //!             MyTargetEvent::StopReason(reason) => {
-//!                 run_blocking::Event::TargetStopped(
-//!                     target_event_to_gdb_event(reason)
-//!                 )
+//!                 run_blocking::Event::TargetStopped(reason)
 //!             }
 //!         };
 //!
@@ -186,16 +238,18 @@
 //!     /// `None` if the interrupt should be ignored.
 //!     fn on_interrupt(
 //!         target: &mut MyTarget,
-//!     ) -> Result<Option<ThreadStopReason<u32>>, <MyTarget as Target>::Error> {
+//!     ) -> Result<Option<SingleThreadStopReason<u32>>, <MyTarget as Target>::Error> {
+//!         // notify the target that a ctrl-c interrupt has occurred.
 //!         target.stop_in_response_to_ctrl_c_interrupt()?;
+//!
 //!         // a pretty typical stop reason in response to a Ctrl-C interrupt is to
 //!         // report a "Signal::SIGINT".
-//!         Ok(Some(StopReason::Signal(Signal::SIGINT).into()))
+//!         Ok(Some(SingleThreadStopReason::Signal(Signal::SIGINT).into()))
 //!     }
 //! }
 //!
 //! fn gdb_event_loop_thread(
-//!     debugger: gdbstub::GdbStub<MyTarget, Box<dyn ConnectionExt<Error = std::io::Error>>>,
+//!     debugger: GdbStub<MyTarget, Box<dyn ConnectionExt<Error = std::io::Error>>>,
 //!     mut target: MyTarget
 //! ) {
 //!     match debugger.run_blocking::<MyGdbBlockingEventLoop>(&mut target) {
@@ -211,7 +265,7 @@
 //!             }
 //!             DisconnectReason::Kill => println!("GDB sent a kill command"),
 //!         },
-//!         Err(gdbstub::GdbStubError::TargetError(e)) => {
+//!         Err(GdbStubError::TargetError(e)) => {
 //!             println!("target encountered a fatal error: {}", e)
 //!         }
 //!         Err(e) => {
@@ -258,11 +312,11 @@
 //
 // For example, instead of writing this monstrosity:
 //
-// Result<Option<ThreadStopReason<<Self::Arch as Arch>::Usize>>, Self::Error>
+// Result<Option<MultiThreadStopReason<<Self::Arch as Arch>::Usize>>, Self::Error>
 //
 // ...it could be rewritten as:
 //
-// type StopReason = ThreadStopReason<<Self::Arch as Arch>::Usize>>;
+// type StopReason = MultiThreadStopReason<<Self::Arch as Arch>::Usize>>;
 //
 // Result<Option<StopReason>, Self::Error>
 #![allow(clippy::type_complexity)]
@@ -291,3 +345,10 @@ const SINGLE_THREAD_TID: common::Tid = unsafe { common::Tid::new_unchecked(1) };
 /// (Internal) The fake Pid reported to GDB (since `gdbstub` only supports
 /// debugging a single process).
 const FAKE_PID: common::Pid = unsafe { common::Pid::new_unchecked(1) };
+
+pub(crate) mod is_valid_tid {
+    pub trait IsValidTid {}
+
+    impl IsValidTid for () {}
+    impl IsValidTid for crate::common::Tid {}
+}

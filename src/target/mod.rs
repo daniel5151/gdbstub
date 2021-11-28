@@ -126,7 +126,7 @@
 //!     SingleThreadResumeOps, SingleThreadSingleStepOps
 //! };
 //! use gdbstub::target::ext::base::singlethread::{
-//!     SingleThreadBase, SingleThreadResume, SingleThreadSingleStep, StopReason,
+//!     SingleThreadBase, SingleThreadResume, SingleThreadSingleStep
 //! };
 //! use gdbstub::target::ext::breakpoints::{Breakpoints, SwBreakpoint};
 //! use gdbstub::target::ext::breakpoints::{BreakpointsOps, SwBreakpointOps};
@@ -276,8 +276,14 @@ pub mod ext;
 /// When using a custom target-specific fatal error type, users are encouraged
 /// to write the following impl to simplify error handling in `Target` methods:
 ///
-/// ```rust,ignore
-/// type MyTargetFatalError = ...; // Target-specific Fatal Error
+/// ```rust
+/// use gdbstub::target::TargetError;
+///
+/// /// Target-specific Fatal Error
+/// enum MyTargetFatalError {
+///     // ...
+/// }
+///
 /// impl From<MyTargetFatalError> for TargetError<MyTargetFatalError> {
 ///     fn from(e: MyTargetFatalError) -> Self {
 ///         TargetError::Fatal(e)
@@ -364,18 +370,47 @@ pub trait Target {
     ///
     /// For example, on a single-threaded target:
     ///
-    /// ```rust,ignore
+    /// ```rust
     /// use gdbstub::target::Target;
-    /// use gdbstub::target::base::singlethread::SingleThreadBase;
-    ///
-    /// impl SingleThreadBase for MyTarget {
-    ///     // ...
-    /// }
+    /// use gdbstub::target::ext::base::BaseOps;
+    /// use gdbstub::target::ext::base::singlethread::SingleThreadBase;
+    /// # use gdbstub::target::TargetResult;
+    /// # struct MyTarget;
     ///
     /// impl Target for MyTarget {
-    ///     fn base_ops(&mut self) -> base::BaseOps<Self::Arch, Self::Error> {
-    ///         base::BaseOps::SingleThread(self)
+    ///     // ...
+    ///     # type Arch = gdbstub_arch::arm::Armv4t;
+    ///     # type Error = ();
+    ///
+    ///     fn base_ops(&mut self) -> BaseOps<Self::Arch, Self::Error> {
+    ///         BaseOps::SingleThread(self)
     ///     }
+    /// }
+    ///
+    /// // ...and then implement the associated base IDET
+    /// impl SingleThreadBase for MyTarget {
+    ///     // ...
+    /// #   fn read_registers(
+    /// #       &mut self,
+    /// #       regs: &mut gdbstub_arch::arm::reg::ArmCoreRegs,
+    /// #   ) -> TargetResult<(), Self> { todo!() }
+    /// #
+    /// #   fn write_registers(
+    /// #       &mut self,
+    /// #       regs: &gdbstub_arch::arm::reg::ArmCoreRegs
+    /// #   ) -> TargetResult<(), Self> { todo!() }
+    /// #
+    /// #   fn read_addrs(
+    /// #       &mut self,
+    /// #       start_addr: u32,
+    /// #       data: &mut [u8],
+    /// #   ) -> TargetResult<(), Self> { todo!() }
+    /// #
+    /// #   fn write_addrs(
+    /// #       &mut self,
+    /// #       start_addr: u32,
+    /// #       data: &[u8],
+    /// #   ) -> TargetResult<(), Self> { todo!() }
     /// }
     /// ```
     fn base_ops(&mut self) -> ext::base::BaseOps<Self::Arch, Self::Error>;

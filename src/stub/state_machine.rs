@@ -38,7 +38,7 @@ use crate::conn::Connection;
 use crate::protocol::recv_packet::RecvPacketStateMachine;
 use crate::protocol::{Packet, ResponseWriter};
 use crate::stub::error::GdbStubError as Error;
-use crate::stub::stop_reason::ThreadStopReason;
+use crate::stub::stop_reason::IntoStopReason;
 use crate::target::Target;
 
 use super::core_impl::{FinishExecStatus, GdbStubImpl, State};
@@ -77,6 +77,8 @@ where
 pub mod state {
     use super::*;
 
+    use crate::stub::stop_reason::MultiThreadStopReason;
+
     // used internally when logging state transitions
     pub(crate) const MODULE_PATH: &str = concat!(module_path!(), "::");
 
@@ -84,7 +86,7 @@ pub mod state {
     #[non_exhaustive]
     pub struct Idle<T: Target> {
         pub(crate) deferred_ctrlc_stop_reason:
-            Option<ThreadStopReason<<<T as Target>::Arch as Arch>::Usize>>,
+            Option<MultiThreadStopReason<<<T as Target>::Arch as Arch>::Usize>>,
     }
 
     /// Typestate corresponding to the "Running" state.
@@ -246,24 +248,13 @@ impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::Idle<T>, 
 /// [`GdbStubStateMachine::Running`] state.
 impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::Running, T, C> {
     /// Report a target stop reason back to GDB.
-    ///
-    /// # Single threaded targets
-    ///
-    /// While the function signature requires returning a
-    /// [`ThreadStopReason`], single threaded targets should return a
-    /// [`StopReason`](crate::target::ext::base::singlethread::StopReason)
-    /// instead, using `.into()` to convert it into a `ThreadStopReason`
-    /// with the correct "dummy" TID.
-    ///
-    /// In the future, this API might be changed to avoid exposing this
-    /// internal implementation detail.
     pub fn report_stop(
         mut self,
         target: &mut T,
-        reason: ThreadStopReason<<T::Arch as Arch>::Usize>,
+        reason: impl IntoStopReason<T>,
     ) -> Result<GdbStubStateMachine<'a, T, C>, Error<T::Error, C::Error>> {
         let mut res = ResponseWriter::new(&mut self.i.conn);
-        let event = self.i.inner.finish_exec(&mut res, target, reason)?;
+        let event = self.i.inner.finish_exec(&mut res, target, reason.into())?;
         res.flush()?;
 
         Ok(match event {
@@ -332,13 +323,13 @@ impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::CtrlCInte
     pub fn interrupt_handled(
         self,
         target: &mut T,
-        stop_reason: Option<ThreadStopReason<<T::Arch as Arch>::Usize>>,
+        stop_reason: Option<impl IntoStopReason<T>>,
     ) -> Result<GdbStubStateMachine<'a, T, C>, Error<T::Error, C::Error>> {
         if self.state.from_idle {
             // target is stopped - we cannot report the stop reason yet
             Ok(self
                 .transition(state::Idle {
-                    deferred_ctrlc_stop_reason: stop_reason,
+                    deferred_ctrlc_stop_reason: stop_reason.map(Into::into),
                 })
                 .into())
         } else {

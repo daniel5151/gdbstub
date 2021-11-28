@@ -5,12 +5,15 @@ use crate::arch::{Arch, RegId};
 use crate::target::ext::base::BaseOps;
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
-    fn inner<Id>(
+    fn inner<Tid>(
         res: &mut ResponseWriter<C>,
-        ops: crate::target::ext::base::SingleRegisterAccessOps<Id, T>,
+        ops: crate::target::ext::base::single_register_access::SingleRegisterAccessOps<Tid, T>,
         command: SingleRegisterAccess<'_>,
-        id: Id,
-    ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
+        id: Tid,
+    ) -> Result<HandlerStatus, Error<T::Error, C::Error>>
+    where
+        Tid: crate::is_valid_tid::IsValidTid,
+    {
         let handler_status = match command {
             SingleRegisterAccess::p(p) => {
                 let reg = <T::Arch as Arch>::RegId::from_raw_id(p.reg_id);

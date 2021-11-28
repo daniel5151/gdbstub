@@ -4,7 +4,7 @@
 extern crate libc;
 
 use gdbstub::stub::state_machine::GdbStubStateMachine;
-use gdbstub::stub::stop_reason::ThreadStopReason;
+use gdbstub::stub::MultiThreadStopReason;
 use gdbstub::stub::{DisconnectReason, GdbStubBuilder, GdbStubError};
 
 mod conn;
@@ -50,13 +50,13 @@ fn rust_main() -> Result<(), i32> {
                 }
             }
             GdbStubStateMachine::Running(gdb) => {
-                match gdb.report_stop(&mut target, ThreadStopReason::DoneStep) {
+                match gdb.report_stop(&mut target, MultiThreadStopReason::DoneStep) {
                     Ok(gdb) => gdb,
                     Err(e) => break Err(e),
                 }
             }
             GdbStubStateMachine::CtrlCInterrupt(gdb) => {
-                match gdb.interrupt_handled(&mut target, None) {
+                match gdb.interrupt_handled(&mut target, None::<MultiThreadStopReason<u32>>) {
                     Ok(gdb) => gdb,
                     Err(e) => break Err(e),
                 }

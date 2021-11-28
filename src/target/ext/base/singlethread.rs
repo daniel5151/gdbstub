@@ -4,8 +4,6 @@ use crate::arch::Arch;
 use crate::common::Signal;
 use crate::target::{Target, TargetResult};
 
-use super::SingleRegisterAccessOps;
-
 /// Base required debugging operations for single threaded targets.
 pub trait SingleThreadBase: Target {
     /// Read the target's registers.
@@ -19,14 +17,18 @@ pub trait SingleThreadBase: Target {
         -> TargetResult<(), Self>;
 
     /// Support for single-register access.
-    /// See [`SingleRegisterAccess`](super::SingleRegisterAccess) for more
-    /// details.
+    /// See [`SingleRegisterAccess`] for more details.
     ///
     /// While this is an optional feature, it is **highly recommended** to
     /// implement it when possible, as it can significantly improve performance
     /// on certain architectures.
+    ///
+    /// [`SingleRegisterAccess`]:
+    /// super::single_register_access::SingleRegisterAccess
     #[inline(always)]
-    fn support_single_register_access(&mut self) -> Option<SingleRegisterAccessOps<(), Self>> {
+    fn support_single_register_access(
+        &mut self,
+    ) -> Option<super::single_register_access::SingleRegisterAccessOps<(), Self>> {
         None
     }
 
@@ -103,7 +105,7 @@ pub trait SingleThreadResume: Target {
     ///
     /// [reverse stepping]: https://sourceware.org/gdb/current/onlinedocs/gdb/Reverse-Execution.html
     #[inline(always)]
-    fn support_reverse_step(&mut self) -> Option<SingleThreadReverseStepOps<Self>> {
+    fn support_reverse_step(&mut self) -> Option<super::reverse_exec::ReverseStepOps<(), Self>> {
         None
     }
 
@@ -111,40 +113,12 @@ pub trait SingleThreadResume: Target {
     ///
     /// [reverse continuing]: https://sourceware.org/gdb/current/onlinedocs/gdb/Reverse-Execution.html
     #[inline(always)]
-    fn support_reverse_cont(&mut self) -> Option<SingleThreadReverseContOps<Self>> {
+    fn support_reverse_cont(&mut self) -> Option<super::reverse_exec::ReverseContOps<(), Self>> {
         None
     }
 }
 
 define_ext!(SingleThreadResumeOps, SingleThreadResume);
-
-/// Target Extension - Reverse continue for single threaded targets.
-/// See [`SingleThreadResume::support_reverse_cont`].
-pub trait SingleThreadReverseCont: Target + SingleThreadResume {
-    /// [Reverse continue] the target.
-    ///
-    /// Reverse continue allows the target to run backwards until it reaches the
-    /// end of the replay log.
-    ///
-    /// [Reverse continue]: https://sourceware.org/gdb/current/onlinedocs/gdb/Reverse-Execution.html
-    fn reverse_cont(&mut self) -> Result<(), Self::Error>;
-}
-
-define_ext!(SingleThreadReverseContOps, SingleThreadReverseCont);
-
-/// Target Extension - Reverse stepping for single threaded targets.
-/// See [`SingleThreadResume::support_reverse_step`].
-pub trait SingleThreadReverseStep: Target + SingleThreadResume {
-    /// [Reverse step] the target.
-    ///
-    /// Reverse stepping allows the target to run backwards by one step -
-    /// typically a single instruction.
-    ///
-    /// [Reverse step]: https://sourceware.org/gdb/current/onlinedocs/gdb/Reverse-Execution.html
-    fn reverse_step(&mut self) -> Result<(), Self::Error>;
-}
-
-define_ext!(SingleThreadReverseStepOps, SingleThreadReverseStep);
 
 /// Target Extension - Optimized [single stepping] for single threaded targets.
 /// See [`SingleThreadResume::support_single_step`].

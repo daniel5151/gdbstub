@@ -179,7 +179,7 @@ impl SingleThreadBase for Emu {
     #[inline(always)]
     fn support_single_register_access(
         &mut self,
-    ) -> Option<target::ext::base::SingleRegisterAccessOps<(), Self>> {
+    ) -> Option<target::ext::base::single_register_access::SingleRegisterAccessOps<(), Self>> {
         Some(self)
     }
 
@@ -232,14 +232,14 @@ impl SingleThreadResume for Emu {
     #[inline(always)]
     fn support_reverse_cont(
         &mut self,
-    ) -> Option<target::ext::base::singlethread::SingleThreadReverseContOps<Self>> {
+    ) -> Option<target::ext::base::reverse_exec::ReverseContOps<(), Self>> {
         Some(self)
     }
 
     #[inline(always)]
     fn support_reverse_step(
         &mut self,
-    ) -> Option<target::ext::base::singlethread::SingleThreadReverseStepOps<Self>> {
+    ) -> Option<target::ext::base::reverse_exec::ReverseStepOps<(), Self>> {
         Some(self)
     }
 
@@ -270,7 +270,7 @@ impl target::ext::base::singlethread::SingleThreadSingleStep for Emu {
     }
 }
 
-impl target::ext::base::SingleRegisterAccess<()> for Emu {
+impl target::ext::base::single_register_access::SingleRegisterAccess<()> for Emu {
     fn read_register(
         &mut self,
         _tid: (),
@@ -333,7 +333,7 @@ impl target::ext::base::SingleRegisterAccess<()> for Emu {
     }
 }
 
-impl target::ext::base::singlethread::SingleThreadReverseCont for Emu {
+impl target::ext::base::reverse_exec::ReverseCont<()> for Emu {
     fn reverse_cont(&mut self) -> Result<(), Self::Error> {
         // FIXME: actually implement reverse step
         eprintln!(
@@ -344,8 +344,8 @@ impl target::ext::base::singlethread::SingleThreadReverseCont for Emu {
     }
 }
 
-impl target::ext::base::singlethread::SingleThreadReverseStep for Emu {
-    fn reverse_step(&mut self) -> Result<(), Self::Error> {
+impl target::ext::base::reverse_exec::ReverseStep<()> for Emu {
+    fn reverse_step(&mut self, _tid: ()) -> Result<(), Self::Error> {
         // FIXME: actually implement reverse step
         eprintln!(
             "FIXME: Not actually reverse-stepping. Performing single forwards step instead..."

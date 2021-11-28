@@ -27,7 +27,8 @@ use crate::internal::{BeBytes, LeBytes};
 /// These identifiers are used by GDB to signal which register to read/wite when
 /// performing [single register accesses].
 ///
-/// [single register accesses]: crate::target::ext::base::SingleRegisterAccess
+/// [single register accesses]:
+/// crate::target::ext::base::single_register_access::SingleRegisterAccess
 pub trait RegId: Sized + Debug {
     /// Map raw GDB register number to a corresponding `RegId` and optional
     /// register size.
