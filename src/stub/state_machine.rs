@@ -334,15 +334,10 @@ impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::CtrlCInte
                 .into())
         } else {
             // target is running - we can immediately report the stop reason
+            let gdb = self.transition(state::Running {});
             match stop_reason {
-                Some(reason) => self
-                    .transition(state::Running {})
-                    .report_stop(target, reason),
-                None => Ok(self
-                    .transition(state::Idle {
-                        deferred_ctrlc_stop_reason: None,
-                    })
-                    .into()),
+                Some(reason) => gdb.report_stop(target, reason),
+                None => Ok(gdb.into()),
             }
         }
     }
