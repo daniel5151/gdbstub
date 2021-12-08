@@ -4,7 +4,7 @@ use crate::protocol::commands::ext::SectionOffsets;
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     pub(crate) fn handle_section_offsets(
         &mut self,
-        res: &mut ResponseWriter<C>,
+        res: &mut ResponseWriter<'_, C>,
         target: &mut T,
         command: SectionOffsets,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {

@@ -5,7 +5,7 @@ use managed::ManagedSlice;
 pub struct CapacityError<Element>(pub Element);
 
 /// Wraps a ManagedSlice in a vec-like interface.
-pub struct ManagedVec<'a, 'b, T: 'a> {
+pub struct ManagedVec<'a, 'b, T> {
     buf: &'b mut ManagedSlice<'a, T>,
     len: usize,
 }

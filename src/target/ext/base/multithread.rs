@@ -39,7 +39,7 @@ pub trait MultiThreadBase: Target {
     #[inline(always)]
     fn support_single_register_access(
         &mut self,
-    ) -> Option<super::single_register_access::SingleRegisterAccessOps<Tid, Self>> {
+    ) -> Option<super::single_register_access::SingleRegisterAccessOps<'_, Tid, Self>> {
         None
     }
 
@@ -94,7 +94,7 @@ pub trait MultiThreadBase: Target {
 
     /// Support for resuming the target (e.g: via `continue` or `step`)
     #[inline(always)]
-    fn support_resume(&mut self) -> Option<MultiThreadResumeOps<Self>> {
+    fn support_resume(&mut self) -> Option<MultiThreadResumeOps<'_, Self>> {
         None
     }
 }
@@ -180,7 +180,7 @@ pub trait MultiThreadResume: Target {
     ///
     /// [single stepping]: https://sourceware.org/gdb/current/onlinedocs/gdb/Continuing-and-Stepping.html#index-stepi
     #[inline(always)]
-    fn support_single_step(&mut self) -> Option<MultiThreadSingleStepOps<Self>> {
+    fn support_single_step(&mut self) -> Option<MultiThreadSingleStepOps<'_, Self>> {
         None
     }
 
@@ -188,7 +188,7 @@ pub trait MultiThreadResume: Target {
     ///
     /// [range stepping]: https://sourceware.org/gdb/current/onlinedocs/gdb/Continuing-and-Stepping.html#range-stepping
     #[inline(always)]
-    fn support_range_step(&mut self) -> Option<MultiThreadRangeSteppingOps<Self>> {
+    fn support_range_step(&mut self) -> Option<MultiThreadRangeSteppingOps<'_, Self>> {
         None
     }
 
@@ -196,7 +196,7 @@ pub trait MultiThreadResume: Target {
     ///
     /// [reverse stepping]: https://sourceware.org/gdb/current/onlinedocs/gdb/Reverse-Execution.html
     #[inline(always)]
-    fn support_reverse_step(&mut self) -> Option<super::reverse_exec::ReverseStepOps<Tid, Self>> {
+    fn support_reverse_step(&mut self) -> Option<super::reverse_exec::ReverseStepOps<'_, Tid, Self>> {
         None
     }
 
@@ -204,7 +204,7 @@ pub trait MultiThreadResume: Target {
     ///
     /// [reverse continuing]: https://sourceware.org/gdb/current/onlinedocs/gdb/Reverse-Execution.html
     #[inline(always)]
-    fn support_reverse_cont(&mut self) -> Option<super::reverse_exec::ReverseContOps<Tid, Self>> {
+    fn support_reverse_cont(&mut self) -> Option<super::reverse_exec::ReverseContOps<'_, Tid, Self>> {
         None
     }
 }

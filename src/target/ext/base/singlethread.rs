@@ -28,7 +28,7 @@ pub trait SingleThreadBase: Target {
     #[inline(always)]
     fn support_single_register_access(
         &mut self,
-    ) -> Option<super::single_register_access::SingleRegisterAccessOps<(), Self>> {
+    ) -> Option<super::single_register_access::SingleRegisterAccessOps<'_, (), Self>> {
         None
     }
 
@@ -56,7 +56,7 @@ pub trait SingleThreadBase: Target {
 
     /// Support for resuming the target (e.g: via `continue` or `step`)
     #[inline(always)]
-    fn support_resume(&mut self) -> Option<SingleThreadResumeOps<Self>> {
+    fn support_resume(&mut self) -> Option<SingleThreadResumeOps<'_, Self>> {
         None
     }
 }
@@ -89,7 +89,7 @@ pub trait SingleThreadResume: Target {
     ///
     /// [single stepping]: https://sourceware.org/gdb/current/onlinedocs/gdb/Continuing-and-Stepping.html#index-stepi
     #[inline(always)]
-    fn support_single_step(&mut self) -> Option<SingleThreadSingleStepOps<Self>> {
+    fn support_single_step(&mut self) -> Option<SingleThreadSingleStepOps<'_, Self>> {
         None
     }
 
@@ -97,7 +97,7 @@ pub trait SingleThreadResume: Target {
     ///
     /// [range stepping]: https://sourceware.org/gdb/current/onlinedocs/gdb/Continuing-and-Stepping.html#range-stepping
     #[inline(always)]
-    fn support_range_step(&mut self) -> Option<SingleThreadRangeSteppingOps<Self>> {
+    fn support_range_step(&mut self) -> Option<SingleThreadRangeSteppingOps<'_, Self>> {
         None
     }
 
@@ -105,7 +105,7 @@ pub trait SingleThreadResume: Target {
     ///
     /// [reverse stepping]: https://sourceware.org/gdb/current/onlinedocs/gdb/Reverse-Execution.html
     #[inline(always)]
-    fn support_reverse_step(&mut self) -> Option<super::reverse_exec::ReverseStepOps<(), Self>> {
+    fn support_reverse_step(&mut self) -> Option<super::reverse_exec::ReverseStepOps<'_, (), Self>> {
         None
     }
 
@@ -113,7 +113,7 @@ pub trait SingleThreadResume: Target {
     ///
     /// [reverse continuing]: https://sourceware.org/gdb/current/onlinedocs/gdb/Reverse-Execution.html
     #[inline(always)]
-    fn support_reverse_cont(&mut self) -> Option<super::reverse_exec::ReverseContOps<(), Self>> {
+    fn support_reverse_cont(&mut self) -> Option<super::reverse_exec::ReverseContOps<'_, (), Self>> {
         None
     }
 }

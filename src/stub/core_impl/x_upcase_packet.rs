@@ -7,7 +7,7 @@ use crate::target::ext::base::BaseOps;
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     pub(crate) fn handle_x_upcase_packet<'a>(
         &mut self,
-        _res: &mut ResponseWriter<C>,
+        _res: &mut ResponseWriter<'_, C>,
         target: &mut T,
         command: XUpcasePacket<'a>,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {

@@ -8,9 +8,9 @@ use crate::target::ext::catch_syscalls::SyscallNumbers;
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     pub(crate) fn handle_catch_syscalls(
         &mut self,
-        _res: &mut ResponseWriter<C>,
+        _res: &mut ResponseWriter<'_, C>,
         target: &mut T,
-        command: CatchSyscalls,
+        command: CatchSyscalls<'_>,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
         let ops = match target.support_catch_syscalls() {
             Some(ops) => ops,
@@ -27,7 +27,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         let mut error = false;
                         let mut filter = sysno
                             .into_iter()
-                            .map(|x| <T::Arch as Arch>::Usize::from_be_bytes(x))
+                            .map(<T::Arch as Arch>::Usize::from_be_bytes)
                             .take_while(|x| {
                                 error = x.is_none();
                                 !error

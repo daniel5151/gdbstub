@@ -22,7 +22,7 @@ pub trait CatchSyscalls: Target {
     /// replace any existing syscall filtering.
     fn enable_catch_syscalls(
         &mut self,
-        filter: Option<SyscallNumbers<<Self::Arch as Arch>::Usize>>,
+        filter: Option<SyscallNumbers<'_, <Self::Arch as Arch>::Usize>>,
     ) -> TargetResult<(), Self>;
 
     /// Disables catching syscalls from the inferior process.

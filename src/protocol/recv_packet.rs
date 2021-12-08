@@ -28,7 +28,7 @@ impl RecvPacketStateMachine {
 
     pub fn pump<'b>(
         &mut self,
-        packet_buffer: &'b mut ManagedSlice<u8>,
+        packet_buffer: &'b mut ManagedSlice<'_, u8>,
         byte: u8,
     ) -> Result<Option<&'b mut [u8]>, CapacityError<u8>> {
         let mut buf = ManagedVec::new_with_idx(packet_buffer, self.idx);

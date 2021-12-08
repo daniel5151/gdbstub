@@ -21,7 +21,7 @@ macro_rules! defn_ops {
             A: Arch,
         {
             #[inline(always)]
-            fn from_target<T>(target: &mut T) -> Option<$name<T::Arch, T::Error>>
+            fn from_target<T>(target: &mut T) -> Option<$name<'_, T::Arch, T::Error>>
             where
                 T: Target,
             {
@@ -41,7 +41,7 @@ defn_ops!(ReverseStepOps, ReverseStepTrait, support_reverse_step);
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     pub(crate) fn handle_reverse_cont(
         &mut self,
-        _res: &mut ResponseWriter<C>,
+        _res: &mut ResponseWriter<'_, C>,
         target: &mut T,
         command: ReverseCont,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
@@ -73,7 +73,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     // FIXME: De-duplicate with above code?
     pub(crate) fn handle_reverse_step(
         &mut self,
-        _res: &mut ResponseWriter<C>,
+        _res: &mut ResponseWriter<'_, C>,
         target: &mut T,
         command: ReverseStep,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {

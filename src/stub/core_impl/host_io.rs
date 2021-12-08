@@ -7,9 +7,9 @@ use crate::target::ext::host_io::{HostIoError, HostIoStat};
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     pub(crate) fn handle_host_io(
         &mut self,
-        res: &mut ResponseWriter<C>,
+        res: &mut ResponseWriter<'_, C>,
         target: &mut T,
-        command: HostIo,
+        command: HostIo<'_>,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
         let ops = match target.support_host_io() {
             Some(ops) => ops,

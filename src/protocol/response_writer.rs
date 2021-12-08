@@ -17,7 +17,7 @@ pub struct Error<C>(pub C);
 
 /// A wrapper around [`Connection`] that computes the single-byte checksum of
 /// incoming / outgoing data.
-pub struct ResponseWriter<'a, C: Connection + 'a> {
+pub struct ResponseWriter<'a, C: Connection> {
     inner: &'a mut C,
     started: bool,
     checksum: u8,

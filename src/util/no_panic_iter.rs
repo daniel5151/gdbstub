@@ -32,7 +32,7 @@ impl<T> SliceExt<T> for [T] {
 }
 
 #[derive(Debug)]
-pub struct SplitMut<'a, T: 'a, P>
+pub struct SplitMut<'a, T, P>
 where
     P: FnMut(&T) -> bool,
 {
@@ -57,7 +57,7 @@ impl<'a, T: 'a, P: FnMut(&T) -> bool> SplitMut<'a, T, P> {
             None
         } else {
             self.finished = true;
-            Some(core::mem::replace(&mut self.v, &mut []))
+            Some(core::mem::take(&mut self.v))
         }
     }
 }
@@ -82,7 +82,7 @@ where
         match idx_opt {
             None => self.finish(),
             Some(idx) => {
-                let tmp = core::mem::replace(&mut self.v, &mut []);
+                let tmp = core::mem::take(&mut self.v);
                 let (head, tail) = tmp.split_at_mut(idx);
                 self.v = tail.get_mut(1..)?; // will never fail
                 Some(head)
@@ -95,7 +95,7 @@ where
 /// match a predicate function, splitting at most a fixed number of
 /// times.
 #[derive(Debug)]
-pub struct SplitNMut<'a, T: 'a, P>
+pub struct SplitNMut<'a, T, P>
 where
     P: FnMut(&T) -> bool,
 {

@@ -413,7 +413,7 @@ pub trait Target {
     /// #   ) -> TargetResult<(), Self> { todo!() }
     /// }
     /// ```
-    fn base_ops(&mut self) -> ext::base::BaseOps<Self::Arch, Self::Error>;
+    fn base_ops(&mut self) -> ext::base::BaseOps<'_, Self::Arch, Self::Error>;
 
     /// Enable/disable using the more efficient `X` packet to write to target
     /// memory (as opposed to the basic `M` packet).
@@ -534,26 +534,26 @@ pub trait Target {
 
     /// Support for setting / removing breakpoints.
     #[inline(always)]
-    fn support_breakpoints(&mut self) -> Option<ext::breakpoints::BreakpointsOps<Self>> {
+    fn support_breakpoints(&mut self) -> Option<ext::breakpoints::BreakpointsOps<'_, Self>> {
         None
     }
 
     /// Support for handling custom GDB `monitor` commands.
     #[inline(always)]
-    fn support_monitor_cmd(&mut self) -> Option<ext::monitor_cmd::MonitorCmdOps<Self>> {
+    fn support_monitor_cmd(&mut self) -> Option<ext::monitor_cmd::MonitorCmdOps<'_, Self>> {
         None
     }
 
     /// Support for Extended Mode operations.
     #[inline(always)]
-    fn support_extended_mode(&mut self) -> Option<ext::extended_mode::ExtendedModeOps<Self>> {
+    fn support_extended_mode(&mut self) -> Option<ext::extended_mode::ExtendedModeOps<'_, Self>> {
         None
     }
 
     /// Support for handling requests to get the target's current section (or
     /// segment) offsets.
     #[inline(always)]
-    fn support_section_offsets(&mut self) -> Option<ext::section_offsets::SectionOffsetsOps<Self>> {
+    fn support_section_offsets(&mut self) -> Option<ext::section_offsets::SectionOffsetsOps<'_, Self>> {
         None
     }
 
@@ -562,37 +562,37 @@ pub trait Target {
     #[inline(always)]
     fn support_target_description_xml_override(
         &mut self,
-    ) -> Option<ext::target_description_xml_override::TargetDescriptionXmlOverrideOps<Self>> {
+    ) -> Option<ext::target_description_xml_override::TargetDescriptionXmlOverrideOps<'_, Self>> {
         None
     }
 
     /// Support for reading a target memory map.
     #[inline(always)]
-    fn support_memory_map(&mut self) -> Option<ext::memory_map::MemoryMapOps<Self>> {
+    fn support_memory_map(&mut self) -> Option<ext::memory_map::MemoryMapOps<'_, Self>> {
         None
     }
 
     /// Support for setting / removing syscall catchpoints.
     #[inline(always)]
-    fn support_catch_syscalls(&mut self) -> Option<ext::catch_syscalls::CatchSyscallsOps<Self>> {
+    fn support_catch_syscalls(&mut self) -> Option<ext::catch_syscalls::CatchSyscallsOps<'_, Self>> {
         None
     }
 
     /// Support for Host I/O operations.
     #[inline(always)]
-    fn support_host_io(&mut self) -> Option<ext::host_io::HostIoOps<Self>> {
+    fn support_host_io(&mut self) -> Option<ext::host_io::HostIoOps<'_, Self>> {
         None
     }
 
     /// Support for reading the current exec-file
     #[inline(always)]
-    fn support_exec_file(&mut self) -> Option<ext::exec_file::ExecFileOps<Self>> {
+    fn support_exec_file(&mut self) -> Option<ext::exec_file::ExecFileOps<'_, Self>> {
         None
     }
 
     /// Support for reading the target's Auxillary Vector
     #[inline(always)]
-    fn support_auxv(&mut self) -> Option<ext::auxv::AuxvOps<Self>> {
+    fn support_auxv(&mut self) -> Option<ext::auxv::AuxvOps<'_, Self>> {
         None
     }
 }
@@ -606,7 +606,7 @@ macro_rules! impl_dyn_target {
             type Arch = A;
             type Error = E;
 
-            fn base_ops(&mut self) -> ext::base::BaseOps<Self::Arch, Self::Error> {
+            fn base_ops(&mut self) -> ext::base::BaseOps<'_, Self::Arch, Self::Error> {
                 (**self).base_ops()
             }
 
@@ -618,52 +618,52 @@ macro_rules! impl_dyn_target {
                 (**self).use_optional_single_step()
             }
 
-            fn support_breakpoints(&mut self) -> Option<ext::breakpoints::BreakpointsOps<Self>> {
+            fn support_breakpoints(&mut self) -> Option<ext::breakpoints::BreakpointsOps<'_, Self>> {
                 (**self).support_breakpoints()
             }
 
-            fn support_monitor_cmd(&mut self) -> Option<ext::monitor_cmd::MonitorCmdOps<Self>> {
+            fn support_monitor_cmd(&mut self) -> Option<ext::monitor_cmd::MonitorCmdOps<'_, Self>> {
                 (**self).support_monitor_cmd()
             }
 
             fn support_extended_mode(
                 &mut self,
-            ) -> Option<ext::extended_mode::ExtendedModeOps<Self>> {
+            ) -> Option<ext::extended_mode::ExtendedModeOps<'_, Self>> {
                 (**self).support_extended_mode()
             }
 
             fn support_section_offsets(
                 &mut self,
-            ) -> Option<ext::section_offsets::SectionOffsetsOps<Self>> {
+            ) -> Option<ext::section_offsets::SectionOffsetsOps<'_, Self>> {
                 (**self).support_section_offsets()
             }
 
             fn support_target_description_xml_override(
                 &mut self,
-            ) -> Option<ext::target_description_xml_override::TargetDescriptionXmlOverrideOps<Self>>
+            ) -> Option<ext::target_description_xml_override::TargetDescriptionXmlOverrideOps<'_, Self>>
             {
                 (**self).support_target_description_xml_override()
             }
 
-            fn support_memory_map(&mut self) -> Option<ext::memory_map::MemoryMapOps<Self>> {
+            fn support_memory_map(&mut self) -> Option<ext::memory_map::MemoryMapOps<'_, Self>> {
                 (**self).support_memory_map()
             }
 
             fn support_catch_syscalls(
                 &mut self,
-            ) -> Option<ext::catch_syscalls::CatchSyscallsOps<Self>> {
+            ) -> Option<ext::catch_syscalls::CatchSyscallsOps<'_, Self>> {
                 (**self).support_catch_syscalls()
             }
 
-            fn support_host_io(&mut self) -> Option<ext::host_io::HostIoOps<Self>> {
+            fn support_host_io(&mut self) -> Option<ext::host_io::HostIoOps<'_, Self>> {
                 (**self).support_host_io()
             }
 
-            fn support_exec_file(&mut self) -> Option<ext::exec_file::ExecFileOps<Self>> {
+            fn support_exec_file(&mut self) -> Option<ext::exec_file::ExecFileOps<'_, Self>> {
                 (**self).support_exec_file()
             }
 
-            fn support_auxv(&mut self) -> Option<ext::auxv::AuxvOps<Self>> {
+            fn support_auxv(&mut self) -> Option<ext::auxv::AuxvOps<'_, Self>> {
                 (**self).support_auxv()
             }
         }

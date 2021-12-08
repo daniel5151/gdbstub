@@ -60,7 +60,7 @@ pub enum FeatureSupported {
 
 #[derive(Debug)]
 pub struct Feature<'a> {
-    name: &'a [u8],
-    val: Option<&'a [u8]>,
-    status: FeatureSupported,
+    pub name: &'a [u8],
+    pub val: Option<&'a [u8]>,
+    pub status: FeatureSupported,
 }

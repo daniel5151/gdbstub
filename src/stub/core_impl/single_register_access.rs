@@ -6,8 +6,8 @@ use crate::target::ext::base::BaseOps;
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     fn inner<Tid>(
-        res: &mut ResponseWriter<C>,
-        ops: crate::target::ext::base::single_register_access::SingleRegisterAccessOps<Tid, T>,
+        res: &mut ResponseWriter<'_, C>,
+        ops: crate::target::ext::base::single_register_access::SingleRegisterAccessOps<'_, Tid, T>,
         command: SingleRegisterAccess<'_>,
         id: Tid,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>>
@@ -59,7 +59,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
     pub(crate) fn handle_single_register_access<'a>(
         &mut self,
-        res: &mut ResponseWriter<C>,
+        res: &mut ResponseWriter<'_, C>,
         target: &mut T,
         command: SingleRegisterAccess<'a>,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {

@@ -88,7 +88,7 @@ pub trait ExtendedMode: Target {
     /// `ExtendedMode`. e.g: if the [`ConfigureEnv`](trait.ConfigureEnv.html)
     /// extension is implemented and enabled, this method should set the spawned
     /// processes' environment variables accordingly.
-    fn run(&mut self, filename: Option<&[u8]>, args: Args) -> TargetResult<Pid, Self>;
+    fn run(&mut self, filename: Option<&[u8]>, args: Args<'_, '_>) -> TargetResult<Pid, Self>;
 
     /// Attach to a new process with the specified PID.
     ///
@@ -148,27 +148,27 @@ pub trait ExtendedMode: Target {
 
     /// Support for enabling / disabling ASLR for spawned processes.
     #[inline(always)]
-    fn support_configure_aslr(&mut self) -> Option<ConfigureAslrOps<Self>> {
+    fn support_configure_aslr(&mut self) -> Option<ConfigureAslrOps<'_, Self>> {
         None
     }
 
     /// Support for setting / removing / resetting environment variables for
     /// spawned processes.
     #[inline(always)]
-    fn support_configure_env(&mut self) -> Option<ConfigureEnvOps<Self>> {
+    fn support_configure_env(&mut self) -> Option<ConfigureEnvOps<'_, Self>> {
         None
     }
 
     /// Support for configuring if spawned processes should be spawned using a
     /// shell.
     #[inline(always)]
-    fn support_configure_startup_shell(&mut self) -> Option<ConfigureStartupShellOps<Self>> {
+    fn support_configure_startup_shell(&mut self) -> Option<ConfigureStartupShellOps<'_, Self>> {
         None
     }
 
     /// Support for configuring the working directory for spawned processes.
     #[inline(always)]
-    fn support_configure_working_dir(&mut self) -> Option<ConfigureWorkingDirOps<Self>> {
+    fn support_configure_working_dir(&mut self) -> Option<ConfigureWorkingDirOps<'_, Self>> {
         None
     }
 }

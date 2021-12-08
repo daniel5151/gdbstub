@@ -36,7 +36,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
     pub(crate) fn handle_base<'a>(
         &mut self,
-        res: &mut ResponseWriter<C>,
+        res: &mut ResponseWriter<'_, C>,
         target: &mut T,
         command: Base<'a>,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {

@@ -4,9 +4,9 @@ use crate::protocol::commands::ext::Auxv;
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     pub(crate) fn handle_auxv(
         &mut self,
-        res: &mut ResponseWriter<C>,
+        res: &mut ResponseWriter<'_, C>,
         target: &mut T,
-        command: Auxv,
+        command: Auxv<'_>,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
         let ops = match target.support_auxv() {
             Some(ops) => ops,

@@ -76,66 +76,69 @@ impl Target for Emu {
     // implementations, resulting in unnecessary binary bloat.
 
     #[inline(always)]
-    fn base_ops(&mut self) -> target::ext::base::BaseOps<Self::Arch, Self::Error> {
+    fn base_ops(&mut self) -> target::ext::base::BaseOps<'_, Self::Arch, Self::Error> {
         target::ext::base::BaseOps::SingleThread(self)
     }
 
     #[inline(always)]
-    fn support_breakpoints(&mut self) -> Option<target::ext::breakpoints::BreakpointsOps<Self>> {
+    fn support_breakpoints(
+        &mut self,
+    ) -> Option<target::ext::breakpoints::BreakpointsOps<'_, Self>> {
         Some(self)
     }
 
     #[inline(always)]
     fn support_extended_mode(
         &mut self,
-    ) -> Option<target::ext::extended_mode::ExtendedModeOps<Self>> {
+    ) -> Option<target::ext::extended_mode::ExtendedModeOps<'_, Self>> {
         Some(self)
     }
 
     #[inline(always)]
-    fn support_monitor_cmd(&mut self) -> Option<target::ext::monitor_cmd::MonitorCmdOps<Self>> {
+    fn support_monitor_cmd(&mut self) -> Option<target::ext::monitor_cmd::MonitorCmdOps<'_, Self>> {
         Some(self)
     }
 
     #[inline(always)]
     fn support_section_offsets(
         &mut self,
-    ) -> Option<target::ext::section_offsets::SectionOffsetsOps<Self>> {
+    ) -> Option<target::ext::section_offsets::SectionOffsetsOps<'_, Self>> {
         Some(self)
     }
 
     #[inline(always)]
     fn support_target_description_xml_override(
         &mut self,
-    ) -> Option<target::ext::target_description_xml_override::TargetDescriptionXmlOverrideOps<Self>>
-    {
+    ) -> Option<
+        target::ext::target_description_xml_override::TargetDescriptionXmlOverrideOps<'_, Self>,
+    > {
         Some(self)
     }
 
     #[inline(always)]
-    fn support_memory_map(&mut self) -> Option<target::ext::memory_map::MemoryMapOps<Self>> {
+    fn support_memory_map(&mut self) -> Option<target::ext::memory_map::MemoryMapOps<'_, Self>> {
         Some(self)
     }
 
     #[inline(always)]
     fn support_catch_syscalls(
         &mut self,
-    ) -> Option<target::ext::catch_syscalls::CatchSyscallsOps<Self>> {
+    ) -> Option<target::ext::catch_syscalls::CatchSyscallsOps<'_, Self>> {
         Some(self)
     }
 
     #[inline(always)]
-    fn support_host_io(&mut self) -> Option<target::ext::host_io::HostIoOps<Self>> {
+    fn support_host_io(&mut self) -> Option<target::ext::host_io::HostIoOps<'_, Self>> {
         Some(self)
     }
 
     #[inline(always)]
-    fn support_exec_file(&mut self) -> Option<target::ext::exec_file::ExecFileOps<Self>> {
+    fn support_exec_file(&mut self) -> Option<target::ext::exec_file::ExecFileOps<'_, Self>> {
         Some(self)
     }
 
     #[inline(always)]
-    fn support_auxv(&mut self) -> Option<target::ext::auxv::AuxvOps<Self>> {
+    fn support_auxv(&mut self) -> Option<target::ext::auxv::AuxvOps<'_, Self>> {
         Some(self)
     }
 }
@@ -179,7 +182,8 @@ impl SingleThreadBase for Emu {
     #[inline(always)]
     fn support_single_register_access(
         &mut self,
-    ) -> Option<target::ext::base::single_register_access::SingleRegisterAccessOps<(), Self>> {
+    ) -> Option<target::ext::base::single_register_access::SingleRegisterAccessOps<'_, (), Self>>
+    {
         Some(self)
     }
 
@@ -200,7 +204,7 @@ impl SingleThreadBase for Emu {
     #[inline(always)]
     fn support_resume(
         &mut self,
-    ) -> Option<target::ext::base::singlethread::SingleThreadResumeOps<Self>> {
+    ) -> Option<target::ext::base::singlethread::SingleThreadResumeOps<'_, Self>> {
         Some(self)
     }
 }
@@ -232,28 +236,28 @@ impl SingleThreadResume for Emu {
     #[inline(always)]
     fn support_reverse_cont(
         &mut self,
-    ) -> Option<target::ext::base::reverse_exec::ReverseContOps<(), Self>> {
+    ) -> Option<target::ext::base::reverse_exec::ReverseContOps<'_, (), Self>> {
         Some(self)
     }
 
     #[inline(always)]
     fn support_reverse_step(
         &mut self,
-    ) -> Option<target::ext::base::reverse_exec::ReverseStepOps<(), Self>> {
+    ) -> Option<target::ext::base::reverse_exec::ReverseStepOps<'_, (), Self>> {
         Some(self)
     }
 
     #[inline(always)]
     fn support_single_step(
         &mut self,
-    ) -> Option<target::ext::base::singlethread::SingleThreadSingleStepOps<Self>> {
+    ) -> Option<target::ext::base::singlethread::SingleThreadSingleStepOps<'_, Self>> {
         Some(self)
     }
 
     #[inline(always)]
     fn support_range_step(
         &mut self,
-    ) -> Option<target::ext::base::singlethread::SingleThreadRangeSteppingOps<Self>> {
+    ) -> Option<target::ext::base::singlethread::SingleThreadRangeSteppingOps<'_, Self>> {
         Some(self)
     }
 }

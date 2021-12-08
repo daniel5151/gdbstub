@@ -1,3 +1,5 @@
+#![deny(rust_2018_idioms, future_incompatible, nonstandard_style)]
+
 use std::net::{TcpListener, TcpStream};
 
 #[cfg(unix)]

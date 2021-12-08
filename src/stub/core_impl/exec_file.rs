@@ -4,9 +4,9 @@ use crate::protocol::commands::ext::ExecFile;
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     pub(crate) fn handle_exec_file(
         &mut self,
-        res: &mut ResponseWriter<C>,
+        res: &mut ResponseWriter<'_, C>,
         target: &mut T,
-        command: ExecFile,
+        command: ExecFile<'_>,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
         let ops = match target.support_exec_file() {
             Some(ops) => ops,

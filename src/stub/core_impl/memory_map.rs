@@ -4,9 +4,9 @@ use crate::protocol::commands::ext::MemoryMap;
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     pub(crate) fn handle_memory_map(
         &mut self,
-        res: &mut ResponseWriter<C>,
+        res: &mut ResponseWriter<'_, C>,
         target: &mut T,
-        command: MemoryMap,
+        command: MemoryMap<'_>,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
         let ops = match target.support_memory_map() {
             Some(ops) => ops,

@@ -6,12 +6,16 @@ use crate::emu::Emu;
 
 impl target::ext::breakpoints::Breakpoints for Emu {
     #[inline(always)]
-    fn support_sw_breakpoint(&mut self) -> Option<target::ext::breakpoints::SwBreakpointOps<Self>> {
+    fn support_sw_breakpoint(
+        &mut self,
+    ) -> Option<target::ext::breakpoints::SwBreakpointOps<'_, Self>> {
         Some(self)
     }
 
     #[inline(always)]
-    fn support_hw_watchpoint(&mut self) -> Option<target::ext::breakpoints::HwWatchpointOps<Self>> {
+    fn support_hw_watchpoint(
+        &mut self,
+    ) -> Option<target::ext::breakpoints::HwWatchpointOps<'_, Self>> {
         Some(self)
     }
 }

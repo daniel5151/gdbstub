@@ -28,12 +28,14 @@ impl Target for Emu {
     type Error = &'static str;
 
     #[inline(always)]
-    fn base_ops(&mut self) -> target::ext::base::BaseOps<Self::Arch, Self::Error> {
+    fn base_ops(&mut self) -> target::ext::base::BaseOps<'_, Self::Arch, Self::Error> {
         target::ext::base::BaseOps::MultiThread(self)
     }
 
     #[inline(always)]
-    fn support_breakpoints(&mut self) -> Option<target::ext::breakpoints::BreakpointsOps<Self>> {
+    fn support_breakpoints(
+        &mut self,
+    ) -> Option<target::ext::breakpoints::BreakpointsOps<'_, Self>> {
         Some(self)
     }
 }
@@ -121,7 +123,7 @@ impl MultiThreadBase for Emu {
     #[inline(always)]
     fn support_resume(
         &mut self,
-    ) -> Option<target::ext::base::multithread::MultiThreadResumeOps<Self>> {
+    ) -> Option<target::ext::base::multithread::MultiThreadResumeOps<'_, Self>> {
         Some(self)
     }
 }
@@ -153,7 +155,7 @@ impl MultiThreadResume for Emu {
     #[inline(always)]
     fn support_single_step(
         &mut self,
-    ) -> Option<target::ext::base::multithread::MultiThreadSingleStepOps<Self>> {
+    ) -> Option<target::ext::base::multithread::MultiThreadSingleStepOps<'_, Self>> {
         Some(self)
     }
 
@@ -190,11 +192,15 @@ impl target::ext::base::multithread::MultiThreadSingleStep for Emu {
 }
 
 impl target::ext::breakpoints::Breakpoints for Emu {
-    fn support_sw_breakpoint(&mut self) -> Option<target::ext::breakpoints::SwBreakpointOps<Self>> {
+    fn support_sw_breakpoint(
+        &mut self,
+    ) -> Option<target::ext::breakpoints::SwBreakpointOps<'_, Self>> {
         Some(self)
     }
 
-    fn support_hw_watchpoint(&mut self) -> Option<target::ext::breakpoints::HwWatchpointOps<Self>> {
+    fn support_hw_watchpoint(
+        &mut self,
+    ) -> Option<target::ext::breakpoints::HwWatchpointOps<'_, Self>> {
         Some(self)
     }
 }

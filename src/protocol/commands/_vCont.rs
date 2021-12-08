@@ -101,7 +101,7 @@ pub enum VContKind<'a> {
 }
 
 impl<'a> VContKind<'a> {
-    fn from_bytes(s: &[u8]) -> Option<VContKind> {
+    fn from_bytes(s: &[u8]) -> Option<VContKind<'_>> {
         use self::VContKind::*;
 
         let res = match s {

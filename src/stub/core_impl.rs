@@ -182,7 +182,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
     fn handle_command(
         &mut self,
-        res: &mut ResponseWriter<C>,
+        res: &mut ResponseWriter<'_, C>,
         target: &mut T,
         cmd: Command<'_>,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {

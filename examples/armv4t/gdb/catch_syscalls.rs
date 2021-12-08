@@ -9,7 +9,7 @@ use crate::gdb::Emu;
 impl target::ext::catch_syscalls::CatchSyscalls for Emu {
     fn enable_catch_syscalls(
         &mut self,
-        filter: Option<SyscallNumbers<u32>>,
+        filter: Option<SyscallNumbers<'_, u32>>,
     ) -> target::TargetResult<(), Self> {
         match filter {
             Some(numbers) => eprintln!(

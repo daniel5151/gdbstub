@@ -293,6 +293,7 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![deny(missing_docs)]
+#![deny(rust_2018_idioms, future_incompatible, nonstandard_style)]
 // Primarily due to rust-lang/rust#8995
 //
 // If this ever gets fixed, it's be possible to rewrite complex types using inherent associated type

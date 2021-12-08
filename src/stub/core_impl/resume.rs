@@ -16,7 +16,7 @@ use super::DisconnectReason;
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     pub(crate) fn handle_stop_resume<'a>(
         &mut self,
-        res: &mut ResponseWriter<C>,
+        res: &mut ResponseWriter<'_, C>,
         target: &mut T,
         command: Resume<'a>,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
@@ -80,7 +80,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             Arch = T::Arch,
             Error = T::Error,
         >,
-        actions: &Actions,
+        actions: &Actions<'_>,
     ) -> Result<(), Error<T::Error, C::Error>> {
         use crate::protocol::commands::_vCont::VContKind;
 
@@ -156,7 +156,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             Arch = T::Arch,
             Error = T::Error,
         >,
-        actions: &Actions,
+        actions: &Actions<'_>,
     ) -> Result<(), Error<T::Error, C::Error>> {
         ops.clear_resume_actions().map_err(Error::TargetError)?;
 
@@ -242,7 +242,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     fn do_vcont(
         &mut self,
         ops: ResumeOps<'_, T::Arch, T::Error>,
-        actions: Actions,
+        actions: Actions<'_>,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
         match ops {
             ResumeOps::SingleThread(ops) => Self::do_vcont_single_thread(ops, &actions)?,
@@ -254,7 +254,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
     fn write_break_common(
         &mut self,
-        res: &mut ResponseWriter<C>,
+        res: &mut ResponseWriter<'_, C>,
         tid: Tid,
     ) -> Result<(), Error<T::Error, C::Error>> {
         self.current_mem_tid = tid;
@@ -274,7 +274,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
     pub(crate) fn finish_exec(
         &mut self,
-        res: &mut ResponseWriter<C>,
+        res: &mut ResponseWriter<'_, C>,
         target: &mut T,
         stop_reason: MultiThreadStopReason<<T::Arch as Arch>::Usize>,
     ) -> Result<FinishExecStatus, Error<T::Error, C::Error>> {

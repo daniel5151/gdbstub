@@ -7,19 +7,19 @@ use crate::target::{Target, TargetResult};
 pub trait Breakpoints: Target {
     /// Support for setting / removing software breakpoints.
     #[inline(always)]
-    fn support_sw_breakpoint(&mut self) -> Option<SwBreakpointOps<Self>> {
+    fn support_sw_breakpoint(&mut self) -> Option<SwBreakpointOps<'_, Self>> {
         None
     }
 
     /// Support for setting / removing hardware breakpoints.
     #[inline(always)]
-    fn support_hw_breakpoint(&mut self) -> Option<HwBreakpointOps<Self>> {
+    fn support_hw_breakpoint(&mut self) -> Option<HwBreakpointOps<'_, Self>> {
         None
     }
 
     /// Support for setting / removing hardware watchpoints.
     #[inline(always)]
-    fn support_hw_watchpoint(&mut self) -> Option<HwWatchpointOps<Self>> {
+    fn support_hw_watchpoint(&mut self) -> Option<HwWatchpointOps<'_, Self>> {
         None
     }
 }
