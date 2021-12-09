@@ -105,7 +105,9 @@ pub trait SingleThreadResume: Target {
     ///
     /// [reverse stepping]: https://sourceware.org/gdb/current/onlinedocs/gdb/Reverse-Execution.html
     #[inline(always)]
-    fn support_reverse_step(&mut self) -> Option<super::reverse_exec::ReverseStepOps<'_, (), Self>> {
+    fn support_reverse_step(
+        &mut self,
+    ) -> Option<super::reverse_exec::ReverseStepOps<'_, (), Self>> {
         None
     }
 
@@ -113,7 +115,9 @@ pub trait SingleThreadResume: Target {
     ///
     /// [reverse continuing]: https://sourceware.org/gdb/current/onlinedocs/gdb/Reverse-Execution.html
     #[inline(always)]
-    fn support_reverse_cont(&mut self) -> Option<super::reverse_exec::ReverseContOps<'_, (), Self>> {
+    fn support_reverse_cont(
+        &mut self,
+    ) -> Option<super::reverse_exec::ReverseContOps<'_, (), Self>> {
         None
     }
 }
