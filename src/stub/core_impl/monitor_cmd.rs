@@ -19,11 +19,13 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
         let handler_status = match command {
             MonitorCmd::qRcmd(cmd) => {
+                let use_rle = ops.use_rle();
+
                 let mut err: Result<_, Error<T::Error, C::Error>> = Ok(());
                 let mut callback = |msg: &[u8]| {
                     // TODO: replace this with a try block (once stabilized)
                     let e = (|| {
-                        let mut res = ResponseWriter::new(res.as_conn());
+                        let mut res = ResponseWriter::new(res.as_conn(), use_rle);
                         res.write_str("O")?;
                         res.write_hex_buf(msg)?;
                         res.flush()?;

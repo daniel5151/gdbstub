@@ -532,6 +532,18 @@ pub trait Target {
         true
     }
 
+    /// Enable/Disable the use of run-length encoding on outgoing packets.
+    ///
+    /// This is enabled by default, as RLE can save substantial amounts of
+    /// bandwidth down the wire.
+    ///
+    /// _Author's note:_ There are essentially no reasons to disable RLE, unless
+    /// you happen to be using a custom GDB client that doesn't support RLE.
+    #[inline(always)]
+    fn use_rle(&self) -> bool {
+        true
+    }
+
     /// Support for setting / removing breakpoints.
     #[inline(always)]
     fn support_breakpoints(&mut self) -> Option<ext::breakpoints::BreakpointsOps<'_, Self>> {
@@ -553,7 +565,9 @@ pub trait Target {
     /// Support for handling requests to get the target's current section (or
     /// segment) offsets.
     #[inline(always)]
-    fn support_section_offsets(&mut self) -> Option<ext::section_offsets::SectionOffsetsOps<'_, Self>> {
+    fn support_section_offsets(
+        &mut self,
+    ) -> Option<ext::section_offsets::SectionOffsetsOps<'_, Self>> {
         None
     }
 
@@ -562,7 +576,8 @@ pub trait Target {
     #[inline(always)]
     fn support_target_description_xml_override(
         &mut self,
-    ) -> Option<ext::target_description_xml_override::TargetDescriptionXmlOverrideOps<'_, Self>> {
+    ) -> Option<ext::target_description_xml_override::TargetDescriptionXmlOverrideOps<'_, Self>>
+    {
         None
     }
 
@@ -574,7 +589,9 @@ pub trait Target {
 
     /// Support for setting / removing syscall catchpoints.
     #[inline(always)]
-    fn support_catch_syscalls(&mut self) -> Option<ext::catch_syscalls::CatchSyscallsOps<'_, Self>> {
+    fn support_catch_syscalls(
+        &mut self,
+    ) -> Option<ext::catch_syscalls::CatchSyscallsOps<'_, Self>> {
         None
     }
 
@@ -618,7 +635,17 @@ macro_rules! impl_dyn_target {
                 (**self).use_optional_single_step()
             }
 
-            fn support_breakpoints(&mut self) -> Option<ext::breakpoints::BreakpointsOps<'_, Self>> {
+            fn use_resume_stub(&self) -> bool {
+                (**self).use_resume_stub()
+            }
+
+            fn use_rle(&self) -> bool {
+                (**self).use_rle()
+            }
+
+            fn support_breakpoints(
+                &mut self,
+            ) -> Option<ext::breakpoints::BreakpointsOps<'_, Self>> {
                 (**self).support_breakpoints()
             }
 
@@ -640,8 +667,9 @@ macro_rules! impl_dyn_target {
 
             fn support_target_description_xml_override(
                 &mut self,
-            ) -> Option<ext::target_description_xml_override::TargetDescriptionXmlOverrideOps<'_, Self>>
-            {
+            ) -> Option<
+                ext::target_description_xml_override::TargetDescriptionXmlOverrideOps<'_, Self>,
+            > {
                 (**self).support_target_description_xml_override()
             }
 

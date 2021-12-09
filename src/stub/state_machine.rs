@@ -253,7 +253,7 @@ impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::Running, 
         target: &mut T,
         reason: impl IntoStopReason<T>,
     ) -> Result<GdbStubStateMachine<'a, T, C>, Error<T::Error, C::Error>> {
-        let mut res = ResponseWriter::new(&mut self.i.conn);
+        let mut res = ResponseWriter::new(&mut self.i.conn, target.use_rle());
         let event = self.i.inner.finish_exec(&mut res, target, reason.into())?;
         res.flush()?;
 

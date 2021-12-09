@@ -144,7 +144,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     conn.write(b'+').map_err(Error::ConnectionWrite)?;
                 }
 
-                let mut res = ResponseWriter::new(conn);
+                let mut res = ResponseWriter::new(conn, target.use_rle());
                 let disconnect_reason = match self.handle_command(&mut res, target, command) {
                     Ok(HandlerStatus::Handled) => None,
                     Ok(HandlerStatus::NeedsOk) => {
@@ -221,7 +221,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                         // TODO: omit this message if non-stop mode is active
                         {
-                            let mut res = ResponseWriter::new(res.as_conn());
+                            let mut res = ResponseWriter::new(res.as_conn(), target.use_rle());
                             res.write_str("O")?;
                             res.write_hex_buf(b"target has not implemented `support_resume()`\n")?;
                             res.flush()?;

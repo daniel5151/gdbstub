@@ -21,11 +21,11 @@ pub struct ResponseWriter<'a, C: Connection> {
     inner: &'a mut C,
     started: bool,
     checksum: u8,
-    // TODO?: Make using RLE configurable by the target?
-    // if implemented correctly, targets that disable RLE entirely could have all RLE code
-    // dead-code-eliminated.
+
+    rle_enabled: bool,
     rle_char: u8,
     rle_repeat: u8,
+
     // buffer to log outgoing packets. only allocates if logging is enabled.
     #[cfg(feature = "trace-pkt")]
     msg: Vec<u8>,
@@ -33,13 +33,16 @@ pub struct ResponseWriter<'a, C: Connection> {
 
 impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
     /// Creates a new ResponseWriter
-    pub fn new(inner: &'a mut C) -> Self {
+    pub fn new(inner: &'a mut C, rle_enabled: bool) -> Self {
         Self {
             inner,
             started: false,
             checksum: 0,
+
+            rle_enabled,
             rle_char: 0,
             rle_repeat: 0,
+
             #[cfg(feature = "trace-pkt")]
             msg: Vec::new(),
         }
@@ -47,23 +50,27 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
 
     /// Consumes self, writing out the final '#' and checksum
     pub fn flush(mut self) -> Result<(), Error<C::Error>> {
-        self.write(b'#')?;
-
         // don't include the '#' in checksum calculation
-        // (note: even though `self.write` was called, the the '#' char hasn't been
-        // added to the checksum, and is just sitting in the RLE buffer)
-        let checksum = self.checksum;
-
-        #[cfg(feature = "trace-pkt")]
-        trace!(
-            "--> ${}#{:02x?}",
-            String::from_utf8_lossy(&self.msg),
+        let checksum = if self.rle_enabled {
+            self.write(b'#')?;
+            // (note: even though `self.write` was called, the the '#' char hasn't been
+            // added to the checksum, and is just sitting in the RLE buffer)
+            self.checksum
+        } else {
+            let checksum = self.checksum;
+            self.write(b'#')?;
             checksum
-        );
+        };
 
         self.write_hex(checksum)?;
+
         // HACK: "write" a dummy char to force an RLE flush
-        self.write(0)?;
+        if self.rle_enabled {
+            self.write(0)?;
+        }
+
+        #[cfg(feature = "trace-pkt")]
+        trace!("--> ${}", String::from_utf8_lossy(&self.msg));
 
         self.inner.flush().map_err(Error)?;
 
@@ -78,15 +85,19 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
     fn inner_write(&mut self, byte: u8) -> Result<(), Error<C::Error>> {
         #[cfg(feature = "trace-pkt")]
         if log_enabled!(log::Level::Trace) {
-            match self.msg.as_slice() {
-                [.., c, b'*'] => {
-                    let c = *c;
-                    self.msg.pop();
-                    for _ in 0..(byte - 29) {
-                        self.msg.push(c);
+            if self.rle_enabled {
+                match self.msg.as_slice() {
+                    [.., c, b'*'] => {
+                        let c = *c;
+                        self.msg.pop();
+                        for _ in 0..(byte - 29) {
+                            self.msg.push(c);
+                        }
                     }
+                    _ => self.msg.push(byte),
                 }
-                _ => self.msg.push(byte),
+            } else {
+                self.msg.push(byte)
             }
         }
 
@@ -100,6 +111,10 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
     }
 
     fn write(&mut self, byte: u8) -> Result<(), Error<C::Error>> {
+        if !self.rle_enabled {
+            return self.inner_write(byte);
+        }
+
         const ASCII_FIRST_PRINT: u8 = b' ';
         const ASCII_LAST_PRINT: u8 = b'~';
 
