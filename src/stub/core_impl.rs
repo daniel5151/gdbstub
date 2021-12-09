@@ -95,7 +95,7 @@ pub struct GdbStubImpl<T: Target, C: Connection> {
 
     current_mem_tid: Tid,
     current_resume_tid: SpecificIdKind,
-    no_ack_mode: bool,
+    features: ProtocolFeatures,
 }
 
 pub enum HandlerStatus {
@@ -121,7 +121,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             // the target will simply return a non-fatal error, which is totally fine.
             current_mem_tid: SINGLE_THREAD_TID,
             current_resume_tid: SpecificIdKind::WithId(SINGLE_THREAD_TID),
-            no_ack_mode: false,
+            features: ProtocolFeatures::empty(),
         }
     }
 
@@ -140,7 +140,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             }
             Packet::Command(command) => {
                 // Acknowledge the command
-                if !self.no_ack_mode {
+                if !self.features.no_ack_mode() {
                     conn.write(b'+').map_err(Error::ConnectionWrite)?;
                 }
 
@@ -235,5 +235,37 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 Ok(HandlerStatus::Handled)
             }
         }
+    }
+}
+
+// This bitflag is not part of the protocol - it is an internal implementation
+// detail. The alternative would be to use multiple `bool` fields, which wastes
+// space in minimal `gdbstub` configurations.
+bitflags::bitflags! {
+    struct ProtocolFeatures: u8 {
+        const NO_ACK_MODE = 1 << 0;
+        const MULTIPROCESS = 1 << 1;
+    }
+}
+
+impl ProtocolFeatures {
+    #[inline(always)]
+    fn no_ack_mode(&self) -> bool {
+        self.contains(ProtocolFeatures::NO_ACK_MODE)
+    }
+
+    #[inline(always)]
+    fn set_no_ack_mode(&mut self, val: bool) {
+        self.set(ProtocolFeatures::NO_ACK_MODE, val)
+    }
+
+    #[inline(always)]
+    fn multiprocess(&self) -> bool {
+        self.contains(ProtocolFeatures::MULTIPROCESS)
+    }
+
+    #[inline(always)]
+    fn set_multiprocess(&mut self, val: bool) {
+        self.set(ProtocolFeatures::MULTIPROCESS, val)
     }
 }

@@ -2,7 +2,7 @@ use super::prelude::*;
 use crate::protocol::commands::ext::Base;
 
 use crate::arch::{Arch, Registers};
-use crate::common::{Pid, Tid};
+use crate::common::Tid;
 use crate::protocol::{IdKind, SpecificIdKind, SpecificThreadId};
 use crate::target::ext::base::{BaseOps, ResumeOps};
 use crate::{FAKE_PID, SINGLE_THREAD_TID};
@@ -43,16 +43,33 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         let handler_status = match command {
             // ------------------ Handshaking and Queries ------------------- //
             Base::qSupported(cmd) => {
-                // XXX: actually read what the client supports, and enable/disable features
-                // appropriately
-                let _features = cmd.features.into_iter();
+                use crate::protocol::commands::_qSupported::Feature;
+
+                // perform incoming feature negotiation
+                for feature in cmd.features.into_iter() {
+                    let (feature, supported) = match feature {
+                        Ok(Some(v)) => v,
+                        Ok(None) => continue,
+                        Err(()) => {
+                            return Err(Error::PacketParse(
+                                crate::protocol::PacketParseError::MalformedCommand,
+                            ))
+                        }
+                    };
+
+                    match feature {
+                        Feature::Multiprocess => self.features.set_multiprocess(supported),
+                    }
+                }
 
                 res.write_str("PacketSize=")?;
                 res.write_num(cmd.packet_buffer_len)?;
 
-                res.write_str(";vContSupported+")?;
-                res.write_str(";multiprocess+")?;
-                res.write_str(";QStartNoAckMode+")?;
+                res.write_str(concat!(
+                    ";vContSupported+",
+                    ";multiprocess+",
+                    ";QStartNoAckMode+",
+                ))?;
 
                 if let Some(resume_ops) = target.base_ops().resume_ops() {
                     let (reverse_cont, reverse_step) = match resume_ops {
@@ -132,7 +149,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 HandlerStatus::Handled
             }
             Base::QStartNoAckMode(_) => {
-                self.no_ack_mode = true;
+                self.features.set_no_ack_mode(true);
                 HandlerStatus::NeedsOk
             }
             Base::qXferFeaturesRead(cmd) => {
@@ -185,8 +202,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     None => true, // assume attached to an existing process
                     // When running in extended mode, we must defer to the target
                     Some(ops) => {
-                        let pid: Pid = cmd.pid.ok_or(Error::PacketUnexpected)?;
-                        ops.query_if_attached(pid).handle_error()?.was_attached()
+                        match cmd.pid {
+                            Some(pid) => ops.query_if_attached(pid).handle_error()?.was_attached(),
+                            None => true, // assume attached to an existing process
+                        }
                     }
                 };
                 res.write_str(if is_attached { "1" } else { "0" })?;
@@ -330,7 +349,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                 match target.base_ops() {
                     BaseOps::SingleThread(_) => res.write_specific_thread_id(SpecificThreadId {
-                        pid: Some(SpecificIdKind::WithId(FAKE_PID)),
+                        pid: self
+                            .features
+                            .multiprocess()
+                            .then(|| SpecificIdKind::WithId(FAKE_PID)),
                         tid: SpecificIdKind::WithId(SINGLE_THREAD_TID),
                     })?,
                     BaseOps::MultiThread(ops) => {
@@ -344,7 +366,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                                 }
                                 first = false;
                                 res.write_specific_thread_id(SpecificThreadId {
-                                    pid: Some(SpecificIdKind::WithId(FAKE_PID)),
+                                    pid: self
+                                        .features
+                                        .multiprocess()
+                                        .then(|| SpecificIdKind::WithId(FAKE_PID)),
                                     tid: SpecificIdKind::WithId(tid),
                                 })?;
                                 Ok(())
