@@ -86,6 +86,7 @@ macro_rules! commands {
                 // parsing code.
                 trait Hack {
                     fn support_base(&mut self) -> Option<()>;
+                    fn support_target_xml(&mut self) -> Option<()>;
                     fn support_resume(&mut self) -> Option<()>;
                     fn support_single_register_access(&mut self) -> Option<()>;
                     fn support_reverse_step(&mut self) -> Option<()>;
@@ -96,6 +97,18 @@ macro_rules! commands {
                 impl<T: Target> Hack for T {
                     fn support_base(&mut self) -> Option<()> {
                         Some(())
+                    }
+
+                    fn support_target_xml(&mut self) -> Option<()> {
+                        use crate::arch::Arch;
+                        if self.use_target_description_xml()
+                            && (T::Arch::target_description_xml().is_some()
+                                || self.support_target_description_xml_override().is_some())
+                        {
+                            Some(())
+                        } else {
+                            None
+                        }
                     }
 
                     fn support_resume(&mut self) -> Option<()> {
@@ -197,9 +210,12 @@ commands! {
         "QStartNoAckMode" => _QStartNoAckMode::QStartNoAckMode,
         "qsThreadInfo" => _qsThreadInfo::qsThreadInfo,
         "qSupported" => _qSupported::qSupported<'a>,
-        "qXfer:features:read" => _qXfer_features_read::qXferFeaturesRead<'a>,
         "T" => _t_upcase::T,
         "vKill" => _vKill::vKill,
+    }
+
+    target_xml use 'a {
+        "qXfer:features:read" => _qXfer_features_read::qXferFeaturesRead<'a>,
     }
 
     resume use 'a {

@@ -1,4 +1,5 @@
 use gdbstub::target;
+use gdbstub::target::TargetError;
 use gdbstub::target::TargetResult;
 
 use super::copy_range_to_buf;
@@ -7,11 +8,28 @@ use crate::emu::Emu;
 impl target::ext::target_description_xml_override::TargetDescriptionXmlOverride for Emu {
     fn target_description_xml(
         &self,
+        annex: &[u8],
         offset: u64,
         length: usize,
         buf: &mut [u8],
     ) -> TargetResult<usize, Self> {
-        let xml = r#"<?xml version="1.0"?>
+        let xml = match annex {
+            b"target.xml" => TARGET_XML.trim(),
+            b"extra.xml" => EXTRA_XML.trim(),
+            _ => return Err(TargetError::NonFatal),
+        };
+
+        Ok(copy_range_to_buf(
+            xml.trim().as_bytes(),
+            offset,
+            length,
+            buf,
+        ))
+    }
+}
+
+const TARGET_XML: &str = r#"
+<?xml version="1.0"?>
 <!DOCTYPE target SYSTEM "gdb-target.dtd">
 <target version="1.0">
     <architecture>armv4t</architecture>
@@ -55,27 +73,28 @@ impl target::ext::target_description_xml_override::TargetDescriptionXmlOverride 
         and the CPSR in the "g" packet. -->
         <reg name="cpsr" bitsize="32" regnum="25"/>
     </feature>
-    <feature name="custom-armv4t-extension">
-        <!--
-            maps to a simple scratch register within the emulator. the GDB
-            client can read the register using `p $custom` and set it using
-            `set $custom=1337`
-        -->
-        <reg name="custom" bitsize="32" type="uint32"/>
-
-        <!--
-            pseudo-register that return the current time when read.
-
-            notably, i've set up the target to NOT send this register as part of
-            the regular register list, which means that GDB will fetch/update
-            this register via the 'p' and 'P' packets respectively
-        -->
-        <reg name="time" bitsize="32" type="uint32"/>
-    </feature>
+    <xi:include href="extra.xml"/>
 </target>
-        "#
-        .trim()
-        .as_bytes();
-        Ok(copy_range_to_buf(xml, offset, length, buf))
-    }
-}
+"#;
+
+const EXTRA_XML: &str = r#"
+<?xml version="1.0"?>
+<!DOCTYPE target SYSTEM "gdb-target.dtd">
+<feature name="custom-armv4t-extension">
+    <!--
+        maps to a simple scratch register within the emulator. the GDB
+        client can read the register using `p $custom` and set it using
+        `set $custom=1337`
+    -->
+    <reg name="custom" bitsize="32" type="uint32"/>
+
+    <!--
+        pseudo-register that return the current time when read.
+
+        notably, i've set up the target to NOT send this register as part of
+        the regular register list, which means that GDB will fetch/update
+        this register via the 'p' and 'P' packets respectively
+    -->
+    <reg name="time" bitsize="32" type="uint32"/>
+</feature>
+"#;

@@ -65,6 +65,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 res.write_str("PacketSize=")?;
                 res.write_num(cmd.packet_buffer_len)?;
 
+                // these are the few features that gdbstub unconditionally supports
                 res.write_str(concat!(
                     ";vContSupported+",
                     ";multiprocess+",
@@ -128,8 +129,9 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     res.write_str(";QCatchSyscalls+")?;
                 }
 
-                if T::Arch::target_description_xml().is_some()
-                    || target.support_target_description_xml_override().is_some()
+                if target.use_target_description_xml()
+                    && (T::Arch::target_description_xml().is_some()
+                        || target.support_target_description_xml_override().is_some())
                 {
                     res.write_str(";qXfer:features:read+")?;
                 }
@@ -151,41 +153,6 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             Base::QStartNoAckMode(_) => {
                 self.features.set_no_ack_mode(true);
                 HandlerStatus::NeedsOk
-            }
-            Base::qXferFeaturesRead(cmd) => {
-                let ret = if let Some(ops) = target.support_target_description_xml_override() {
-                    ops.target_description_xml(cmd.offset, cmd.length, cmd.buf)
-                        .handle_error()?
-                } else if let Some(xml) = T::Arch::target_description_xml() {
-                    let xml = xml.trim().as_bytes();
-                    let xml_len = xml.len();
-
-                    let start = xml_len.min(cmd.offset as usize);
-                    let end = xml_len.min(cmd.offset as usize + cmd.length);
-
-                    // LLVM isn't smart enough to realize that `end` will always be greater than
-                    // `start`, and fails to elide the `slice_index_order_fail` check unless we
-                    // include this seemingly useless call to `max`.
-                    let data = &xml[start..end.max(start)];
-
-                    let n = data.len().min(cmd.buf.len());
-                    cmd.buf[..n].copy_from_slice(&data[..n]);
-                    n
-                } else {
-                    // If the target hasn't provided their own XML, then the initial response to
-                    // "qSupported" wouldn't have included "qXfer:features:read", and gdb wouldn't
-                    // send this packet unless it was explicitly marked as supported.
-                    return Err(Error::PacketUnexpected);
-                };
-
-                if ret == 0 {
-                    res.write_str("l")?;
-                } else {
-                    res.write_str("m")?;
-                    // TODO: add more specific error variant?
-                    res.write_binary(cmd.buf.get(..ret).ok_or(Error::PacketBufferOverflow)?)?;
-                }
-                HandlerStatus::Handled
             }
 
             // -------------------- "Core" Functionality -------------------- //

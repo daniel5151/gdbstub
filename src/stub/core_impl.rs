@@ -34,6 +34,7 @@ mod resume;
 mod reverse_exec;
 mod section_offsets;
 mod single_register_access;
+mod target_xml;
 mod x_upcase_packet;
 
 pub(crate) use resume::FinishExecStatus;
@@ -189,6 +190,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         match cmd {
             // `handle_X` methods are defined in the `ext` module
             Command::Base(cmd) => self.handle_base(res, target, cmd),
+            Command::TargetXml(cmd) => self.handle_target_xml(res, target, cmd),
             Command::Resume(cmd) => self.handle_stop_resume(res, target, cmd),
             Command::XUpcasePacket(cmd) => self.handle_x_upcase_packet(res, target, cmd),
             Command::SingleRegisterAccess(cmd) => {

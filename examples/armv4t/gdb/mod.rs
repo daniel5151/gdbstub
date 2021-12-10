@@ -1,4 +1,4 @@
-use core::convert::{TryFrom, TryInto};
+use core::convert::TryInto;
 
 use armv4t_emu::{reg, Memory};
 use gdbstub::common::Signal;
@@ -37,9 +37,8 @@ fn cpu_reg_id(id: ArmCoreRegId) -> Option<u8> {
 /// Copy all bytes of `data` to `buf`.
 /// Return the size of data copied.
 pub fn copy_to_buf(data: &[u8], buf: &mut [u8]) -> usize {
-    let len = data.len();
-    let buf = &mut buf[..len];
-    buf.copy_from_slice(data);
+    let len = buf.len().min(data.len());
+    buf[..len].copy_from_slice(&data[..len]);
     len
 }
 
@@ -48,13 +47,14 @@ pub fn copy_to_buf(data: &[u8], buf: &mut [u8]) -> usize {
 ///
 /// Mainly used by qXfer:_object_:read commands.
 pub fn copy_range_to_buf(data: &[u8], offset: u64, length: usize, buf: &mut [u8]) -> usize {
-    let offset = match usize::try_from(offset) {
-        Ok(v) => v,
-        Err(_) => return 0,
-    };
-    let len = data.len();
-    let data = &data[len.min(offset)..len.min(offset + length)];
-    copy_to_buf(data, buf)
+    let offset = offset as usize;
+    if offset > data.len() {
+        return 0;
+    }
+
+    let start = offset;
+    let end = (offset + length).min(data.len());
+    copy_to_buf(&data[start..end], buf)
 }
 
 impl Target for Emu {

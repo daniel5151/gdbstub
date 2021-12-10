@@ -544,6 +544,21 @@ pub trait Target {
         true
     }
 
+    /// Whether to send a target description XML to the client.
+    ///
+    /// Setting this to `false` will override both
+    /// [`Target::support_target_description_xml_override`] and the associated
+    /// [`Arch::target_description_xml`].
+    ///
+    /// _Author's note:_ Having the GDB client autodetect your target's
+    /// architecture and register set is really useful, so unless you're
+    /// _really_ trying to squeeze `gdbstub` onto a particularly
+    /// resource-constrained platform, you may as well leave this enabled.
+    #[inline(always)]
+    fn use_target_description_xml(&self) -> bool {
+        true
+    }
+
     /// Support for setting / removing breakpoints.
     #[inline(always)]
     fn support_breakpoints(&mut self) -> Option<ext::breakpoints::BreakpointsOps<'_, Self>> {
@@ -641,6 +656,10 @@ macro_rules! impl_dyn_target {
 
             fn use_rle(&self) -> bool {
                 (**self).use_rle()
+            }
+
+            fn use_target_description_xml(&self) -> bool {
+                (**self).use_target_description_xml()
             }
 
             fn support_breakpoints(

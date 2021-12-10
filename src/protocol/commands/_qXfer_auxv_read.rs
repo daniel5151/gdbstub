@@ -7,7 +7,7 @@ pub type qXferAuxvRead<'a> = QXferReadBase<'a, AuxvAnnex>;
 #[derive(Debug)]
 pub struct AuxvAnnex;
 
-impl ParseAnnex for AuxvAnnex {
+impl<'a> ParseAnnex<'a> for AuxvAnnex {
     fn from_buf(buf: &[u8]) -> Option<Self> {
         if buf != b"" {
             return None;

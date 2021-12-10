@@ -8,7 +8,13 @@ use crate::target::{Target, TargetResult};
 /// runtime-configurable target, it's unlikely that you'll need to implement
 /// this extension.
 pub trait TargetDescriptionXmlOverride: Target {
-    /// Return the target's description XML file (`target.xml`).
+    /// Read a target's description XML file at the specified `annex`.
+    ///
+    /// The "root" `annex` will always be `target.xml`, though advanced targets
+    /// may choose to split `target.xml` into multiple files via the the
+    /// `<xi:include href="other_file.xml"/>` XML tag. If the GDB client
+    /// encounter any such tags, it will re-invoke this handler with `annex`
+    /// specified to point to `other_file.xml`.
     ///
     /// Refer to the
     /// [target_description_xml](crate::arch::Arch::target_description_xml)
@@ -21,6 +27,7 @@ pub trait TargetDescriptionXmlOverride: Target {
     /// `Ok(0)`.
     fn target_description_xml(
         &self,
+        annex: &[u8],
         offset: u64,
         length: usize,
         buf: &mut [u8],
