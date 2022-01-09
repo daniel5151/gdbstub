@@ -124,7 +124,7 @@ pub trait SingleThreadResume: Target {
 
 define_ext!(SingleThreadResumeOps, SingleThreadResume);
 
-/// Target Extension - Optimized [single stepping] for single threaded targets.
+/// Target Extension - Optimized single stepping for single threaded targets.
 /// See [`SingleThreadResume::support_single_step`].
 pub trait SingleThreadSingleStep: Target + SingleThreadResume {
     /// [Single step] the target.

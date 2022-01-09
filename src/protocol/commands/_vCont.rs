@@ -4,10 +4,10 @@ use crate::common::Signal;
 use crate::protocol::common::hex::HexString;
 use crate::protocol::common::thread_id::{SpecificThreadId, ThreadId};
 
-// TODO?: instead of parsing lazily when invoked, parse the strings into a
-// compressed binary representations that can be stuffed back into the packet
-// buffer, and return an iterator over the binary data that's _guaranteed_ to be
-// valid. This would clean up some of the code in the vCont handler.
+// TODO?: instead of lazily parsing data, parse the strings into a compressed
+// binary representations that can be stuffed back into the packet buffer and
+// return an iterator over the binary data that's _guaranteed_ to be valid. This
+// would clean up some of the code in the vCont handler.
 //
 // The interesting part would be to see whether or not the simplified error
 // handing code will compensate for all the new code required to pre-validate

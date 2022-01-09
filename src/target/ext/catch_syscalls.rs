@@ -9,8 +9,6 @@ use crate::target::{Target, TargetResult};
 /// Implementing this extension allows the target to support the `catch syscall`
 /// GDB client command. See [GDB documentation](https://sourceware.org/gdb/onlinedocs/gdb/Set-Catchpoints.html)
 /// for further details.
-///
-/// Corresponds to GDB's [`QCatchSyscalls`](https://sourceware.org/gdb/current/onlinedocs/gdb/General-Query-Packets.html#QCatchSyscalls) command.
 pub trait CatchSyscalls: Target {
     /// Enables catching syscalls from the inferior process.
     ///

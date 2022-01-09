@@ -365,8 +365,6 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                             ops.is_thread_alive(tid).map_err(Error::TargetError)?
                         }
                     },
-                    // TODO: double-check if GDB ever sends other variants
-                    // Even after ample testing, this arm has never been hit...
                     _ => return Err(Error::PacketUnexpected),
                 };
                 if alive {

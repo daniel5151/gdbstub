@@ -68,14 +68,17 @@ pub mod run_blocking {
             >,
         >;
 
-        /// Invoked when the GDB client sends a Ctrl-C interrupt. The
-        /// implementation should handle the interrupt request + return an
-        /// appropriate stop reason to report back to the GDB client, or return
-        /// `None` if the interrupt should be ignored.
+        /// Invoked when the GDB client sends a Ctrl-C interrupt.
+        ///
+        /// Depending on how the target is implemented, it may or may not make
+        /// sense to immediately return a stop reason as part of handling the
+        /// Ctrl-C interrupt. e.g: in some cases, it may be better to send the
+        /// target a signal upon receiving a Ctrl-C interrupt _without_
+        /// immediately sending a stop reason, and instead deferring the stop
+        /// reason to some later point in the target's execution.
         ///
         /// _Suggestion_: If you're unsure which stop reason to report,
-        /// [`BaseStopReason::Signal(Signal::SIGINT)`] is a sensible
-        /// default.
+        /// [`BaseStopReason::Signal(Signal::SIGINT)`] is a sensible default.
         ///
         /// [`BaseStopReason::Signal(Signal::SIGINT)`]:
         /// crate::stub::BaseStopReason::Signal

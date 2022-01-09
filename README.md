@@ -8,6 +8,8 @@ An ergonomic and easy-to-integrate implementation of the [GDB Remote Serial Prot
 
 `gdbstub`  makes it easy to integrate powerful guest debugging support to your emulator / hypervisor / debugger / embedded project. By implementing just a few basic methods of the [`gdbstub::Target`](https://docs.rs/gdbstub/latest/gdbstub/target/ext/base/singlethread/trait.SingleThreadResume.html) trait, you can have a rich GDB debugging session up and running in no time!
 
+`gdbstub`'s API makes extensive use of a technique called [**Inlineable Dyn Extension Traits**](#zero-overhead-protocol-extensions) (IDETs) to expose fine-grained, zero-cost control over enabled GDB protocol features _without_ relying on compile-time features flags. Aside from making it effortless to toggle enabled protocol features, IDETs also ensure that any unimplemented features are guaranteed to be dead-code-eliminated in release builds!
+
 **If you're looking for a quick snippet of example code to see what a typical `gdbstub` integration might look like, check out [examples/armv4t/gdb/mod.rs](https://github.com/daniel5151/gdbstub/blob/master/examples/armv4t/gdb/mod.rs)**
 
 -   [Documentation (gdbstub)](https://docs.rs/gdbstub)
@@ -33,7 +35,7 @@ Why use `gdbstub`?
         -   \*when compiled in release mode, without the `paranoid_unsafe` cargo feature, on certain platforms.
         -   Validated by inspecting the asm output of the in-tree `example_no_std`.
     -   `gdbstub` is transport-layer agnostic, and uses a basic [`Connection`](https://docs.rs/gdbstub/latest/gdbstub/conn/trait.Connection.html) interface to communicate with the GDB server. As long as target has some method of performing in-order, serial, byte-wise I/O (e.g: putchar/getchar over UART), it's possible to run `gdbstub` on it!
-    -   "You don't pay for what you don't use": All code related to parsing/handling protocol extensions is guaranteed to be dead-code-eliminated from an optimized binary if left unimplemented! See the [Zero-overhead Protocol Extensions](#zero-overhead-protocol-extensions) section below for more details.
+    -   "You don't pay for what you don't use": All code related to parsing/handling protocol extensions is guaranteed to be dead-code-eliminated from an optimized binary if left unimplemented. See the [Zero-overhead Protocol Extensions](#zero-overhead-protocol-extensions) section below for more details.
     -   `gdbstub`'s minimal configuration has an incredibly low binary size + RAM overhead, enabling it to be used on even the most resource-constrained microcontrollers.
         -   When compiled in release mode, using all the tricks outlined in [`min-sized-rust`](https://github.com/johnthagen/min-sized-rust), a baseline `gdbstub` implementation can weigh in at **_less than 10kb of `.text` + `.rodata`!_** \*
         - \*Exact numbers vary by target platform, compiler version, and `gdbstub` revision. Data was collected using the included `example_no_std` project compiled on x86_64.
@@ -44,7 +46,7 @@ Why use `gdbstub`?
 
 Due to `gdbstub`'s heavy use of Rust's type system in enforcing GDB protocol invariants at compile time, it's often been the case that implementing new GDB protocol features has required making some breaking API changes. While these changes are typically quite minor, they are nonetheless semver-breaking, and may require a code-change when moving between versions. Any particularly involved changes will typically be documented in a dedicated [transition guide](docs/transition_guide.md) document.
 
-That being said, `gdbstub` has already been integrated into [many real-world projects](#real-world-examples) since its initial `0.1` release, and empirical evidence suggests that it seems to be doing its job quite well! Thusfar, there haven't been any reported issues related to core GDB debugging functionality, with most issues being caused by faulty `Target` and/or `Arch` implementations.
+That being said, `gdbstub` has already been integrated into [many real-world projects](#real-world-examples) since its initial `0.1` release, and empirical evidence suggests that it seems to be doing its job quite well! Thusfar, most reported issues have been caused by improperly implemented `Target` and/or `Arch` implementations, while the core `gdbstub` library itself has proven to be reasonably bug-free.
 
 See the [Future Plans + Roadmap to `1.0.0`](#future-plans--roadmap-to-100) for more information on what features `gdbstub` still needs to implement before committing to API stability with version `1.0.0`.
 

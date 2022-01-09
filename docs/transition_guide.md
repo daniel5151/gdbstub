@@ -10,6 +10,8 @@ This document does _not_ discuss any new features that might have been added bet
 
 `0.6` introduces a large number of breaking changes to the public APIs, and will require quite a bit more more "hands on" porting than previous `gdbstub` upgrades.
 
+The following guide is a best-effort attempt to document all the changes, but there are some parts that may be missing / incomplete.
+
 ##### General API change - _lots_ of renaming + exported type reorganization
 
 Many types have been renamed, and many import paths have changed in `0.6`.
@@ -247,7 +249,7 @@ impl SingleThreadSingleStep for Emu {
 
 With the introduction of the new state-machine API, the responsibility of reading incoming has been lifted out of `gdbstub` itself, and is now something implementations are responsible for . The alternative approach would've been to have `Connection` include multiple different `read`-like methods for various kinds of paradigms - such as `async`/`await`, `epoll`, etc...
 
-TODO
+> TODO. In the meantime, I would suggest looking at rustdoc for details on how to use `GdbStub::run_blocking`...
 
 ## `0.4` -> `0.5`
 

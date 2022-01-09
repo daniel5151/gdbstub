@@ -47,23 +47,6 @@
 //! becomes `fn resume(&mut self, ...) -> Result<_, MyEmuError>`, which makes it
 //! possible to preserve the target-specific error while using `gdbstub`!
 //!
-//! > _Aside:_ What's with all the `<Self::Arch as Arch>::` syntax?
-//!
-//! > As you explore `Target` and its many extension traits, you'll enounter
-//! many method signatures that use this pretty gnarly bit of Rust type syntax.
-//!
-//! > If [rust-lang/rust#38078](https://github.com/rust-lang/rust/issues/38078)
-//! gets fixed, then types like `<Self::Arch as Arch>::Foo` could be simplified
-//! to just `Self::Arch::Foo`, but until then, the much more explicit
-//! [fully qualified syntax](https://doc.rust-lang.org/book/ch19-03-advanced-traits.html#fully-qualified-syntax-for-disambiguation-calling-methods-with-the-same-name)
-//! must be used instead.
-//!
-//! > To improve the readability and maintainability of your own implementation,
-//! it'd be best to swap out the fully qualified syntax with whatever concrete
-//! type is being used. e.g: on a 32-bit target, instead of cluttering up a
-//! method implementation with a parameter passed as `(addr: <Self::Arch as
-//! Arch>::Usize)`, just write `(addr: u32)` directly.
-//!
 //! ## Required Methods (Base Protocol)
 //!
 //! A minimal `Target` implementation only needs to implement a single method:
@@ -73,26 +56,29 @@
 //! fundamental operations such as reading/writing memory, etc...
 //!
 //! All other methods are entirely optional! Check out the
-//! [`ext`] module for a full list of currently supported protocol extensions.
+//! [`ext`](ext#modules) module for a full list of currently supported protocol
+//! extensions.
 //!
 //! ## Optional Protocol Extensions
 //!
 //! The GDB protocol is _massive_, and there are plenty of optional protocol
 //! extensions that targets can implement to enhance the base debugging
-//! experience. These protocol extensions range from relatively mundane things
-//! such as setting/removing breakpoints or reading/writing individual
-//! registers, but also include fancy things such as support for time travel
-//! debugging, running shell commands remotely, or even performing file IO on
-//! the target!
+//! experience.
+//!
+//! These protocol extensions range from relatively mundane things such as
+//! setting/removing breakpoints or reading/writing individual registers, but
+//! also include fancy things such as support for time travel debugging, running
+//! shell commands remotely, or even performing file IO on the target!
 //!
 //! `gdbstub` uses a somewhat unique approach to exposing these many features,
 //! called **Inlinable Dyn Extension Traits (IDETs)**. While this might sound a
 //! bit daunting, the API is actually quite straightforward, and described in
 //! great detail under the [`ext` module's documentation](ext).
 //!
-//! As you being working on your `gdbstub` integration, take a moment to skim
-//! through and familiarize yourself with the many different protocol extensions
-//! that `gdbstub` implements!
+//! After getting the base protocol up and running, do take a moment to skim
+//! through and familiarize yourself with the [many different protocol
+//! extensions](ext# modules) that `gdbstub` implements. There are some really
+//! nifty ones that you might not even realize you need!
 //!
 //! As a suggestion on where to start, consider implementing some of the
 //! breakpoint related extensions under
@@ -107,7 +93,8 @@
 //!
 //! If there's a GDB protocol extensions you're interested in that hasn't been
 //! implemented in `gdbstub` yet, (e.g: remote filesystem access, tracepoint
-//! support, etc...), consider opening an issue / filing a PR on GitHub!
+//! support, etc...), consider opening an issue / filing a PR on the
+//! [`gdbstub` GitHub repo](https://github.com/daniel5151/gdbstub/).
 //!
 //! Check out the [GDB Remote Configuration Docs](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Configuration.html)
 //! for a table of GDB commands + their corresponding Remote Serial Protocol
@@ -245,7 +232,25 @@
 //! instead of immediately terminating the entire debugging session, it's
 //! possible to simply return a `Err(TargetError::Errno(14)) // EFAULT`, which
 //! will notify the GDB client that the operation has failed.
-
+//!
+//! See the [`TargetError`] docs for more details.
+//!
+//! ## A note on all the `<Self::Arch as Arch>::` syntax
+//!
+//! As you explore `Target` and its many extension traits, you'll enounter
+//! many method signatures that use this pretty gnarly bit of Rust type syntax.
+//!
+//! If [rust-lang/rust#38078](https://github.com/rust-lang/rust/issues/38078)
+//! gets fixed, then types like `<Self::Arch as Arch>::Foo` could be simplified
+//! to just `Self::Arch::Foo`, but until then, the much more explicit
+//! [fully qualified syntax](https://doc.rust-lang.org/book/ch19-03-advanced-traits.html#fully-qualified-syntax-for-disambiguation-calling-methods-with-the-same-name)
+//! must be used instead.
+//!
+//! To improve the readability and maintainability of your own implementation,
+//! it'd be best to swap out the fully qualified syntax with whatever concrete
+//! type is being used. e.g: on a 32-bit target, instead of cluttering up a
+//! method implementation with a parameter passed as `(addr: <Self::Arch as
+//! Arch>::Usize)`, just write `(addr: u32)` directly.
 use crate::arch::Arch;
 
 pub mod ext;
@@ -257,7 +262,7 @@ pub mod ext;
 ///
 /// The GDB Remote Serial Protocol has less-than-stellar support for error
 /// handling, typically taking the form of a single-byte
-/// [`errno`-style error codes](https://www-numi.fnal.gov/offline_software/srt_public_context/WebDocs/Errors/unix_system_errors.html).
+/// [`errno`-style error codes](https://chromium.googlesource.com/chromiumos/docs/+/HEAD/constants/errnos.md).
 /// Moreover, often times the GDB client will simply _ignore_ the specific error
 /// code returned by the stub, and print a generic failure message instead.
 ///
@@ -596,7 +601,7 @@ pub trait Target {
         None
     }
 
-    /// Support for reading a target memory map.
+    /// Support for reading the target's memory map.
     #[inline(always)]
     fn support_memory_map(&mut self) -> Option<ext::memory_map::MemoryMapOps<'_, Self>> {
         None
@@ -616,13 +621,13 @@ pub trait Target {
         None
     }
 
-    /// Support for reading the current exec-file
+    /// Support for reading the current exec-file.
     #[inline(always)]
     fn support_exec_file(&mut self) -> Option<ext::exec_file::ExecFileOps<'_, Self>> {
         None
     }
 
-    /// Support for reading the target's Auxillary Vector
+    /// Support for reading the target's Auxillary Vector.
     #[inline(always)]
     fn support_auxv(&mut self) -> Option<ext::auxv::AuxvOps<'_, Self>> {
         None

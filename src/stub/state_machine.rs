@@ -1,18 +1,18 @@
 //! Low-level state-machine interface that underpins [`GdbStub`].
-//!
-//! TODO: write some proper documentation + examples of how to interface with
-//! this API.
+//
+// TODO: write some proper documentation + examples of how to interface with
+// this API.
 //!
 //! # Hey, what gives? Where are all the docs!?
 //!
-//! Sorry about that!
+//! Yep, sorry about that!
 //!
 //! `gdbstub` 0.6 turned out ot be a pretty massive release, and documenting
-//! everything has proven to be a gargantuan task.
+//! everything has proven to be a somewhat gargantuan task that's kept delaying
+//! the release data further and further back...
 //!
-//! There are quite a few folks asking that I publish 0.6 to crates.io, so to
-//! avoid blocking the release any further, I've decided to leave this bit of
-//! the API sparsely documented...
+//! To avoid blocking the release any further, I've decided to leave this bit of
+//! the API sparsely documented.
 //!
 //! If you're interested in using this API directly (e.g: to integrate `gdbstub`
 //! into a `no_std` project, or to use `gdbstub` in a non-blocking manner
@@ -24,12 +24,14 @@
 //!   `GdbStub::run_blocking` (e.g: the in-tree `armv4t` / `armv4t_multicore`
 //!   examples)
 //! - Real-world projects using the API
-//!     - The best example of this (at the time of writing) is the code at [`vmware-labs/node-replicated-kernel`](https://github.com/vmware-labs/node-replicated-kernel/blob/4326704aaf3c0052e614dcde2a788a8483224394/kernel/src/arch/x86_64/gdb/mod.rs#L106)
+//!     - The best example of this (at the time of writing) is the code at
+//!     [`vmware-labs/node-replicated-kernel`](https://github.com/vmware-labs/node-replicated-kernel/blob/4326704aaf3c0052e614dcde2a788a8483224394/kernel/src/arch/x86_64/gdb/mod.rs#L106)
 //!
 //! If you have any questions, feel free to open a discussion thread over at the
-//! `gdbstub` [GitHub repo](https://github.com/daniel5151/gdbstub/discussions)
+//! [`gdbstub` GitHub repo](https://github.com/daniel5151/gdbstub/).
 //!
 //! [`BlockingEventLoop`]: super::run_blocking::BlockingEventLoop
+//! [`GdbStub::run_blocking`]: super::GdbStub::run_blocking
 
 use managed::ManagedSlice;
 
@@ -303,17 +305,24 @@ impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::Running, 
 /// Methods which can only be called from the
 /// [`GdbStubStateMachine::CtrlCInterrupt`] state.
 impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::CtrlCInterrupt, T, C> {
-    /// The target has acknowledged the clients Ctrl-C interrupt, and taken
-    /// any appropriate actions to fulfil the interrupt request.
+    /// Acknowledge the Ctrl-C interrupt.
+    ///
+    /// Passing `None` as a stop reason will return the state machine to
+    /// whatever state it was in pre-interruption, without immediately returning
+    /// a stop reason.
+    ///
+    /// Depending on how the target is implemented, it may or may not make sense
+    /// to immediately return a stop reason as part of handling the Ctrl-C
+    /// interrupt. e.g: in some cases, it may be better to send the target a
+    /// signal upon receiving a Ctrl-C interrupt _without_ immediately sending a
+    /// stop reason, and instead deferring the stop reason to some later point
+    /// in the target's execution.
     ///
     /// Some notes on handling Ctrl-C interrupts:
     ///
     /// - Stubs are not required to recognize these interrupt mechanisms, and
     ///   the precise meaning associated with receipt of the interrupt is
     ///   implementation defined.
-    ///   - Passing `None` as the `stop_reason` will ignore the Ctrl-C
-    ///     interrupt, and return the state machine to whatever state it was in
-    ///     before being interrupted.
     /// - If the target supports debugging of multiple threads and/or processes,
     ///   it should attempt to interrupt all currently-executing threads and
     ///   processes.

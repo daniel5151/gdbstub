@@ -37,7 +37,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     .run(cmd.filename, Args::new(&mut cmd.args.into_iter()))
                     .handle_error()?;
 
-                // TODO: send a more descriptive stop packet?
+                // This is a reasonable response, as the `run` handler must
+                // spawn the process in a stopped state.
                 res.write_str("S05")?;
                 HandlerStatus::Handled
             }

@@ -1,7 +1,7 @@
 //! Provide a memory map for the target.
 use crate::target::{Target, TargetResult};
 
-/// Target Extension - Provide a target memory map.
+/// Target Extension - Read the target's memory map.
 pub trait MemoryMap: Target {
     /// Get memory map XML file from the target.
     ///

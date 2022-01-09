@@ -8,7 +8,8 @@
 //!
 //! If there's a GDB protocol extensions you're interested in that hasn't been
 //! implemented in `gdbstub` yet, (e.g: remote filesystem access, tracepoint
-//! support, etc...), consider opening an issue / filing a PR on GitHub!
+//! support, etc...), consider opening an issue / filing a PR on the
+//! [`gdbstub` GitHub repo](https://github.com/daniel5151/gdbstub/).
 //!
 //! Check out the [GDB Remote Configuration Docs](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Configuration.html)
 //! for a table of GDB commands + their corresponding Remote Serial Protocol
@@ -18,9 +19,9 @@
 //!
 //! The GDB protocol is massive, and contains all sorts of optional
 //! functionality. In the early versions of `gdbstub`, the `Target` trait
-//! directly had a method for _every single protocol extension_, which if taken
-//! to the extreme, would have resulted in literally _hundreds_ of associated
-//! methods!
+//! directly implemented a method for _every single protocol extension_. If this
+//! trend continued, there would've been literally _hundreds_ of associated
+//! methods - of which only a small subset were ever used at once!
 //!
 //! Aside from the cognitive complexity of having so many methods on a single
 //! trait, this approach had numerous other drawbacks as well:
@@ -28,8 +29,8 @@
 //!  - Implementations that did not implement all available protocol extensions
 //!    still had to "pay" for the unused packet parsing/handler code, resulting
 //!    in substantial code bloat, even on `no_std` platforms.
-//!  - `GdbStub`'s internal implementation needed to include _runtime_ checks to
-//!    deal with incorrectly implemented `Target`s.
+//!  - `GdbStub`'s internal implementation needed to include a large number of
+//!    _runtime_ checks to deal with incorrectly implemented `Target`s.
 //!      - No way to enforce "mutually-dependent" trait methods at compile-time.
 //!          - e.g: When implementing hardware breakpoint extensions, targets
 //!            _must_ implement both the `add_breakpoint` and
@@ -41,7 +42,7 @@
 //!
 //! At first blush, it seems the the solution to all these issues is obvious:
 //! simply tie each protocol extension to a `cargo` feature! And yes, while
-//! would would indeed work, there would be several serious ergonomic drawbacks:
+//! this would indeed work, there would be several serious ergonomic drawbacks:
 //!
 //! - There would be _hundreds_ of individual feature flags that would need to
 //!   be toggled by end users.

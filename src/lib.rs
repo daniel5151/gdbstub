@@ -39,9 +39,8 @@
 //! [`Target`](#the-target-trait), and a [event loop](#the-event-loop).
 //!
 //! > _Note:_ I _highly recommended_ referencing some of the
-//! [examples](https://github.com/daniel5151/gdbstub/blob/master/README.md#examples)
-//! listed in the project README when integrating `gdbstub` into a project for
-//! the first time.
+//! [examples](https://github.com/daniel5151/gdbstub#examples) listed in the
+//! project README when integrating `gdbstub` into a project for the first time.
 //!
 //! > In particular, the in-tree
 //! [`armv4t`](https://github.com/daniel5151/gdbstub/tree/master/examples/armv4t)
@@ -128,8 +127,8 @@
 // use an explicit doc attribute to avoid automatic rustfmt wrapping
 #![doc = "### `GdbStub::run_blocking`: The quick and easy way to get up and running with `gdbstub`"]
 //!
-//! If you're running on a hosted system and have an extra thread to spare, the
-//! quickest way to get up and running with `gdbstub` is by using the
+//! If you've got an extra thread to spare, the quickest way to get up and
+//! running with `gdbstub` is by using the
 //! [`GdbStub::run_blocking`](stub::run_blocking) API alongside the
 //! [`BlockingEventLoop`] trait.
 //!
@@ -138,8 +137,8 @@
 //! [following
 //! section](#gdbstubstatemachine-driving-gdbstub-in-an-async-event-loop--via-interrupt-handlers).
 //!
-//!
-//! A basic integration might look something like this:
+//! A basic integration of `gdbstub` into a project using the
+//! `GdbStub::run_blocking` API might look something like this:
 //!
 //! ```rust
 //! # use gdbstub::target::ext::base::BaseOps;
@@ -176,6 +175,8 @@
 //!
 //! enum MyGdbBlockingEventLoop {}
 //!
+//! // The `run_blocking::BlockingEventLoop` groups together various callbacks
+//! // the `GdbStub::run_blocking` event loop requires you to implement.
 //! impl run_blocking::BlockingEventLoop for MyGdbBlockingEventLoop {
 //!     type Target = MyTarget;
 //!     type Connection = Box<dyn ConnectionExt<Error = std::io::Error>>;
@@ -183,9 +184,9 @@
 //!     // or MultiThreadStopReason on multi threaded targets
 //!     type StopReason = SingleThreadStopReason<u32>;
 //!
-//!     /// Invoked immediately after the target's `resume` method has been
-//!     /// called. The implementation should block until either the target
-//!     /// reports a stop reason, or if new data was sent over the connection.
+//!     // Invoked immediately after the target's `resume` method has been
+//!     // called. The implementation should block until either the target
+//!     // reports a stop reason, or if new data was sent over the connection.
 //!     fn wait_for_stop_reason(
 //!         target: &mut MyTarget,
 //!         conn: &mut Self::Connection,
@@ -220,10 +221,7 @@
 //!         Ok(event)
 //!     }
 //!
-//!     /// Invoked when the GDB client sends a Ctrl-C interrupt. The
-//!     /// implementation should handle the interrupt request + return an
-//!     /// appropriate stop reason to report back to the GDB client, or return
-//!     /// `None` if the interrupt should be ignored.
+//!     // Invoked when the GDB client sends a Ctrl-C interrupt.
 //!     fn on_interrupt(
 //!         target: &mut MyTarget,
 //!     ) -> Result<Option<SingleThreadStopReason<u32>>, <MyTarget as Target>::Error> {
@@ -275,7 +273,7 @@
 //! Unfortunately, this blocking behavior can be a non-starter when integrating
 //! `gdbstub` in projects that don't support / wish to avoid the traditional
 //! thread-based execution model, such as projects using `async/await`, or
-//! bare-metal, `no_std` projects running on embedded hardware.
+//! bare-metal `no_std` projects running on embedded hardware.
 //!
 //! In these cases, `gdbstub` provides access to the underlying
 //! [`GdbStubStateMachine`] API, which gives implementations full control over
@@ -287,6 +285,19 @@
 //!
 //! See the [`GdbStubStateMachine`] docs for more details on how to use this
 //! API.
+//!
+//! <br>
+//!
+//! * * *
+//!
+//! <br>
+//!
+//! And with that lengthy introduction, I wish you the best of luck in your
+//! debugging adventures!
+//!
+//! If you have any suggestions, feature requests, or run into any problems,
+//! please start a discussion / open an issue over on the
+//! [`gdbstub` GitHub repo](https://github.com/daniel5151/gdbstub/).
 //!
 //! [`GdbStubStateMachine`]: stub::state_machine::GdbStubStateMachine
 //! [`BlockingEventLoop`]: stub::run_blocking::BlockingEventLoop

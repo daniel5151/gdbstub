@@ -4,20 +4,29 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 # 0.6.0
 
-After over a half-year of development, `gdbstub` 0.6 is ready for release!
+After over a half-year of development, `gdbstub` 0.6 has finally been released!
 
-This is a huge release, delivering a slew of new protocol extensions, internal improvements, and API features!
+This massive release delivers a slew of new protocol extensions, internal improvements, and key API improvements. Some highlights include:
 
-Some highlights of this release:
-
-- The new `GdbStubStateMachine` API makes it possible to drive `gdbstub` on `no_std` platforms directly via interrupt handlers! This is already being used in several Rust kernel projects, such as [`vmware-labs/node-replicated-kernel`](https://github.com/vmware-labs/node-replicated-kernel/tree/4326704/kernel/src/arch/x86_64/gdb) and [`betrusted-io/xous-core`](https://github.com/betrusted-io/xous-core/blob/7d3d710/kernel/src/debug/gdb_server.rs) to enable in-kernel debugging.
+- A new _non-blocking_ `GdbStubStateMachine` API, enabling `gdbstub` to integrate nicely with async event loops!
+  - Moreover, on `no_std` platforms, this new API enables `gdbstub` to be driven directly via breakpoint/serial interrupt handlers! This is already being used in several Rust kernel projects, such as [`vmware-labs/node-replicated-kernel`](https://github.com/vmware-labs/node-replicated-kernel/tree/4326704/kernel/src/arch/x86_64/gdb) and [`betrusted-io/xous-core`](https://github.com/betrusted-io/xous-core/blob/7d3d710/kernel/src/debug/gdb_server.rs) to enable bare-metal, in-kernel debugging.
 - `gdbstub` is now entirely **panic free** in release builds!
   - \* subject to `rustc`'s compiler optimizations
-  - This was a painstaking manual effort, but the end result is a substantial reduction in binary size on `no_std` platforms.
-- Support for tons of new and exciting protocol extensions!
-- Relicensed the project from just MIT to MIT OR Apache-2.0
+  - This was a pretty painstaking effort, but the end result is a substantial reduction in binary size on `no_std` platforms.
+- Tons of new and exciting protocol extensions, including but not limited to:
+  - Support for remote file I/O
+  - Fetching remote memory maps
+  - Catching + reporting syscalls
+  - ...and many more!
+- A new license: `gdbtsub` is licensed under MIT OR Apache-2.0
 
-While this release does introduce quite a few breaking changes, porting code from `0.5.x` to `0.6` should be relatively straightforward. Check out [`transition_guide.md`](./docs/transition_guide.md) for guidance on upgrading from `0.5.x` to `0.6`.
+See the [changelog](https://github.com/daniel5151/gdbstub/blob/dev/0.6/CHANGELOG.md) for a comprehensive rundown of all the new features.
+
+While this release does come with quite a few breaking changes, the core IDET-based `Target` API has remained much the same, which should make porting code over from 0.5.x to 0.6 pretty mechanical. See the [`transition_guide.md`](./docs/transition_guide.md) for guidance on upgrading from `0.5.x` to `0.6`.
+
+And as always, a huge shoutout to the folks who contributed PRs, Issues, and ideas to `gdbstub` - this release wouldn't have been possible without you! Special shoutouts to [gz](https://github.com/gz) and [xobs](https://github.com/xobs) for helping me test and iterate on the new bare-metal state machine API, and [bet4it](https://github.com/bet4it) for pointing out and implementing many useful API improvements and internal refactors.
+
+Cheers!
 
 #### New Features
 
@@ -25,12 +34,15 @@ While this release does introduce quite a few breaking changes, porting code fro
   - e.g: A global instance of `GdbStubStateMachine` can be driven directly from bare-metal interrupt handlers in `no_std` environments
   - e.g: A project using `async`/`await` can wrap `GdbStubStateMachine` in a task, yielding execution while waiting for the target to resume / new data to arrive down the `Connection`
 - Added several new "guard rails" to avoid common integration footguns:
-  - `use_implicit_sw_breakpoints` - guards against the GDB client silently overriding target instructions with breakpoints if `SwBreakpoints` hasn't been implemented.
-  - `optional_single_step` - guards against GDB client bug, where optional single step support is not respected on certain platforms (e.g: `x86`)
-- Removed all panicking code from `gdbstub`!
+  - `Target::use_implicit_sw_breakpoints` - guards against the GDB client silently overriding target instructions with breakpoints if `SwBreakpoints` hasn't been implemented.
+  - `Target::use_optional_single_step` - guards against GDB client bug where optional single step support is not respected on certain platforms (e.g: `x86`)
+  - `Target::use_resume_stub` - `gdbstub` now includes a "stub" resume handler that simply returns SIGRAP to work around a GDB client bug on targets that don't implement support for `resume`.
+- Removed all panicking code from `gdbstub`
   - See the [commit message](https://github.com/daniel5151/gdbstub/commit/ecbbaf72e01293b410ef3bc5970d18aa81e45599) for more details on how this was achieved.
-- Introduce strongly-typed enum for protocol defined signal numbers (instead of using bare `u8`s)
-- Relicense `gdbstub` under MIT OR Apache-2.0 [\#68](https://github.com/daniel5151/gdbstub/pull/68)
+- Introduced strongly-typed enum for protocol defined signal numbers (instead of using bare `u8`s)
+- Made response packet Run Length Encoding (RLE) toggleable via `Target::use_rle`.
+- Added basic feature negotiation to support clients that don't support `multiprocess+` extensions.
+- Relicensed `gdbstub` under MIT OR Apache-2.0 [\#68](https://github.com/daniel5151/gdbstub/pull/68)
 
 #### New Protocol Extensions
 
@@ -59,12 +71,13 @@ While this release does introduce quite a few breaking changes, porting code fro
     - Remove `ResumeAction` type (in favor of separate methods for various resume types)
   - `Breakpoints` API:
     - `HwWatchpoint`: Plumb watchpoint `length` parameter to public API
+  - `TargetXml` API:
+    - Support for `<xi:include>` in target.xml, which required including the `annex` parameter in the handler method.
+    - `annex` is set to `b"target.xml"` on the fist call, though it may be set to other values in subsequent calls if `<xi:include>` is being used.
   - Pass `PacketBuf`-backed `&mut [u8]` as a response buffer to various APIs [\#72](https://github.com/daniel5151/gdbstub/pull/72) ([bet4it](https://github.com/bet4it))
-    - _Note:_ only a compat hazard for the existing `TargetXmlOverride` API
     - Improvement over the callback-based approach.
     - This change is possible thanks to a clause in the GDB spec that specifies that responses will never exceed the size of the `PacketBuf`.
     - Also see [\#70](https://github.com/daniel5151/gdbstub/pull/70), which tracks some other methods that might be refactored to use this approach in the future.
-
 
 #### Internal Improvements
 
@@ -73,6 +86,7 @@ While this release does introduce quite a few breaking changes, porting code fro
   - Add `uhyve` to real-world examples [\#73](https://github.com/daniel5151/gdbstub/pull/73) ([mkroening](https://github.com/mkroening))
 - Use stable `clippy` in CI
 - Enable logging for responses with only alloc [\#78](https://github.com/daniel5151/gdbstub/pull/78) ([gz](https://github.com/gz))
+- Lots of internal refactoring and cleanup
 
 #### Bugfixes
 

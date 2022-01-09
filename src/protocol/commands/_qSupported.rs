@@ -38,7 +38,7 @@ impl<'a> Features<'a> {
                 }
                 _ => {
                     // TODO: add support for "xmlRegisters="
-                    // that's the only feature packet that uses an '=;, and AFAIK, it's not really
+                    // that's the only feature packet that uses an '=', and AFAIK, it's not really
                     // used anymore...
                     Ok(None)
                 }
