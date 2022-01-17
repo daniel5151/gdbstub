@@ -1,6 +1,6 @@
 //! Implementations for the TI-MSP430 family of MCUs.
 
-use gdbstub::arch::Arch;
+use gdbstub::arch::{Arch, SingleStepGdbBehavior};
 
 pub mod reg;
 
@@ -16,6 +16,12 @@ impl Arch for Msp430 {
     fn target_description_xml() -> Option<&'static str> {
         Some(r#"<target version="1.0"><architecture>msp430</architecture></target>"#)
     }
+
+    #[inline(always)]
+    fn single_step_gdb_behavior() -> SingleStepGdbBehavior {
+        // TODO: update with proper value
+        SingleStepGdbBehavior::Unknown
+    }
 }
 
 /// Implements `Arch` for 20-bit TI-MSP430 MCUs (CPUX).
@@ -29,5 +35,11 @@ impl Arch for Msp430X {
 
     fn target_description_xml() -> Option<&'static str> {
         Some(r#"<target version="1.0"><architecture>msp430x</architecture></target>"#)
+    }
+
+    #[inline(always)]
+    fn single_step_gdb_behavior() -> SingleStepGdbBehavior {
+        // TODO: update with proper value
+        SingleStepGdbBehavior::Unknown
     }
 }

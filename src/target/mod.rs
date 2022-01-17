@@ -422,7 +422,7 @@ pub trait Target {
 
     /// If the target supports resumption, but hasn't implemented explicit
     /// support for software breakpoints (via
-    /// [`SwBreakpoints`](ext::breakpoints::SwBreakpoints)), notify the user
+    /// [`SwBreakpoints`](ext::breakpoints::SwBreakpoint)), notify the user
     /// that the GDB client may set "implicit" software breakpoints by
     /// rewriting the target's instruction stream.
     ///

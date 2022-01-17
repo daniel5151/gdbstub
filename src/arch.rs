@@ -202,19 +202,20 @@ pub trait Arch {
     /// pre-init error that informs the user of the potential issues they may
     /// run into.
     ///
-    /// # Default implementation
+    /// # `Unknown` implementations
     ///
     /// Because this method was only introduced in `gdbstub` version 0.6, there
-    /// are many existing `Arch` implementations that haven't been tested to
-    /// discover what kind of behavior they exhibit.
+    /// are many existing `Arch` implementations in the
+    /// [`gdbstub_arch`](https://docs.rs/gdbstub_arch/) companion crate that
+    /// have not yet been tested and updated what kind of behavior they exhibit.
     ///
-    /// As such, this method includes a default implementation that returns
-    /// [`SingleStepGdbBehavior::Unknown`], resulting in a pre-init error that
-    /// notifies the user of this bug, along with imploring them to be a Good
-    /// Citizen and discover + upstream a proper implementation of this method
-    /// for their `Arch`.
+    /// These implementations currently return
+    /// [`SingleStepGdbBehavior::Unknown`], which will result in a pre-init
+    /// error that notifies users of this issue, along with imploring them
+    /// to be a Good Citizen and discover + upstream a proper implementation
+    /// of this method for their `Arch`.
     ///
-    /// # Writing a "proper" implementation
+    /// # Writing a proper implementation
     ///
     /// To check whether or not a particular architecture exhibits this
     /// behavior, an implementation should temporarily override this method to
@@ -237,10 +238,7 @@ pub trait Arch {
     /// `vCont` packet with a `s` resume action, then this architecture
     /// _ignores_ single stepping entirely, and this method should return
     /// [`SingleStepGdbBehavior::Ignored`].
-    #[inline(always)]
-    fn single_step_gdb_behavior() -> SingleStepGdbBehavior {
-        SingleStepGdbBehavior::Unknown
-    }
+    fn single_step_gdb_behavior() -> SingleStepGdbBehavior;
 }
 
 /// Encodes how the mainline GDB client handles target support for single-step
