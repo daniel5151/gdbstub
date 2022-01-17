@@ -146,6 +146,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
             // Instead of using `_ =>`, explicitly list out any remaining unguarded cases.
             VContKind::RangeStep(..) | VContKind::Step | VContKind::StepWithSig(..) => {
+                error!("GDB client sent resume action not reported by `vCont?`");
                 Err(Error::PacketUnexpected)
             }
         }
@@ -231,7 +232,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                 // Instead of using `_ =>`, explicitly list out any remaining unguarded cases.
                 VContKind::RangeStep(..) | VContKind::Step | VContKind::StepWithSig(..) => {
-                    return Err(Error::PacketUnexpected)
+                    error!("GDB client sent resume action not reported by `vCont?`");
+                    return Err(Error::PacketUnexpected);
                 }
             }
         }

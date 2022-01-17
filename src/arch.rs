@@ -154,59 +154,118 @@ pub trait Arch {
     ///
     /// See the [GDB docs](https://sourceware.org/gdb/current/onlinedocs/gdb/Target-Description-Format.html)
     /// for details on the target description XML format.
+    #[inline(always)]
     fn target_description_xml() -> Option<&'static str> {
         None
     }
 
-    /// Return `true` if the mainline GDB client implementation respects
-    /// optional single stepping for this architecture.
+    /// Encode how the mainline GDB client handles target support for
+    /// single-step on this particular architecture.
     ///
     /// # Context
     ///
-    /// According to the spec, GDB _should_ treat single stepping as an optional
-    /// feature for _all_ architectures, as single stepping can be emulated
-    /// using temporary breakpoints + regular "continue" resumption.
+    /// According to the spec, supporting single step _should_ be quite
+    /// straightforward:
     ///
-    /// Unfortunately, it seems that on certain architectures, GDB
-    /// _unconditionally_ assumes single-step support, regardless whether or not
-    /// the target implements supports it.
+    /// - The GDB client sends a `vCont?` packet to enumerate supported
+    ///   resumption modes
+    /// - If the target supports single-step, it responds with the `s;S`
+    ///   capability as part of the response, omitting it if it is not
+    ///   supported.
+    /// - Later, when the user attempts to `stepi`, the GDB client sends a `s`
+    ///   resumption reason if it is supported, falling back to setting a
+    ///   temporary breakpoint + continue to "emulate" the single step.
+    ///
+    /// Unfortunately, the reality is that the mainline GDB client does _not_ do
+    /// this on all architectures...
+    ///
+    /// - On certain architectures (e.g: x86), GDB will _unconditionally_ assume
+    ///   single-step support, regardless whether or not the target reports
+    ///   supports it.
+    /// - On certain architectures (e.g: MIPS), GDB will _never_ use single-step
+    ///   support, even in the target has explicitly reported support for it.
     ///
     /// This is a bug, and has been reported at
-    /// <https://sourceware.org/bugzilla/show_bug.cgi?id=28440>
+    /// <https://sourceware.org/bugzilla/show_bug.cgi?id=28440>.
     ///
-    /// Unfortunately, even if this bug is fixed, it will be quite a while until
-    /// the typical user's distro-provided GDB client includes this bugfix, and
-    /// as such, `gdbstub` has included an extra "guard rail" to detect
-    /// instances of this bug, and provide an explanation to the user.
+    /// For a easy repro of this behavior, also see
+    /// <https://github.com/daniel5151/gdb-optional-step-bug>.
     ///
-    /// # Implementation
+    /// # Implications
     ///
-    /// To check whether or not a particular architecture exhibits this
-    /// behavior, an implementation should temporarily override this method to
-    /// return `true`, disable support for single-stepping, and observe the
-    /// behavior of the GDB client after invoking `stepi`.
+    /// Unfortunately, even if these idiosyncratic behaviors get fixed in the
+    /// mainline GDB client, it will be quite a while until the typical
+    /// user's distro-provided GDB client includes this bugfix.
     ///
-    /// If the client sends a `vCont` packet with a `s` resume action, then this
-    /// architecture _does not_ support optional single stepping, and this
-    /// method should return `false`.
-    ///
-    /// If the client instead attempts to set a temporary breakpoint (using the
-    /// `z` packet), and sends a `vCont` packet with a `c` resume action, then
-    /// this architecture _does_ support optional single stepping, and this
-    /// method should return `true`.
+    /// As such, `gdbstub` has opted to include this method as a "guard rail" to
+    /// preemptively detect cases of this idiosyncratic behavior, and throw a
+    /// pre-init error that informs the user of the potential issues they may
+    /// run into.
     ///
     /// # Default implementation
     ///
-    /// This method includes a default implementation that returns `false`.
+    /// Because this method was only introduced in `gdbstub` version 0.6, there
+    /// are many existing `Arch` implementations that haven't been tested to
+    /// discover what kind of behavior they exhibit.
     ///
-    /// **If you are using an architecture that does not yet include an explicit
-    /// `supports_optional_single_step` implementation, please consider checking
-    /// if optional single stepping is supported by that arch, and upstreaming
-    /// an explicit implementation!**
+    /// As such, this method includes a default implementation that returns
+    /// [`SingleStepGdbBehavior::Unknown`], resulting in a pre-init error that
+    /// notifies the user of this bug, along with imploring them to be a Good
+    /// Citizen and discover + upstream a proper implementation of this method
+    /// for their `Arch`.
     ///
-    /// Even if that implementation also returns `false`, it would help in
-    /// documenting which architectures are affected by this bug.
-    fn supports_optional_single_step() -> bool {
-        false
+    /// # Writing a "proper" implementation
+    ///
+    /// To check whether or not a particular architecture exhibits this
+    /// behavior, an implementation should temporarily override this method to
+    /// return [`SingleStepGdbBehavior::Optional`], toggle target support for
+    /// single-step on/off, and observe the behavior of the GDB client after
+    /// invoking `stepi`.
+    ///
+    /// If single-stepping was **disabled**, yet the client nonetheless sent a
+    /// `vCont` packet with a `s` resume action, then this architecture
+    /// _does not_ support optional single stepping, and this method should
+    /// return [`SingleStepGdbBehavior::Required`].
+    ///
+    /// If single-stepping was **disabled**, and the client attempted to set a
+    /// temporary breakpoint (using the `z` packet), and then sent a `vCont`
+    /// packet with a `c` resume action, then this architecture _does_
+    /// support optional single stepping, and this method should return
+    /// [`SingleStepGdbBehavior::Optional`].
+    ///
+    /// If single-stepping was **enabled**, yet the client did _not_ send a
+    /// `vCont` packet with a `s` resume action, then this architecture
+    /// _ignores_ single stepping entirely, and this method should return
+    /// [`SingleStepGdbBehavior::Ignored`].
+    #[inline(always)]
+    fn single_step_gdb_behavior() -> SingleStepGdbBehavior {
+        SingleStepGdbBehavior::Unknown
     }
+}
+
+/// Encodes how the mainline GDB client handles target support for single-step
+/// on a particular architecture.
+///
+/// See [Arch::single_step_gdb_behavior] for details.
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy)]
+pub enum SingleStepGdbBehavior {
+    /// GDB will use single-stepping if available, falling back to using
+    /// a temporary breakpoint + continue if unsupported.
+    ///
+    /// e.g: ARM
+    Optional,
+    /// GDB will unconditionally send single-step packets, _requiring_ the
+    /// target to handle these requests.
+    ///
+    /// e.g: x86/x64
+    Required,
+    /// GDB will never use single-stepping, regardless if it's supported by the
+    /// stub. It will always use a temporary breakpoint + continue.
+    ///
+    /// e.g: MIPS
+    Ignored,
+    /// Unknown behavior - no one has tested this platform yet. If possible,
+    /// please conduct a test + upstream your findings to `gdbstub_arch`.
+    Unknown,
 }

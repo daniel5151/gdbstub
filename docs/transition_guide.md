@@ -10,7 +10,7 @@ This document does _not_ discuss any new features that might have been added bet
 
 `0.6` introduces a large number of breaking changes to the public APIs, and will require quite a bit more more "hands on" porting than previous `gdbstub` upgrades.
 
-The following guide is a best-effort attempt to document all the changes, but there are some parts that may be missing / incomplete.
+The following guide is a **best-effort** attempt to document all the changes, but there are some parts that may be missing / incomplete.
 
 ##### General API change - _lots_ of renaming + exported type reorganization
 
@@ -180,7 +180,7 @@ Much of the code contained within methods such as `block_until_stop_reason_or_in
 ```rust
 // ==== 0.5.x ==== //
 
-impl SingleThreadBase for Emu {
+impl SingleThreadOps for Emu {
     fn resume(
         &mut self,
         action: ResumeAction,
@@ -328,14 +328,14 @@ Porting from `0.4` to `0.5` should be as simple as:
 ```rust
 // ==== 0.4.x ==== //
 
-impl SingleThreadResume for Emu {
+impl SingleThreadOps for Emu {
     fn read_register(&mut self, reg_id: arch::arm::reg::id::ArmCoreRegId, dst: &mut [u8]) -> TargetResult<(), Self> { ... }
     fn write_register(&mut self, reg_id: arch::arm::reg::id::ArmCoreRegId, val: &[u8]) -> TargetResult<(), Self> { ... }
 }
 
 // ==== 0.5.0 ==== //
 
-impl SingleThreadResume for Emu {
+impl SingleThreadOps for Emu {
     // (New Method) //
     fn single_register_access(&mut self) -> Option<target::ext::base::SingleRegisterAccessOps<(), Self>> {
         Some(self)

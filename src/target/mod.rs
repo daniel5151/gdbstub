@@ -251,7 +251,7 @@
 //! type is being used. e.g: on a 32-bit target, instead of cluttering up a
 //! method implementation with a parameter passed as `(addr: <Self::Arch as
 //! Arch>::Usize)`, just write `(addr: u32)` directly.
-use crate::arch::Arch;
+use crate::arch::{Arch, SingleStepGdbBehavior};
 
 pub mod ext;
 
@@ -420,22 +420,21 @@ pub trait Target {
     /// ```
     fn base_ops(&mut self) -> ext::base::BaseOps<'_, Self::Arch, Self::Error>;
 
-    /// Enable/disable using the more efficient `X` packet to write to target
-    /// memory (as opposed to the basic `M` packet).
+    /// If the target supports resumption, but hasn't implemented explicit
+    /// support for software breakpoints (via
+    /// [`SwBreakpoints`](ext::breakpoints::SwBreakpoints)), notify the user
+    /// that the GDB client may set "implicit" software breakpoints by
+    /// rewriting the target's instruction stream.
     ///
-    /// By default, this method returns `true`.
+    /// Targets that wish to use the GDB client's implicit software breakpoint
+    /// handler must explicitly **opt-in** to this somewhat surprising GDB
+    /// feature by overriding this method to return `true`.
     ///
-    /// _Author's note:_ Unless you're _really_ trying to squeeze `gdbstub` onto
-    /// a particularly resource-constrained platform, you may as well leave this
-    /// optimization enabled.
-    #[inline(always)]
-    fn use_x_upcase_packet(&self) -> bool {
-        true
-    }
-
-    /// The target has decided not to implement an explicit software breakpoint
-    /// handler, and acknowledges that the GDB client may set "implicit"
-    /// software breakpoints within the target prior to calling `resume`.
+    /// If you are reading these docs after having encountered a
+    /// [`GdbStubError::ImplicitSwBreakpoints`] error, it's quite likely that
+    /// you'll want to implement explicit support for software breakpoints.
+    ///
+    /// # Context
     ///
     /// An "implicit" software breakpoint is set by the GDB client by manually
     /// writing a software breakpoint instruction into target memory via the
@@ -444,9 +443,12 @@ pub trait Target {
     /// instruction, with the expectation that the target has a implemented a
     /// breakpoint exception handler.
     ///
-    /// Unfortunately, there are many `gdbstub` implementations that do _not_
-    /// implement "software breakpoints" by naively rewriting the target's
-    /// instruction stream.
+    /// # Implications
+    ///
+    /// While this is a reasonable (and useful!) bit of behavior when targeting
+    /// many classes of remote stub (e.g: bare-metal, separate process), there
+    /// are many `gdbstub` implementations that do _not_ implement "software
+    /// breakpoints" by naively rewriting the target's instruction stream.
     ///
     /// - e.g: a `gdbstub` implemented in an emulator is unlikely to implement
     ///   "software breakpoints" by hooking into the emulated hardware's
@@ -458,56 +460,87 @@ pub trait Target {
     ///   there would need to be some way to distinguish between "in-guest"
     ///   debugging, and "hypervisor" debugging.
     ///
-    /// As such, `gdbstub` includes `use_implicit_sw_breakpoints` a "guard rail"
-    /// to prevent implementors from accidentally opting into this implicit
-    /// breakpoint functionality, and being exceptionally confused as to why
-    /// their target is acting weird.
+    /// As such, `gdbstub` includes this `guard_rail_implicit_sw_breakpoints`
+    /// method.
+    ///
+    /// As the name suggests, this method acts as a "guard rail" that
+    /// warns users from accidentally opting into this "implicit" breakpoint
+    /// functionality, and being exceptionally confused as to why their
+    /// target is acting weird.
     ///
     /// If `gdbstub` detects that the target has not implemented a software
-    /// breakpoint handler, it will check if `use_implicit_sw_breakpoints()` has
-    /// been enabled, and if it has not, it will trigger a runtime
-    /// [`GdbStubError::ImplicitSwBreakpoints`] error pointing at this very
-    /// documentation.
+    /// breakpoint handler, it will check if
+    /// `guard_rail_implicit_sw_breakpoints()` has been enabled, and if it
+    /// has not, it will trigger a runtime error that points the user at this
+    /// very documentation.
     ///
-    /// Targets that wish to use the GDB client's implicit software breakpoint
-    /// handler must _explicitly opt-in_ to this somewhat surprising GDB feature
-    /// by overriding this method to return `true`.
+    /// # A note on breakpoints
+    ///
+    /// Aside from setting breakpoints at the explicit behest of the user (e.g:
+    /// when setting breakpoints via the `b` command in GDB), the GDB client may
+    /// also set/remove _temporary breakpoints_ as part of other commands.
+    ///
+    /// e.g: On targets without native support for hardware single-stepping,
+    /// calling `stepi` in GDB will result in the GDB client setting a temporary
+    /// breakpoint on the next instruction + resuming via `continue` instead.
     ///
     /// [`GdbStubError::ImplicitSwBreakpoints`]:
     /// crate::stub::GdbStubError::ImplicitSwBreakpoints
     #[inline(always)]
-    fn use_implicit_sw_breakpoints(&self) -> bool {
+    fn guard_rail_implicit_sw_breakpoints(&self) -> bool {
         false
     }
 
-    /// Whether or not this target supports single-stepping as an optional
-    /// feature.
+    /// Override the arch-level value for [`Arch::single_step_gdb_behavior`].
     ///
     /// If you are reading these docs after having encountered a
-    /// [`GdbStubError::UnconditionalSingleStep`] error, you will most likely
-    /// have to implement support for single-stepping.
+    /// [`GdbStubError::SingleStepGdbBehavior`] error, you may need to either:
+    ///
+    /// - implement support for single-step
+    /// - disable existing support for single step
+    /// - be a Good Citizen and perform a quick test to see what kind of
+    ///   behavior your Arch exhibits.
+    ///
+    /// # WARNING
+    ///
+    /// Unless you _really_ know what you're doing (e.g: working on a dynamic
+    /// target implementation, attempting to fix the underlying bug, etc...),
+    /// you should **not** override this method, and instead follow the advice
+    /// the error gives you.
+    ///
+    /// Incorrectly setting this method may lead to "unexpected packet" runtime
+    /// errors!
     ///
     /// # Details
     ///
-    /// This method is a workaround for a bug in the mainline GDB client
-    /// implementation. For more information, see the documentation for
-    /// [`Arch::supports_optional_single_step`].
+    /// This method provides an "escape hatch" for disabling a workaround for a
+    /// bug in the mainline GDB client implementation.
     ///
-    /// By default, this method returns the value specified by
-    /// [`Arch::supports_optional_single_step`].
+    /// To squelch all errors, this method can be set to return
+    /// [`SingleStepGdbBehavior::Optional`] (though as mentioned above - you
+    /// should only do so if you're sure that's the right behavior).
     ///
-    /// To reiterate: unless you _really_ know what you're doing (e.g: working
-    /// on a dynamic target implementation, attempting to fix the underlying
-    /// bug, etc...), you should **not** override this method.
+    /// For more information, see the documentation for
+    /// [`Arch::single_step_gdb_behavior`].
     ///
-    /// Overriding this method to return `true` on unsupported architectures
-    /// will lead to "unexpected packet" runtime errors!
-    ///
-    /// [`GdbStubError::UnconditionalSingleStep`]:
-    /// crate::stub::GdbStubError::UnconditionalSingleStep
+    /// [`GdbStubError::SingleStepGdbBehavior`]:
+    /// crate::stub::GdbStubError::SingleStepGdbBehavior
     #[inline(always)]
-    fn use_optional_single_step(&self) -> bool {
-        <Self::Arch as Arch>::supports_optional_single_step()
+    fn guard_rail_single_step_gdb_behavior(&self) -> SingleStepGdbBehavior {
+        <Self::Arch as Arch>::single_step_gdb_behavior()
+    }
+
+    /// Enable/disable using the more efficient `X` packet to write to target
+    /// memory (as opposed to the basic `M` packet).
+    ///
+    /// By default, this method returns `true`.
+    ///
+    /// _Author's note:_ Unless you're _really_ trying to squeeze `gdbstub` onto
+    /// a particularly resource-constrained platform, you may as well leave this
+    /// optimization enabled.
+    #[inline(always)]
+    fn use_x_upcase_packet(&self) -> bool {
+        true
     }
 
     /// Whether `gdbstub` should provide a "stub" `resume` implementation on
@@ -647,12 +680,16 @@ macro_rules! impl_dyn_target {
                 (**self).base_ops()
             }
 
-            fn use_implicit_sw_breakpoints(&self) -> bool {
-                (**self).use_implicit_sw_breakpoints()
+            fn guard_rail_implicit_sw_breakpoints(&self) -> bool {
+                (**self).guard_rail_implicit_sw_breakpoints()
             }
 
-            fn use_optional_single_step(&self) -> bool {
-                (**self).use_optional_single_step()
+            fn guard_rail_single_step_gdb_behavior(&self) -> SingleStepGdbBehavior {
+                (**self).guard_rail_single_step_gdb_behavior()
+            }
+
+            fn use_x_upcase_packet(&self) -> bool {
+                (**self).use_x_upcase_packet()
             }
 
             fn use_resume_stub(&self) -> bool {

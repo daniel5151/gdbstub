@@ -1,7 +1,6 @@
 //! Implementations for the MIPS architecture.
 
-use gdbstub::arch::Arch;
-use gdbstub::arch::RegId;
+use gdbstub::arch::{Arch, RegId, SingleStepGdbBehavior};
 
 pub mod reg;
 
@@ -70,6 +69,11 @@ impl<RegIdImpl: RegId> Arch for Mips<RegIdImpl> {
     fn target_description_xml() -> Option<&'static str> {
         Some(r#"<target version="1.0"><architecture>mips</architecture></target>"#)
     }
+
+    #[inline(always)]
+    fn single_step_gdb_behavior() -> SingleStepGdbBehavior {
+        SingleStepGdbBehavior::Ignored
+    }
 }
 
 impl<RegIdImpl: RegId> Arch for Mips64<RegIdImpl> {
@@ -80,6 +84,11 @@ impl<RegIdImpl: RegId> Arch for Mips64<RegIdImpl> {
 
     fn target_description_xml() -> Option<&'static str> {
         Some(r#"<target version="1.0"><architecture>mips64</architecture></target>"#)
+    }
+
+    #[inline(always)]
+    fn single_step_gdb_behavior() -> SingleStepGdbBehavior {
+        SingleStepGdbBehavior::Ignored
     }
 }
 
@@ -94,6 +103,11 @@ impl Arch for MipsWithDsp {
             r#"<target version="1.0"><architecture>mips</architecture><feature name="org.gnu.gdb.mips.dsp"></feature></target>"#,
         )
     }
+
+    #[inline(always)]
+    fn single_step_gdb_behavior() -> SingleStepGdbBehavior {
+        SingleStepGdbBehavior::Ignored
+    }
 }
 
 impl Arch for Mips64WithDsp {
@@ -106,5 +120,10 @@ impl Arch for Mips64WithDsp {
         Some(
             r#"<target version="1.0"><architecture>mips64</architecture><feature name="org.gnu.gdb.mips.dsp"></feature></target>"#,
         )
+    }
+
+    #[inline(always)]
+    fn single_step_gdb_behavior() -> SingleStepGdbBehavior {
+        SingleStepGdbBehavior::Ignored
     }
 }

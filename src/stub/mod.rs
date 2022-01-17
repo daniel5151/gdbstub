@@ -224,13 +224,14 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
                 .map(|ops| ops.support_sw_breakpoint().is_some())
                 .unwrap_or(false);
 
-            if !support_software_breakpoints && !target.use_implicit_sw_breakpoints() {
+            if !support_software_breakpoints && !target.guard_rail_implicit_sw_breakpoints() {
                 return Err(Error::ImplicitSwBreakpoints);
             }
         }
 
-        // Check if the target supports single stepping as an optional feature
+        // Check how the target's arch handles single stepping
         {
+            use crate::arch::SingleStepGdbBehavior;
             use crate::target::ext::base::ResumeOps;
 
             if let Some(ops) = target.base_ops().resume_ops() {
@@ -239,8 +240,17 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
                     ResumeOps::MultiThread(ops) => ops.support_single_step().is_some(),
                 };
 
-                if !support_single_step && !target.use_optional_single_step() {
-                    return Err(Error::UnconditionalSingleStep);
+                let behavior = target.guard_rail_single_step_gdb_behavior();
+
+                let return_error = match behavior {
+                    SingleStepGdbBehavior::Optional => false,
+                    SingleStepGdbBehavior::Required => !support_single_step,
+                    SingleStepGdbBehavior::Ignored => support_single_step,
+                    SingleStepGdbBehavior::Unknown => true,
+                };
+
+                if return_error {
+                    return Err(Error::SingleStepGdbBehavior(behavior));
                 }
             }
         }

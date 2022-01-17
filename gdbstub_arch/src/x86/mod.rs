@@ -1,7 +1,6 @@
 //! Implementations for various x86 architectures.
 
-use gdbstub::arch::Arch;
-use gdbstub::arch::RegId;
+use gdbstub::arch::{Arch, RegId, SingleStepGdbBehavior};
 
 pub mod reg;
 
@@ -27,9 +26,9 @@ impl<RegIdImpl: RegId> Arch for X86_64_SSE<RegIdImpl> {
         )
     }
 
-    /// GDB clients unconditionally assume x86 targets support single-stepping
-    fn supports_optional_single_step() -> bool {
-        false
+    #[inline(always)]
+    fn single_step_gdb_behavior() -> SingleStepGdbBehavior {
+        SingleStepGdbBehavior::Required
     }
 }
 
@@ -55,8 +54,8 @@ impl<RegIdImpl: RegId> Arch for X86_SSE<RegIdImpl> {
         )
     }
 
-    /// GDB clients unconditionally assume x86 targets support single-stepping
-    fn supports_optional_single_step() -> bool {
-        false
+    #[inline(always)]
+    fn single_step_gdb_behavior() -> SingleStepGdbBehavior {
+        SingleStepGdbBehavior::Required
     }
 }

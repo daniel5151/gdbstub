@@ -9,14 +9,15 @@ After over a half-year of development, `gdbstub` 0.6 has finally been released!
 This massive release delivers a slew of new protocol extensions, internal improvements, and key API improvements. Some highlights include:
 
 - A new _non-blocking_ `GdbStubStateMachine` API, enabling `gdbstub` to integrate nicely with async event loops!
-  - Moreover, on `no_std` platforms, this new API enables `gdbstub` to be driven directly via breakpoint/serial interrupt handlers! This is already being used in several Rust kernel projects, such as [`vmware-labs/node-replicated-kernel`](https://github.com/vmware-labs/node-replicated-kernel/tree/4326704/kernel/src/arch/x86_64/gdb) and [`betrusted-io/xous-core`](https://github.com/betrusted-io/xous-core/blob/7d3d710/kernel/src/debug/gdb_server.rs) to enable bare-metal, in-kernel debugging.
+  - Moreover, on `no_std` platforms, this new API enables `gdbstub` to be driven directly via breakpoint/serial interrupt handlers!
+  - This API is already being used in several Rust kernel projects, such as [`vmware-labs/node-replicated-kernel`](https://github.com/vmware-labs/node-replicated-kernel/tree/4326704/kernel/src/arch/x86_64/gdb) and [`betrusted-io/xous-core`](https://github.com/betrusted-io/xous-core/blob/7d3d710/kernel/src/debug/gdb_server.rs) to enable bare-metal, in-kernel debugging.
 - `gdbstub` is now entirely **panic free** in release builds!
   - \* subject to `rustc`'s compiler optimizations
   - This was a pretty painstaking effort, but the end result is a substantial reduction in binary size on `no_std` platforms.
 - Tons of new and exciting protocol extensions, including but not limited to:
-  - Support for remote file I/O
+  - Support for remote file I/O (reading/writing files to the debug target)
   - Fetching remote memory maps
-  - Catching + reporting syscalls
+  - Catching + reporting syscall entry/exit conditions
   - ...and many more!
 - A new license: `gdbtsub` is licensed under MIT OR Apache-2.0
 
@@ -33,16 +34,18 @@ Cheers!
 - The new `GdbStubStateMachine` API gives users the power and flexibility to integrate `gdbstub` into their project-specific event loop infrastructure.
   - e.g: A global instance of `GdbStubStateMachine` can be driven directly from bare-metal interrupt handlers in `no_std` environments
   - e.g: A project using `async`/`await` can wrap `GdbStubStateMachine` in a task, yielding execution while waiting for the target to resume / new data to arrive down the `Connection`
-- Added several new "guard rails" to avoid common integration footguns:
-  - `Target::use_implicit_sw_breakpoints` - guards against the GDB client silently overriding target instructions with breakpoints if `SwBreakpoints` hasn't been implemented.
-  - `Target::use_optional_single_step` - guards against GDB client bug where optional single step support is not respected on certain platforms (e.g: `x86`)
-  - `Target::use_resume_stub` - `gdbstub` now includes a "stub" resume handler that simply returns SIGRAP to work around a GDB client bug on targets that don't implement support for `resume`.
 - Removed all panicking code from `gdbstub`
   - See the [commit message](https://github.com/daniel5151/gdbstub/commit/ecbbaf72e01293b410ef3bc5970d18aa81e45599) for more details on how this was achieved.
 - Introduced strongly-typed enum for protocol defined signal numbers (instead of using bare `u8`s)
-- Made response packet Run Length Encoding (RLE) toggleable via `Target::use_rle`.
 - Added basic feature negotiation to support clients that don't support `multiprocess+` extensions.
 - Relicensed `gdbstub` under MIT OR Apache-2.0 [\#68](https://github.com/daniel5151/gdbstub/pull/68)
+- Added several new "guard rails" to avoid common integration footguns:
+  - `Target::guard_rail_implicit_sw_breakpoints` - guards against the GDB client silently overriding target instructions with breakpoints if `SwBreakpoints` hasn't been implemented.
+  - `Target::guard_rail_single_step_gdb_behavior` - guards against a GDB client bug where support for single step may be required / ignored on certain platforms (e.g: required on x86, ignored on MIPS)
+- Added several new "toggle switches" to enable/disable parts of the protocol (all default to `true`)
+  - `Target::use_x_upcase_packet` - toggle support for the more efficient `X` memory write packet
+  - `Target::use_resume_stub` - toggle `gdbstub`'s built-in "stub" resume handler that returns `SIGRAP` if a target doesn't implement support for resumption
+  - `Target::use_rle` - toggle whether outgoing packets are Run Length Encoded (RLE)
 
 #### New Protocol Extensions
 
@@ -51,8 +54,8 @@ Cheers!
 - `HostIo` - Perform I/O operations on host. [\#66](https://github.com/daniel5151/gdbstub/pull/66) ([bet4it](https://github.com/bet4it))
   - Support for all Host I/O operations: `open`, `close`, `pread`, `pwrite`, `fstat`, `unlink`, `readlink`, `setfs`
 - `ExecFile` - Get full absolute path of the file that was executed to create a process running on the remote system. [\#69](https://github.com/daniel5151/gdbstub/pull/69) ([bet4it](https://github.com/bet4it))
-- Implement X packet (for more efficient binary writes to memory). [\#82](https://github.com/daniel5151/gdbstub/pull/82) ([gz](https://github.com/gz))
 - `Auxv` - Access the target’s auxiliary vector. [\#86](https://github.com/daniel5151/gdbstub/pull/86) ([bet4it](https://github.com/bet4it))
+- Implement `X` packet - More efficient bulk-write to memory (superceding the `M` packet). [\#82](https://github.com/daniel5151/gdbstub/pull/82) ([gz](https://github.com/gz))
 
 #### Breaking API Changes
 

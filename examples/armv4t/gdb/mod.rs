@@ -369,7 +369,7 @@ impl target::ext::base::singlethread::SingleThreadRangeStepping for Emu {
 mod custom_arch {
     use core::num::NonZeroUsize;
 
-    use gdbstub::arch::{Arch, RegId, Registers};
+    use gdbstub::arch::{Arch, RegId, Registers, SingleStepGdbBehavior};
 
     use gdbstub_arch::arm::reg::id::ArmCoreRegId;
     use gdbstub_arch::arm::reg::ArmCoreRegs;
@@ -486,8 +486,9 @@ mod custom_arch {
         //
         // notably, x86 is an example of an arch that does _not_ support
         // optional single stepping.
-        fn supports_optional_single_step() -> bool {
-            true
+        #[inline(always)]
+        fn single_step_gdb_behavior() -> SingleStepGdbBehavior {
+            SingleStepGdbBehavior::Optional
         }
     }
 }
