@@ -36,6 +36,13 @@ pub enum BaseStopReason<Tid, U> {
     Terminated(Signal),
     /// The program received a signal.
     Signal(Signal),
+    /// A specific thread received a signal.
+    SignalWithThread {
+        /// Tid of the associated thread
+        tid: Tid,
+        /// The signal
+        signal: Signal,
+    },
     /// A thread hit a software breakpoint (e.g. due to a trap instruction).
     ///
     /// Requires: [`SwBreakpoint`].
@@ -57,7 +64,7 @@ pub enum BaseStopReason<Tid, U> {
     ///
     /// [`HwWatchpoint`]: crate::target::ext::breakpoints::HwWatchpoint
     Watch {
-        /// Which thread hit the watchpoint
+        /// Tid of the associated thread
         tid: Tid,
         /// Kind of watchpoint that was hit
         kind: WatchKind,
@@ -75,16 +82,23 @@ pub enum BaseStopReason<Tid, U> {
     ///
     /// [`ReverseCont`]: crate::target::ext::base::reverse_exec::ReverseCont
     /// [`ReverseStep`]: crate::target::ext::base::reverse_exec::ReverseStep
-    ReplayLog(ReplayLogPosition),
+    ReplayLog {
+        /// (optional) Tid of the associated thread.
+        tid: Option<Tid>,
+        /// The point reached in a replay log (i.e: beginning vs. end).
+        pos: ReplayLogPosition,
+    },
     /// The program has reached a syscall entry or return location.
     ///
     /// Requires: [`CatchSyscalls`].
     ///
     /// [`CatchSyscalls`]: crate::target::ext::catch_syscalls::CatchSyscalls
     CatchSyscall {
+        /// (optional) Tid of the associated thread.
+        tid: Option<Tid>,
         /// The syscall number.
         number: U,
-        /// The location the event occured at.
+        /// The location the event occurred at.
         position: CatchSyscallPosition,
     },
 }
@@ -106,18 +120,26 @@ impl<U> From<BaseStopReason<(), U>> for BaseStopReason<Tid, U> {
             BaseStopReason::DoneStep => BaseStopReason::DoneStep,
             BaseStopReason::Exited(code) => BaseStopReason::Exited(code),
             BaseStopReason::Terminated(sig) => BaseStopReason::Terminated(sig),
+            BaseStopReason::SignalWithThread { signal, .. } => BaseStopReason::SignalWithThread {
+                tid: crate::SINGLE_THREAD_TID,
+                signal,
+            },
             BaseStopReason::SwBreak(_) => BaseStopReason::SwBreak(crate::SINGLE_THREAD_TID),
             BaseStopReason::HwBreak(_) => BaseStopReason::HwBreak(crate::SINGLE_THREAD_TID),
-            BaseStopReason::Watch { kind, addr, tid: _ } => BaseStopReason::Watch {
+            BaseStopReason::Watch { kind, addr, .. } => BaseStopReason::Watch {
                 tid: crate::SINGLE_THREAD_TID,
                 kind,
                 addr,
             },
             BaseStopReason::Signal(sig) => BaseStopReason::Signal(sig),
-            BaseStopReason::ReplayLog(pos) => BaseStopReason::ReplayLog(pos),
-            BaseStopReason::CatchSyscall { number, position } => {
-                BaseStopReason::CatchSyscall { number, position }
-            }
+            BaseStopReason::ReplayLog { pos, .. } => BaseStopReason::ReplayLog { tid: None, pos },
+            BaseStopReason::CatchSyscall {
+                number, position, ..
+            } => BaseStopReason::CatchSyscall {
+                tid: None,
+                number,
+                position,
+            },
         }
     }
 }

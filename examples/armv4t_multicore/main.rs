@@ -164,10 +164,8 @@ fn main() -> DynResult<()> {
     match gdb.run_blocking::<EmuGdbEventLoop>(&mut emu) {
         Ok(disconnect_reason) => match disconnect_reason {
             DisconnectReason::Disconnect => {
-                // run to completion
+                println!("GDB client has disconnected. Running to completion...");
                 while emu.step() != Some((emu::Event::Halted, emu::CpuId::Cpu)) {}
-                let ret = emu.cpu.reg_get(armv4t_emu::Mode::User, 0);
-                println!("Program completed. Return value: {}", ret)
             }
             DisconnectReason::TargetExited(code) => {
                 println!("Target exited with code {}!", code)
@@ -184,6 +182,9 @@ fn main() -> DynResult<()> {
             println!("gdbstub encountered a fatal error: {}", e)
         }
     }
+
+    let ret = emu.cpu.reg_get(armv4t_emu::Mode::User, 0);
+    println!("Program completed. Return value: {}", ret);
 
     Ok(())
 }

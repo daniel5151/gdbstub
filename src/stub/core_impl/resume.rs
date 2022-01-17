@@ -2,7 +2,7 @@ use super::prelude::*;
 use crate::protocol::commands::ext::Resume;
 
 use crate::arch::Arch;
-use crate::common::Tid;
+use crate::common::{Signal, Tid};
 use crate::protocol::commands::_vCont::Actions;
 use crate::protocol::{SpecificIdKind, SpecificThreadId};
 use crate::stub::MultiThreadStopReason;
@@ -254,25 +254,29 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         Ok(HandlerStatus::DeferredStopReason)
     }
 
-    fn write_break_common(
+    fn write_stop_common(
         &mut self,
         res: &mut ResponseWriter<'_, C>,
-        tid: Tid,
+        tid: Option<Tid>,
+        signal: Signal,
     ) -> Result<(), Error<T::Error, C::Error>> {
-        self.current_mem_tid = tid;
-        self.current_resume_tid = SpecificIdKind::WithId(tid);
+        res.write_str("T")?;
+        res.write_num(signal as u8)?;
 
-        res.write_str("T05")?;
+        if let Some(tid) = tid {
+            self.current_mem_tid = tid;
+            self.current_resume_tid = SpecificIdKind::WithId(tid);
 
-        res.write_str("thread:")?;
-        res.write_specific_thread_id(SpecificThreadId {
-            pid: self
-                .features
-                .multiprocess()
-                .then(|| SpecificIdKind::WithId(FAKE_PID)),
-            tid: SpecificIdKind::WithId(tid),
-        })?;
-        res.write_str(";")?;
+            res.write_str("thread:")?;
+            res.write_specific_thread_id(SpecificThreadId {
+                pid: self
+                    .features
+                    .multiprocess()
+                    .then(|| SpecificIdKind::WithId(FAKE_PID)),
+                tid: SpecificIdKind::WithId(tid),
+            })?;
+            res.write_str(";")?;
+        }
 
         Ok(())
     }
@@ -321,7 +325,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
         let status = match stop_reason {
             MultiThreadStopReason::DoneStep => {
-                res.write_str("S05")?;
+                res.write_str("S")?;
+                res.write_num(Signal::SIGTRAP as u8)?;
                 FinishExecStatus::Handled
             }
             MultiThreadStopReason::Signal(sig) => {
@@ -339,17 +344,21 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 res.write_num(sig as u8)?;
                 FinishExecStatus::Disconnect(DisconnectReason::TargetTerminated(sig))
             }
+            MultiThreadStopReason::SignalWithThread { tid, signal } => {
+                self.write_stop_common(res, Some(tid), signal)?;
+                FinishExecStatus::Handled
+            }
             MultiThreadStopReason::SwBreak(tid) if guard_break!(support_sw_breakpoint) => {
                 crate::__dead_code_marker!("sw_breakpoint", "stop_reason");
 
-                self.write_break_common(res, tid)?;
+                self.write_stop_common(res, Some(tid), Signal::SIGTRAP)?;
                 res.write_str("swbreak:;")?;
                 FinishExecStatus::Handled
             }
             MultiThreadStopReason::HwBreak(tid) if guard_break!(support_hw_breakpoint) => {
                 crate::__dead_code_marker!("hw_breakpoint", "stop_reason");
 
-                self.write_break_common(res, tid)?;
+                self.write_stop_common(res, Some(tid), Signal::SIGTRAP)?;
                 res.write_str("hwbreak:;")?;
                 FinishExecStatus::Handled
             }
@@ -358,7 +367,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             {
                 crate::__dead_code_marker!("hw_watchpoint", "stop_reason");
 
-                self.write_break_common(res, tid)?;
+                self.write_stop_common(res, Some(tid), Signal::SIGTRAP)?;
 
                 use crate::target::ext::breakpoints::WatchKind;
                 match kind {
@@ -370,10 +379,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 res.write_str(";")?;
                 FinishExecStatus::Handled
             }
-            MultiThreadStopReason::ReplayLog(pos) if guard_reverse_exec!() => {
+            MultiThreadStopReason::ReplayLog { tid, pos } if guard_reverse_exec!() => {
                 crate::__dead_code_marker!("reverse_exec", "stop_reason");
 
-                res.write_str("T05")?;
+                self.write_stop_common(res, tid, Signal::SIGTRAP)?;
 
                 res.write_str("replaylog:")?;
                 res.write_str(match pos {
@@ -384,10 +393,14 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                 FinishExecStatus::Handled
             }
-            MultiThreadStopReason::CatchSyscall { number, position } if guard_catch_syscall!() => {
+            MultiThreadStopReason::CatchSyscall {
+                tid,
+                number,
+                position,
+            } if guard_catch_syscall!() => {
                 crate::__dead_code_marker!("catch_syscall", "stop_reason");
 
-                res.write_str("T05")?;
+                self.write_stop_common(res, tid, Signal::SIGTRAP)?;
 
                 res.write_str(match position {
                     CatchSyscallPosition::Entry => "syscall_entry:",
@@ -403,7 +416,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             MultiThreadStopReason::SwBreak(_)
             | MultiThreadStopReason::HwBreak(_)
             | MultiThreadStopReason::Watch { .. }
-            | MultiThreadStopReason::ReplayLog(_)
+            | MultiThreadStopReason::ReplayLog { .. }
             | MultiThreadStopReason::CatchSyscall { .. } => {
                 return Err(Error::UnsupportedStopReason);
             }
