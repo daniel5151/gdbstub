@@ -10,6 +10,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 - Improved support + fixes for `Msp430` [\#62](https://github.com/daniel5151/gdbstub/pull/62) ([mchesser](https://github.com/mchesser))
 - `X86_64CoreRegId`: Change rip size to 8 [\#87](https://github.com/daniel5151/gdbstub/pull/87) ([gz](https://github.com/gz))
+- Removed `RegId` template parameters from the following `Arch` implementations:
+  - x86/x64
+  - MIPS
+  - MSP-430
 
 # 0.1.0
 

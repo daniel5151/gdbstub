@@ -20,7 +20,7 @@ pub enum Msp430RegId<U> {
     /// General Purpose Registers (R4-R15)
     Gpr(u8),
     #[doc(hidden)]
-    _Size(U),
+    _Size(core::marker::PhantomData<U>),
 }
 
 fn from_raw_id<U>(id: usize) -> Option<(Msp430RegId<U>, Option<NonZeroUsize>)> {

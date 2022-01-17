@@ -43,7 +43,7 @@ pub enum MipsRegId<U> {
     /// Restart register
     Restart,
     #[doc(hidden)]
-    _Size(U),
+    _Size(core::marker::PhantomData<U>),
 }
 
 fn from_raw_id<U>(id: usize) -> Option<(MipsRegId<U>, Option<NonZeroUsize>)> {

@@ -1,6 +1,6 @@
 //! Implementations for the MIPS architecture.
 
-use gdbstub::arch::{Arch, RegId, SingleStepGdbBehavior};
+use gdbstub::arch::{Arch, SingleStepGdbBehavior};
 
 pub mod reg;
 
@@ -37,22 +37,10 @@ impl gdbstub::arch::BreakpointKind for MipsBreakpointKind {
 }
 
 /// Implements `Arch` for 32-bit MIPS.
-///
-/// Check out the [module level docs](gdbstub::arch#whats-with-regidimpl) for
-/// more info about the `RegIdImpl` type parameter.
-pub enum Mips<RegIdImpl: RegId = reg::id::MipsRegId<u32>> {
-    #[doc(hidden)]
-    _Marker(core::marker::PhantomData<RegIdImpl>),
-}
+pub enum Mips {}
 
 /// Implements `Arch` for 64-bit MIPS.
-///
-/// Check out the [module level docs](gdbstub::arch#whats-with-regidimpl) for
-/// more info about the `RegIdImpl` type parameter.
-pub enum Mips64<RegIdImpl: RegId = reg::id::MipsRegId<u64>> {
-    #[doc(hidden)]
-    _Marker(core::marker::PhantomData<RegIdImpl>),
-}
+pub enum Mips64 {}
 
 /// Implements `Arch` for 32-bit MIPS with the DSP feature enabled.
 pub enum MipsWithDsp {}
@@ -60,10 +48,10 @@ pub enum MipsWithDsp {}
 /// Implements `Arch` for 64-bit MIPS with the DSP feature enabled.
 pub enum Mips64WithDsp {}
 
-impl<RegIdImpl: RegId> Arch for Mips<RegIdImpl> {
+impl Arch for Mips {
     type Usize = u32;
     type Registers = reg::MipsCoreRegs<u32>;
-    type RegId = RegIdImpl;
+    type RegId = reg::id::MipsRegId<u32>;
     type BreakpointKind = MipsBreakpointKind;
 
     fn target_description_xml() -> Option<&'static str> {
@@ -76,10 +64,10 @@ impl<RegIdImpl: RegId> Arch for Mips<RegIdImpl> {
     }
 }
 
-impl<RegIdImpl: RegId> Arch for Mips64<RegIdImpl> {
+impl Arch for Mips64 {
     type Usize = u64;
     type Registers = reg::MipsCoreRegs<u64>;
-    type RegId = RegIdImpl;
+    type RegId = reg::id::MipsRegId<u64>;
     type BreakpointKind = MipsBreakpointKind;
 
     fn target_description_xml() -> Option<&'static str> {
