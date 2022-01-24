@@ -27,7 +27,6 @@ impl<RegIdImpl: RegId> Arch for PowerPcAltivec32<RegIdImpl> {
 
     #[inline(always)]
     fn single_step_gdb_behavior() -> SingleStepGdbBehavior {
-        // TODO: update with proper value
-        SingleStepGdbBehavior::Unknown
+        SingleStepGdbBehavior::Required
     }
 }
