@@ -109,6 +109,7 @@ where
                         SingleStepGdbBehavior::Optional => "", // unreachable, since optional single step will not result in an error
                         SingleStepGdbBehavior::Required => "GDB requires single-step support on this arch.",
                         SingleStepGdbBehavior::Ignored => "GDB ignores single-step support on this arch, yet the target has implemented support for it.",
+                        SingleStepGdbBehavior::Unknown => "This arch's single-step behavior hasn't been tested yet: please conduct a test + upstream your findings!",
                     }
                 )?;
                 write!(f, "See `Target::guard_rail_single_step_gdb_behavior` for more information.")

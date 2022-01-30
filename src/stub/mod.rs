@@ -246,6 +246,7 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
                     SingleStepGdbBehavior::Optional => false,
                     SingleStepGdbBehavior::Required => !support_single_step,
                     SingleStepGdbBehavior::Ignored => support_single_step,
+                    SingleStepGdbBehavior::Unknown => true,
                 };
 
                 if return_error {

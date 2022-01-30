@@ -250,4 +250,8 @@ pub enum SingleStepGdbBehavior {
     ///
     /// e.g: MIPS
     Ignored,
+    /// Unknown behavior - no one has tested this platform yet. If possible,
+    /// please conduct a test + upstream your findings to `gdbstub_arch`.
+    #[doc(hidden)]
+    Unknown,
 }
