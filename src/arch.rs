@@ -202,19 +202,6 @@ pub trait Arch {
     /// pre-init error that informs the user of the potential issues they may
     /// run into.
     ///
-    /// # `Unknown` implementations
-    ///
-    /// Because this method was only introduced in `gdbstub` version 0.6, there
-    /// are many existing `Arch` implementations in the
-    /// [`gdbstub_arch`](https://docs.rs/gdbstub_arch/) companion crate that
-    /// have not yet been tested and updated what kind of behavior they exhibit.
-    ///
-    /// These implementations currently return
-    /// [`SingleStepGdbBehavior::Unknown`], which will result in a pre-init
-    /// error that notifies users of this issue, along with imploring them
-    /// to be a Good Citizen and discover + upstream a proper implementation
-    /// of this method for their `Arch`.
-    ///
     /// # Writing a proper implementation
     ///
     /// To check whether or not a particular architecture exhibits this
@@ -265,5 +252,6 @@ pub enum SingleStepGdbBehavior {
     Ignored,
     /// Unknown behavior - no one has tested this platform yet. If possible,
     /// please conduct a test + upstream your findings to `gdbstub_arch`.
+    #[doc(hidden)]
     Unknown,
 }

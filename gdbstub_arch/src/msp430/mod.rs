@@ -19,8 +19,7 @@ impl Arch for Msp430 {
 
     #[inline(always)]
     fn single_step_gdb_behavior() -> SingleStepGdbBehavior {
-        // TODO: update with proper value
-        SingleStepGdbBehavior::Unknown
+        SingleStepGdbBehavior::Required
     }
 }
 
@@ -39,7 +38,6 @@ impl Arch for Msp430X {
 
     #[inline(always)]
     fn single_step_gdb_behavior() -> SingleStepGdbBehavior {
-        // TODO: update with proper value
-        SingleStepGdbBehavior::Unknown
+        SingleStepGdbBehavior::Required
     }
 }
