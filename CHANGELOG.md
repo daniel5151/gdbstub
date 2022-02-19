@@ -2,6 +2,10 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+# 0.6.1
+
+- ignore unknown vFile:open flags
+
 # 0.6.0
 
 After over a half-year of development, `gdbstub` 0.6 has finally been released!
