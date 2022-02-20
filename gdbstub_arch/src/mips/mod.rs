@@ -39,13 +39,29 @@ impl gdbstub::arch::BreakpointKind for MipsBreakpointKind {
 /// Implements `Arch` for 32-bit MIPS.
 pub enum Mips {}
 
-/// Implements `Arch` for 64-bit MIPS.
-pub enum Mips64 {}
-
-/// Implements `Arch` for 32-bit MIPS with the DSP feature enabled.
+/// Implements `Arch` for 32-bit MIPS, with the DSP feature enabled.
 pub enum MipsWithDsp {}
 
-/// Implements `Arch` for 64-bit MIPS with the DSP feature enabled.
+/// Implements `Arch` for 64-bit MIPS.
+///
+/// **NOTE:** Due to GDB client behavior, this arch does _not_ include a
+/// built-in `target.xml` implementation. Consider manually implementing
+/// [`TargetDescriptionXmlOverride`].
+///
+/// See [daniel5151/gdbstub#97](https://github.com/daniel5151/gdbstub/issues/97).
+///
+/// [`TargetDescriptionXmlOverride`]: gdbstub::target::ext::target_description_xml_override::TargetDescriptionXmlOverride
+pub enum Mips64 {}
+
+/// Implements `Arch` for 64-bit MIPS, with the DSP feature enabled.
+///
+/// **NOTE:** Due to GDB client behavior, this arch does _not_ include a
+/// built-in `target.xml` implementation. Consider manually implementing
+/// [`TargetDescriptionXmlOverride`].
+///
+/// See [daniel5151/gdbstub#97](https://github.com/daniel5151/gdbstub/issues/97).
+///
+/// [`TargetDescriptionXmlOverride`]: gdbstub::target::ext::target_description_xml_override::TargetDescriptionXmlOverride
 pub enum Mips64WithDsp {}
 
 impl Arch for Mips {
@@ -56,22 +72,6 @@ impl Arch for Mips {
 
     fn target_description_xml() -> Option<&'static str> {
         Some(r#"<target version="1.0"><architecture>mips</architecture></target>"#)
-    }
-
-    #[inline(always)]
-    fn single_step_gdb_behavior() -> SingleStepGdbBehavior {
-        SingleStepGdbBehavior::Ignored
-    }
-}
-
-impl Arch for Mips64 {
-    type Usize = u64;
-    type Registers = reg::MipsCoreRegs<u64>;
-    type RegId = reg::id::MipsRegId<u64>;
-    type BreakpointKind = MipsBreakpointKind;
-
-    fn target_description_xml() -> Option<&'static str> {
-        Some(r#"<target version="1.0"><architecture>mips64</architecture></target>"#)
     }
 
     #[inline(always)]
@@ -98,6 +98,24 @@ impl Arch for MipsWithDsp {
     }
 }
 
+#[allow(deprecated)]
+impl Arch for Mips64 {
+    type Usize = u64;
+    type Registers = reg::MipsCoreRegs<u64>;
+    type RegId = reg::id::MipsRegId<u64>;
+    type BreakpointKind = MipsBreakpointKind;
+
+    fn target_description_xml() -> Option<&'static str> {
+        None
+    }
+
+    #[inline(always)]
+    fn single_step_gdb_behavior() -> SingleStepGdbBehavior {
+        SingleStepGdbBehavior::Ignored
+    }
+}
+
+#[allow(deprecated)]
 impl Arch for Mips64WithDsp {
     type Usize = u64;
     type Registers = reg::MipsCoreRegsWithDsp<u64>;
@@ -105,9 +123,7 @@ impl Arch for Mips64WithDsp {
     type BreakpointKind = MipsBreakpointKind;
 
     fn target_description_xml() -> Option<&'static str> {
-        Some(
-            r#"<target version="1.0"><architecture>mips64</architecture><feature name="org.gnu.gdb.mips.dsp"></feature></target>"#,
-        )
+        None
     }
 
     #[inline(always)]
