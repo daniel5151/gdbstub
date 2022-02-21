@@ -24,6 +24,18 @@ bitflags! {
         const O_TRUNC = 0x400;
         /// Exclusive access.
         const O_EXCL = 0x800;
+
+        // LLDB-specific flags, as documented at:
+        // https://github.com/llvm/llvm-project/blob/ec642ceebc1aacc8b16249df7734b8cf90ae2963/lldb/include/lldb/Host/File.h#L47-L66
+
+        /// Do not block
+        const O_NONBLOCK = 1 << 28;
+        /// Do not follow symlinks
+        const O_DONT_FOLLOW_SYMLINKS = 1 << 29;
+        /// Close the file when executing a new process
+        const O_CLOSE_ON_EXEC = 1 << 30;
+        /// Invalid value
+        const O_INVALID = 1 << 31;
     }
 }
 
