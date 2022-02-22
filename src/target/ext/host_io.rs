@@ -8,7 +8,9 @@ bitflags! {
     /// Host flags for opening files.
     ///
     /// Extracted from the GDB documentation at
-    /// [Open Flags](https://sourceware.org/gdb/current/onlinedocs/gdb/Open-Flags.html#Open-Flags)
+    /// [Open Flags](https://sourceware.org/gdb/current/onlinedocs/gdb/Open-Flags.html#Open-Flags),
+    /// and the LLDB source code at
+    /// [`lldb/include/lldb/Host/File.h`](https://github.com/llvm/llvm-project/blob/ec642ceebc1aacc8b16249df7734b8cf90ae2963/lldb/include/lldb/Host/File.h#L47-L66)
     pub struct HostIoOpenFlags: u32 {
         /// A read-only file.
         const O_RDONLY = 0x0;
@@ -24,6 +26,15 @@ bitflags! {
         const O_TRUNC = 0x400;
         /// Exclusive access.
         const O_EXCL = 0x800;
+
+        /// LLDB extension: Do not block.
+        const O_NONBLOCK = 1 << 28;
+        /// LLDB extension: Do not follow symlinks.
+        const O_DONT_FOLLOW_SYMLINKS = 1 << 29;
+        /// LLDB extension: Close the file when executing a new process.
+        const O_CLOSE_ON_EXEC = 1 << 30;
+        /// LLDB extension: Invalid value.
+        const O_INVALID = 1 << 31;
     }
 }
 
