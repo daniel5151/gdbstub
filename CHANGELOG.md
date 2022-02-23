@@ -23,7 +23,7 @@ This massive release delivers a slew of new protocol extensions, internal improv
   - Fetching remote memory maps
   - Catching + reporting syscall entry/exit conditions
   - ...and many more!
-- A new license: `gdbtsub` is licensed under MIT OR Apache-2.0
+- A new license: `gdbstub` is licensed under MIT OR Apache-2.0
 
 See the [changelog](https://github.com/daniel5151/gdbstub/blob/dev/0.6/CHANGELOG.md) for a comprehensive rundown of all the new features.
 
