@@ -125,20 +125,22 @@ When using `gdbstub` in `#![no_std]` contexts, make sure to set `default-feature
 ### Real-World Examples
 
 -   Virtual Machine Monitors (VMMs)
-    -   [crosvm](https://google.github.io/crosvm/running_crosvm/usage.html#gdb-support) - The Chrome OS Virtual Machine Monitor (x64)
-    -   [Firecracker](https://firecracker-microvm.github.io/) - A lightweight VMM developed by AWS - feature is in [PR](https://github.com/firecracker-microvm/firecracker/pull/2333)
+    -   [crosvm](https://google.github.io/crosvm/running_crosvm/advanced_usage.html#gdb-support) - The Chrome OS Virtual Machine Monitor (x64)
     -   [uhyve](https://github.com/hermitcore/uhyve) - A minimal hypervisor for [RustyHermit](https://github.com/hermitcore/rusty-hermit)
+    -   [cloud-hypervisor](https://github.com/cloud-hypervisor/cloud-hypervisor) - A Virtual Machine Monitor for modern Cloud workloads
 -   OS Kernels (using `gdbstub` on `no_std`)
     -   [`vmware-labs/node-replicated-kernel`](https://github.com/vmware-labs/node-replicated-kernel/tree/4326704/kernel/src/arch/x86_64/gdb) - An (experimental) research OS kernel for x86-64 (amd64) machines
     -   [`betrusted-io/xous-core`](https://github.com/betrusted-io/xous-core/blob/7d3d710/kernel/src/debug/gdb_server.rs) - The Xous microkernel operating system
--   Emulators (x64)
-    -   [clicky](https://github.com/daniel5151/clicky/) - An emulator for classic clickwheel iPods (dual-core ARMv4T SoC)
-    -   [rustyboyadvance-ng](https://github.com/michelhe/rustboyadvance-ng/) - Nintendo GameBoy Advance emulator and debugger (ARMv4T)
+-   Emulators
+    -   [udbserver](https://github.com/bet4it/udbserver) - Provide Unicorn emulator with a debug server (Multi Architecture)
+    -   [rmips](https://github.com/starfleetcadet75/rmips) - MIPS R3000 virtual machine simulator
+    -   [clicky](https://github.com/daniel5151/clicky) - An emulator for classic clickwheel iPods (dual-core ARMv4T SoC)
+    -   [rustboyadvance-ng](https://github.com/michelhe/rustboyadvance-ng) - Nintendo GameBoy Advance emulator and debugger (ARMv4T)
     -   [vaporstation](https://github.com/Colin-Suckow/vaporstation) - A Playstation One emulator (MIPS)
-    -   [ts7200](https://github.com/daniel5151/ts7200/) - An emulator for the TS-7200, a somewhat bespoke embedded ARMv4t platform
+    -   [ts7200](https://github.com/daniel5151/ts7200) - An emulator for the TS-7200, a somewhat bespoke embedded ARMv4t platform
     -   [microcorruption-emu](https://github.com/sapir/microcorruption-emu) - msp430 emulator for the microcorruption.com ctf
 -   Other
-    -   [memflow](https://github.com/memflow/memflow-cli) - A physical memory introspection framework (part of `memflow-cli`)
+    -   [enarx](https://github.com/enarx/enarx) - Running code inside a hardware isolated environment
 
 While some of these projects may use older versions of `gdbstub`, they can nonetheless serve as useful examples of what a typical `gdbstub` integration might look like.
 
