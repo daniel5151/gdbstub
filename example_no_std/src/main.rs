@@ -1,7 +1,8 @@
+//! A basic `no_std` example that's used to ballpark estimate how large
+//! `gdbstub`'s binary footprint is resource-restricted environments.
+
 #![no_std]
 #![no_main]
-
-extern crate libc;
 
 use gdbstub::stub::state_machine::GdbStubStateMachine;
 use gdbstub::stub::MultiThreadStopReason;
@@ -14,11 +15,13 @@ mod print_str;
 use crate::print_str::print_str;
 
 #[panic_handler]
-fn panic(_info: &core::panic::PanicInfo) -> ! {
+fn panic(_info: &core::panic::PanicInfo<'_>) -> ! {
     loop {}
 }
 
 fn rust_main() -> Result<(), i32> {
+    print_str("Running example_no_std...");
+
     let mut target = gdb::DummyTarget::new();
 
     let conn = match conn::TcpConnection::new_localhost(9001) {
@@ -84,7 +87,7 @@ fn rust_main() -> Result<(), i32> {
 }
 
 #[no_mangle]
-pub extern "C" fn main(_argc: isize, _argv: *const *const u8) -> isize {
+extern "C" fn main(_argc: isize, _argv: *const *const u8) -> isize {
     if let Err(e) = rust_main() {
         return e as isize;
     }

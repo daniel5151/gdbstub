@@ -47,7 +47,7 @@ where
         write_le_bytes!(&self.sr);
         (0..core::mem::size_of::<U>()).for_each(|_| write_byte(None)); // Constant Generator (CG/R3)
         for reg in self.r.iter() {
-            write_le_bytes!(&reg);
+            write_le_bytes!(reg);
         }
     }
 

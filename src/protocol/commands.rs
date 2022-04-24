@@ -51,7 +51,7 @@ macro_rules! commands {
 
         pub mod ext {
             $(
-                #[allow(non_camel_case_types)]
+                #[allow(non_camel_case_types, clippy::enum_variant_names)]
                 pub enum [<$ext:camel>] $(<$lt>)? {
                     $($command(super::$mod::$command<$($lifetime)?>),)*
                 }

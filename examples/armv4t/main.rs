@@ -1,4 +1,6 @@
-#![deny(rust_2018_idioms, future_incompatible, nonstandard_style)]
+//! An incredibly simple emulator to run elf binaries compiled with
+//! `arm-none-eabi-cc -march=armv4t`. It's not modeled after any real-world
+//! system.
 
 use std::net::{TcpListener, TcpStream};
 
@@ -11,9 +13,9 @@ use gdbstub::stub::SingleThreadStopReason;
 use gdbstub::stub::{run_blocking, DisconnectReason, GdbStub, GdbStubError};
 use gdbstub::target::Target;
 
-pub type DynResult<T> = Result<T, Box<dyn std::error::Error>>;
+type DynResult<T> = Result<T, Box<dyn std::error::Error>>;
 
-pub static TEST_PROGRAM_ELF: &[u8] = include_bytes!("test_bin/test.elf");
+const TEST_PROGRAM_ELF: &[u8] = include_bytes!("test_bin/test.elf");
 
 mod emu;
 mod gdb;

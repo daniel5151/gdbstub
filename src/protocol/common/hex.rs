@@ -239,7 +239,8 @@ pub fn encode_hex_buf(buf: &mut [u8], start_idx: usize) -> Result<&mut [u8], Enc
         buf[i] = match nybble {
             0x0..=0x9 => b'0' + nybble,
             0xa..=0xf => b'A' + (nybble - 0xa),
-            _ => unreachable!(), // could be unreachable_unchecked...
+            #[allow(clippy::unreachable)] // will be optimized out
+            _ => unreachable!(), // TODO: use unreachable_unchecked?
         };
     }
 

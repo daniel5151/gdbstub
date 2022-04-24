@@ -50,6 +50,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     2 => WatchKind::Write,
                     3 => WatchKind::Read,
                     4 => WatchKind::ReadWrite,
+                    #[allow(clippy::unreachable)] // will be optimized out
                     _ => unreachable!(),
                 };
                 let len = <T::Arch as Arch>::Usize::from_be_bytes(cmd.kind)

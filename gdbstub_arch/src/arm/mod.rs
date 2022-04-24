@@ -30,7 +30,7 @@ impl gdbstub::arch::BreakpointKind for ArmBreakpointKind {
     }
 }
 
-/// Implements `Arch` for ARMv4T
+/// Implements `Arch` for the ARMv4T architecture
 pub enum Armv4t {}
 
 impl Arch for Armv4t {

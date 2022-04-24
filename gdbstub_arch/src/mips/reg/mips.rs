@@ -132,7 +132,7 @@ where
 
         // Write FPRs
         for reg in self.fpu.r.iter() {
-            write_le_bytes!(&reg);
+            write_le_bytes!(reg);
         }
 
         // Write FCSR and FIR registers

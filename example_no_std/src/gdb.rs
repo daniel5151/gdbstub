@@ -18,7 +18,7 @@ impl Target for DummyTarget {
     type Error = &'static str;
 
     #[inline(always)]
-    fn base_ops(&mut self) -> target::ext::base::BaseOps<Self::Arch, Self::Error> {
+    fn base_ops(&mut self) -> target::ext::base::BaseOps<'_, Self::Arch, Self::Error> {
         target::ext::base::BaseOps::MultiThread(self)
     }
 
@@ -29,7 +29,9 @@ impl Target for DummyTarget {
     }
 
     #[inline(always)]
-    fn support_breakpoints(&mut self) -> Option<target::ext::breakpoints::BreakpointsOps<Self>> {
+    fn support_breakpoints(
+        &mut self,
+    ) -> Option<target::ext::breakpoints::BreakpointsOps<'_, Self>> {
         Some(self)
     }
 }
@@ -97,7 +99,7 @@ impl MultiThreadBase for DummyTarget {
     #[inline(always)]
     fn support_resume(
         &mut self,
-    ) -> Option<target::ext::base::multithread::MultiThreadResumeOps<Self>> {
+    ) -> Option<target::ext::base::multithread::MultiThreadResumeOps<'_, Self>> {
         Some(self)
     }
 }
@@ -128,7 +130,9 @@ impl MultiThreadResume for DummyTarget {
 
 impl target::ext::breakpoints::Breakpoints for DummyTarget {
     #[inline(always)]
-    fn support_sw_breakpoint(&mut self) -> Option<target::ext::breakpoints::SwBreakpointOps<Self>> {
+    fn support_sw_breakpoint(
+        &mut self,
+    ) -> Option<target::ext::breakpoints::SwBreakpointOps<'_, Self>> {
         Some(self)
     }
 }

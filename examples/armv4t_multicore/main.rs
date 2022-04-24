@@ -1,4 +1,7 @@
-#![deny(rust_2018_idioms, future_incompatible, nonstandard_style)]
+//! An incredibly simple emulator to run elf binaries compiled with
+//! `arm-none-eabi-cc -march=armv4t`. Uses a dual-core architecture to show off
+//! `gdbstub`'s multi-process support. It's not modeled after any real-world
+//! system.
 
 use std::net::{TcpListener, TcpStream};
 
@@ -10,7 +13,7 @@ use gdbstub::conn::{Connection, ConnectionExt};
 use gdbstub::stub::{run_blocking, DisconnectReason, GdbStub, GdbStubError, MultiThreadStopReason};
 use gdbstub::target::Target;
 
-pub type DynResult<T> = Result<T, Box<dyn std::error::Error>>;
+type DynResult<T> = Result<T, Box<dyn std::error::Error>>;
 
 static TEST_PROGRAM_ELF: &[u8] = include_bytes!("test_bin/test.elf");
 

@@ -1,4 +1,4 @@
-# armv4t
+# armv4t-multicore
 
 An incredibly simple emulator to run elf binaries compiled with `arm-none-eabi-cc -march=armv4t`. Uses a dual-core architecture to show off `gdbstub`'s multi-process support. It's not modeled after any real-world system.
 
