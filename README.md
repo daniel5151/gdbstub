@@ -128,7 +128,7 @@ While some of these projects may use older versions of `gdbstub`, they can nonet
 If you end up using `gdbstub` in your project, consider opening a PR and adding it to this list!
 
 -   Virtual Machine Monitors (VMMs)
-    -   [crosvm](https://google.github.io/crosvm/running_crosvm/usage.html#gdb-support) - The Chrome OS VMM
+    -   [crosvm](https://google.github.io/crosvm/running_crosvm/advanced_usage.html#gdb-support) - The Chrome OS VMM
     -   [cloud-hypervisor](https://github.com/cloud-hypervisor/cloud-hypervisor) - A VMM for modern cloud workloads
     -   [Firecracker](https://firecracker-microvm.github.io/) - A lightweight VMM developed by AWS (feature is in [PR](https://github.com/firecracker-microvm/firecracker/pull/2333))
     -   [uhyve](https://github.com/hermitcore/uhyve) - A minimal hypervisor for [RustyHermit](https://github.com/hermitcore/rusty-hermit)
