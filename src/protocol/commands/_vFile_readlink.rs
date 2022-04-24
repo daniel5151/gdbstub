@@ -8,6 +8,7 @@ pub struct vFileReadlink<'a> {
 }
 
 impl<'a> ParseCommand<'a> for vFileReadlink<'a> {
+    #[inline(always)]
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
         let (buf, body_range) = buf.into_raw_buf();
         // TODO: rewrite to avoid panic
@@ -21,7 +22,7 @@ impl<'a> ParseCommand<'a> for vFileReadlink<'a> {
             [b':', body @ ..] => {
                 let filename = decode_hex_buf(body).ok()?;
                 Some(vFileReadlink { filename, buf })
-            },
+            }
             _ => None,
         }
     }

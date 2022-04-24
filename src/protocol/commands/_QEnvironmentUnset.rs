@@ -6,6 +6,7 @@ pub struct QEnvironmentUnset<'a> {
 }
 
 impl<'a> ParseCommand<'a> for QEnvironmentUnset<'a> {
+    #[inline(always)]
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
         let body = buf.into_body();
         let key = match body {

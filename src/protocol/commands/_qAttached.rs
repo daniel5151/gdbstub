@@ -8,6 +8,7 @@ pub struct qAttached {
 }
 
 impl<'a> ParseCommand<'a> for qAttached {
+    #[inline(always)]
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
         let body = buf.into_body();
         let pid = match body {

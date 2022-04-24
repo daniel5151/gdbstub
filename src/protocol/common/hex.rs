@@ -54,6 +54,7 @@ pub enum DecodeHexBufError {
     NotAscii,
 }
 
+#[inline]
 fn ascii2byte(c: u8) -> Option<u8> {
     match c {
         b'0'..=b'9' => Some(c - b'0'),
@@ -65,8 +66,9 @@ fn ascii2byte(c: u8) -> Option<u8> {
 }
 
 /// Check if the byte `c` is a valid GDB hex digit `[0-9a-fA-FxX]`
-#[allow(clippy::match_like_matches_macro)]
+#[inline]
 pub fn is_hex(c: u8) -> bool {
+    #[allow(clippy::match_like_matches_macro)] // mirror ascii2byte
     match c {
         b'0'..=b'9' => true,
         b'a'..=b'f' => true,

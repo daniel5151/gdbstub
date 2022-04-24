@@ -18,6 +18,7 @@ pub struct QXferReadBase<'a, T: ParseAnnex<'a>> {
 }
 
 impl<'a, T: ParseAnnex<'a>> ParseCommand<'a> for QXferReadBase<'a, T> {
+    #[inline(always)]
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
         let (buf, body_range) = buf.into_raw_buf();
 

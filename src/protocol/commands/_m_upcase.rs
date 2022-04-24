@@ -8,6 +8,7 @@ pub struct M<'a> {
 }
 
 impl<'a> ParseCommand<'a> for M<'a> {
+    #[inline(always)]
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
         let body = buf.into_body();
 

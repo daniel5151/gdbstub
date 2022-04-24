@@ -6,6 +6,7 @@ pub struct vFileClose {
 }
 
 impl<'a> ParseCommand<'a> for vFileClose {
+    #[inline(always)]
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
         let body = buf.into_body();
         if body.is_empty() {
@@ -16,7 +17,7 @@ impl<'a> ParseCommand<'a> for vFileClose {
             [b':', body @ ..] => {
                 let fd = decode_hex(body).ok()?;
                 Some(vFileClose { fd })
-            },
+            }
             _ => None,
         }
     }

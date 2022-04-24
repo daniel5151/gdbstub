@@ -6,6 +6,7 @@ pub struct vFileFstat {
 }
 
 impl<'a> ParseCommand<'a> for vFileFstat {
+    #[inline(always)]
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
         let body = buf.into_body();
         if body.is_empty() {
@@ -16,7 +17,7 @@ impl<'a> ParseCommand<'a> for vFileFstat {
             [b':', body @ ..] => {
                 let fd = decode_hex(body).ok()?;
                 Some(vFileFstat { fd })
-            },
+            }
             _ => None,
         }
     }

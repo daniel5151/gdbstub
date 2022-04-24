@@ -7,6 +7,7 @@ pub struct qSupported<'a> {
 }
 
 impl<'a> ParseCommand<'a> for qSupported<'a> {
+    #[inline(always)]
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
         let packet_buffer_len = buf.full_len();
         let body = buf.into_body();

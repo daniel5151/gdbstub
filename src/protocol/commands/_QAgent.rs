@@ -6,6 +6,7 @@ pub struct QAgent {
 }
 
 impl<'a> ParseCommand<'a> for QAgent {
+    #[inline(always)]
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
         let body = buf.into_body();
         let value = match body as &[u8] {

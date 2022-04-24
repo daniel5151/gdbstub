@@ -19,6 +19,7 @@ pub enum vCont<'a> {
 }
 
 impl<'a> ParseCommand<'a> for vCont<'a> {
+    #[inline(always)]
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
         let body = buf.into_body();
         match body as &[u8] {
@@ -40,10 +41,12 @@ impl<'a> Actions<'a> {
         Actions::Buf(ActionsBuf(buf))
     }
 
+    #[inline(always)]
     pub fn new_step(tid: SpecificThreadId) -> Actions<'a> {
         Actions::FixedStep(tid)
     }
 
+    #[inline(always)]
     pub fn new_continue(tid: SpecificThreadId) -> Actions<'a> {
         Actions::FixedCont(tid)
     }
@@ -101,6 +104,7 @@ pub enum VContKind<'a> {
 }
 
 impl<'a> VContKind<'a> {
+    #[inline(always)]
     fn from_bytes(s: &[u8]) -> Option<VContKind<'_>> {
         use self::VContKind::*;
 
@@ -134,6 +138,8 @@ where
     B: Iterator<Item = T>,
 {
     type Item = T;
+
+    #[inline(always)]
     fn next(&mut self) -> Option<T> {
         match self {
             EitherIter::A(a) => a.next(),

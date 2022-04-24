@@ -6,6 +6,7 @@ pub struct qRcmd<'a> {
 }
 
 impl<'a> ParseCommand<'a> for qRcmd<'a> {
+    #[inline(always)]
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
         crate::__dead_code_marker!("qRcmd", "from_packet");
 

@@ -71,6 +71,10 @@ pub trait MultiThreadBase: Target {
     ///
     /// See [the section above](#bare-metal-targets) on implementing
     /// thread-related methods on bare-metal (threadless) targets.
+    ///
+    /// _Note_: Implementors should mark this method as `#[inline(always)]`, as
+    /// this will result in better codegen (namely, by sidestepping any of the
+    /// `dyn FnMut` closure machinery).
     fn list_active_threads(
         &mut self,
         thread_is_active: &mut dyn FnMut(Tid),

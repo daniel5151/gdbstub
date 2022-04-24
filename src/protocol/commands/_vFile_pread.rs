@@ -10,6 +10,7 @@ pub struct vFilePread<'a> {
 }
 
 impl<'a> ParseCommand<'a> for vFilePread<'a> {
+    #[inline(always)]
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
         let (buf, body_range) = buf.into_raw_buf();
         let body = buf.get_mut(body_range.start..body_range.end)?;
@@ -27,8 +28,13 @@ impl<'a> ParseCommand<'a> for vFilePread<'a> {
 
                 drop(body);
 
-                Some(vFilePread { fd, count, offset, buf })
-            },
+                Some(vFilePread {
+                    fd,
+                    count,
+                    offset,
+                    buf,
+                })
+            }
             _ => None,
         }
     }

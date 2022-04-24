@@ -7,6 +7,7 @@ pub struct QEnvironmentHexEncoded<'a> {
 }
 
 impl<'a> ParseCommand<'a> for QEnvironmentHexEncoded<'a> {
+    #[inline(always)]
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
         let body = buf.into_body();
 

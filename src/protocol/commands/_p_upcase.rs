@@ -7,6 +7,7 @@ pub struct P<'a> {
 }
 
 impl<'a> ParseCommand<'a> for P<'a> {
+    #[inline(always)]
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
         let body = buf.into_body();
         let mut body = body.split_mut(|&b| b == b'=');

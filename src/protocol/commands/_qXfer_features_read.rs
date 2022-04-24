@@ -10,6 +10,7 @@ pub struct FeaturesAnnex<'a> {
 }
 
 impl<'a> ParseAnnex<'a> for FeaturesAnnex<'a> {
+    #[inline(always)]
     fn from_buf(buf: &'a [u8]) -> Option<Self> {
         Some(FeaturesAnnex { name: buf })
     }

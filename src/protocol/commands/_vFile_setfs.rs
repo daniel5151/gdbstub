@@ -8,6 +8,7 @@ pub struct vFileSetfs {
 }
 
 impl<'a> ParseCommand<'a> for vFileSetfs {
+    #[inline(always)]
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
         let body = buf.into_body();
         if body.is_empty() {
@@ -21,7 +22,7 @@ impl<'a> ParseCommand<'a> for vFileSetfs {
                     Some(pid) => FsKind::Pid(pid),
                 };
                 Some(vFileSetfs { fs })
-            },
+            }
             _ => None,
         }
     }

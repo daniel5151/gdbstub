@@ -6,6 +6,7 @@ pub struct c<'a> {
 }
 
 impl<'a> ParseCommand<'a> for c<'a> {
+    #[inline(always)]
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
         let body = buf.into_body();
         if body.is_empty() {

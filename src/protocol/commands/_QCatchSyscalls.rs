@@ -10,6 +10,7 @@ pub enum QCatchSyscalls<'a> {
 }
 
 impl<'a> ParseCommand<'a> for QCatchSyscalls<'a> {
+    #[inline(always)]
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
         let body = buf.into_body();
 

@@ -9,6 +9,7 @@ pub struct m<'a> {
 }
 
 impl<'a> ParseCommand<'a> for m<'a> {
+    #[inline(always)]
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
         // the total packet buffer currently looks like:
         //

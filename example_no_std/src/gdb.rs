@@ -40,6 +40,9 @@ impl Target for DummyTarget {
 // `gdbstub`'s library overhead, non-IDET methods are marked as
 // `#[inline(never)]` to prevent the optimizer from too aggressively coalescing
 // the stubbed implementations.
+//
+// EXCEPTION: `list_active_threads` accepts a closure arg, and should be
+// be inlined for smaller codegen
 
 impl MultiThreadBase for DummyTarget {
     #[inline(never)]
@@ -85,7 +88,7 @@ impl MultiThreadBase for DummyTarget {
         Ok(())
     }
 
-    #[inline(never)]
+    #[inline(always)] // !! EXCEPTION !!
     fn list_active_threads(
         &mut self,
         register_thread: &mut dyn FnMut(Tid),

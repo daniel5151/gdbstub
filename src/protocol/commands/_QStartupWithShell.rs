@@ -6,6 +6,7 @@ pub struct QStartupWithShell {
 }
 
 impl<'a> ParseCommand<'a> for QStartupWithShell {
+    #[inline(always)]
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
         let body = buf.into_body();
         let value = match body as &[u8] {

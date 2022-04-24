@@ -6,6 +6,7 @@ pub struct QSetWorkingDir<'a> {
 }
 
 impl<'a> ParseCommand<'a> for QSetWorkingDir<'a> {
+    #[inline(always)]
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
         let body = buf.into_body();
         let dir = match body {

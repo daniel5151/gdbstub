@@ -8,6 +8,7 @@ pub struct vKill {
 }
 
 impl<'a> ParseCommand<'a> for vKill {
+    #[inline(always)]
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
         let body = buf.into_body();
         let pid = match body {

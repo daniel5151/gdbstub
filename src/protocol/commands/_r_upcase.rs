@@ -4,6 +4,7 @@ use super::prelude::*;
 pub struct R;
 
 impl<'a> ParseCommand<'a> for R {
+    #[inline(always)]
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
         crate::__dead_code_marker!("R", "from_packet");
 
