@@ -31,9 +31,8 @@ Why use `gdbstub`?
 -   **`#![no_std]` Ready & Size Optimized**
     -   `gdbstub` is a **`no_std` first** library, whereby all protocol features are required to be `no_std` compatible.
     -   `gdbstub` does not require _any_ dynamic memory allocation, and can be configured to use fixed-size, pre-allocated buffers. This enables `gdbstub` to be used on even the most resource constrained, no-[`alloc`](https://doc.rust-lang.org/alloc/) platforms.
-    -   `gdbstub` is entirely **panic free** in most minimal configurations\*
-        -   \*when compiled in release mode, without the `paranoid_unsafe` cargo feature, on certain platforms.
-        -   Validated by inspecting the asm output of the in-tree `example_no_std`.
+    -   `gdbstub` is entirely **panic free** in most minimal configurations\*, resulting in substantially smaller and more robust code.
+        -   \*See the [Writing panic-free code](#writing-panic-free-code) section below for more details.
     -   `gdbstub` is transport-layer agnostic, and uses a basic [`Connection`](https://docs.rs/gdbstub/latest/gdbstub/conn/trait.Connection.html) interface to communicate with the GDB server. As long as target has some method of performing in-order, serial, byte-wise I/O (e.g: putchar/getchar over UART), it's possible to run `gdbstub` on it!
     -   "You don't pay for what you don't use": All code related to parsing/handling protocol extensions is guaranteed to be dead-code-eliminated from an optimized binary if left unimplemented. See the [Zero-overhead Protocol Extensions](#zero-overhead-protocol-extensions) section below for more details.
     -   `gdbstub`'s minimal configuration has an incredibly low binary size + RAM overhead, enabling it to be used on even the most resource-constrained microcontrollers.
@@ -181,6 +180,33 @@ Enabling the `paranoid_unsafe` feature will swap out a handful of unsafe `get_un
 
 -   When the `std` feature is enabled:
     -   `src/connection/impls/unixstream.rs`: An implementation of `UnixStream::peek` which uses `libc::recv`. This manual implementation will be removed once [rust-lang/rust#76923](https://github.com/rust-lang/rust/issues/76923) is stabilized.
+
+## Writing panic-free code
+
+Ideally, the Rust compiler would have some way to opt-in to a strict "no-panic" mode. Unfortunately, at the time of writing (2022/04/24), no such mode exists. As such, the only way to avoid the Rust compiler + stdlib's implicit panics is by being _very careful_ when writing code, and _manually checking_ that those panicking paths get optimized out!
+
+And when I say "manually checking", I actually mean "reading through [generated assembly](example_no_std/dump_asm.sh)".
+
+Why even go through this effort?
+
+- Panic infrastructure can be _expensive_, and when you're optimizing for embedded, `no_std` use-cases, panic infrastructure brings in hundreds of additional bytes into the final binary.
+- `gdbstub` can be used to implement low-level debuggers, and if the debugger itself panics, well... it's not like you can debug it all that easily!
+
+In conclusion, here is the `gdbstub` promise regarding panicking code:
+
+`gdbstub` will not introduce any additional panics into an existing binary, subject to the following conditions:
+
+1. The binary is compiled in _release_ mode
+    - Subject to the specific `rustc` version being used (as codegen and optimization can vary wildly between versions)
+    - _Note:_ different hardware architectures may be subject to different compiler optimizations.
+      - At this time, only `x86` has been confirmed panic-free
+2. `gdbstub`'s `paranoid_unsafe` cargo feature is _disabled_
+   - See the [`unsafe` in `gdbstub`](#unsafe-in-gdbstub) section for more details.
+3. The `Arch` implementation being used doesn't include panicking code
+   - _Note:_ The arch implementations under `gdbstub_arch` are _not_ guaranteed to be panic free!
+   - If you do spot a panicking arch in `gdbstub_arch`, consider opening a PR to fix it
+
+If you're using `gdbstub` in a no-panic project and found that `gdbstub` has introduced some panicking code, please file an issue!
 
 ## Future Plans + Roadmap to `1.0.0`
 

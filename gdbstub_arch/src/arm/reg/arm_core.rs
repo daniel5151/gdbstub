@@ -48,32 +48,38 @@ impl Registers for ArmCoreRegs {
         write_bytes!(&self.cpsr.to_le_bytes());
     }
 
-    fn gdb_deserialize(&mut self, bytes: &[u8]) -> Result<(), ()> {
-        // ensure bytes.chunks_exact(4) won't panic
-        if bytes.len() % 4 != 0 {
+    fn gdb_deserialize(&mut self, mut bytes: &[u8]) -> Result<(), ()> {
+        if bytes.len() != (17 + 25) * 4 {
             return Err(());
         }
 
-        use core::convert::TryInto;
-        let mut regs = bytes
-            .chunks_exact(4)
-            .map(|c| u32::from_le_bytes(c.try_into().unwrap()));
+        let mut next_reg = || {
+            if bytes.len() < 4 {
+                Err(())
+            } else {
+                use core::convert::TryInto;
+
+                let (next, rest) = bytes.split_at(4);
+                bytes = rest;
+                Ok(u32::from_le_bytes(next.try_into().unwrap()))
+            }
+        };
 
         for reg in self.r.iter_mut() {
-            *reg = regs.next().ok_or(())?
+            *reg = next_reg()?
         }
-        self.sp = regs.next().ok_or(())?;
-        self.lr = regs.next().ok_or(())?;
-        self.pc = regs.next().ok_or(())?;
+        self.sp = next_reg()?;
+        self.lr = next_reg()?;
+        self.pc = next_reg()?;
 
         // Floating point registers (unused)
         for _ in 0..25 {
-            regs.next().ok_or(())?;
+            next_reg()?;
         }
 
-        self.cpsr = regs.next().ok_or(())?;
+        self.cpsr = next_reg()?;
 
-        if regs.next().is_some() {
+        if next_reg().is_ok() {
             return Err(());
         }
 
