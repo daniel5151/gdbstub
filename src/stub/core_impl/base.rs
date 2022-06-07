@@ -159,7 +159,17 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             // TODO: Improve the '?' response based on last-sent stop reason.
             // this will be particularly relevant when working on non-stop mode.
             Base::QuestionMark(_) => {
-                res.write_str("S05")?;
+                // Reply with a valid thread-id or GDB issues a warning when more
+                // than one thread is active
+                res.write_str("T05thread:")?;
+                res.write_specific_thread_id(SpecificThreadId {
+                    pid: self
+                        .features
+                        .multiprocess()
+                        .then(|| SpecificIdKind::WithId(FAKE_PID)),
+                    tid: SpecificIdKind::WithId(self.get_sane_any_tid(target)?),
+                })?;
+                res.write_str(";")?;
                 HandlerStatus::Handled
             }
             Base::qAttached(cmd) => {
