@@ -35,6 +35,7 @@ mod reverse_exec;
 mod section_offsets;
 mod single_register_access;
 mod target_xml;
+mod thread_extra_info;
 mod x_upcase_packet;
 
 pub(crate) use resume::FinishExecStatus;
@@ -207,6 +208,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             Command::HostIo(cmd) => self.handle_host_io(res, target, cmd),
             Command::ExecFile(cmd) => self.handle_exec_file(res, target, cmd),
             Command::Auxv(cmd) => self.handle_auxv(res, target, cmd),
+            Command::ThreadExtraInfo(cmd) => self.handle_thread_extra_info(res, target, cmd),
             // in the worst case, the command could not be parsed...
             Command::Unknown(cmd) => {
                 // HACK: if the user accidentally sends a resume command to a

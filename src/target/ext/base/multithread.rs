@@ -102,6 +102,14 @@ pub trait MultiThreadBase: Target {
     fn support_resume(&mut self) -> Option<MultiThreadResumeOps<'_, Self>> {
         None
     }
+
+    /// Support for providing thread extra information.
+    #[inline(always)]
+    fn support_thread_extra_info(
+        &mut self,
+    ) -> Option<crate::target::ext::thread_extra_info::ThreadExtraInfoOps<'_, Self>> {
+        None
+    }
 }
 
 /// Target extension - support for resuming multi threaded targets.
