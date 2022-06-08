@@ -126,6 +126,13 @@ impl MultiThreadBase for Emu {
     ) -> Option<target::ext::base::multithread::MultiThreadResumeOps<'_, Self>> {
         Some(self)
     }
+
+    #[inline(always)]
+    fn support_thread_extra_info(
+        &mut self,
+    ) -> Option<gdbstub::target::ext::thread_extra_info::ThreadExtraInfoOps<'_, Self>> {
+        Some(self)
+    }
 }
 
 impl MultiThreadResume for Emu {
@@ -271,4 +278,21 @@ impl target::ext::breakpoints::HwWatchpoint for Emu {
 
         Ok(true)
     }
+}
+
+impl target::ext::thread_extra_info::ThreadExtraInfo for Emu {
+    fn thread_extra_info(&self, tid: Tid, buf: &mut [u8]) -> Result<usize, Self::Error> {
+        let cpu_id = tid_to_cpuid(tid)?;
+        let info = format!("CPU {:?}", cpu_id);
+
+        Ok(copy_to_buf(info.as_bytes(), buf))
+    }
+}
+
+/// Copy all bytes of `data` to `buf`.
+/// Return the size of data copied.
+pub fn copy_to_buf(data: &[u8], buf: &mut [u8]) -> usize {
+    let len = buf.len().min(data.len());
+    buf[..len].copy_from_slice(&data[..len]);
+    len
 }

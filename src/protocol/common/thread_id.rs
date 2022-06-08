@@ -125,3 +125,37 @@ impl TryFrom<ThreadId> for SpecificThreadId {
         })
     }
 }
+
+/// Like [`ThreadId`], without the `Any`, or `All` variants.
+#[derive(Debug, Copy, Clone)]
+pub struct ConcreteThreadId {
+    /// Process ID (may or may not be present).
+    pub pid: Option<NonZeroUsize>,
+    /// Thread ID.
+    pub tid: NonZeroUsize,
+}
+
+impl TryFrom<ThreadId> for ConcreteThreadId {
+    type Error = ();
+
+    fn try_from(thread: ThreadId) -> Result<ConcreteThreadId, ()> {
+        Ok(ConcreteThreadId {
+            pid: match thread.pid {
+                None => None,
+                Some(id_kind) => Some(id_kind.try_into()?),
+            },
+            tid: thread.tid.try_into()?,
+        })
+    }
+}
+
+impl TryFrom<IdKind> for NonZeroUsize {
+    type Error = ();
+
+    fn try_from(value: IdKind) -> Result<NonZeroUsize, ()> {
+        match value {
+            IdKind::WithId(v) => Ok(v),
+            _ => Err(()),
+        }
+    }
+}

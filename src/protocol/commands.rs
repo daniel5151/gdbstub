@@ -92,6 +92,7 @@ macro_rules! commands {
                     fn support_reverse_step(&mut self) -> Option<()>;
                     fn support_reverse_cont(&mut self) -> Option<()>;
                     fn support_x_upcase_packet(&mut self) -> Option<()>;
+                    fn support_thread_extra_info(&mut self) -> Option<()>;
                 }
 
                 impl<T: Target> Hack for T {
@@ -144,6 +145,14 @@ macro_rules! commands {
                             Some(())
                         } else {
                             None
+                        }
+                    }
+
+                    fn support_thread_extra_info(&mut self) -> Option<()> {
+                        use crate::target::ext::base::BaseOps;
+                        match self.base_ops() {
+                            BaseOps::SingleThread(_) => None,
+                            BaseOps::MultiThread(ops) => ops.support_thread_extra_info().map(drop),
                         }
                     }
                 }
@@ -287,5 +296,9 @@ commands! {
 
     catch_syscalls use 'a {
         "QCatchSyscalls" => _QCatchSyscalls::QCatchSyscalls<'a>,
+    }
+
+    thread_extra_info use 'a {
+        "qThreadExtraInfo" => _qThreadExtraInfo::qThreadExtraInfo<'a>,
     }
 }

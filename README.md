@@ -87,6 +87,7 @@ Of course, most use-cases will want to support additional debugging features as 
     -   Access the remote target's filesystem to read/write file
     -   Can be used to automatically read the remote executable on attach (using `ExecFile`)
 -   Read auxiliary vector (`info auxv`)
+-   Extra thread info (`info threads`)
 
 _Note:_ GDB features are implemented on an as-needed basis by `gdbstub`'s contributors. If there's a missing GDB feature that you'd like `gdbstub` to implement, please file an issue and/or open a PR!
 
