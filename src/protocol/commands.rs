@@ -87,6 +87,7 @@ macro_rules! commands {
                 trait Hack {
                     fn support_base(&mut self) -> Option<()>;
                     fn support_target_xml(&mut self) -> Option<()>;
+                    fn support_register_info(&mut self) -> Option<()>;
                     fn support_resume(&mut self) -> Option<()>;
                     fn support_single_register_access(&mut self) -> Option<()>;
                     fn support_reverse_step(&mut self) -> Option<()>;
@@ -111,6 +112,18 @@ macro_rules! commands {
                             None
                         }
                     }
+
+                    fn support_register_info(&mut self) -> Option<()> {
+                        use crate::arch::Arch;
+			if self.use_register_info()
+                            && (T::Arch::register_info(usize::max_value()).is_some()
+                                || self.support_register_info_override().is_some())
+                        {
+                            Some(())
+                        } else {
+                            None
+                        }
+		    }
 
                     fn support_resume(&mut self) -> Option<()> {
                         self.base_ops().resume_ops().map(drop)
@@ -300,5 +313,9 @@ commands! {
 
     thread_extra_info use 'a {
         "qThreadExtraInfo" => _qThreadExtraInfo::qThreadExtraInfo<'a>,
+    }
+
+    register_info {
+        "qRegisterInfo" => _qRegisterInfo::qRegisterInfo,
     }
 }

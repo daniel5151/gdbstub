@@ -159,6 +159,33 @@ pub trait Arch {
         None
     }
 
+    /// (optional) (LLDB extension) Write register info for one of the arch's
+    /// register.
+    ///
+    /// Implementing this method enables LLDB to dynamically query the
+    /// target's register information one by one.
+    ///
+    /// Some targets don't have register context in the compiled version
+    /// of the debugger. Help the debugger by dynamically supplying the register
+    /// info from the target. The debugger will request the register info in
+    /// a sequential manner till an error packet is received. In LLDB, the
+    /// register info search has the following [order](https://github.com/llvm/llvm-project/blob/369ce54bb302f209239b8ebc77ad824add9df089/lldb/source/Plugins/Process/gdb-remote/ProcessGDBRemote.cpp#L397-L402):
+    ///
+    ///1.    Use the target definition python file if one is specified.
+    ///2.    If the target definition doesn't have any of the info from the
+    ///target.xml (registers) then proceed to read the `target.xml`.
+    ///3.    Fall back on the `qRegisterInfo` packets.
+    ///4.    Use hardcoded defaults if available.
+    ///
+    /// See the LLDB [gdb-remote docs](https://github.com/llvm-mirror/lldb/blob/d01083a850f577b85501a0902b52fd0930de72c7/docs/lldb-gdb-remote.txt#L396)
+    /// for more details on the available information that a single register can
+    /// be described by and [#99](https://github.com/daniel5151/gdbstub/issues/99) for more information on LLDB compatibility.
+    #[inline(always)]
+    fn register_info(reg_id: usize) -> Option<lldb::RegisterInfo<'static>> {
+        let _ = reg_id;
+        None
+    }
+
     /// Encode how the mainline GDB client handles target support for
     /// single-step on this particular architecture.
     ///
@@ -254,4 +281,124 @@ pub enum SingleStepGdbBehavior {
     /// please conduct a test + upstream your findings to `gdbstub_arch`.
     #[doc(hidden)]
     Unknown,
+}
+
+/// LLDB-specific types supporting [`Arch::register_info`] and
+/// [`RegisterInfoOverride`](
+/// crate::target::ext::register_info_override::RegisterInfoOverride) APIs.
+pub mod lldb {
+    /// The architecture's register information of a single register.
+    pub enum RegisterInfo<'a> {
+        /// The register info of a single register that should be written.
+        Register(Register<'a>),
+        /// The `qRegisterInfo` query shall be concluded.
+        Done,
+    }
+
+    /// Describes the register info for a single register of
+    /// the target.
+    pub struct Register<'a> {
+        /// The primary register name.
+        pub name: &'a str,
+        /// An alternate name for the register.
+        pub alt_name: Option<&'a str>,
+        /// Size in bits of a register.
+        pub bitsize: usize,
+        /// The offset within the 'g' and 'G' packet of the register data for
+        /// this register.
+        pub offset: usize,
+        /// The encoding type of the register.
+        pub encoding: Encoding,
+        /// The preferred format for display of this register.
+        pub format: Format,
+        /// The register set name this register belongs to.
+        pub set: &'a str,
+        /// The GCC compiler registers number for this register.
+        /// _Note:_ This denotes the same `KEY:VALUE;` pair as `ehframe:VALUE;`.
+        /// See the LLDB [source](https://github.com/llvm/llvm-project/blob/b92436efcb7813fc481b30f2593a4907568d917a/lldb/source/Plugins/Process/gdb-remote/ProcessGDBRemote.cpp#L493).
+        pub gcc: Option<usize>,
+        /// The DWARF register number for this register that is used for this
+        /// register in the debug information.
+        pub dwarf: Option<usize>,
+        /// Specify as a generic register.
+        pub generic: Option<Generic>,
+        /// Other concrete register values this register is contained in.
+        pub container_regs: Option<&'a [usize]>,
+        /// Specifies which register values should be invalidated when this
+        /// register is modified.
+        pub invalidate_regs: Option<&'a [usize]>,
+    }
+
+    /// Describes the encoding type of the register.
+    #[non_exhaustive]
+    pub enum Encoding {
+        /// Unsigned integer
+        Uint,
+        /// Signed integer
+        Sint,
+        /// IEEE 754 float
+        IEEE754,
+        /// Vector register
+        Vector,
+    }
+
+    /// Describes the preferred format for display of this register.
+    #[non_exhaustive]
+    pub enum Format {
+        /// Binary format
+        Binary,
+        /// Decimal format
+        Decimal,
+        /// Hexadecimal format
+        Hex,
+        /// Floating point format
+        Float,
+        /// 8 bit signed int vector
+        VectorSInt8,
+        /// 8 bit unsigned int vector
+        VectorUInt8,
+        /// 16 bit signed int vector
+        VectorSInt16,
+        /// 16 bit unsigned int vector
+        VectorUInt16,
+        /// 32 bit signed int vector
+        VectorSInt32,
+        /// 32 bit unsigned int vector
+        VectorUInt32,
+        /// 32 bit floating point vector
+        VectorFloat32,
+        /// 128 bit unsigned int vector
+        VectorUInt128,
+    }
+
+    /// Describes the generic types that most CPUs have.
+    #[non_exhaustive]
+    pub enum Generic {
+        /// Program counter register
+        Pc,
+        /// Stack pointer register
+        Sp,
+        /// Frame pointer register
+        Fp,
+        /// Return address register
+        Ra,
+        /// CPU flags register
+        Flags,
+        /// Function argument 1
+        Arg1,
+        /// Function argument 2
+        Arg2,
+        /// Function argument 3
+        Arg3,
+        /// Function argument 4
+        Arg4,
+        /// Function argument 5
+        Arg5,
+        /// Function argument 6
+        Arg6,
+        /// Function argument 7
+        Arg7,
+        /// Function argument 8
+        Arg8,
+    }
 }

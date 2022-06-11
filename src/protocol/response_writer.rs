@@ -3,7 +3,8 @@ use alloc::string::String;
 #[cfg(feature = "trace-pkt")]
 use alloc::vec::Vec;
 
-use num_traits::PrimInt;
+use num_traits::identities::one;
+use num_traits::{CheckedRem, PrimInt};
 
 use crate::conn::Connection;
 use crate::internal::BeBytes;
@@ -156,7 +157,7 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
     }
 
     /// Write an entire string over the connection.
-    pub fn write_str(&mut self, s: &'static str) -> Result<(), Error<C::Error>> {
+    pub fn write_str(&mut self, s: &str) -> Result<(), Error<C::Error>> {
         for b in s.as_bytes().iter() {
             self.write(*b)?;
         }
@@ -224,6 +225,42 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
         let buf = &buf[..len];
         for b in buf.iter().copied().skip_while(|&b| b == 0) {
             self.write_hex(b)?
+        }
+        Ok(())
+    }
+
+    /// Write a number as a decimal string, converting every digit to an ascii
+    /// char.
+    pub fn write_dec<D: PrimInt + CheckedRem>(
+        &mut self,
+        mut digit: D,
+    ) -> Result<(), Error<C::Error>> {
+        if digit.is_zero() {
+            return self.write(b'0');
+        }
+
+        let one: D = one();
+        let ten = (one << 3) + (one << 1);
+        let mut d = digit;
+        let mut pow_10 = one;
+        // Get the number of digits in digit
+        while d >= ten {
+            d = d / ten;
+            pow_10 = pow_10 * ten;
+        }
+
+        // Write every digit from left to right as an ascii char
+        while !pow_10.is_zero() {
+            let mut byte = 0;
+            // We have a single digit here which uses up to 4 bit
+            for i in 0..4 {
+                if !((digit / pow_10) & (one << i)).is_zero() {
+                    byte += 1 << i;
+                }
+            }
+            self.write(b'0' + byte)?;
+            digit = digit % pow_10;
+            pow_10 = pow_10 / ten;
         }
         Ok(())
     }
