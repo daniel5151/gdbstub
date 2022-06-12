@@ -597,6 +597,21 @@ pub trait Target {
         true
     }
 
+    /// (LLDB extension) Whether to send register information to the client.
+    ///
+    /// Setting this to `false` will override both
+    /// [`Target::support_register_info_override`] and the associated
+    /// [`Arch::register_info`].
+    ///
+    /// _Author's note:_ Having the LLDB client autodetect your target's
+    /// register set is really useful, so unless you're _really_ trying to
+    /// squeeze `gdbstub` onto a particularly resource-constrained platform, you
+    /// may as well leave this enabled.
+    #[inline(always)]
+    fn use_register_info(&self) -> bool {
+        true
+    }
+
     /// Support for setting / removing breakpoints.
     #[inline(always)]
     fn support_breakpoints(&mut self) -> Option<ext::breakpoints::BreakpointsOps<'_, Self>> {
@@ -631,6 +646,15 @@ pub trait Target {
         &mut self,
     ) -> Option<ext::target_description_xml_override::TargetDescriptionXmlOverrideOps<'_, Self>>
     {
+        None
+    }
+
+    /// (LLDB extension) Support for overriding the register info specified by
+    /// `Target::Arch`.
+    #[inline(always)]
+    fn support_register_info_override(
+        &mut self,
+    ) -> Option<ext::register_info_override::RegisterInfoOverrideOps<'_, Self>> {
         None
     }
 
@@ -704,6 +728,10 @@ macro_rules! impl_dyn_target {
                 (**self).use_target_description_xml()
             }
 
+            fn use_register_info(&self) -> bool {
+                (**self).use_register_info()
+            }
+
             fn support_breakpoints(
                 &mut self,
             ) -> Option<ext::breakpoints::BreakpointsOps<'_, Self>> {
@@ -732,6 +760,12 @@ macro_rules! impl_dyn_target {
                 ext::target_description_xml_override::TargetDescriptionXmlOverrideOps<'_, Self>,
             > {
                 (**self).support_target_description_xml_override()
+            }
+
+            fn support_register_info_override(
+                &mut self,
+            ) -> Option<ext::register_info_override::RegisterInfoOverrideOps<'_, Self>> {
+                (**self).support_register_info_override()
             }
 
             fn support_memory_map(&mut self) -> Option<ext::memory_map::MemoryMapOps<'_, Self>> {

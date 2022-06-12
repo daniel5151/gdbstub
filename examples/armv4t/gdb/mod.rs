@@ -19,6 +19,7 @@ mod extended_mode;
 mod host_io;
 mod memory_map;
 mod monitor_cmd;
+mod register_info_override;
 mod section_offsets;
 mod target_description_xml_override;
 
@@ -112,6 +113,13 @@ impl Target for Emu {
     ) -> Option<
         target::ext::target_description_xml_override::TargetDescriptionXmlOverrideOps<'_, Self>,
     > {
+        Some(self)
+    }
+
+    #[inline(always)]
+    fn support_register_info_override(
+        &mut self,
+    ) -> Option<target::ext::register_info_override::RegisterInfoOverrideOps<'_, Self>> {
         Some(self)
     }
 
@@ -369,6 +377,7 @@ impl target::ext::base::singlethread::SingleThreadRangeStepping for Emu {
 mod custom_arch {
     use core::num::NonZeroUsize;
 
+    use gdbstub::arch::lldb::{Encoding, Format, Generic, Register, RegisterInfo};
     use gdbstub::arch::{Arch, RegId, Registers, SingleStepGdbBehavior};
 
     use gdbstub_arch::arm::reg::id::ArmCoreRegId;
@@ -482,6 +491,98 @@ mod custom_arch {
             Some("never gets returned")
         }
 
+        // (LLDB extension)
+        //
+        // for _purely demonstrative purposes_, even though this provides a working
+        // example, it will get overwritten by RegisterInfoOverride.
+        //
+        // See `examples/armv4t/gdb/register_info_override.rs`
+        fn register_info(reg_id: usize) -> Option<RegisterInfo<'static>> {
+            // Fix for missing 24 => Self::Fps in ArmCoreRegId::from_raw_id
+            let id = if reg_id == 24 { 23 } else { reg_id };
+
+            match ArmCoreRegIdCustom::from_raw_id(id) {
+                Some((_, None)) | None => Some(RegisterInfo::Done),
+                Some((r, Some(size))) => {
+                    let name = match r {
+                        // For the purpose of demonstration, we end the qRegisterInfo packet
+                        // exchange when reaching the Time register id, so that this register can
+                        // only be explicitly queried via the single-register read packet.
+                        ArmCoreRegIdCustom::Time => return Some(RegisterInfo::Done),
+                        ArmCoreRegIdCustom::Core(ArmCoreRegId::Gpr(i)) => match i {
+                            0 => "r0",
+                            1 => "r1",
+                            2 => "r2",
+                            3 => "r3",
+                            4 => "r4",
+                            5 => "r5",
+                            6 => "r6",
+                            7 => "r7",
+                            8 => "r8",
+                            9 => "r9",
+                            10 => "r10",
+                            11 => "r11",
+                            12 => "r12",
+                            _ => "unknown",
+                        },
+                        ArmCoreRegIdCustom::Core(ArmCoreRegId::Sp) => "sp",
+                        ArmCoreRegIdCustom::Core(ArmCoreRegId::Lr) => "lr",
+                        ArmCoreRegIdCustom::Core(ArmCoreRegId::Pc) => "pc",
+                        ArmCoreRegIdCustom::Core(ArmCoreRegId::Fpr(_i)) => "padding",
+                        ArmCoreRegIdCustom::Core(ArmCoreRegId::Fps) => "padding",
+                        ArmCoreRegIdCustom::Core(ArmCoreRegId::Cpsr) => "cpsr",
+                        ArmCoreRegIdCustom::Custom => "custom",
+                        _ => "unknown",
+                    };
+                    let encoding = match r {
+                        ArmCoreRegIdCustom::Core(ArmCoreRegId::Gpr(_i)) => Encoding::Uint,
+                        ArmCoreRegIdCustom::Core(ArmCoreRegId::Sp)
+                        | ArmCoreRegIdCustom::Core(ArmCoreRegId::Pc)
+                        | ArmCoreRegIdCustom::Core(ArmCoreRegId::Cpsr)
+                        | ArmCoreRegIdCustom::Custom => Encoding::Uint,
+                        _ => Encoding::Vector,
+                    };
+                    let format = match r {
+                        ArmCoreRegIdCustom::Core(ArmCoreRegId::Gpr(_i)) => Format::Hex,
+                        ArmCoreRegIdCustom::Core(ArmCoreRegId::Sp)
+                        | ArmCoreRegIdCustom::Core(ArmCoreRegId::Pc)
+                        | ArmCoreRegIdCustom::Core(ArmCoreRegId::Cpsr)
+                        | ArmCoreRegIdCustom::Custom => Format::Hex,
+                        _ => Format::VectorUInt8,
+                    };
+                    let set = match r {
+                        ArmCoreRegIdCustom::Core(ArmCoreRegId::Gpr(_i)) => {
+                            "General Purpose Registers"
+                        }
+                        ArmCoreRegIdCustom::Core(ArmCoreRegId::Sp)
+                        | ArmCoreRegIdCustom::Core(ArmCoreRegId::Pc)
+                        | ArmCoreRegIdCustom::Core(ArmCoreRegId::Cpsr)
+                        | ArmCoreRegIdCustom::Custom => "General Purpose Registers",
+                        _ => "Floating Point Registers",
+                    };
+                    let generic = match r {
+                        ArmCoreRegIdCustom::Core(ArmCoreRegId::Sp) => Some(Generic::Sp),
+                        ArmCoreRegIdCustom::Core(ArmCoreRegId::Pc) => Some(Generic::Pc),
+                        _ => None,
+                    };
+                    let reg = Register {
+                        name,
+                        alt_name: None,
+                        bitsize: (usize::from(size)) * 8,
+                        offset: id * (usize::from(size)),
+                        encoding,
+                        format,
+                        set,
+                        gcc: None,
+                        dwarf: Some(id),
+                        generic,
+                        container_regs: None,
+                        invalidate_regs: None,
+                    };
+                    Some(RegisterInfo::Register(reg))
+                }
+            }
+        }
         // armv4t supports optional single stepping.
         //
         // notably, x86 is an example of an arch that does _not_ support

@@ -267,6 +267,7 @@ pub mod extended_mode;
 pub mod host_io;
 pub mod memory_map;
 pub mod monitor_cmd;
+pub mod register_info_override;
 pub mod section_offsets;
 pub mod target_description_xml_override;
 pub mod thread_extra_info;
