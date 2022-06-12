@@ -12,6 +12,7 @@ jobs:
         with:
           profile: minimal
           toolchain: stable
+          override: true
       - name: cargo clippy
         uses: actions-rs/cargo@v1
         with:
@@ -33,6 +34,7 @@ jobs:
         with:
           command: doc
           args: --workspace --features=std
+
   rustfmt:
     name: rustfmt (nightly)
     runs-on: ubuntu-latest
@@ -42,6 +44,7 @@ jobs:
         with:
           profile: minimal
           toolchain: nightly
+          override: true
           components: rustfmt
       - name: cargo +nightly fmt
         uses: actions-rs/cargo@v1
