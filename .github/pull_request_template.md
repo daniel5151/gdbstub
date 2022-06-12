@@ -14,24 +14,22 @@ Closes #(issue number) <!-- if appropriate -->
 
 ### Checklist
 
-- Implementation
-  - [ ] `cargo build` compiles without `errors` or `warnings`
-  - [ ] `cargo clippy` runs without `errors` or `warnings`
-  - [ ] `cargo fmt` was run
-  - [ ] All tests pass
+<!-- CI takes care of a lot of things, but there are some things that have yet to be automated -->
+
 - Documentation
-  - [ ] rustdoc + approprate inline code comments
-  - [ ] Updated CHANGELOG.md
+  - [ ] Ensured any public-facing `rustdoc` formatting looks good (via `cargo doc`)
   - [ ] (if appropriate) Added feature to "Debugging Features" in README.md
+- Validation
+  - [ ] Included output of running `examples/armv4t` with `RUST_LOG=trace` + any relevant GDB output under the "Validation" section below
+  - [ ] Included output of running `./example_no_std/check_size.sh` before/after changes under the "Validation" section below
 - _If implementing a new protocol extension IDET_
   - [ ] Included a basic sample implementation in `examples/armv4t`
-  - [ ] Included output of running `examples/armv4t` with `RUST_LOG=trace` + any relevant GDB output under the "Validation" section below
-  - [ ] Confirmed that IDET can be optimized away (using `./scripts/test_dead_code_elim.sh` and/or `./example_no_std/check_size.sh`)
-  - [ ] **OR** Implementation requires adding non-optional binary bloat (please elaborate under "Description")
+  - [ ] IDET can be optimized out (confirmed via `./example_no_std/check_size.sh`)
+  - [ ] **OR** implementation requires introducing non-optional binary bloat (please elaborate under "Description")
 - _If upstreaming an `Arch` implementation_
   - [ ] I have tested this code in my project, and to the best of my knowledge, it is working as intended.
 
-<!-- If you are implementing `gdbstub` in an open-source project, consider updating the README.md's "Real World Examples" section to link back to your project! -->
+<!-- Oh, and if you're integrating `gdbstub` in an open-source project, do consider updating the README.md's "Real World Examples" section to link back to your project! -->
 
 ### Validation
 
@@ -146,4 +144,77 @@ GDB queried if it was attached to a process with PID 1
  TRACE gdbstub::gdbstub_impl              > <-- $m0,4#fd
  TRACE gdbstub::protocol::response_writer > --> $00000000#7e
 ```
+</details>
+
+<details>
+<summary>Before/After `./example_no_std/check_size.sh` output</summary>
+
+### Before
+
+```
+!!!!! EXAMPLE OUTPUT !!!!!
+
+target/release/gdbstub-nostd  :
+section               size    addr
+.interp                 28     680
+.note.gnu.build-id      36     708
+.note.ABI-tag           32     744
+.gnu.hash               36     776
+.dynsym                360     816
+.dynstr                193    1176
+.gnu.version            30    1370
+.gnu.version_r          48    1400
+.rela.dyn              408    1448
+.init                   27    4096
+.plt                    16    4128
+.plt.got                 8    4144
+.text                15253    4160
+.fini                   13   19416
+.rodata                906   20480
+.eh_frame_hdr          284   21388
+.eh_frame             1432   21672
+.init_array              8   28072
+.fini_array              8   28080
+.dynamic               448   28088
+.got                   136   28536
+.data                    8   28672
+.bss                     8   28680
+.comment                43       0
+Total                19769
+```
+
+### After
+
+```
+!!!!! EXAMPLE OUTPUT !!!!!
+
+target/release/gdbstub-nostd  :
+section               size    addr
+.interp                 28     680
+.note.gnu.build-id      36     708
+.note.ABI-tag           32     744
+.gnu.hash               36     776
+.dynsym                360     816
+.dynstr                193    1176
+.gnu.version            30    1370
+.gnu.version_r          48    1400
+.rela.dyn              408    1448
+.init                   27    4096
+.plt                    16    4128
+.plt.got                 8    4144
+.text                15253    4160
+.fini                   13   19416
+.rodata                906   20480
+.eh_frame_hdr          284   21388
+.eh_frame             1432   21672
+.init_array              8   28072
+.fini_array              8   28080
+.dynamic               448   28088
+.got                   136   28536
+.data                    8   28672
+.bss                     8   28680
+.comment                43       0
+Total                19769
+```
+
 </details>
