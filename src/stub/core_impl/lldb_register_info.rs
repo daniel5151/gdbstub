@@ -1,22 +1,22 @@
 use super::prelude::*;
-use crate::protocol::commands::ext::RegisterInfo;
+use crate::protocol::commands::ext::LldbRegisterInfo;
 
 use crate::arch::lldb::{Encoding, Format, Generic, Register, RegisterInfo as LLDBRegisterInfo};
 use crate::arch::Arch;
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
-    pub(crate) fn handle_register_info(
+    pub(crate) fn handle_lldb_register_info(
         &mut self,
         res: &mut ResponseWriter<'_, C>,
         target: &mut T,
-        command: RegisterInfo,
+        command: LldbRegisterInfo,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
-        if !target.use_register_info() {
+        if !target.use_lldb_register_info() {
             return Ok(HandlerStatus::Handled);
         }
 
         let handler_status = match command {
-            RegisterInfo::qRegisterInfo(cmd) => {
+            LldbRegisterInfo::qRegisterInfo(cmd) => {
                 let mut err = Ok(());
                 let cb = &mut |reg: Option<Register<'_>>| {
                     let res = match reg {
@@ -111,10 +111,12 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         err = Err(e);
                     }
                 };
-                if let Some(ops) = target.support_register_info_override() {
-                    use crate::target::ext::register_info_override::{Callback, CallbackToken};
+                if let Some(ops) = target.support_lldb_register_info_override() {
+                    use crate::target::ext::lldb_register_info_override::{
+                        Callback, CallbackToken,
+                    };
 
-                    ops.register_info(
+                    ops.lldb_register_info(
                         cmd.reg_id,
                         Callback {
                             cb,
@@ -123,7 +125,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     )
                     .map_err(Error::TargetError)?;
                     err?;
-                } else if let Some(reg) = T::Arch::register_info(cmd.reg_id) {
+                } else if let Some(reg) = T::Arch::lldb_register_info(cmd.reg_id) {
                     match reg {
                         LLDBRegisterInfo::Register(reg) => cb(Some(reg)),
                         LLDBRegisterInfo::Done => cb(None),

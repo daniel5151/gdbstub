@@ -600,15 +600,15 @@ pub trait Target {
     /// (LLDB extension) Whether to send register information to the client.
     ///
     /// Setting this to `false` will override both
-    /// [`Target::support_register_info_override`] and the associated
-    /// [`Arch::register_info`].
+    /// [`Target::support_lldb_register_info_override`] and the associated
+    /// [`Arch::lldb_register_info`].
     ///
     /// _Author's note:_ Having the LLDB client autodetect your target's
     /// register set is really useful, so unless you're _really_ trying to
     /// squeeze `gdbstub` onto a particularly resource-constrained platform, you
     /// may as well leave this enabled.
     #[inline(always)]
-    fn use_register_info(&self) -> bool {
+    fn use_lldb_register_info(&self) -> bool {
         true
     }
 
@@ -652,9 +652,9 @@ pub trait Target {
     /// (LLDB extension) Support for overriding the register info specified by
     /// `Target::Arch`.
     #[inline(always)]
-    fn support_register_info_override(
+    fn support_lldb_register_info_override(
         &mut self,
-    ) -> Option<ext::register_info_override::RegisterInfoOverrideOps<'_, Self>> {
+    ) -> Option<ext::lldb_register_info_override::LldbRegisterInfoOverrideOps<'_, Self>> {
         None
     }
 
@@ -728,8 +728,8 @@ macro_rules! impl_dyn_target {
                 (**self).use_target_description_xml()
             }
 
-            fn use_register_info(&self) -> bool {
-                (**self).use_register_info()
+            fn use_lldb_register_info(&self) -> bool {
+                (**self).use_lldb_register_info()
             }
 
             fn support_breakpoints(
@@ -762,10 +762,11 @@ macro_rules! impl_dyn_target {
                 (**self).support_target_description_xml_override()
             }
 
-            fn support_register_info_override(
+            fn support_lldb_register_info_override(
                 &mut self,
-            ) -> Option<ext::register_info_override::RegisterInfoOverrideOps<'_, Self>> {
-                (**self).support_register_info_override()
+            ) -> Option<ext::lldb_register_info_override::LldbRegisterInfoOverrideOps<'_, Self>>
+            {
+                (**self).support_lldb_register_info_override()
             }
 
             fn support_memory_map(&mut self) -> Option<ext::memory_map::MemoryMapOps<'_, Self>> {

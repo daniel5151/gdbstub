@@ -159,29 +159,31 @@ pub trait Arch {
         None
     }
 
-    /// (optional) (LLDB extension) Write register info for one of the arch's
+    /// (optional) (LLDB extension) Return register info for the specified
     /// register.
     ///
-    /// Implementing this method enables LLDB to dynamically query the
-    /// target's register information one by one.
+    /// Implementing this method enables LLDB to dynamically query the target's
+    /// register information one by one.
     ///
-    /// Some targets don't have register context in the compiled version
-    /// of the debugger. Help the debugger by dynamically supplying the register
-    /// info from the target. The debugger will request the register info in
-    /// a sequential manner till an error packet is received. In LLDB, the
-    /// register info search has the following [order](https://github.com/llvm/llvm-project/blob/369ce54bb302f209239b8ebc77ad824add9df089/lldb/source/Plugins/Process/gdb-remote/ProcessGDBRemote.cpp#L397-L402):
+    /// Some targets don't have register context in the compiled version of the
+    /// debugger. Help the debugger by dynamically supplying the register info
+    /// from the target. The debugger will request the register info in a
+    /// sequential manner till an error packet is received. In LLDB, the
+    /// register info search has the following
+    /// [order](https://github.com/llvm/llvm-project/blob/369ce54bb302f209239b8ebc77ad824add9df089/lldb/source/Plugins/Process/gdb-remote/ProcessGDBRemote.cpp#L397-L402):
     ///
-    ///1.    Use the target definition python file if one is specified.
-    ///2.    If the target definition doesn't have any of the info from the
-    ///target.xml (registers) then proceed to read the `target.xml`.
-    ///3.    Fall back on the `qRegisterInfo` packets.
-    ///4.    Use hardcoded defaults if available.
+    /// 1. Use the target definition python file if one is specified.
+    /// 2. If the target definition doesn't have any of the info from the
+    ///    target.xml (registers) then proceed to read the `target.xml`.
+    /// 3. Fall back on the `qRegisterInfo` packets.
+    /// 4. Use hardcoded defaults if available.
     ///
     /// See the LLDB [gdb-remote docs](https://github.com/llvm-mirror/lldb/blob/d01083a850f577b85501a0902b52fd0930de72c7/docs/lldb-gdb-remote.txt#L396)
     /// for more details on the available information that a single register can
-    /// be described by and [#99](https://github.com/daniel5151/gdbstub/issues/99) for more information on LLDB compatibility.
+    /// be described by and [#99](https://github.com/daniel5151/gdbstub/issues/99)
+    /// for more information on LLDB compatibility.
     #[inline(always)]
-    fn register_info(reg_id: usize) -> Option<lldb::RegisterInfo<'static>> {
+    fn lldb_register_info(reg_id: usize) -> Option<lldb::RegisterInfo<'static>> {
         let _ = reg_id;
         None
     }
@@ -283,9 +285,10 @@ pub enum SingleStepGdbBehavior {
     Unknown,
 }
 
-/// LLDB-specific types supporting [`Arch::register_info`] and
-/// [`RegisterInfoOverride`](
-/// crate::target::ext::register_info_override::RegisterInfoOverride) APIs.
+/// LLDB-specific types supporting [`Arch::lldb_register_info`] and
+/// [`LldbRegisterInfoOverride`] APIs.
+///
+/// [`LldbRegisterInfoOverride`]: crate::target::ext::lldb_register_info_override::LldbRegisterInfoOverride
 pub mod lldb {
     /// The architecture's register information of a single register.
     pub enum RegisterInfo<'a> {
@@ -314,6 +317,7 @@ pub mod lldb {
         /// The register set name this register belongs to.
         pub set: &'a str,
         /// The GCC compiler registers number for this register.
+        ///
         /// _Note:_ This denotes the same `KEY:VALUE;` pair as `ehframe:VALUE;`.
         /// See the LLDB [source](https://github.com/llvm/llvm-project/blob/b92436efcb7813fc481b30f2593a4907568d917a/lldb/source/Plugins/Process/gdb-remote/ProcessGDBRemote.cpp#L493).
         pub gcc: Option<usize>,

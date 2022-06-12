@@ -17,9 +17,9 @@ mod catch_syscalls;
 mod exec_file;
 mod extended_mode;
 mod host_io;
+mod lldb_register_info_override;
 mod memory_map;
 mod monitor_cmd;
-mod register_info_override;
 mod section_offsets;
 mod target_description_xml_override;
 
@@ -117,9 +117,10 @@ impl Target for Emu {
     }
 
     #[inline(always)]
-    fn support_register_info_override(
+    fn support_lldb_register_info_override(
         &mut self,
-    ) -> Option<target::ext::register_info_override::RegisterInfoOverrideOps<'_, Self>> {
+    ) -> Option<target::ext::lldb_register_info_override::LldbRegisterInfoOverrideOps<'_, Self>>
+    {
         Some(self)
     }
 
@@ -497,7 +498,7 @@ mod custom_arch {
         // example, it will get overwritten by RegisterInfoOverride.
         //
         // See `examples/armv4t/gdb/register_info_override.rs`
-        fn register_info(reg_id: usize) -> Option<RegisterInfo<'static>> {
+        fn lldb_register_info(reg_id: usize) -> Option<RegisterInfo<'static>> {
             // Fix for missing 24 => Self::Fps in ArmCoreRegId::from_raw_id
             let id = if reg_id == 24 { 23 } else { reg_id };
 

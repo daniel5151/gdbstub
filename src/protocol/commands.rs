@@ -87,7 +87,7 @@ macro_rules! commands {
                 trait Hack {
                     fn support_base(&mut self) -> Option<()>;
                     fn support_target_xml(&mut self) -> Option<()>;
-                    fn support_register_info(&mut self) -> Option<()>;
+                    fn support_lldb_register_info(&mut self) -> Option<()>;
                     fn support_resume(&mut self) -> Option<()>;
                     fn support_single_register_access(&mut self) -> Option<()>;
                     fn support_reverse_step(&mut self) -> Option<()>;
@@ -113,11 +113,11 @@ macro_rules! commands {
                         }
                     }
 
-                    fn support_register_info(&mut self) -> Option<()> {
+                    fn support_lldb_register_info(&mut self) -> Option<()> {
                         use crate::arch::Arch;
-			if self.use_register_info()
-                            && (T::Arch::register_info(usize::max_value()).is_some()
-                                || self.support_register_info_override().is_some())
+			            if self.use_lldb_register_info()
+                            && (T::Arch::lldb_register_info(usize::max_value()).is_some()
+                                || self.support_lldb_register_info_override().is_some())
                         {
                             Some(())
                         } else {
@@ -315,7 +315,7 @@ commands! {
         "qThreadExtraInfo" => _qThreadExtraInfo::qThreadExtraInfo<'a>,
     }
 
-    register_info {
+    lldb_register_info {
         "qRegisterInfo" => _qRegisterInfo::qRegisterInfo,
     }
 }

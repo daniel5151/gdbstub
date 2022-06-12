@@ -1,7 +1,7 @@
 use gdbstub::arch::lldb::{Encoding, Format, Generic, Register};
 use gdbstub::arch::RegId;
 use gdbstub::target;
-use gdbstub::target::ext::register_info_override::{Callback, CallbackToken};
+use gdbstub::target::ext::lldb_register_info_override::{Callback, CallbackToken};
 use gdbstub_arch::arm::reg::id::ArmCoreRegId;
 
 use crate::gdb::custom_arch::ArmCoreRegIdCustom;
@@ -12,8 +12,8 @@ use crate::gdb::Emu;
 // Note: In this implementation, we have r0-pc from 0-16 but cpsr is at offset
 // 25*4 in the 'g'/'G' packets, so we add 8 padding registers here. Please see
 // gdbstub/examples/armv4t/gdb/target_description_xml_override.rs for more info.
-impl target::ext::register_info_override::RegisterInfoOverride for Emu {
-    fn register_info<'a>(
+impl target::ext::lldb_register_info_override::LldbRegisterInfoOverride for Emu {
+    fn lldb_register_info<'a>(
         &mut self,
         reg_id: usize,
         reg_info: Callback<'a>,
