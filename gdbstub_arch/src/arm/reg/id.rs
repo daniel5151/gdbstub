@@ -30,6 +30,7 @@ impl RegId for ArmCoreRegId {
             14 => Self::Lr,
             15 => Self::Pc,
             16..=23 => Self::Fpr((id as u8) - 16),
+            24 => Self::Fps,
             25 => Self::Cpsr,
             _ => return None,
         };

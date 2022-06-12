@@ -18,10 +18,7 @@ impl target::ext::lldb_register_info_override::LldbRegisterInfoOverride for Emu 
         reg_id: usize,
         reg_info: Callback<'a>,
     ) -> Result<CallbackToken<'a>, Self::Error> {
-        // Fix for missing 24 => Self::Fps in ArmCoreRegId::from_raw_id
-        let id = if reg_id == 24 { 23 } else { reg_id };
-
-        match ArmCoreRegIdCustom::from_raw_id(id) {
+        match ArmCoreRegIdCustom::from_raw_id(reg_id) {
             Some((_, None)) | None => Ok(reg_info.done()),
             Some((r, Some(size))) => {
                 let name: String = match r {
@@ -89,12 +86,12 @@ impl target::ext::lldb_register_info_override::LldbRegisterInfoOverride for Emu 
                     name: &name,
                     alt_name: None,
                     bitsize: (usize::from(size)) * 8,
-                    offset: id * (usize::from(size)),
+                    offset: reg_id * (usize::from(size)),
                     encoding,
                     format,
                     set: &set,
                     gcc: None,
-                    dwarf: Some(id),
+                    dwarf: Some(reg_id),
                     generic,
                     container_regs: None,
                     invalidate_regs: None,
