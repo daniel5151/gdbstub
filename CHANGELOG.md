@@ -2,7 +2,27 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+# 0.6.2
+
+#### New Protocol Extensions
+
+- `MultiThreadBase > ThreadExtraInfo` - Provide extra information per-thread. [\#106](https://github.com/daniel5151/gdbstub/pull/106) ([thefaxman](https://github.com/thefaxman))
+- `LldbRegisterInfo` - (LLDB specific) Report register information in the LLDB format. [\#103](https://github.com/daniel5151/gdbstub/pull/103) ([jawilk](https://github.com/jawilk))
+  - This information can be statically included as part of the `Arch` implemention, or dynamically reported via the `LldbRegisterInfoOverride` IDET.
+
+#### Bugfixes
+
+- Report thread ID in response to `?` packet. [\#105](https://github.com/daniel5151/gdbstub/pull/105) ([thefaxman](https://github.com/thefaxman))
+
+#### Internal Improvements
+
+- Tweak enabled clippy lints
+- Added a light dusting of `#[inline]` across the packet parsing code, crunching the code down even further
+- Expanded on "no-panic guarantee" docs
+
 # 0.6.1
+
+#### New Features
 
 - add LLDB-specific HostIoOpenFlags [\#100](https://github.com/daniel5151/gdbstub/pull/100) ([mrk](https://github.com/mrk-its))
 

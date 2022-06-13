@@ -2,6 +2,14 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+# 0.2.3
+
+- Fix missing reg_id mapping in `Armv4t` (24 => Fps)
+
+# 0.2.2
+
+- Remove faulty target.xml from mips64 arch
+
 # 0.2.1
 
 - Removed all remaining instances of `SingleStepGdbBehavior::Unknown` [\#62](https://github.com/daniel5151/gdbstub/pull/95) ([bet4it](https://github.com/bet4it))
