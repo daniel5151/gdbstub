@@ -314,6 +314,7 @@ impl target::ext::base::single_register_access::SingleRegisterAccess<()> for Emu
                 );
                 Ok(buf.len())
             }
+            custom_arch::ArmCoreRegIdCustom::Unavailable => Ok(0),
         }
     }
 
@@ -341,7 +342,8 @@ impl target::ext::base::single_register_access::SingleRegisterAccess<()> for Emu
                 Ok(())
             }
             // ignore writes
-            custom_arch::ArmCoreRegIdCustom::Time => Ok(()),
+            custom_arch::ArmCoreRegIdCustom::Unavailable
+            | custom_arch::ArmCoreRegIdCustom::Time => Ok(()),
         }
     }
 }
@@ -460,6 +462,8 @@ mod custom_arch {
         // not sent as part of `struct ArmCoreRegsCustom`, and only accessible via the single
         // register read/write functions
         Time,
+        /// This pseudo-register is valid but never available
+        Unavailable,
     }
 
     impl RegId for ArmCoreRegIdCustom {
@@ -467,6 +471,7 @@ mod custom_arch {
             let reg = match id {
                 26 => Self::Custom,
                 27 => Self::Time,
+                28 => Self::Unavailable,
                 _ => {
                     let (reg, size) = ArmCoreRegId::from_raw_id(id)?;
                     return Some((Self::Core(reg), size));
@@ -530,6 +535,7 @@ mod custom_arch {
                         ArmCoreRegIdCustom::Core(ArmCoreRegId::Fps) => "padding",
                         ArmCoreRegIdCustom::Core(ArmCoreRegId::Cpsr) => "cpsr",
                         ArmCoreRegIdCustom::Custom => "custom",
+                        ArmCoreRegIdCustom::Unavailable => "Unavailable",
                         _ => "unknown",
                     };
                     let encoding = match r {
@@ -537,6 +543,7 @@ mod custom_arch {
                         ArmCoreRegIdCustom::Core(ArmCoreRegId::Sp)
                         | ArmCoreRegIdCustom::Core(ArmCoreRegId::Pc)
                         | ArmCoreRegIdCustom::Core(ArmCoreRegId::Cpsr)
+                        | ArmCoreRegIdCustom::Unavailable
                         | ArmCoreRegIdCustom::Custom => Encoding::Uint,
                         _ => Encoding::Vector,
                     };
@@ -545,6 +552,7 @@ mod custom_arch {
                         ArmCoreRegIdCustom::Core(ArmCoreRegId::Sp)
                         | ArmCoreRegIdCustom::Core(ArmCoreRegId::Pc)
                         | ArmCoreRegIdCustom::Core(ArmCoreRegId::Cpsr)
+                        | ArmCoreRegIdCustom::Unavailable
                         | ArmCoreRegIdCustom::Custom => Format::Hex,
                         _ => Format::VectorUInt8,
                     };
@@ -555,6 +563,7 @@ mod custom_arch {
                         ArmCoreRegIdCustom::Core(ArmCoreRegId::Sp)
                         | ArmCoreRegIdCustom::Core(ArmCoreRegId::Pc)
                         | ArmCoreRegIdCustom::Core(ArmCoreRegId::Cpsr)
+                        | ArmCoreRegIdCustom::Unavailable
                         | ArmCoreRegIdCustom::Custom => "General Purpose Registers",
                         _ => "Floating Point Registers",
                     };

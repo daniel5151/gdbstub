@@ -96,5 +96,13 @@ const EXTRA_XML: &str = r#"
         this register via the 'p' and 'P' packets respectively
     -->
     <reg name="time" bitsize="32" type="uint32"/>
+
+    <!--
+        pseudo-register that is always unavailable.
+
+        it is supposed to be reported as 'x'-ed bytes in replies to 'p' packets
+        and shown by the GDB client as "<unavailable>".
+    -->
+    <reg name="unavailable" bitsize="32" type="uint32"/>
 </feature>
 "#;
