@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+cd "$(dirname "$(realpath $0)")"
+
 # checks the size of the resulting --release level binary (that's been stripped)
 
 cargo build --release
