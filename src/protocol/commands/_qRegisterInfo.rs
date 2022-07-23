@@ -10,8 +10,8 @@ impl<'a> ParseCommand<'a> for qRegisterInfo {
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
         let body = buf.into_body();
 
-        let reg_id = decode_hex(body).ok()?; 
-      
+        let reg_id = decode_hex(body).ok()?;
+
         Some(qRegisterInfo { reg_id })
     }
 }

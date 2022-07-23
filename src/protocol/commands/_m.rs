@@ -38,8 +38,6 @@ impl<'a> ParseCommand<'a> for m<'a> {
         let addr_len = addr.len();
         let len = decode_hex(body.next()?).ok()?;
 
-        drop(body);
-
         // ensures that `split_at_mut` doesn't panic
         if buf.len() < body_range.start + addr_len {
             return None;

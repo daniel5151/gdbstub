@@ -26,8 +26,6 @@ impl<'a> ParseCommand<'a> for vFilePread<'a> {
                 let count = decode_hex(body.next()?).ok()?;
                 let offset = decode_hex(body.next()?).ok()?;
 
-                drop(body);
-
                 Some(vFilePread {
                     fd,
                     count,

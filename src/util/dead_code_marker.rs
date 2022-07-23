@@ -32,6 +32,6 @@ pub fn black_box<T>(dummy: T) -> T {
 macro_rules! __dead_code_marker {
     ($feature:literal, $ctx:literal) => {
         #[cfg(feature = "__dead_code_marker")]
-        crate::util::dead_code_marker::black_box(concat!("<", $feature, ",", $ctx, ">"));
+        $crate::util::dead_code_marker::black_box(concat!("<", $feature, ",", $ctx, ">"));
     };
 }
