@@ -33,14 +33,24 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                 let len = ops.read_register(id, reg_id, buf).handle_error()?;
 
-                if let Some(size) = reg_size {
-                    if size.get() != len {
+                if len == 0 {
+                    if let Some(size) = reg_size {
+                        for _ in 0..size.get() {
+                            res.write_str("xx")?;
+                        }
+                    } else {
                         return Err(Error::TargetMismatch);
                     }
                 } else {
-                    buf = buf.get_mut(..len).ok_or(Error::PacketBufferOverflow)?;
+                    if let Some(size) = reg_size {
+                        if size.get() != len {
+                            return Err(Error::TargetMismatch);
+                        }
+                    } else {
+                        buf = buf.get_mut(..len).ok_or(Error::PacketBufferOverflow)?;
+                    }
+                    res.write_hex_buf(buf)?;
                 }
-                res.write_hex_buf(buf)?;
                 HandlerStatus::Handled
             }
             SingleRegisterAccess::P(p) => {

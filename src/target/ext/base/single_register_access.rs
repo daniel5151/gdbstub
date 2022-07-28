@@ -29,7 +29,8 @@ where
     /// Implementations should write the value of the register using target's
     /// native byte order in the buffer `buf`.
     ///
-    /// Return the number of bytes written into `buf`.
+    /// Return the number of bytes written into `buf` or `0` if the register is
+    /// valid but unavailable.
     ///
     /// If the requested register could not be accessed, an appropriate
     /// non-fatal error should be returned.
