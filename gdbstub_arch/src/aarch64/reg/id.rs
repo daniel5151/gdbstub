@@ -54,6 +54,8 @@ impl RegId for AArch64RegId {
             32 => Self::Pc,
             33 => Self::Pstate,
             34..=65 => Self::V((id - 34) as u8),
+            66 => Self::FPSR,
+            67 => Self::FPCR,
             #[allow(clippy::unusual_byte_groupings)]
             // We configure GDB to use regnums that correspond to the architectural u16 opcode
             // and avoid clashes with core registers thanks to op0==0b00 and op0==0b01 not being

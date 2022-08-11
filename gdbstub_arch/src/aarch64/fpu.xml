@@ -121,7 +121,7 @@
          operations.  -->
     <field name="N" start="31" end="31"/>
   </flags>
-  <reg name="fpsr" bitsize="32" type="fpsr_flags" regnum="55841"/>
+  <reg name="fpsr" bitsize="32" type="fpsr_flags"/>
 
   <flags id="fpcr_flags" size="4">
     <!-- Flush Inputs to Zero (part of Armv8.7).  -->
@@ -156,5 +156,5 @@
     <!-- Alternative half-precision control bit.  -->
     <field name="AHP" start="26" end="26"/>
   </flags>
-  <reg name="fpcr" bitsize="32" type="fpcr_flags" regnum="55840"/>
+  <reg name="fpcr" bitsize="32" type="fpcr_flags"/>
 </feature>

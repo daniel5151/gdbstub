@@ -16,6 +16,12 @@ pub struct AArch64CoreRegs {
     pub pc: u64,
     /// Process State (GDB uses the AArch32 CPSR name)
     pub cpsr: u32,
+    /// FP & SIMD Registers (V0-V31)
+    pub v: [u128; 32],
+    /// Floating-point Control Register
+    pub fpcr: u32,
+    /// Floating-point Status Register
+    pub fpsr: u32,
 }
 
 impl Registers for AArch64CoreRegs {
@@ -40,16 +46,24 @@ impl Registers for AArch64CoreRegs {
         write_bytes!(self.sp);
         write_bytes!(self.pc);
         write_bytes!(self.cpsr);
+        for reg in self.v.iter() {
+            write_bytes!(reg);
+        }
+        write_bytes!(self.fpcr);
+        write_bytes!(self.fpsr);
     }
 
     fn gdb_deserialize(&mut self, bytes: &[u8]) -> Result<(), ()> {
-        const U64_END: usize = core::mem::size_of::<u64>() * 33;
+        const CPSR_OFF: usize = core::mem::size_of::<u64>() * 33;
+        const FPSIMD_OFF: usize = CPSR_OFF + core::mem::size_of::<u32>();
+        const FPCR_OFF: usize = FPSIMD_OFF + core::mem::size_of::<u128>() * 32;
+        const END: usize = FPCR_OFF + core::mem::size_of::<u32>() * 2;
 
-        if bytes.len() % core::mem::size_of::<u32>() != 0 {
+        if bytes.len() < END {
             return Err(());
         }
 
-        let mut regs = bytes[0..U64_END]
+        let mut regs = bytes[0..CPSR_OFF]
             .chunks_exact(core::mem::size_of::<u64>())
             .map(|c| u64::from_le_bytes(c.try_into().unwrap()));
 
@@ -59,11 +73,26 @@ impl Registers for AArch64CoreRegs {
         self.sp = regs.next().ok_or(())?;
         self.pc = regs.next().ok_or(())?;
 
-        let mut regs = bytes[U64_END..]
+        let mut regs = bytes[CPSR_OFF..FPSIMD_OFF]
             .chunks_exact(core::mem::size_of::<u32>())
             .map(|c| u32::from_le_bytes(c.try_into().unwrap()));
 
         self.cpsr = regs.next().ok_or(())?;
+
+        let mut regs = bytes[FPSIMD_OFF..FPCR_OFF]
+            .chunks_exact(core::mem::size_of::<u128>())
+            .map(|c| u128::from_le_bytes(c.try_into().unwrap()));
+
+        for reg in self.v.iter_mut() {
+            *reg = regs.next().ok_or(())?
+        }
+
+        let mut regs = bytes[FPCR_OFF..]
+            .chunks_exact(core::mem::size_of::<u32>())
+            .map(|c| u32::from_le_bytes(c.try_into().unwrap()));
+
+        self.fpcr = regs.next().ok_or(())?;
+        self.fpsr = regs.next().ok_or(())?;
 
         Ok(())
     }
