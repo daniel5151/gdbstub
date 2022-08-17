@@ -10,7 +10,7 @@ use gdbstub::internal::LeBytes;
 /// Useful links:
 /// * [GNU binutils-gdb XML descriptions](https://github.com/bminor/binutils-gdb/blob/master/gdb/features/riscv)
 /// * [riscv-tdep.h](https://github.com/bminor/binutils-gdb/blob/master/gdb/riscv-tdep.h)
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct RiscvCoreRegs<U> {
     /// General purpose registers (x0-x31)
     pub x: [U; 32],

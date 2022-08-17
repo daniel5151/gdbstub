@@ -17,7 +17,7 @@ pub use core64::X86_64CoreRegs;
 pub type F80 = [u8; 10];
 
 /// FPU registers
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct X87FpuInternalRegs {
     /// Floating-point control register
     pub fctrl: u32,
@@ -92,7 +92,7 @@ impl Registers for X87FpuInternalRegs {
 /// x86 segment registers.
 ///
 /// Source: <https://github.com/bminor/binutils-gdb/blob/master/gdb/features/i386/64bit-core.xml>
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct X86SegmentRegs {
     /// Code Segment
     pub cs: u32,

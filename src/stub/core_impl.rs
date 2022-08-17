@@ -218,7 +218,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 // return a dummy stop reason.
                 if target.base_ops().resume_ops().is_none() && target.use_resume_stub() {
                     let is_resume_pkt = cmd
-                        .get(0)
+                        .first()
                         .map(|c| matches!(c, b'c' | b'C' | b's' | b'S'))
                         .unwrap_or(false);
 
