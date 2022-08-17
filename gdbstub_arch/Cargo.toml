@@ -2,7 +2,7 @@
 name = "gdbstub_arch"
 description = "Implementations of `gdbstub::arch::Arch` for various architectures."
 authors = ["Daniel Prilik <danielprilik@gmail.com>"]
-version = "0.2.3"
+version = "0.2.4"
 license = "MIT OR Apache-2.0"
 edition = "2018"
 readme = "README.md"

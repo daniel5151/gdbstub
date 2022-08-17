@@ -2,6 +2,12 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+# 0.6.3
+
+#### New Features
+
+- `SingleRegisterAccess`: Support reporting unavailable regs [\#107](https://github.com/daniel5151/gdbstub/pull/107) ([ptosi](https://github.com/ptosi))
+
 # 0.6.2
 
 #### New Protocol Extensions
