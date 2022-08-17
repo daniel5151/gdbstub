@@ -53,6 +53,7 @@
 #![cfg_attr(not(test), no_std)]
 #![deny(missing_docs)]
 
+pub mod aarch64;
 pub mod arm;
 pub mod mips;
 pub mod msp430;
