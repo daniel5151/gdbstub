@@ -117,11 +117,11 @@ impl<'a> PacketBuf<'a> {
         // always stays within the bounds of the provided buffer.
         #[cfg(not(feature = "paranoid_unsafe"))]
         unsafe {
-            self.buf.get_unchecked_mut(self.body_range.clone())
+            self.buf.get_unchecked_mut(self.body_range)
         }
 
         #[cfg(feature = "paranoid_unsafe")]
-        &mut self.buf[self.body_range.clone()]
+        &mut self.buf[self.body_range]
     }
 
     /// Return a mutable reference to the _entire_ underlying packet buffer, and
