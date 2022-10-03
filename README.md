@@ -37,7 +37,7 @@ Why use `gdbstub`?
     -   "You don't pay for what you don't use": All code related to parsing/handling protocol extensions is guaranteed to be dead-code-eliminated from an optimized binary if left unimplemented. See the [Zero-overhead Protocol Extensions](#zero-overhead-protocol-extensions) section below for more details.
     -   `gdbstub`'s minimal configuration has an incredibly low binary size + RAM overhead, enabling it to be used on even the most resource-constrained microcontrollers.
         -   When compiled in release mode, using all the tricks outlined in [`min-sized-rust`](https://github.com/johnthagen/min-sized-rust), a baseline `gdbstub` implementation can weigh in at **_less than 10kb of `.text` + `.rodata`!_** \*
-        - \*Exact numbers vary by target platform, compiler version, and `gdbstub` revision. Data was collected using the included `example_no_std` project compiled on x86_64.
+        - \*Exact numbers vary by target platform, compiler version, and `gdbstub` revision. In mixed-language projects, cross-language LTO may be required ([\#101](https://github.com/daniel5151/gdbstub/issues/101#issuecomment-1264444815)). Data was collected using the included `example_no_std` project compiled on x86_64.
 
 ### Can I Use `gdbstub` in Production?
 
