@@ -11,6 +11,7 @@ mod core_impl;
 mod error;
 mod stop_reason;
 
+pub mod run;
 pub mod state_machine;
 
 pub use builder::{GdbStubBuilder, GdbStubBuilderError};
