@@ -71,10 +71,10 @@ impl MultiThreadBase for DummyTarget {
         _start_addr: u32,
         data: &mut [u8],
         _tid: Tid, // same address space for each core
-    ) -> TargetResult<(), Self> {
+    ) -> TargetResult<usize, Self> {
         print_str("> read_addrs");
         data.iter_mut().for_each(|b| *b = 0x55);
-        Ok(())
+        Ok(data.len())
     }
 
     #[inline(never)]

@@ -151,7 +151,7 @@
 //!         &mut self,
 //!         start_addr: u32,
 //!         data: &mut [u8],
-//!     ) -> TargetResult<(), Self> { todo!() }
+//!     ) -> TargetResult<usize, Self> { todo!() }
 //!
 //!     fn write_addrs(
 //!         &mut self,
@@ -409,7 +409,7 @@ pub trait Target {
     /// #       &mut self,
     /// #       start_addr: u32,
     /// #       data: &mut [u8],
-    /// #   ) -> TargetResult<(), Self> { todo!() }
+    /// #   ) -> TargetResult<usize, Self> { todo!() }
     /// #
     /// #   fn write_addrs(
     /// #       &mut self,
