@@ -15,6 +15,9 @@ use alloc::vec::Vec;
 ///
 /// When the `alloc` feature is disabled, all output buffering is disabled, and
 /// each call to `output!` will automatically flush data over the Connection.
+///
+/// [`output!`]: crate::output
+/// [`outputln!`]: crate::outputln
 // TODO: support user-provided output buffers for no-`alloc` environments.
 pub struct ConsoleOutput<'a> {
     #[cfg(feature = "alloc")]
