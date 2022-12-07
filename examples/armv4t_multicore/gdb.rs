@@ -92,11 +92,11 @@ impl MultiThreadBase for Emu {
         start_addr: u32,
         data: &mut [u8],
         _tid: Tid, // same address space for each core
-    ) -> TargetResult<(), Self> {
+    ) -> TargetResult<usize, Self> {
         for (addr, val) in (start_addr..).zip(data.iter_mut()) {
             *val = self.mem.r8(addr)
         }
-        Ok(())
+        Ok(data.len())
     }
 
     fn write_addrs(

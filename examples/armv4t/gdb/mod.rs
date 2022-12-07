@@ -196,11 +196,22 @@ impl SingleThreadBase for Emu {
         Some(self)
     }
 
-    fn read_addrs(&mut self, start_addr: u32, data: &mut [u8]) -> TargetResult<(), Self> {
-        for (addr, val) in (start_addr..).zip(data.iter_mut()) {
+    fn read_addrs(&mut self, start_addr: u32, data: &mut [u8]) -> TargetResult<usize, Self> {
+        // These values are taken from the link script.
+        const MEMORY_ORIGIN: u32 = 0x5555_0000;
+        const MEMORY_LENGTH: u32 = 0x1000_0000;
+        const MEMORY_END: u32 = MEMORY_ORIGIN + MEMORY_LENGTH;
+
+        if !(MEMORY_ORIGIN..MEMORY_END).contains(&start_addr) {
+            return Err(TargetError::NonFatal);
+        }
+
+        let end_addr = std::cmp::min(start_addr + data.len() as u32, MEMORY_END);
+
+        for (addr, val) in (start_addr..end_addr).zip(data.iter_mut()) {
             *val = self.mem.r8(addr)
         }
-        Ok(())
+        Ok((end_addr - start_addr) as usize)
     }
 
     fn write_addrs(&mut self, start_addr: u32, data: &[u8]) -> TargetResult<(), Self> {

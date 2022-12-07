@@ -43,17 +43,25 @@ pub trait MultiThreadBase: Target {
         None
     }
 
-    /// Read bytes from the specified address range.
+    /// Read bytes from the specified address range and return the number of
+    /// bytes that were read.
     ///
-    /// If the requested address range could not be accessed (e.g: due to
-    /// MMU protection, unhanded page fault, etc...), an appropriate non-fatal
-    /// error should be returned.
+    /// Implementations may return a number `n` that is less than `data.len()`
+    /// to indicate that memory starting at `start_addr + n` cannot be
+    /// accessed.
+    ///
+    /// Implemenations may also return an appropriate non-fatal error if the
+    /// requested address range could not be accessed (e.g: due to MMU
+    /// protection, unhanded page fault, etc...).
+    ///
+    /// Implementations must guarantee that the returned number is less than or
+    /// equal `data.len()`.
     fn read_addrs(
         &mut self,
         start_addr: <Self::Arch as Arch>::Usize,
         data: &mut [u8],
         tid: Tid,
-    ) -> TargetResult<(), Self>;
+    ) -> TargetResult<usize, Self>;
 
     /// Write bytes to the specified address range.
     ///

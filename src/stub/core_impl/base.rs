@@ -266,7 +266,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                     let addr = addr + NumCast::from(i).ok_or(Error::TargetMismatch)?;
                     let data = &mut buf[..chunk_size];
-                    match target.base_ops() {
+                    let data_len = match target.base_ops() {
                         BaseOps::SingleThread(ops) => ops.read_addrs(addr, data),
                         BaseOps::MultiThread(ops) => {
                             ops.read_addrs(addr, data, self.current_mem_tid)
@@ -277,6 +277,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     n -= chunk_size;
                     i += chunk_size;
 
+                    // TODO: add more specific error variant?
+                    let data = data.get(..data_len).ok_or(Error::PacketBufferOverflow)?;
                     res.write_hex_buf(data)?;
                 }
                 HandlerStatus::Handled
