@@ -19,7 +19,7 @@ impl<'a> ParseCommand<'a> for vFilePwrite<'a> {
 
         match body {
             [b':', body @ ..] => {
-                let mut body = body.splitn_mut_no_panic(3, |b| *b == b',');
+                let mut body = body.splitn_mut(3, |b| *b == b',');
                 let fd = decode_hex(body.next()?).ok()?;
                 let offset = decode_hex_buf(body.next()?).ok()?;
                 let data = decode_bin_buf(body.next()?).ok()?;

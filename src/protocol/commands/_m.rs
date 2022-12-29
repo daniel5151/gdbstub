@@ -32,7 +32,7 @@ impl<'a> ParseCommand<'a> for m<'a> {
         let (buf, body_range) = buf.into_raw_buf();
         let body = buf.get_mut(body_range.start..body_range.end)?;
 
-        let mut body = body.split_mut_no_panic(|b| *b == b',');
+        let mut body = body.split_mut(|b| *b == b',');
 
         let addr = decode_hex_buf(body.next()?).ok()?;
         let addr_len = addr.len();

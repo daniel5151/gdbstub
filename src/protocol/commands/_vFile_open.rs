@@ -19,7 +19,7 @@ impl<'a> ParseCommand<'a> for vFileOpen<'a> {
 
         match body {
             [b':', body @ ..] => {
-                let mut body = body.splitn_mut_no_panic(3, |b| *b == b',');
+                let mut body = body.splitn_mut(3, |b| *b == b',');
                 let filename = decode_hex_buf(body.next()?).ok()?;
                 let flags = HostIoOpenFlags::from_bits(decode_hex(body.next()?).ok()?)?;
                 let mode = HostIoOpenMode::from_bits(decode_hex(body.next()?).ok()?)?;

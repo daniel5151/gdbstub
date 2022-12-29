@@ -12,7 +12,6 @@ pub(self) mod prelude {
     pub use crate::protocol::commands::ParseCommand;
     pub use crate::protocol::common::hex::{decode_hex, decode_hex_buf};
     pub use crate::protocol::packet::PacketBuf;
-    pub use crate::util::no_panic_iter::SliceExt;
 }
 
 pub trait ParseCommand<'a>: Sized {
