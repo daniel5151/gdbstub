@@ -691,6 +691,28 @@ pub trait Target {
     }
 }
 
+macro_rules! __delegate {
+    (fn $op:ident(&mut $this:ident) $($sig:tt)*) => {
+        fn $op(&mut $this) $($sig)* {
+            (**$this).$op()
+        }
+    };
+
+    (fn $op:ident(&$this:ident) $($sig:tt)*) => {
+        fn $op(&$this) $($sig)* {
+            (**$this).$op()
+        }
+    }
+}
+
+macro_rules! __delegate_support {
+    ($ext:ident) => {
+        paste::paste! {
+            __delegate!(fn [<support_ $ext>](&mut self) -> Option<ext::$ext::[<$ext:camel Ops>]<'_, Self>>);
+        }
+    };
+}
+
 macro_rules! impl_dyn_target {
     ($type:ty) => {
         impl<A, E> Target for $type
@@ -700,96 +722,28 @@ macro_rules! impl_dyn_target {
             type Arch = A;
             type Error = E;
 
-            fn base_ops(&mut self) -> ext::base::BaseOps<'_, Self::Arch, Self::Error> {
-                (**self).base_ops()
-            }
+            __delegate!(fn base_ops(&mut self) -> ext::base::BaseOps<'_, Self::Arch, Self::Error>);
 
-            fn guard_rail_implicit_sw_breakpoints(&self) -> bool {
-                (**self).guard_rail_implicit_sw_breakpoints()
-            }
+            __delegate!(fn guard_rail_implicit_sw_breakpoints(&self) -> bool);
+            __delegate!(fn guard_rail_single_step_gdb_behavior(&self) -> SingleStepGdbBehavior);
 
-            fn guard_rail_single_step_gdb_behavior(&self) -> SingleStepGdbBehavior {
-                (**self).guard_rail_single_step_gdb_behavior()
-            }
+            __delegate!(fn use_x_upcase_packet(&self) -> bool);
+            __delegate!(fn use_resume_stub(&self) -> bool);
+            __delegate!(fn use_rle(&self) -> bool);
+            __delegate!(fn use_target_description_xml(&self) -> bool);
+            __delegate!(fn use_lldb_register_info(&self) -> bool);
 
-            fn use_x_upcase_packet(&self) -> bool {
-                (**self).use_x_upcase_packet()
-            }
-
-            fn use_resume_stub(&self) -> bool {
-                (**self).use_resume_stub()
-            }
-
-            fn use_rle(&self) -> bool {
-                (**self).use_rle()
-            }
-
-            fn use_target_description_xml(&self) -> bool {
-                (**self).use_target_description_xml()
-            }
-
-            fn use_lldb_register_info(&self) -> bool {
-                (**self).use_lldb_register_info()
-            }
-
-            fn support_breakpoints(
-                &mut self,
-            ) -> Option<ext::breakpoints::BreakpointsOps<'_, Self>> {
-                (**self).support_breakpoints()
-            }
-
-            fn support_monitor_cmd(&mut self) -> Option<ext::monitor_cmd::MonitorCmdOps<'_, Self>> {
-                (**self).support_monitor_cmd()
-            }
-
-            fn support_extended_mode(
-                &mut self,
-            ) -> Option<ext::extended_mode::ExtendedModeOps<'_, Self>> {
-                (**self).support_extended_mode()
-            }
-
-            fn support_section_offsets(
-                &mut self,
-            ) -> Option<ext::section_offsets::SectionOffsetsOps<'_, Self>> {
-                (**self).support_section_offsets()
-            }
-
-            fn support_target_description_xml_override(
-                &mut self,
-            ) -> Option<
-                ext::target_description_xml_override::TargetDescriptionXmlOverrideOps<'_, Self>,
-            > {
-                (**self).support_target_description_xml_override()
-            }
-
-            fn support_lldb_register_info_override(
-                &mut self,
-            ) -> Option<ext::lldb_register_info_override::LldbRegisterInfoOverrideOps<'_, Self>>
-            {
-                (**self).support_lldb_register_info_override()
-            }
-
-            fn support_memory_map(&mut self) -> Option<ext::memory_map::MemoryMapOps<'_, Self>> {
-                (**self).support_memory_map()
-            }
-
-            fn support_catch_syscalls(
-                &mut self,
-            ) -> Option<ext::catch_syscalls::CatchSyscallsOps<'_, Self>> {
-                (**self).support_catch_syscalls()
-            }
-
-            fn support_host_io(&mut self) -> Option<ext::host_io::HostIoOps<'_, Self>> {
-                (**self).support_host_io()
-            }
-
-            fn support_exec_file(&mut self) -> Option<ext::exec_file::ExecFileOps<'_, Self>> {
-                (**self).support_exec_file()
-            }
-
-            fn support_auxv(&mut self) -> Option<ext::auxv::AuxvOps<'_, Self>> {
-                (**self).support_auxv()
-            }
+            __delegate_support!(breakpoints);
+            __delegate_support!(monitor_cmd);
+            __delegate_support!(extended_mode);
+            __delegate_support!(section_offsets);
+            __delegate_support!(target_description_xml_override);
+            __delegate_support!(lldb_register_info_override);
+            __delegate_support!(memory_map);
+            __delegate_support!(catch_syscalls);
+            __delegate_support!(host_io);
+            __delegate_support!(exec_file);
+            __delegate_support!(auxv);
         }
     };
 }
