@@ -4,11 +4,11 @@ use crate::protocol::commands::ext::MonitorCmd;
 use crate::protocol::ConsoleOutput;
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
-    pub(crate) fn handle_monitor_cmd<'a>(
+    pub(crate) fn handle_monitor_cmd(
         &mut self,
         res: &mut ResponseWriter<'_, C>,
         target: &mut T,
-        command: MonitorCmd<'a>,
+        command: MonitorCmd<'_>,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
         let ops = match target.support_monitor_cmd() {
             Some(ops) => ops,

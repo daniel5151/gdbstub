@@ -76,11 +76,11 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         }
     }
 
-    pub(crate) fn handle_breakpoints<'a>(
+    pub(crate) fn handle_breakpoints(
         &mut self,
         _res: &mut ResponseWriter<'_, C>,
         target: &mut T,
-        command: Breakpoints<'a>,
+        command: Breakpoints<'_>,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
         let ops = match target.support_breakpoints() {
             Some(ops) => ops,

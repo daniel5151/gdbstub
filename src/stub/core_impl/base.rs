@@ -34,11 +34,11 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         Ok(tid)
     }
 
-    pub(crate) fn handle_base<'a>(
+    pub(crate) fn handle_base(
         &mut self,
         res: &mut ResponseWriter<'_, C>,
         target: &mut T,
-        command: Base<'a>,
+        command: Base<'_>,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
         let handler_status = match command {
             // ------------------ Handshaking and Queries ------------------- //

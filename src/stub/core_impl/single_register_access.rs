@@ -67,11 +67,11 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         Ok(handler_status)
     }
 
-    pub(crate) fn handle_single_register_access<'a>(
+    pub(crate) fn handle_single_register_access(
         &mut self,
         res: &mut ResponseWriter<'_, C>,
         target: &mut T,
-        command: SingleRegisterAccess<'a>,
+        command: SingleRegisterAccess<'_>,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
         match target.base_ops() {
             BaseOps::SingleThread(ops) => match ops.support_single_register_access() {

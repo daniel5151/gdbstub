@@ -5,11 +5,11 @@ use crate::arch::Arch;
 use crate::target::ext::base::BaseOps;
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
-    pub(crate) fn handle_x_upcase_packet<'a>(
+    pub(crate) fn handle_x_upcase_packet(
         &mut self,
         _res: &mut ResponseWriter<'_, C>,
         target: &mut T,
-        command: XUpcasePacket<'a>,
+        command: XUpcasePacket<'_>,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
         if !target.use_x_upcase_packet() {
             return Ok(HandlerStatus::Handled);

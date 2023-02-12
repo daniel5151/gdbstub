@@ -3,11 +3,11 @@ use crate::protocol::commands::ext::ThreadExtraInfo;
 use crate::target::ext::base::BaseOps;
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
-    pub(crate) fn handle_thread_extra_info<'a>(
+    pub(crate) fn handle_thread_extra_info(
         &mut self,
         res: &mut ResponseWriter<'_, C>,
         target: &mut T,
-        command: ThreadExtraInfo<'a>,
+        command: ThreadExtraInfo<'_>,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
         let ops = match target.base_ops() {
             BaseOps::SingleThread(_) => return Ok(HandlerStatus::Handled),
