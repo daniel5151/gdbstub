@@ -184,25 +184,25 @@ impl AArch64RegId {
     pub const TTBR1_EL1: Self = Self::System(0b11_000_0010_0000_001);
     /// Translation Control Register (EL1)
     pub const TCR_EL1: Self = Self::System(0b11_000_0010_0000_010);
-    /// Pointer Authentication Key A For Instruction (bits[63:0])
+    /// Pointer Authentication Key A For Instruction (bits\[63:0])
     pub const APIAKEYLO_EL1: Self = Self::System(0b11_000_0010_0001_000);
-    /// Pointer Authentication Key A For Instruction (bits[127:64])
+    /// Pointer Authentication Key A For Instruction (bits\[127:64])
     pub const APIAKEYHI_EL1: Self = Self::System(0b11_000_0010_0001_001);
-    /// Pointer Authentication Key B For Instruction (bits[63:0])
+    /// Pointer Authentication Key B For Instruction (bits\[63:0])
     pub const APIBKEYLO_EL1: Self = Self::System(0b11_000_0010_0001_010);
-    /// Pointer Authentication Key B For Instruction (bits[127:64])
+    /// Pointer Authentication Key B For Instruction (bits\[127:64])
     pub const APIBKEYHI_EL1: Self = Self::System(0b11_000_0010_0001_011);
-    /// Pointer Authentication Key A For Data (bits[63:0])
+    /// Pointer Authentication Key A For Data (bits\[63:0])
     pub const APDAKEYLO_EL1: Self = Self::System(0b11_000_0010_0010_000);
-    /// Pointer Authentication Key A For Data (bits[127:64])
+    /// Pointer Authentication Key A For Data (bits\[127:64])
     pub const APDAKEYHI_EL1: Self = Self::System(0b11_000_0010_0010_001);
-    /// Pointer Authentication Key B For Data (bits[63:0])
+    /// Pointer Authentication Key B For Data (bits\[63:0])
     pub const APDBKEYLO_EL1: Self = Self::System(0b11_000_0010_0010_010);
-    /// Pointer Authentication Key B For Data (bits[127:64])
+    /// Pointer Authentication Key B For Data (bits\[127:64])
     pub const APDBKEYHI_EL1: Self = Self::System(0b11_000_0010_0010_011);
-    /// Pointer Authentication Key A For Code (bits[63:0])
+    /// Pointer Authentication Key A For Code (bits\[63:0])
     pub const APGAKEYLO_EL1: Self = Self::System(0b11_000_0010_0011_000);
-    /// Pointer Authentication Key A For Code (bits[127:64])
+    /// Pointer Authentication Key A For Code (bits\[127:64])
     pub const APGAKEYHI_EL1: Self = Self::System(0b11_000_0010_0011_001);
     /// Saved Program Status Register (EL1)
     pub const SPSR_EL1: Self = Self::System(0b11_000_0100_0000_000);
