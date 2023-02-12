@@ -20,12 +20,6 @@ jobs:
           command: clippy
           args: --workspace --tests --examples --features=std -- -D warnings
 
-      - name: cargo doc
-        uses: actions-rs/cargo@v1
-        with:
-          command: doc
-          args: --workspace --features=std
-
       # don't forget the no_std example!
       - name: cargo clippy (example_no_std)
         uses: actions-rs/cargo@v1
@@ -42,6 +36,11 @@ jobs:
       - name: no panics in example_no_std
         run: ./example_no_std/dump_asm.sh
         shell: bash
+
+      - name: cargo doc
+        run: cargo doc --workspace --features=std
+        env:
+          RUSTDOCFLAGS: "-Dwarnings"
 
   rustfmt:
     name: rustfmt (nightly)
