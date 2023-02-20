@@ -17,7 +17,7 @@ impl<'a> ParseCommand<'a> for X<'a> {
         let mut body = body.split_mut(|&b| b == b',' || b == b':');
         let addr = decode_hex_buf(body.next()?).ok()?;
         let len = decode_hex(body.next()?).ok()?;
-        let val = decode_bin_buf(body.next()?).ok()?;
+        let val = decode_bin_buf(body.next()?)?;
 
         Some(X { addr, len, val })
     }

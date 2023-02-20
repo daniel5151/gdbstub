@@ -303,6 +303,7 @@
 //! [`BlockingEventLoop`]: stub::run_blocking::BlockingEventLoop
 
 #![cfg_attr(not(feature = "std"), no_std)]
+#![cfg_attr(feature = "paranoid_unsafe", forbid(unsafe_code))]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
@@ -322,12 +323,26 @@ pub mod conn;
 pub mod stub;
 pub mod target;
 
+// https://users.rust-lang.org/t/compile-time-const-unwrapping/51619/7
+//
+// This works from Rust 1.46.0 onwards, which stabilized branching and looping
+// in const contexts.
+macro_rules! unwrap {
+    ($e:expr $(,)*) => {
+        match $e {
+            ::core::option::Option::Some(x) => x,
+            ::core::option::Option::None => {
+                ["tried to unwrap a None"][99];
+                loop {}
+            }
+        }
+    };
+}
+
 /// (Internal) The fake Tid that's used when running in single-threaded mode.
-// SAFETY: 1 is clearly non-zero.
-const SINGLE_THREAD_TID: common::Tid = unsafe { common::Tid::new_unchecked(1) };
-/// (Internal) The fake Pid reported to GDB (since `gdbstub` only supports
-/// debugging a single process).
-const FAKE_PID: common::Pid = unsafe { common::Pid::new_unchecked(1) };
+const SINGLE_THREAD_TID: common::Tid = unwrap!(common::Tid::new(1));
+/// (Internal) The fake Pid reported to GDB when running in multi-threaded mode.
+const FAKE_PID: common::Pid = unwrap!(common::Pid::new(1));
 
 pub(crate) mod is_valid_tid {
     pub trait IsValidTid {}

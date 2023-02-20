@@ -137,14 +137,17 @@ If you end up using `gdbstub` in your project, consider opening a PR and adding 
     -   [`vmware-labs/node-replicated-kernel`](https://github.com/vmware-labs/node-replicated-kernel/tree/4326704/kernel/src/arch/x86_64/gdb) - An (experimental) research OS kernel for x86-64 (amd64) machines
     -   [`betrusted-io/xous-core`](https://github.com/betrusted-io/xous-core/blob/7d3d710/kernel/src/debug/gdb_server.rs) - The Xous microkernel operating system
 -   Emulators
+    -   [solana_rbpf](https://github.com/solana-labs/rbpf) - VM and JIT compiler for eBPF programs
+    -   [rustyboyadvance-ng](https://github.com/michelhe/rustboyadvance-ng/) - Nintendo Gameboy Advance emulator and debugger (ARMv4T)
+    -   [gamegirl](https://github.com/anellie/gamegirl) -  A Gameboy (Color/Advance) emulator
     -   [bevy-atari](https://github.com/mrk-its/bevy-atari) - An Atari XL/XE Emulator (MOS 6502)
     -   [rmips](https://github.com/starfleetcadet75/rmips) - MIPS R3000 virtual machine simulator
     -   [clicky](https://github.com/daniel5151/clicky/) - Emulator for classic clickwheel iPods (dual-core ARMv4T)
     -   [ts7200](https://github.com/daniel5151/ts7200/) - Emulator for the TS-7200 SoC (ARMv4T)
     -   [vaporstation](https://github.com/Colin-Suckow/vaporstation) - A Playstation One emulator (MIPS)
-    -   [rustyboyadvance-ng](https://github.com/michelhe/rustboyadvance-ng/) - Nintendo GameBoy Advance emulator and debugger (ARMv4T)
     -   [microcorruption-emu](https://github.com/sapir/microcorruption-emu) - Emulator for the microcorruption.com ctf (MSP430)
 -   Other
+    -   [probe-rs](https://probe.rs/) - A modern, embedded debugging toolkit
     -   [udbserver](https://github.com/bet4it/udbserver) - Plug-in GDB debugging for the [Unicorn Engine](https://www.unicorn-engine.org/) (Multi Architecture)
     -   [enarx](https://github.com/enarx/enarx) - An open source framework for running applications in Trusted Execution Environments
 
@@ -165,49 +168,48 @@ These examples are built as part of the CI, and are guaranteed to be kept up to 
 
 ## `unsafe` in `gdbstub`
 
-`gdbstub` limits its use of `unsafe` to a bare minimum, with all uses of `unsafe` required to have a corresponding `// SAFETY` comment as justification. The following list exhaustively documents all uses of `unsafe` in `gdbstub`.
+`gdbstub` limits its use of `unsafe` to a bare minimum, with all uses of `unsafe` required to have a corresponding `// SAFETY` comment as justification.
 
-`rustc` + LLVM do a pretty incredible job at eliding bounds checks... most of the time. Unfortunately, there are a few places in the code where the compiler is not smart enough to "prove" that a bounds check isn't needed, and a bit of unsafe code is required to remove those bounds checks.
+For those paranoid about trusting third-party unsafe code, `gdbstub` comes with an opt-in `paranoid_unsafe` feature, which enables `#![forbid(unsafe_code)]` on the entire `gdbstub` crate, swapping out all instances of `unsafe` code with equivalent (albeit less-performant) alternatives.
 
-Enabling the `paranoid_unsafe` feature will swap out a handful of unsafe `get_unchecked_mut` operations with their safe equivalents, at the expense of introducing panicking code into `gdbstub`. This feature is **disabled** by default, as the unsafe code has been aggressively audited and tested for correctness. That said, if you're particularly paranoid about the use of unsafe code, enabling this feature may offer some piece of mind.
+The following list exhaustively documents all uses of `unsafe` in `gdbstub`:
 
--   When no cargo features are enabled:
-    -   A few trivially safe calls to `NonZeroUsize::new_unchecked()` when defining internal constants.
-
--   When the `paranoid_unsafe` feature is enabled, the following `unsafe` code is _removed_:
-    -   `src/protocol/packet.rs`: Swaps a couple slice-index methods in `PacketBuf` to use `get_unchecked_mut`. The public API of struct ensures that the bounds used to index into the array remain in-bounds.
-    -   `src/protocol/common/hex.rs`: Use an alternate implementation of `decode_hex_buf`/`decode_bin_buf` which uses unsafe slice indexing.
-    -   `src/common.rs`: Use a checked transmute to convert a `u8` to a `Signal`
+- With `default` features
+  - Don't emit provably unreachable panics
+    -   `src/protocol/packet.rs`: Method in `PacketBuf` that use index using stored sub-`Range<usize>` into the buffer
+    -   `src/protocol/common/hex.rs`: `decode_hex_buf`
+  - Don't emit large `match`-arm LUT
+    - `src/common.rs`: Checked transmute of `u8` to `Signal`
 
 -   When the `std` feature is enabled:
-    -   `src/connection/impls/unixstream.rs`: An implementation of `UnixStream::peek` which uses `libc::recv`. This manual implementation will be removed once [rust-lang/rust#76923](https://github.com/rust-lang/rust/issues/76923) is stabilized.
+    -   `src/connection/impls/unixstream.rs`: An implementation of `UnixStream::peek` which uses `libc::recv`. Will be removed once [rust-lang/rust#76923](https://github.com/rust-lang/rust/issues/76923) stabilizes this feature in the stdlib.
+
 
 ## Writing panic-free code
 
 Ideally, the Rust compiler would have some way to opt-in to a strict "no-panic" mode. Unfortunately, at the time of writing (2022/04/24), no such mode exists. As such, the only way to avoid the Rust compiler + stdlib's implicit panics is by being _very careful_ when writing code, and _manually checking_ that those panicking paths get optimized out!
 
-And when I say "manually checking", I actually mean "reading through [generated assembly](example_no_std/dump_asm.sh)".
+And when I say "manually checking", I mean [checking generated asm output](example_no_std/dump_asm.sh).
 
 Why even go through this effort?
 
 - Panic infrastructure can be _expensive_, and when you're optimizing for embedded, `no_std` use-cases, panic infrastructure brings in hundreds of additional bytes into the final binary.
 - `gdbstub` can be used to implement low-level debuggers, and if the debugger itself panics, well... it's not like you can debug it all that easily!
 
-In conclusion, here is the `gdbstub` promise regarding panicking code:
+As such, **`gdbstub` promises to introduce zero additional panics** into an existing project, subject to the following conditions:
 
-`gdbstub` will not introduce any additional panics into an existing binary, subject to the following conditions:
-
-1. The binary is compiled in _release_ mode
-    - Subject to the specific `rustc` version being used (as codegen and optimization can vary wildly between versions)
-    - _Note:_ different hardware architectures may be subject to different compiler optimizations.
-      - At this time, only `x86` has been confirmed panic-free
+1. The binary is compiled in release mode
+    - \*subject to the specific `rustc` version being used (codegen and optimization vary between versions)
+    - \*different hardware architectures may be subject to different compiler optimizations
+      - i.e: at this time, only `x86` is actively tested to be panic-free
 2. `gdbstub`'s `paranoid_unsafe` cargo feature is _disabled_
-   - See the [`unsafe` in `gdbstub`](#unsafe-in-gdbstub) section for more details.
+   - LLVM is unable to omit certain `panic` checks without requiring a bit of `unsafe` code
+   - See the [`unsafe` in `gdbstub`](#unsafe-in-gdbstub) section for more details
 3. The `Arch` implementation being used doesn't include panicking code
    - _Note:_ The arch implementations under `gdbstub_arch` are _not_ guaranteed to be panic free!
    - If you do spot a panicking arch in `gdbstub_arch`, consider opening a PR to fix it
 
-If you're using `gdbstub` in a no-panic project and found that `gdbstub` has introduced some panicking code, please file an issue!
+If you're using `gdbstub` in a no-panic project and have determined that `gdbstub` is at fault for introducing a panicking code path, please file an issue!
 
 ## Future Plans + Roadmap to `1.0.0`
 
@@ -219,11 +221,10 @@ Not that this is _not_ an exhaustive list, and is subject to change.
 -   [ ] Implement GDB's various high-level operating modes:
     -   [x] Single/Multi Thread debugging
     -   [ ] Multiprocess Debugging
-        -   [ ] Will require adding a third `target::ext::base::multiprocess` API.
+        -   [ ] Requires adding a new `target::ext::base::multiprocess` API.
         -   _Note:_ `gdbstub` already implements multiprocess extensions "under-the-hood", and just hard-codes a fake PID, so this is mostly a matter of "putting in the work".
     -   [x] [Extended Mode](https://sourceware.org/gdb/current/onlinedocs/gdb/Connecting.html) (`target extended-remote`)
     -   [ ] [Non-Stop Mode](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Non_002dStop.html#Remote-Non_002dStop)
-        -   This may require some breaking API changes and/or some internals rework -- more research is needed.
 -   [x] Have a working example of `gdbstub` running in a "bare-metal" `#![no_std]` environment.
 
 Additionally, while not _strict_ blockers to `1.0.0`, it would be good to explore these features as well:
@@ -231,10 +232,9 @@ Additionally, while not _strict_ blockers to `1.0.0`, it would be good to explor
 -   [ ] Should `gdbstub` commit to a MSRV?
 -   [ ] Remove lingering instances of `RawRegId` from `gdbstub_arch` ([\#29](https://github.com/daniel5151/gdbstub/issues/29))
 -   [x] Exposing `async/await` interfaces (particularly wrt. handling GDB client interrupts) ([\#36](https://github.com/daniel5151/gdbstub/issues/36))
--   [ ] Supporting various [LLDB extensions](https://raw.githubusercontent.com/llvm-mirror/lldb/master/docs/lldb-gdb-remote.txt) to the GDB RSP
-    -   Skimming through the list, it doesn't seem like these extensions would require breaking API changes -- more research is needed.
+-   [ ] How/if to support [LLDB extensions](https://raw.githubusercontent.com/llvm-mirror/lldb/master/docs/lldb-gdb-remote.txt) ([\#99](https://github.com/daniel5151/gdbstub/issues/99))
 -   [ ] Supporting multi-arch debugging via a single target
-    -   e.g: debugging both x86 and x64 processes when running in extended mode
+    -   e.g: debugging x86 and ARM processes on macOS
 -   [ ] Proper handling of "nack" packets (for spotty connections)
     - Responding with "nack" is easy - the client has to re-transmit the command
     - Re-transmitting after receiving a "nack" might be a bit harder...
