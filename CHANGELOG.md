@@ -2,6 +2,20 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+# 0.6.4
+
+#### Bugfixes
+
+- Avoid truncating `X` packets that contain `:` and `,` as part of the payload. [\#121](https://github.com/daniel5151/gdbstub/pull/121) ([709924470](https://github.com/709924470))
+
+#### Internal Improvements
+
+- Various README tweaks
+- Remove some `unsafe` code
+- CI improvements
+  - Run no-panic checks on `example_no_std`
+  - Run CI on docs
+
 # 0.6.3
 
 #### New Features
