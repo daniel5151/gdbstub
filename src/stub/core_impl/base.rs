@@ -11,9 +11,12 @@ use super::DisconnectReason;
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     #[inline(always)]
-    fn get_sane_any_tid(&mut self, target: &mut T) -> Result<Tid, Error<T::Error, C::Error>> {
+    fn get_sane_any_tid(
+        &mut self,
+        target: &mut T,
+    ) -> Result<Option<Tid>, Error<T::Error, C::Error>> {
         let tid = match target.base_ops() {
-            BaseOps::SingleThread(_) => SINGLE_THREAD_TID,
+            BaseOps::SingleThread(_) => Some(SINGLE_THREAD_TID),
             BaseOps::MultiThread(ops) => {
                 let mut first_tid = None;
                 ops.list_active_threads(&mut |tid| {
@@ -22,13 +25,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     }
                 })
                 .map_err(Error::TargetError)?;
-                // Note that `Error::NoActiveThreads` shouldn't ever occur, since this method is
-                // called from the `H` packet handler, which AFAIK is only sent after the GDB
-                // client has confirmed that a thread / process exists.
-                //
-                // If it does, that really sucks, and will require rethinking how to handle "any
-                // thread" messages.
-                first_tid.ok_or(Error::NoActiveThreads)?
+                // It is possible for this to be `None` in the case where the target has
+                // not yet called `register_thread()`. This can happen, for example, if
+                // there are no active threads in the current target process.
+                first_tid
             }
         };
         Ok(tid)
@@ -161,14 +161,18 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             Base::QuestionMark(_) => {
                 // Reply with a valid thread-id or GDB issues a warning when more
                 // than one thread is active
-                res.write_str("T05thread:")?;
-                res.write_specific_thread_id(SpecificThreadId {
-                    pid: self
-                        .features
-                        .multiprocess()
-                        .then_some(SpecificIdKind::WithId(FAKE_PID)),
-                    tid: SpecificIdKind::WithId(self.get_sane_any_tid(target)?),
-                })?;
+                if let Some(tid) = self.get_sane_any_tid(target)? {
+                    res.write_str("T05thread:")?;
+                    res.write_specific_thread_id(SpecificThreadId {
+                        pid: self
+                            .features
+                            .multiprocess()
+                            .then_some(SpecificIdKind::WithId(FAKE_PID)),
+                        tid: SpecificIdKind::WithId(tid),
+                    })?;
+                } else {
+                    res.write_str("W00")?;
+                }
                 res.write_str(";")?;
                 HandlerStatus::Handled
             }
@@ -302,17 +306,26 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 use crate::protocol::commands::_h_upcase::Op;
                 match cmd.kind {
                     Op::Other => match cmd.thread.tid {
-                        IdKind::Any => self.current_mem_tid = self.get_sane_any_tid(target)?,
+                        IdKind::Any => match self.get_sane_any_tid(target)? {
+                            Some(tid) => self.current_mem_tid = tid,
+                            None => {
+                                res.write_str("E01")?;
+                                return Ok(HandlerStatus::Handled);
+                            }
+                        },
                         // "All" threads doesn't make sense for memory accesses
                         IdKind::All => return Err(Error::PacketUnexpected),
                         IdKind::WithId(tid) => self.current_mem_tid = tid,
                     },
                     // technically, this variant is deprecated in favor of vCont...
                     Op::StepContinue => match cmd.thread.tid {
-                        IdKind::Any => {
-                            self.current_resume_tid =
-                                SpecificIdKind::WithId(self.get_sane_any_tid(target)?)
-                        }
+                        IdKind::Any => match self.get_sane_any_tid(target)? {
+                            Some(tid) => self.current_resume_tid = SpecificIdKind::WithId(tid),
+                            None => {
+                                res.write_str("E01")?;
+                                return Ok(HandlerStatus::Handled);
+                            }
+                        },
                         IdKind::All => self.current_resume_tid = SpecificIdKind::All,
                         IdKind::WithId(tid) => {
                             self.current_resume_tid = SpecificIdKind::WithId(tid)
