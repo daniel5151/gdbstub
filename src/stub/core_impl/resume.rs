@@ -9,7 +9,6 @@ use crate::stub::MultiThreadStopReason;
 use crate::target::ext::base::reverse_exec::ReplayLogPosition;
 use crate::target::ext::base::ResumeOps;
 use crate::target::ext::catch_syscalls::CatchSyscallPosition;
-use crate::FAKE_PID;
 
 use super::DisconnectReason;
 
@@ -257,6 +256,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     fn write_stop_common(
         &mut self,
         res: &mut ResponseWriter<'_, C>,
+        target: &mut T,
         tid: Option<Tid>,
         signal: Signal,
     ) -> Result<(), Error<T::Error, C::Error>> {
@@ -272,7 +272,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 pid: self
                     .features
                     .multiprocess()
-                    .then_some(SpecificIdKind::WithId(FAKE_PID)),
+                    .then_some(SpecificIdKind::WithId(self.get_sane_current_pid(target)?)),
                 tid: SpecificIdKind::WithId(tid),
             })?;
             res.write_str(";")?;
@@ -345,20 +345,20 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 FinishExecStatus::Disconnect(DisconnectReason::TargetTerminated(sig))
             }
             MultiThreadStopReason::SignalWithThread { tid, signal } => {
-                self.write_stop_common(res, Some(tid), signal)?;
+                self.write_stop_common(res, target, Some(tid), signal)?;
                 FinishExecStatus::Handled
             }
             MultiThreadStopReason::SwBreak(tid) if guard_break!(support_sw_breakpoint) => {
                 crate::__dead_code_marker!("sw_breakpoint", "stop_reason");
 
-                self.write_stop_common(res, Some(tid), Signal::SIGTRAP)?;
+                self.write_stop_common(res, target, Some(tid), Signal::SIGTRAP)?;
                 res.write_str("swbreak:;")?;
                 FinishExecStatus::Handled
             }
             MultiThreadStopReason::HwBreak(tid) if guard_break!(support_hw_breakpoint) => {
                 crate::__dead_code_marker!("hw_breakpoint", "stop_reason");
 
-                self.write_stop_common(res, Some(tid), Signal::SIGTRAP)?;
+                self.write_stop_common(res, target, Some(tid), Signal::SIGTRAP)?;
                 res.write_str("hwbreak:;")?;
                 FinishExecStatus::Handled
             }
@@ -367,7 +367,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             {
                 crate::__dead_code_marker!("hw_watchpoint", "stop_reason");
 
-                self.write_stop_common(res, Some(tid), Signal::SIGTRAP)?;
+                self.write_stop_common(res, target, Some(tid), Signal::SIGTRAP)?;
 
                 use crate::target::ext::breakpoints::WatchKind;
                 match kind {
@@ -382,7 +382,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             MultiThreadStopReason::ReplayLog { tid, pos } if guard_reverse_exec!() => {
                 crate::__dead_code_marker!("reverse_exec", "stop_reason");
 
-                self.write_stop_common(res, tid, Signal::SIGTRAP)?;
+                self.write_stop_common(res, target, tid, Signal::SIGTRAP)?;
 
                 res.write_str("replaylog:")?;
                 res.write_str(match pos {
@@ -400,7 +400,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             } if guard_catch_syscall!() => {
                 crate::__dead_code_marker!("catch_syscall", "stop_reason");
 
-                self.write_stop_common(res, tid, Signal::SIGTRAP)?;
+                self.write_stop_common(res, target, tid, Signal::SIGTRAP)?;
 
                 res.write_str(match position {
                     CatchSyscallPosition::Entry => "syscall_entry:",

@@ -26,8 +26,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             }
             ExtendedMode::vAttach(cmd) => {
                 ops.attach(cmd.pid).handle_error()?;
-
-                // TODO: sends OK when running in Non-Stop mode
+                res.write_str("S00")?;
                 HandlerStatus::Handled
             }
             ExtendedMode::vRun(cmd) => {

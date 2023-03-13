@@ -228,6 +228,7 @@ commands! {
         "M" => _m_upcase::M<'a>,
         "qAttached" => _qAttached::qAttached,
         "qfThreadInfo" => _qfThreadInfo::qfThreadInfo,
+        "qC" => _qC::qC,
         "QStartNoAckMode" => _QStartNoAckMode::QStartNoAckMode,
         "qsThreadInfo" => _qsThreadInfo::qsThreadInfo,
         "qSupported" => _qSupported::qSupported<'a>,
