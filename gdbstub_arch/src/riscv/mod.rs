@@ -24,7 +24,7 @@ impl Arch for Riscv32 {
 
     #[inline(always)]
     fn single_step_gdb_behavior() -> SingleStepGdbBehavior {
-        SingleStepGdbBehavior::Ignored
+        SingleStepGdbBehavior::Required
     }
 }
 
@@ -40,6 +40,6 @@ impl Arch for Riscv64 {
 
     #[inline(always)]
     fn single_step_gdb_behavior() -> SingleStepGdbBehavior {
-        SingleStepGdbBehavior::Ignored
+        SingleStepGdbBehavior::Required
     }
 }
