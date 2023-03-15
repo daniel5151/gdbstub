@@ -309,8 +309,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         IdKind::Any => match self.get_sane_any_tid(target)? {
                             Some(tid) => self.current_mem_tid = tid,
                             None => {
-                                res.write_str("E01")?;
-                                return Ok(HandlerStatus::Handled);
+                                return Err(Error::NonFatalError(1));
                             }
                         },
                         // "All" threads doesn't make sense for memory accesses
@@ -322,8 +321,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         IdKind::Any => match self.get_sane_any_tid(target)? {
                             Some(tid) => self.current_resume_tid = SpecificIdKind::WithId(tid),
                             None => {
-                                res.write_str("E01")?;
-                                return Ok(HandlerStatus::Handled);
+                                return Err(Error::NonFatalError(1));
                             }
                         },
                         IdKind::All => self.current_resume_tid = SpecificIdKind::All,
