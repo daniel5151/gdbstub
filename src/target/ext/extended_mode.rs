@@ -95,9 +95,6 @@ pub trait ExtendedMode: Target {
     /// In all-stop mode, all threads in the attached process are stopped; in
     /// non-stop mode, it may be attached without being stopped (if that is
     /// supported by the target).
-    ///
-    /// After this method resolves, GDB will immediately request a stop reason.
-    /// It is up to the implementation to ensure the stop reason is accurate.
     fn attach(&mut self, pid: Pid) -> TargetResult<(), Self>;
 
     /// Query if specified PID was spawned by the target (via `run`), or if the

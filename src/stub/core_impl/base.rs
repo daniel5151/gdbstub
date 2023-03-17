@@ -44,6 +44,30 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         }
     }
 
+    #[inline(always)]
+    pub(crate) fn report_reasonable_stop_reason(
+        &mut self,
+        res: &mut ResponseWriter<'_, C>,
+        target: &mut T,
+    ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
+        // Reply with a valid thread-id or GDB issues a warning when more
+        // than one thread is active
+        if let Some(tid) = self.get_sane_any_tid(target)? {
+            res.write_str("T05thread:")?;
+            res.write_specific_thread_id(SpecificThreadId {
+                pid: self
+                    .features
+                    .multiprocess()
+                    .then_some(SpecificIdKind::WithId(self.get_sane_current_pid(target)?)),
+                tid: SpecificIdKind::WithId(tid),
+            })?;
+        } else {
+            res.write_str("W00")?;
+        }
+        res.write_str(";")?;
+        Ok(HandlerStatus::Handled)
+    }
+
     pub(crate) fn handle_base(
         &mut self,
         res: &mut ResponseWriter<'_, C>,
@@ -168,24 +192,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             // -------------------- "Core" Functionality -------------------- //
             // TODO: Improve the '?' response based on last-sent stop reason.
             // this will be particularly relevant when working on non-stop mode.
-            Base::QuestionMark(_) => {
-                // Reply with a valid thread-id or GDB issues a warning when more
-                // than one thread is active
-                if let Some(tid) = self.get_sane_any_tid(target)? {
-                    res.write_str("T05thread:")?;
-                    res.write_specific_thread_id(SpecificThreadId {
-                        pid: self
-                            .features
-                            .multiprocess()
-                            .then_some(SpecificIdKind::WithId(self.get_sane_current_pid(target)?)),
-                        tid: SpecificIdKind::WithId(tid),
-                    })?;
-                } else {
-                    res.write_str("W00")?;
-                }
-                res.write_str(";")?;
-                HandlerStatus::Handled
-            }
+            Base::QuestionMark(_) => self.report_reasonable_stop_reason(res, target)?,
             Base::qAttached(cmd) => {
                 let is_attached = match target.support_extended_mode() {
                     // when _not_ running in extended mode, just report that we're attaching to an

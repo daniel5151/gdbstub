@@ -120,10 +120,13 @@ pub trait MultiThreadBase: Target {
     /// process.
     ///
     /// This should reflect the currently-debugged process which should be
-    /// updated when switching processes after calling `attach()`.
+    /// updated when switching processes after calling [`attach()`].
     ///
     /// This function is only useful if your target implements multiple
     /// processes.
+    ///
+    /// [`attach()`]:
+    /// crate::target::ext::extended_mode::ExtendedMode::attach
     #[inline(always)]
     fn active_pid(&mut self) -> Result<Pid, Self::Error> {
         Ok(FAKE_PID)
