@@ -362,31 +362,41 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         tid: SpecificIdKind::WithId(SINGLE_THREAD_TID),
                     })?,
                     BaseOps::MultiThread(ops) => {
-                        let mut err: Result<_, Error<T::Error, C::Error>> = Ok(());
-                        let mut first = true;
-                        ops.list_active_threads(&mut |tid| {
-                            // TODO: replace this with a try block (once stabilized)
-                            let e = (|| {
-                                if !first {
-                                    return Ok(());
-                                }
-                                first = false;
-                                res.write_specific_thread_id(SpecificThreadId {
-                                    pid: self
-                                        .features
-                                        .multiprocess()
-                                        .then_some(SpecificIdKind::WithId(pid)),
-                                    tid: SpecificIdKind::WithId(tid),
-                                })?;
-                                Ok(())
-                            })();
+                        if self.current_mem_tid == SINGLE_THREAD_TID {
+                            let mut err: Result<_, Error<T::Error, C::Error>> = Ok(());
+                            let mut first = true;
+                            ops.list_active_threads(&mut |tid| {
+                                // TODO: replace this with a try block (once stabilized)
+                                let e = (|| {
+                                    if !first {
+                                        return Ok(());
+                                    }
+                                    first = false;
+                                    res.write_specific_thread_id(SpecificThreadId {
+                                        pid: self
+                                            .features
+                                            .multiprocess()
+                                            .then_some(SpecificIdKind::WithId(pid)),
+                                        tid: SpecificIdKind::WithId(tid),
+                                    })?;
+                                    Ok(())
+                                })();
 
-                            if let Err(e) = e {
-                                err = Err(e)
-                            }
-                        })
-                        .map_err(Error::TargetError)?;
-                        err?;
+                                if let Err(e) = e {
+                                    err = Err(e)
+                                }
+                            })
+                            .map_err(Error::TargetError)?;
+                            err?
+                        } else {
+                            res.write_specific_thread_id(SpecificThreadId {
+                                pid: self
+                                    .features
+                                    .multiprocess()
+                                    .then_some(SpecificIdKind::WithId(pid)),
+                                tid: SpecificIdKind::WithId(self.current_mem_tid),
+                            })?;
+                        }
                     }
                 }
 
