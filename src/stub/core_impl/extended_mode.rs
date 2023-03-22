@@ -26,9 +26,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             }
             ExtendedMode::vAttach(cmd) => {
                 ops.attach(cmd.pid).handle_error()?;
-
-                // TODO: sends OK when running in Non-Stop mode
-                HandlerStatus::Handled
+                self.report_reasonable_stop_reason(res, target)?
             }
             ExtendedMode::vRun(cmd) => {
                 use crate::target::ext::extended_mode::Args;

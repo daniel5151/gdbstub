@@ -2,7 +2,7 @@ use super::prelude::*;
 use crate::protocol::commands::ext::Base;
 
 use crate::arch::{Arch, Registers};
-use crate::common::Tid;
+use crate::common::{Pid, Tid};
 use crate::protocol::{IdKind, SpecificIdKind, SpecificThreadId};
 use crate::target::ext::base::{BaseOps, ResumeOps};
 use crate::{FAKE_PID, SINGLE_THREAD_TID};
@@ -32,6 +32,40 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             }
         };
         Ok(tid)
+    }
+
+    pub(crate) fn get_sane_current_pid(
+        &mut self,
+        target: &mut T,
+    ) -> Result<Pid, Error<T::Error, C::Error>> {
+        match target.base_ops() {
+            BaseOps::SingleThread(_) => Ok(FAKE_PID),
+            BaseOps::MultiThread(ops) => ops.active_pid().map_err(Error::TargetError),
+        }
+    }
+
+    #[inline(always)]
+    pub(crate) fn report_reasonable_stop_reason(
+        &mut self,
+        res: &mut ResponseWriter<'_, C>,
+        target: &mut T,
+    ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
+        // Reply with a valid thread-id or GDB issues a warning when more
+        // than one thread is active
+        if let Some(tid) = self.get_sane_any_tid(target)? {
+            res.write_str("T05thread:")?;
+            res.write_specific_thread_id(SpecificThreadId {
+                pid: self
+                    .features
+                    .multiprocess()
+                    .then_some(SpecificIdKind::WithId(self.get_sane_current_pid(target)?)),
+                tid: SpecificIdKind::WithId(tid),
+            })?;
+        } else {
+            res.write_str("W00")?;
+        }
+        res.write_str(";")?;
+        Ok(HandlerStatus::Handled)
     }
 
     pub(crate) fn handle_base(
@@ -158,24 +192,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             // -------------------- "Core" Functionality -------------------- //
             // TODO: Improve the '?' response based on last-sent stop reason.
             // this will be particularly relevant when working on non-stop mode.
-            Base::QuestionMark(_) => {
-                // Reply with a valid thread-id or GDB issues a warning when more
-                // than one thread is active
-                if let Some(tid) = self.get_sane_any_tid(target)? {
-                    res.write_str("T05thread:")?;
-                    res.write_specific_thread_id(SpecificThreadId {
-                        pid: self
-                            .features
-                            .multiprocess()
-                            .then_some(SpecificIdKind::WithId(FAKE_PID)),
-                        tid: SpecificIdKind::WithId(tid),
-                    })?;
-                } else {
-                    res.write_str("W00")?;
-                }
-                res.write_str(";")?;
-                HandlerStatus::Handled
-            }
+            Base::QuestionMark(_) => self.report_reasonable_stop_reason(res, target)?,
             Base::qAttached(cmd) => {
                 let is_attached = match target.support_extended_mode() {
                     // when _not_ running in extended mode, just report that we're attaching to an
@@ -332,15 +349,69 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 }
                 HandlerStatus::NeedsOk
             }
-            Base::qfThreadInfo(_) => {
-                res.write_str("m")?;
+            Base::qC(_) => {
+                res.write_str("QC")?;
+                let pid = self.get_sane_current_pid(target)?;
 
                 match target.base_ops() {
                     BaseOps::SingleThread(_) => res.write_specific_thread_id(SpecificThreadId {
                         pid: self
                             .features
                             .multiprocess()
-                            .then_some(SpecificIdKind::WithId(FAKE_PID)),
+                            .then_some(SpecificIdKind::WithId(pid)),
+                        tid: SpecificIdKind::WithId(SINGLE_THREAD_TID),
+                    })?,
+                    BaseOps::MultiThread(ops) => {
+                        if self.current_mem_tid == SINGLE_THREAD_TID {
+                            let mut err: Result<_, Error<T::Error, C::Error>> = Ok(());
+                            let mut first = true;
+                            ops.list_active_threads(&mut |tid| {
+                                // TODO: replace this with a try block (once stabilized)
+                                let e = (|| {
+                                    if !first {
+                                        return Ok(());
+                                    }
+                                    first = false;
+                                    res.write_specific_thread_id(SpecificThreadId {
+                                        pid: self
+                                            .features
+                                            .multiprocess()
+                                            .then_some(SpecificIdKind::WithId(pid)),
+                                        tid: SpecificIdKind::WithId(tid),
+                                    })?;
+                                    Ok(())
+                                })();
+
+                                if let Err(e) = e {
+                                    err = Err(e)
+                                }
+                            })
+                            .map_err(Error::TargetError)?;
+                            err?
+                        } else {
+                            res.write_specific_thread_id(SpecificThreadId {
+                                pid: self
+                                    .features
+                                    .multiprocess()
+                                    .then_some(SpecificIdKind::WithId(pid)),
+                                tid: SpecificIdKind::WithId(self.current_mem_tid),
+                            })?;
+                        }
+                    }
+                }
+
+                HandlerStatus::Handled
+            }
+            Base::qfThreadInfo(_) => {
+                res.write_str("m")?;
+                let pid = self.get_sane_current_pid(target)?;
+
+                match target.base_ops() {
+                    BaseOps::SingleThread(_) => res.write_specific_thread_id(SpecificThreadId {
+                        pid: self
+                            .features
+                            .multiprocess()
+                            .then_some(SpecificIdKind::WithId(pid)),
                         tid: SpecificIdKind::WithId(SINGLE_THREAD_TID),
                     })?,
                     BaseOps::MultiThread(ops) => {
@@ -357,7 +428,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                                     pid: self
                                         .features
                                         .multiprocess()
-                                        .then_some(SpecificIdKind::WithId(FAKE_PID)),
+                                        .then_some(SpecificIdKind::WithId(pid)),
                                     tid: SpecificIdKind::WithId(tid),
                                 })?;
                                 Ok(())
