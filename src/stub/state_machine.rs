@@ -272,10 +272,6 @@ impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::Running, 
     }
 
     /// Pass a byte to the GDB stub.
-    ///
-    /// NOTE: unlike the `incoming_data` method in the `state::Idle` state,
-    /// this method does not perform any state transitions, and will
-    /// return a `GdbStubStateMachineInner` in the `state::Running` state.
     pub fn incoming_data(
         mut self,
         target: &mut T,
