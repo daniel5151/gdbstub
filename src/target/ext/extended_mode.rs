@@ -1,18 +1,6 @@
 //! Enables [Extended Mode](https://sourceware.org/gdb/current/onlinedocs/gdb/Connecting.html)
 //! functionality when connecting using `target extended-remote`, such as
 //! spawning new processes and/or attaching to existing processes.
-//!
-//! # Disclaimer
-//!
-//! While this API has been end-to-end tested and confirmed working with a "toy"
-//! target implementation (see the included `armv4t` example), it has _not_ been
-//! "battle-tested" with a fully-featured extended-mode capable target.
-//!
-//! If you end up using this API to implement an extended-mode capable target,
-//! _please_ file an issue on the repo detailing any bugs / usability issues you
-//! may encountered while implementing this API! If everything happens to Just
-//! Work as expected, nonetheless file an issue so that this disclaimer can be
-//! removed in future releases!
 
 use crate::common::*;
 use crate::target::{Target, TargetResult};
@@ -92,6 +80,14 @@ pub trait ExtendedMode: Target {
 
     /// Attach to a new process with the specified PID.
     ///
+    /// Targets that wish to use `attach` are required to implement
+    /// [`CurrentActivePid`] (via `support_current_active_pid`), as the default
+    /// `gdbstub` behavior of always reporting a Pid of `1` will cause issues
+    /// when attaching to new processes.
+    ///
+    /// _Note:_ In the next API-breaking release of `gdbstub`, this coupling
+    /// will become a compile-time checked invariant.
+    ///
     /// In all-stop mode, all threads in the attached process are stopped; in
     /// non-stop mode, it may be attached without being stopped (if that is
     /// supported by the target).
@@ -169,6 +165,13 @@ pub trait ExtendedMode: Target {
     /// Support for configuring the working directory for spawned processes.
     #[inline(always)]
     fn support_configure_working_dir(&mut self) -> Option<ConfigureWorkingDirOps<'_, Self>> {
+        None
+    }
+
+    /// Support for reporting the current active Pid. Must be implemented in
+    /// order to use `attach`.
+    #[inline(always)]
+    fn support_current_active_pid(&mut self) -> Option<CurrentActivePidOps<'_, Self>> {
         None
     }
 }
@@ -265,3 +268,24 @@ pub trait ConfigureWorkingDir: ExtendedMode {
 }
 
 define_ext!(ConfigureWorkingDirOps, ConfigureWorkingDir);
+
+/// Nested Target extension - Return the current active Pid.
+pub trait CurrentActivePid: ExtendedMode {
+    /// Report the current active Pid.
+    ///
+    /// When implementing gdbstub on a platform that supports multiple
+    /// processes, the active PID needs to match the attached process. Failing
+    /// to do so will cause GDB to fail to attach to the target process.
+    ///
+    /// This should reflect the currently-debugged process which should be
+    /// updated when switching processes after calling
+    /// [`attach()`](ExtendedMode::attach).
+    ///
+    /// _Note:_ `gdbstub` doesn't yet support debugging multiple processes
+    /// _simultaneously_. If this is a feature you're interested in, please
+    /// leave a comment on this [tracking
+    /// issue](https://github.com/daniel5151/gdbstub/issues/124).
+    fn current_active_pid(&mut self) -> Result<Pid, Self::Error>;
+}
+
+define_ext!(CurrentActivePidOps, CurrentActivePid);

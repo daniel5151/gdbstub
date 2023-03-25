@@ -2,9 +2,8 @@
 
 use crate::arch::Arch;
 use crate::common::Signal;
-use crate::common::{Pid, Tid};
+use crate::common::Tid;
 use crate::target::{Target, TargetResult};
-use crate::FAKE_PID;
 
 /// Base required debugging operations for multi threaded targets.
 pub trait MultiThreadBase: Target {
@@ -110,26 +109,6 @@ pub trait MultiThreadBase: Target {
         &mut self,
     ) -> Option<crate::target::ext::thread_extra_info::ThreadExtraInfoOps<'_, Self>> {
         None
-    }
-
-    /// Override the reported PID when running in multithread mode (default: 1)
-    ///
-    /// When implementing gdbstub on a platform that supports multiple
-    /// processes, the active PID needs to match the attached process.
-    /// Failing to do so will cause GDB to fail to attach to the target
-    /// process.
-    ///
-    /// This should reflect the currently-debugged process which should be
-    /// updated when switching processes after calling [`attach()`].
-    ///
-    /// This function is only useful if your target implements multiple
-    /// processes.
-    ///
-    /// [`attach()`]:
-    /// crate::target::ext::extended_mode::ExtendedMode::attach
-    #[inline(always)]
-    fn active_pid(&mut self) -> Result<Pid, Self::Error> {
-        Ok(FAKE_PID)
     }
 }
 

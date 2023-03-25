@@ -114,7 +114,7 @@ macro_rules! commands {
 
                     fn support_lldb_register_info(&mut self) -> Option<()> {
                         use crate::arch::Arch;
-			            if self.use_lldb_register_info()
+                        if self.use_lldb_register_info()
                             && (T::Arch::lldb_register_info(usize::max_value()).is_some()
                                 || self.support_lldb_register_info_override().is_some())
                         {
@@ -122,7 +122,7 @@ macro_rules! commands {
                         } else {
                             None
                         }
-		    }
+                    }
 
                     fn support_resume(&mut self) -> Option<()> {
                         self.base_ops().resume_ops().map(drop)
@@ -228,7 +228,6 @@ commands! {
         "M" => _m_upcase::M<'a>,
         "qAttached" => _qAttached::qAttached,
         "qfThreadInfo" => _qfThreadInfo::qfThreadInfo,
-        "qC" => _qC::qC,
         "QStartNoAckMode" => _QStartNoAckMode::QStartNoAckMode,
         "qsThreadInfo" => _qsThreadInfo::qsThreadInfo,
         "qSupported" => _qSupported::qSupported<'a>,
@@ -257,6 +256,7 @@ commands! {
 
     extended_mode use 'a {
         "!" => exclamation_mark::ExclamationMark,
+        "qC" => _qC::qC,
         "QDisableRandomization" => _QDisableRandomization::QDisableRandomization,
         "QEnvironmentHexEncoded" => _QEnvironmentHexEncoded::QEnvironmentHexEncoded<'a>,
         "QEnvironmentReset" => _QEnvironmentReset::QEnvironmentReset,

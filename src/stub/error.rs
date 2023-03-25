@@ -61,6 +61,16 @@ pub enum GdbStubError<T, C> {
     /// [`Target::guard_rail_single_step_gdb_behavior`]:
     /// crate::target::Target::guard_rail_single_step_gdb_behavior
     SingleStepGdbBehavior(SingleStepGdbBehavior),
+    /// GDB client attempted to attach to a new process, but the target has not
+    /// implemented [`ExtendedMode::support_current_active_pid`].
+    ///
+    /// [`ExtendedMode::support_current_active_pid`]:
+    ///     crate::target::ext::extended_mode::ExtendedMode::support_current_active_pid
+    // DEVNOTE: this is a temporary workaround for something that can and should
+    // be caught at compile time via IDETs. That said, since i'm not sure when
+    // I'll find the time to cut a breaking release of gdbstub, I'd prefer to
+    // push out this feature as a non-breaking change now.
+    MissingCurrentActivePidImpl,
 
     // Internal - A non-fatal error occurred (with errno-style error code)
     //
@@ -119,6 +129,7 @@ where
                 )?;
                 write!(f, "See `Target::guard_rail_single_step_gdb_behavior` for more information.")
             },
+            MissingCurrentActivePidImpl => write!(f, "GDB client attempted to attach to a new process, but the target has not implemented support for `ExtendedMode::support_current_active_pid`"),
 
             NonFatalError(_) => write!(f, "Internal non-fatal error. End users should never see this! Please file an issue if you do!"),
         }

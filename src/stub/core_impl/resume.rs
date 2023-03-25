@@ -272,7 +272,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 pid: self
                     .features
                     .multiprocess()
-                    .then_some(SpecificIdKind::WithId(self.get_sane_current_pid(target)?)),
+                    .then_some(SpecificIdKind::WithId(self.get_current_pid(target)?)),
                 tid: SpecificIdKind::WithId(tid),
             })?;
             res.write_str(";")?;
