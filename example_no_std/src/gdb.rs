@@ -22,6 +22,12 @@ impl Target for DummyTarget {
         target::ext::base::BaseOps::MultiThread(self)
     }
 
+    // disable `QStartNoAckMode`
+    #[inline(always)]
+    fn use_no_ack_mode(&self) -> bool {
+        false
+    }
+
     // disable X packet optimization in order to save space
     #[inline(always)]
     fn use_x_upcase_packet(&self) -> bool {

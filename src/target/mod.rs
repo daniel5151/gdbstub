@@ -543,6 +543,14 @@ pub trait Target {
         true
     }
 
+    /// Enable/disable `QStartNoAckMode`
+    ///
+    /// By default, this method returns `true`.
+    #[inline(always)]
+    fn use_no_ack_mode(&self) -> bool {
+        true
+    }
+
     /// Whether `gdbstub` should provide a "stub" `resume` implementation on
     /// targets without support for resumption.
     ///
@@ -728,6 +736,7 @@ macro_rules! impl_dyn_target {
             __delegate!(fn guard_rail_single_step_gdb_behavior(&self) -> SingleStepGdbBehavior);
 
             __delegate!(fn use_x_upcase_packet(&self) -> bool);
+            __delegate!(fn use_no_ack_mode(&self) -> bool);
             __delegate!(fn use_resume_stub(&self) -> bool);
             __delegate!(fn use_rle(&self) -> bool);
             __delegate!(fn use_target_description_xml(&self) -> bool);
