@@ -1,6 +1,11 @@
 use super::prelude::*;
 use crate::protocol::commands::ext::ExtendedMode;
 
+use crate::protocol::SpecificIdKind;
+use crate::protocol::SpecificThreadId;
+use crate::target::ext::base::BaseOps;
+use crate::SINGLE_THREAD_TID;
+
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     pub(crate) fn handle_extended_mode(
         &mut self,
@@ -25,8 +30,57 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 HandlerStatus::Handled
             }
             ExtendedMode::vAttach(cmd) => {
+                if ops.support_current_active_pid().is_none() {
+                    return Err(Error::MissingCurrentActivePidImpl);
+                }
+
                 ops.attach(cmd.pid).handle_error()?;
                 self.report_reasonable_stop_reason(res, target)?
+            }
+            ExtendedMode::qC(_cmd) if ops.support_current_active_pid().is_some() => {
+                let ops = ops.support_current_active_pid().unwrap();
+
+                res.write_str("QC")?;
+                let pid = ops.current_active_pid().map_err(Error::TargetError)?;
+                let tid = match target.base_ops() {
+                    BaseOps::SingleThread(_) => SINGLE_THREAD_TID,
+                    BaseOps::MultiThread(ops) => {
+                        // HACK: gdbstub should avoid using a sentinel value here...
+                        if self.current_mem_tid == SINGLE_THREAD_TID {
+                            let mut err: Result<_, Error<T::Error, C::Error>> = Ok(());
+                            let mut first_tid = None;
+                            ops.list_active_threads(&mut |tid| {
+                                // TODO: replace this with a try block (once stabilized)
+                                let e = (|| {
+                                    if first_tid.is_some() {
+                                        return Ok(());
+                                    }
+                                    first_tid = Some(tid);
+                                    Ok(())
+                                })();
+
+                                if let Err(e) = e {
+                                    err = Err(e)
+                                }
+                            })
+                            .map_err(Error::TargetError)?;
+                            err?;
+                            first_tid.unwrap_or(SINGLE_THREAD_TID)
+                        } else {
+                            self.current_mem_tid
+                        }
+                    }
+                };
+
+                res.write_specific_thread_id(SpecificThreadId {
+                    pid: self
+                        .features
+                        .multiprocess()
+                        .then_some(SpecificIdKind::WithId(pid)),
+                    tid: SpecificIdKind::WithId(tid),
+                })?;
+
+                HandlerStatus::Handled
             }
             ExtendedMode::vRun(cmd) => {
                 use crate::target::ext::extended_mode::Args;
@@ -35,10 +89,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     .run(cmd.filename, Args::new(&mut cmd.args.into_iter()))
                     .handle_error()?;
 
-                // This is a reasonable response, as the `run` handler must
-                // spawn the process in a stopped state.
-                res.write_str("S05")?;
-                HandlerStatus::Handled
+                self.report_reasonable_stop_reason(res, target)?
             }
             // --------- ASLR --------- //
             ExtendedMode::QDisableRandomization(cmd) if ops.support_configure_aslr().is_some() => {
@@ -76,6 +127,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 ops.cfg_startup_with_shell(cmd.value).handle_error()?;
                 HandlerStatus::NeedsOk
             }
+
             _ => HandlerStatus::Handled,
         };
 
