@@ -31,6 +31,7 @@ mod host_io;
 mod lldb_register_info;
 mod memory_map;
 mod monitor_cmd;
+mod no_ack_mode;
 mod resume;
 mod reverse_exec;
 mod section_offsets;
@@ -194,6 +195,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             Command::Base(cmd) => self.handle_base(res, target, cmd),
             Command::TargetXml(cmd) => self.handle_target_xml(res, target, cmd),
             Command::Resume(cmd) => self.handle_stop_resume(res, target, cmd),
+            Command::NoAckMode(cmd) => self.handle_no_ack_mode(res, target, cmd),
             Command::XUpcasePacket(cmd) => self.handle_x_upcase_packet(res, target, cmd),
             Command::SingleRegisterAccess(cmd) => {
                 self.handle_single_register_access(res, target, cmd)

@@ -22,7 +22,7 @@ impl Target for DummyTarget {
         target::ext::base::BaseOps::MultiThread(self)
     }
 
-    // disable `QStartNoAckMode`
+    // disable `QStartNoAckMode` in order to save space
     #[inline(always)]
     fn use_no_ack_mode(&self) -> bool {
         false

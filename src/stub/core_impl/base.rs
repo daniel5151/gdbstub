@@ -184,10 +184,6 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                 HandlerStatus::Handled
             }
-            Base::QStartNoAckMode(_) => {
-                self.features.set_no_ack_mode(true);
-                HandlerStatus::NeedsOk
-            }
 
             // -------------------- "Core" Functionality -------------------- //
             // TODO: Improve the '?' response based on last-sent stop reason.

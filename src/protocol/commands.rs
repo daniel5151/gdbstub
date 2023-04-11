@@ -91,6 +91,7 @@ macro_rules! commands {
                     fn support_single_register_access(&mut self) -> Option<()>;
                     fn support_reverse_step(&mut self) -> Option<()>;
                     fn support_reverse_cont(&mut self) -> Option<()>;
+                    fn support_no_ack_mode(&mut self) -> Option<()>;
                     fn support_x_upcase_packet(&mut self) -> Option<()>;
                     fn support_thread_extra_info(&mut self) -> Option<()>;
                 }
@@ -154,6 +155,14 @@ macro_rules! commands {
 
                     fn support_x_upcase_packet(&mut self) -> Option<()> {
                         if self.use_x_upcase_packet() {
+                            Some(())
+                        } else {
+                            None
+                        }
+                    }
+
+                    fn support_no_ack_mode(&mut self) -> Option<()> {
+                        if self.use_no_ack_mode() {
                             Some(())
                         } else {
                             None
@@ -229,7 +238,6 @@ commands! {
         "qAttached" => _qAttached::qAttached,
         "qfThreadInfo" => _qfThreadInfo::qfThreadInfo,
         "qC" => _qC::qC,
-        "QStartNoAckMode" => _QStartNoAckMode::QStartNoAckMode,
         "qsThreadInfo" => _qsThreadInfo::qsThreadInfo,
         "qSupported" => _qSupported::qSupported<'a>,
         "T" => _t_upcase::T,
@@ -248,6 +256,10 @@ commands! {
 
     x_upcase_packet use 'a {
         "X" => _x_upcase::X<'a>,
+    }
+
+    no_ack_mode {
+        "QStartNoAckMode" => _QStartNoAckMode::QStartNoAckMode,
     }
 
     single_register_access use 'a {
