@@ -2,6 +2,19 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+# 0.6.5
+
+#### New Protocol Extensions
+
+- `ExtendedMode > CurrentActivePid` - Support reporting a non-default active PID [\#133](https://github.com/daniel5151/gdbstub/pull/129)
+  - Required to fix `vAttach` behavior (see Bugfixes section below)
+
+#### Bugfixes
+
+- Fix for targets with no active threads [\#127](https://github.com/daniel5151/gdbstub/pull/127) ([xobs](https://github.com/xobs))
+- Fix `vAttach` behavior when switching between multiple processes [\#129](https://github.com/daniel5151/gdbstub/pull/129) ([xobs](https://github.com/xobs)), and [\#133](https://github.com/daniel5151/gdbstub/pull/129)
+- Minor doc fixes
+
 # 0.6.4
 
 #### Bugfixes

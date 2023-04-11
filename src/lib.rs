@@ -341,7 +341,8 @@ macro_rules! unwrap {
 
 /// (Internal) The fake Tid that's used when running in single-threaded mode.
 const SINGLE_THREAD_TID: common::Tid = unwrap!(common::Tid::new(1));
-/// (Internal) The fake Pid reported to GDB when running in multi-threaded mode.
+/// (Internal) The fake Pid reported to GDB when the target hasn't opted into
+/// reporting a custom Pid itself.
 const FAKE_PID: common::Pid = unwrap!(common::Pid::new(1));
 
 pub(crate) mod is_valid_tid {
