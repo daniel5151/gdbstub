@@ -530,6 +530,14 @@ pub trait Target {
         <Self::Arch as Arch>::single_step_gdb_behavior()
     }
 
+    /// Enable/disable `QStartNoAckMode`
+    ///
+    /// By default, this method returns `true`.
+    #[inline(always)]
+    fn use_no_ack_mode(&self) -> bool {
+        true
+    }
+
     /// Enable/disable using the more efficient `X` packet to write to target
     /// memory (as opposed to the basic `M` packet).
     ///
@@ -727,6 +735,7 @@ macro_rules! impl_dyn_target {
             __delegate!(fn guard_rail_implicit_sw_breakpoints(&self) -> bool);
             __delegate!(fn guard_rail_single_step_gdb_behavior(&self) -> SingleStepGdbBehavior);
 
+            __delegate!(fn use_no_ack_mode(&self) -> bool);
             __delegate!(fn use_x_upcase_packet(&self) -> bool);
             __delegate!(fn use_resume_stub(&self) -> bool);
             __delegate!(fn use_rle(&self) -> bool);

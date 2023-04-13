@@ -109,11 +109,11 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 res.write_num(cmd.packet_buffer_len)?;
 
                 // these are the few features that gdbstub unconditionally supports
-                res.write_str(concat!(
-                    ";vContSupported+",
-                    ";multiprocess+",
-                    ";QStartNoAckMode+",
-                ))?;
+                res.write_str(concat!(";vContSupported+", ";multiprocess+",))?;
+
+                if target.use_no_ack_mode() {
+                    res.write_str(";QStartNoAckMode+")?;
+                }
 
                 if let Some(resume_ops) = target.base_ops().resume_ops() {
                     let (reverse_cont, reverse_step) = match resume_ops {
@@ -192,10 +192,6 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 }
 
                 HandlerStatus::Handled
-            }
-            Base::QStartNoAckMode(_) => {
-                self.features.set_no_ack_mode(true);
-                HandlerStatus::NeedsOk
             }
 
             // -------------------- "Core" Functionality -------------------- //
