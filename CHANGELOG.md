@@ -2,6 +2,12 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+# 0.6.6
+
+#### New Features
+
+- `Target::use_no_ack_mode` - toggle support for for activating "no ack mode" [\#135](https://github.com/daniel5151/gdbstub/pull/135) ([bet4it](https://github.com/bet4it))
+
 # 0.6.5
 
 #### New Protocol Extensions
