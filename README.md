@@ -134,8 +134,8 @@ If you end up using `gdbstub` in your project, consider opening a PR and adding 
     -   [Firecracker](https://firecracker-microvm.github.io/) - A lightweight VMM developed by AWS (feature is in [PR](https://github.com/firecracker-microvm/firecracker/pull/2333))
     -   [uhyve](https://github.com/hermitcore/uhyve) - A minimal hypervisor for [RustyHermit](https://github.com/hermitcore/rusty-hermit)
 -   OS Kernels (using `gdbstub` on `no_std`)
+    -   [`betrusted-io/xous-core`](https://github.com/betrusted-io/xous-core/blob/b471b604/kernel/src/debug/gdb.rs) - The Xous microkernel operating system
     -   [`vmware-labs/node-replicated-kernel`](https://github.com/vmware-labs/node-replicated-kernel/tree/4326704/kernel/src/arch/x86_64/gdb) - An (experimental) research OS kernel for x86-64 (amd64) machines
-    -   [`betrusted-io/xous-core`](https://github.com/betrusted-io/xous-core/blob/7d3d710/kernel/src/debug/gdb_server.rs) - The Xous microkernel operating system
 -   Emulators
     -   [solana_rbpf](https://github.com/solana-labs/rbpf) - VM and JIT compiler for eBPF programs
     -   [rustyboyadvance-ng](https://github.com/michelhe/rustboyadvance-ng/) - Nintendo Gameboy Advance emulator and debugger (ARMv4T)
@@ -220,7 +220,7 @@ Not that this is _not_ an exhaustive list, and is subject to change.
 -   [ ] Allow fine-grained control over target features via the `Arch` trait ([\#12](https://github.com/daniel5151/gdbstub/issues/12))
 -   [ ] Implement GDB's various high-level operating modes:
     -   [x] Single/Multi Thread debugging
-    -   [ ] Multiprocess Debugging
+    -   [ ] Multiprocess Debugging ([\#124](https://github.com/daniel5151/gdbstub/issues/124)
         -   [ ] Requires adding a new `target::ext::base::multiprocess` API.
         -   _Note:_ `gdbstub` already implements multiprocess extensions "under-the-hood", and just hard-codes a fake PID, so this is mostly a matter of "putting in the work".
     -   [x] [Extended Mode](https://sourceware.org/gdb/current/onlinedocs/gdb/Connecting.html) (`target extended-remote`)
@@ -235,9 +235,7 @@ Additionally, while not _strict_ blockers to `1.0.0`, it would be good to explor
 -   [ ] How/if to support [LLDB extensions](https://raw.githubusercontent.com/llvm-mirror/lldb/master/docs/lldb-gdb-remote.txt) ([\#99](https://github.com/daniel5151/gdbstub/issues/99))
 -   [ ] Supporting multi-arch debugging via a single target
     -   e.g: debugging x86 and ARM processes on macOS
--   [ ] Proper handling of "nack" packets (for spotty connections)
-    - Responding with "nack" is easy - the client has to re-transmit the command
-    - Re-transmitting after receiving a "nack" might be a bit harder...
+-   [ ] Proper handling of "nack" packets (for spotty connections) ([\#137](https://github.com/daniel5151/gdbstub/issues/137))
 
 ## License
 

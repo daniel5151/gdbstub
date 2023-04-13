@@ -530,9 +530,33 @@ pub trait Target {
         <Self::Arch as Arch>::single_step_gdb_behavior()
     }
 
-    /// Enable/disable `QStartNoAckMode`
+    /// Enable/disable support for activating "no ack mode".
     ///
     /// By default, this method returns `true`.
+    ///
+    /// _Author's note:_ Unless you're using `gdbstub` with a truly unreliable
+    /// transport line (e.g: a noisy serial connection), it's best to support
+    /// "no ack mode", as it can substantially improve debugging latency.
+    ///
+    /// **Warning:** `gdbstub` doesn't currently implement all necessary
+    /// features for running correctly over a unreliable transport! See issue
+    /// [\#137](https://github.com/daniel5151/gdbstub/issues/137) for details.
+    ///
+    /// # What is "No Ack Mode"?
+    ///
+    /// From the [GDB RSP docs](https://sourceware.org/gdb/onlinedocs/gdb/Packet-Acknowledgment.html#Packet-Acknowledgment):
+    ///
+    /// > By default, when either the host or the target machine receives a
+    /// > packet, the first response expected is an acknowledgment: either '+'
+    /// > (to indicate the package was received correctly) or '-' (to request
+    /// > retransmission). This mechanism allows the GDB remote protocol to
+    /// > operate over unreliable transport mechanisms, such as a serial line.
+    /// >
+    /// > In cases where the transport mechanism is itself reliable (such as a
+    /// > pipe or TCP connection), the '+'/'-' acknowledgments are redundant. It
+    /// > may be desirable to disable them in that case to reduce communication
+    /// > overhead, or for other reasons. This can be accomplished by means of
+    /// > the 'QStartNoAckMode' packet
     #[inline(always)]
     fn use_no_ack_mode(&self) -> bool {
         true
