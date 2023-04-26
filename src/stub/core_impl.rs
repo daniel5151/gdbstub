@@ -253,7 +253,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 // detail. The alternative would be to use multiple `bool` fields, which wastes
 // space in minimal `gdbstub` configurations.
 bitflags::bitflags! {
-    #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[derive(Copy, Clone)]
     #[repr(transparent)]
     struct ProtocolFeatures: u8 {
         const NO_ACK_MODE = 1 << 0;
