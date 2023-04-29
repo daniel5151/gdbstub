@@ -1,6 +1,6 @@
 //! Implementations for various x86 architectures.
 
-use gdbstub::arch::{Arch, SingleStepGdbBehavior};
+use gdbstub::arch::Arch;
 
 pub mod reg;
 
@@ -19,11 +19,6 @@ impl Arch for X86_64_SSE {
             r#"<target version="1.0"><architecture>i386:x86-64</architecture><feature name="org.gnu.gdb.i386.sse"></feature></target>"#,
         )
     }
-
-    #[inline(always)]
-    fn single_step_gdb_behavior() -> SingleStepGdbBehavior {
-        SingleStepGdbBehavior::Required
-    }
 }
 
 /// Implements `Arch` for 32-bit x86 + SSE Extensions.
@@ -40,10 +35,5 @@ impl Arch for X86_SSE {
         Some(
             r#"<target version="1.0"><architecture>i386:intel</architecture><feature name="org.gnu.gdb.i386.sse"></feature></target>"#,
         )
-    }
-
-    #[inline(always)]
-    fn single_step_gdb_behavior() -> SingleStepGdbBehavior {
-        SingleStepGdbBehavior::Required
     }
 }

@@ -1,6 +1,5 @@
 use core::fmt::{self, Debug, Display};
 
-use crate::arch::SingleStepGdbBehavior;
 use crate::protocol::{PacketParseError, ResponseWriterError};
 use crate::util::managed_vec::CapacityError;
 
@@ -51,16 +50,6 @@ pub enum GdbStubError<T, C> {
     /// [`Target::guard_rail_implicit_sw_breakpoints`]:
     /// crate::target::Target::guard_rail_implicit_sw_breakpoints
     ImplicitSwBreakpoints,
-    /// The target has not indicated support for optional single stepping. See
-    /// [`Target::guard_rail_single_step_gdb_behavior`] for more information.
-    ///
-    /// If you encountered this error while using an `Arch` implementation
-    /// defined in `gdbstub_arch` and believe this is incorrect, please file an
-    /// issue at <https://github.com/daniel5151/gdbstub/issues>.
-    ///
-    /// [`Target::guard_rail_single_step_gdb_behavior`]:
-    /// crate::target::Target::guard_rail_single_step_gdb_behavior
-    SingleStepGdbBehavior(SingleStepGdbBehavior),
     /// GDB client attempted to attach to a new process, but the target has not
     /// implemented [`ExtendedMode::support_current_active_pid`].
     ///
@@ -115,20 +104,6 @@ where
             NoActiveThreads => write!(f, "Target didn't report any active threads when there should have been at least one running."),
 
             ImplicitSwBreakpoints => write!(f, "Warning: The target has not opted into using implicit software breakpoints. See `Target::guard_rail_implicit_sw_breakpoints` for more information."),
-            SingleStepGdbBehavior(behavior) => {
-                use crate::arch::SingleStepGdbBehavior;
-                write!(
-                    f,
-                    "Warning: Mismatch between the targets' single-step support and arch-level single-step behavior: {} ",
-                    match behavior {
-                        SingleStepGdbBehavior::Optional => "", // unreachable, since optional single step will not result in an error
-                        SingleStepGdbBehavior::Required => "GDB requires single-step support on this arch.",
-                        SingleStepGdbBehavior::Ignored => "GDB ignores single-step support on this arch, yet the target has implemented support for it.",
-                        SingleStepGdbBehavior::Unknown => "This arch's single-step behavior hasn't been tested yet: please conduct a test + upstream your findings!",
-                    }
-                )?;
-                write!(f, "See `Target::guard_rail_single_step_gdb_behavior` for more information.")
-            },
             MissingCurrentActivePidImpl => write!(f, "GDB client attempted to attach to a new process, but the target has not implemented support for `ExtendedMode::support_current_active_pid`"),
 
             NonFatalError(_) => write!(f, "Internal non-fatal error. End users should never see this! Please file an issue if you do!"),

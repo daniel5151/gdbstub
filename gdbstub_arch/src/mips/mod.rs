@@ -1,6 +1,6 @@
 //! Implementations for the MIPS architecture.
 
-use gdbstub::arch::{Arch, SingleStepGdbBehavior};
+use gdbstub::arch::{Arch};
 
 pub mod reg;
 
@@ -73,11 +73,6 @@ impl Arch for Mips {
     fn target_description_xml() -> Option<&'static str> {
         Some(r#"<target version="1.0"><architecture>mips</architecture></target>"#)
     }
-
-    #[inline(always)]
-    fn single_step_gdb_behavior() -> SingleStepGdbBehavior {
-        SingleStepGdbBehavior::Ignored
-    }
 }
 
 impl Arch for MipsWithDsp {
@@ -91,11 +86,6 @@ impl Arch for MipsWithDsp {
             r#"<target version="1.0"><architecture>mips</architecture><feature name="org.gnu.gdb.mips.dsp"></feature></target>"#,
         )
     }
-
-    #[inline(always)]
-    fn single_step_gdb_behavior() -> SingleStepGdbBehavior {
-        SingleStepGdbBehavior::Ignored
-    }
 }
 
 #[allow(deprecated)]
@@ -108,11 +98,6 @@ impl Arch for Mips64 {
     fn target_description_xml() -> Option<&'static str> {
         None
     }
-
-    #[inline(always)]
-    fn single_step_gdb_behavior() -> SingleStepGdbBehavior {
-        SingleStepGdbBehavior::Ignored
-    }
 }
 
 #[allow(deprecated)]
@@ -124,10 +109,5 @@ impl Arch for Mips64WithDsp {
 
     fn target_description_xml() -> Option<&'static str> {
         None
-    }
-
-    #[inline(always)]
-    fn single_step_gdb_behavior() -> SingleStepGdbBehavior {
-        SingleStepGdbBehavior::Ignored
     }
 }

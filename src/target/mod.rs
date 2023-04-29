@@ -251,7 +251,7 @@
 //! type is being used. e.g: on a 32-bit target, instead of cluttering up a
 //! method implementation with a parameter passed as `(addr: <Self::Arch as
 //! Arch>::Usize)`, just write `(addr: u32)` directly.
-use crate::arch::{Arch, SingleStepGdbBehavior};
+use crate::arch::{Arch};
 
 pub mod ext;
 
@@ -491,45 +491,6 @@ pub trait Target {
         false
     }
 
-    /// Override the arch-level value for [`Arch::single_step_gdb_behavior`].
-    ///
-    /// If you are reading these docs after having encountered a
-    /// [`GdbStubError::SingleStepGdbBehavior`] error, you may need to either:
-    ///
-    /// - implement support for single-step
-    /// - disable existing support for single step
-    /// - be a Good Citizen and perform a quick test to see what kind of
-    ///   behavior your Arch exhibits.
-    ///
-    /// # WARNING
-    ///
-    /// Unless you _really_ know what you're doing (e.g: working on a dynamic
-    /// target implementation, attempting to fix the underlying bug, etc...),
-    /// you should **not** override this method, and instead follow the advice
-    /// the error gives you.
-    ///
-    /// Incorrectly setting this method may lead to "unexpected packet" runtime
-    /// errors!
-    ///
-    /// # Details
-    ///
-    /// This method provides an "escape hatch" for disabling a workaround for a
-    /// bug in the mainline GDB client implementation.
-    ///
-    /// To squelch all errors, this method can be set to return
-    /// [`SingleStepGdbBehavior::Optional`] (though as mentioned above - you
-    /// should only do so if you're sure that's the right behavior).
-    ///
-    /// For more information, see the documentation for
-    /// [`Arch::single_step_gdb_behavior`].
-    ///
-    /// [`GdbStubError::SingleStepGdbBehavior`]:
-    /// crate::stub::GdbStubError::SingleStepGdbBehavior
-    #[inline(always)]
-    fn guard_rail_single_step_gdb_behavior(&self) -> SingleStepGdbBehavior {
-        <Self::Arch as Arch>::single_step_gdb_behavior()
-    }
-
     /// Enable/disable support for activating "no ack mode".
     ///
     /// By default, this method returns `true`.
@@ -757,7 +718,6 @@ macro_rules! impl_dyn_target {
             __delegate!(fn base_ops(&mut self) -> ext::base::BaseOps<'_, Self::Arch, Self::Error>);
 
             __delegate!(fn guard_rail_implicit_sw_breakpoints(&self) -> bool);
-            __delegate!(fn guard_rail_single_step_gdb_behavior(&self) -> SingleStepGdbBehavior);
 
             __delegate!(fn use_no_ack_mode(&self) -> bool);
             __delegate!(fn use_x_upcase_packet(&self) -> bool);

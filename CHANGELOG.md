@@ -2,6 +2,14 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+# 0.7.0 (UNRELEASED)
+
+#### Breaking API Changes
+
+- `Target` APIs:
+  - `SingleThreadBase`/`MultiThreadBase`
+    - `read_addrs` now returns a `usize` instead of a `()`, allowing implementations to report cases where only a subset of memory could be read.
+
 # 0.6.6
 
 #### New Features

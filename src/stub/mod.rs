@@ -229,32 +229,6 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
             }
         }
 
-        // Check how the target's arch handles single stepping
-        {
-            use crate::arch::SingleStepGdbBehavior;
-            use crate::target::ext::base::ResumeOps;
-
-            if let Some(ops) = target.base_ops().resume_ops() {
-                let support_single_step = match ops {
-                    ResumeOps::SingleThread(ops) => ops.support_single_step().is_some(),
-                    ResumeOps::MultiThread(ops) => ops.support_single_step().is_some(),
-                };
-
-                let behavior = target.guard_rail_single_step_gdb_behavior();
-
-                let return_error = match behavior {
-                    SingleStepGdbBehavior::Optional => false,
-                    SingleStepGdbBehavior::Required => !support_single_step,
-                    SingleStepGdbBehavior::Ignored => support_single_step,
-                    SingleStepGdbBehavior::Unknown => true,
-                };
-
-                if return_error {
-                    return Err(Error::SingleStepGdbBehavior(behavior));
-                }
-            }
-        }
-
         // Perform any connection initialization
         {
             self.conn

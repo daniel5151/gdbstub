@@ -7,7 +7,7 @@
 //! *Note*: the target XML currently advertises all system registers to the GDB
 //! client.
 
-use gdbstub::arch::{Arch, SingleStepGdbBehavior};
+use gdbstub::arch::Arch;
 
 pub mod reg;
 
@@ -31,10 +31,5 @@ impl Arch for AArch64 {
         );
 
         Some(DESCRIPTION_XML)
-    }
-
-    #[inline(always)]
-    fn single_step_gdb_behavior() -> SingleStepGdbBehavior {
-        SingleStepGdbBehavior::Required
     }
 }

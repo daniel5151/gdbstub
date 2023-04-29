@@ -392,7 +392,7 @@ mod custom_arch {
     use core::num::NonZeroUsize;
 
     use gdbstub::arch::lldb::{Encoding, Format, Generic, Register, RegisterInfo};
-    use gdbstub::arch::{Arch, RegId, Registers, SingleStepGdbBehavior};
+    use gdbstub::arch::{Arch, RegId, Registers};
 
     use gdbstub_arch::arm::reg::id::ArmCoreRegId;
     use gdbstub_arch::arm::reg::ArmCoreRegs;
@@ -600,14 +600,6 @@ mod custom_arch {
                     Some(RegisterInfo::Register(reg))
                 }
             }
-        }
-        // armv4t supports optional single stepping.
-        //
-        // notably, x86 is an example of an arch that does _not_ support
-        // optional single stepping.
-        #[inline(always)]
-        fn single_step_gdb_behavior() -> SingleStepGdbBehavior {
-            SingleStepGdbBehavior::Optional
         }
     }
 }

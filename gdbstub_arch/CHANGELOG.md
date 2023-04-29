@@ -2,6 +2,12 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+# 0.3.0 (UNRELEASED)
+
+#### Breaking Arch Changes
+
+- Entirely removed `SingleStepGdbBehavior` APIs
+
 # 0.2.4
 
 - Add support for AArch64 [\#109](https://github.com/daniel5151/gdbstub/pull/109) ([ptosi](https://github.com/ptosi))

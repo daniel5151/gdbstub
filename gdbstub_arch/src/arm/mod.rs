@@ -1,6 +1,6 @@
 //! Implementations for various ARM architectures.
 
-use gdbstub::arch::{Arch, SingleStepGdbBehavior};
+use gdbstub::arch::{Arch};
 
 pub mod reg;
 
@@ -41,10 +41,5 @@ impl Arch for Armv4t {
 
     fn target_description_xml() -> Option<&'static str> {
         Some(r#"<target version="1.0"><architecture>armv4t</architecture></target>"#)
-    }
-
-    #[inline(always)]
-    fn single_step_gdb_behavior() -> SingleStepGdbBehavior {
-        SingleStepGdbBehavior::Optional
     }
 }
