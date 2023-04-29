@@ -36,6 +36,13 @@ pub enum GdbStubError<T, C> {
     /// `StopReason::HwBreak` if the hardware breakpoints IDET hasn't been
     /// implemented.
     UnsupportedStopReason,
+    /// GDB client sent an unexpected `step` request, most-likely due to this
+    /// GDB client bug: <https://sourceware.org/bugzilla/show_bug.cgi?id=28440>.
+    ///
+    /// Unfortunately, there's nothing `gdbstub` can do to work around this bug,
+    /// so if you've encountered this error, you'll need to implement
+    /// single-step support for your target.
+    UnexpectedStepPacket,
 
     /// The target has not opted into using implicit software breakpoints.
     /// See [`Target::guard_rail_implicit_sw_breakpoints`] for more information.
@@ -93,6 +100,7 @@ where
             TargetMismatch => write!(f, "GDB client sent a packet with too much data for the given target."),
             TargetError(e) => write!(f, "Target threw a fatal error: {:?}", e),
             UnsupportedStopReason => write!(f, "Target responded with an unsupported stop reason."),
+            UnexpectedStepPacket => write!(f, "GDB client sent an unexpected `step` request. This is most-likely due to this GDB client bug: https://sourceware.org/bugzilla/show_bug.cgi?id=28440"),
 
             ImplicitSwBreakpoints => write!(f, "Warning: The target has not opted into using implicit software breakpoints. See `Target::guard_rail_implicit_sw_breakpoints` for more information."),
             MissingCurrentActivePidImpl => write!(f, "GDB client attempted to attach to a new process, but the target has not implemented support for `ExtendedMode::support_current_active_pid`"),

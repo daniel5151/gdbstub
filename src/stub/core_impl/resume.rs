@@ -229,8 +229,16 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 // TODO: update this case when non-stop mode is implemented
                 VContKind::Stop => return Err(Error::PacketUnexpected),
 
+                // GDB doesn't always respect `vCont?` responses that omit `;s;S`, and will try to
+                // send step packets regardless. Inform the user of this bug by issuing a
+                // `UnexpectedStepPacket` error, which is more useful than a generic
+                // `PacketUnexpected` error.
+                VContKind::Step | VContKind::StepWithSig(..) => {
+                    return Err(Error::UnexpectedStepPacket)
+                }
+
                 // Instead of using `_ =>`, explicitly list out any remaining unguarded cases.
-                VContKind::RangeStep(..) | VContKind::Step | VContKind::StepWithSig(..) => {
+                VContKind::RangeStep(..) => {
                     error!("GDB client sent resume action not reported by `vCont?`");
                     return Err(Error::PacketUnexpected);
                 }
