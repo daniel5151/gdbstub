@@ -1,6 +1,6 @@
 //! Implementations for the TI-MSP430 family of MCUs.
 
-use gdbstub::arch::{Arch};
+use gdbstub::arch::Arch;
 
 pub mod reg;
 

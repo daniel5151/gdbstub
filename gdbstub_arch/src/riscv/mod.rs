@@ -2,7 +2,7 @@
 //!
 //! *Note*: currently only supports integer versions of the ISA.
 
-use gdbstub::arch::{Arch};
+use gdbstub::arch::Arch;
 
 pub mod reg;
 

@@ -1,6 +1,6 @@
 //! Implementations for various ARM architectures.
 
-use gdbstub::arch::{Arch};
+use gdbstub::arch::Arch;
 
 pub mod reg;
 

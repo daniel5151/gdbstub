@@ -6,9 +6,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 #### Breaking API Changes
 
+- `Arch` API:
+  - Entirely removed `single_step_behavior`. See [\#132](https://github.com/daniel5151/gdbstub/pull/132) for details and rationale
 - `Target` APIs:
   - `SingleThreadBase`/`MultiThreadBase`
     - `read_addrs` now returns a `usize` instead of a `()`, allowing implementations to report cases where only a subset of memory could be read.
+- `GdbStubError`:
+  - Removed `NoActiveThread` variant
 
 # 0.6.6
 

@@ -251,7 +251,7 @@
 //! type is being used. e.g: on a 32-bit target, instead of cluttering up a
 //! method implementation with a parameter passed as `(addr: <Self::Arch as
 //! Arch>::Usize)`, just write `(addr: u32)` directly.
-use crate::arch::{Arch};
+use crate::arch::Arch;
 
 pub mod ext;
 

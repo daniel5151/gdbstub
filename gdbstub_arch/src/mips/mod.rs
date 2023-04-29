@@ -1,6 +1,6 @@
 //! Implementations for the MIPS architecture.
 
-use gdbstub::arch::{Arch};
+use gdbstub::arch::Arch;
 
 pub mod reg;
 
