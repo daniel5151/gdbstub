@@ -6,6 +6,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 #### Breaking API Changes
 
+- `Signal` is not longer an `enum`, and is instead a `struct` with a single `pub u8` field + a collection of associated constants.
 - `Arch` API:
   - Entirely removed `single_step_behavior`. See [\#132](https://github.com/daniel5151/gdbstub/pull/132) for details and rationale
 - `Target` APIs:

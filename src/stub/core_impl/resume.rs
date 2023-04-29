@@ -269,7 +269,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         signal: Signal,
     ) -> Result<(), Error<T::Error, C::Error>> {
         res.write_str("T")?;
-        res.write_num(signal as u8)?;
+        res.write_num(signal.0)?;
 
         if let Some(tid) = tid {
             self.current_mem_tid = tid;
@@ -334,12 +334,12 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         let status = match stop_reason {
             MultiThreadStopReason::DoneStep => {
                 res.write_str("S")?;
-                res.write_num(Signal::SIGTRAP as u8)?;
+                res.write_num(Signal::SIGTRAP.0)?;
                 FinishExecStatus::Handled
             }
             MultiThreadStopReason::Signal(sig) => {
                 res.write_str("S")?;
-                res.write_num(sig as u8)?;
+                res.write_num(sig.0)?;
                 FinishExecStatus::Handled
             }
             MultiThreadStopReason::Exited(code) => {
@@ -349,7 +349,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             }
             MultiThreadStopReason::Terminated(sig) => {
                 res.write_str("X")?;
-                res.write_num(sig as u8)?;
+                res.write_num(sig.0)?;
                 FinishExecStatus::Disconnect(DisconnectReason::TargetTerminated(sig))
             }
             MultiThreadStopReason::SignalWithThread { tid, signal } => {

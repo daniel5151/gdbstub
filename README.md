@@ -178,8 +178,6 @@ The following list exhaustively documents all uses of `unsafe` in `gdbstub`:
   - Don't emit provably unreachable panics
     -   `src/protocol/packet.rs`: Method in `PacketBuf` that use index using stored sub-`Range<usize>` into the buffer
     -   `src/protocol/common/hex.rs`: `decode_hex_buf`
-  - Don't emit large `match`-arm LUT
-    - `src/common.rs`: Checked transmute of `u8` to `Signal`
 
 -   When the `std` feature is enabled:
     -   `src/connection/impls/unixstream.rs`: An implementation of `UnixStream::peek` which uses `libc::recv`. Will be removed once [rust-lang/rust#76923](https://github.com/rust-lang/rust/issues/76923) stabilizes this feature in the stdlib.

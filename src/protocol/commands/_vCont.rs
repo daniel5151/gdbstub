@@ -112,8 +112,8 @@ impl<'a> VContKind<'a> {
             [b'c'] => Continue,
             [b's'] => Step,
             [b't'] => Stop,
-            [b'C', sig @ ..] => ContinueWithSig(Signal::from_protocol_u8(decode_hex(sig).ok()?)),
-            [b'S', sig @ ..] => StepWithSig(Signal::from_protocol_u8(decode_hex(sig).ok()?)),
+            [b'C', sig @ ..] => ContinueWithSig(Signal(decode_hex(sig).ok()?)),
+            [b'S', sig @ ..] => StepWithSig(Signal(decode_hex(sig).ok()?)),
             [b'r', range @ ..] => {
                 let mut range = range.split(|b| *b == b',');
                 RangeStep(HexString(range.next()?), HexString(range.next()?))
