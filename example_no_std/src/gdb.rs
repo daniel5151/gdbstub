@@ -1,9 +1,11 @@
-use gdbstub::common::{Signal, Tid};
-use gdbstub::target;
-use gdbstub::target::ext::base::multithread::{MultiThreadBase, MultiThreadResume};
-use gdbstub::target::{Target, TargetResult};
-
 use crate::print_str::print_str;
+use gdbstub::common::Signal;
+use gdbstub::common::Tid;
+use gdbstub::target;
+use gdbstub::target::ext::base::multithread::MultiThreadBase;
+use gdbstub::target::ext::base::multithread::MultiThreadResume;
+use gdbstub::target::Target;
+use gdbstub::target::TargetResult;
 
 pub struct DummyTarget {}
 

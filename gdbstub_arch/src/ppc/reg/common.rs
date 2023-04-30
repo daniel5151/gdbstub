@@ -1,8 +1,6 @@
-use gdbstub::arch::Registers;
-
 use super::PpcVector;
-
 use core::convert::TryInto;
+use gdbstub::arch::Registers;
 
 /// 32-bit PowerPC core registers, FPU registers, and AltiVec SIMD registers.
 ///

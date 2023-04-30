@@ -1,8 +1,8 @@
+use super::X86SegmentRegs;
+use super::X87FpuInternalRegs;
+use super::F80;
 use core::convert::TryInto;
-
 use gdbstub::arch::Registers;
-
-use super::{X86SegmentRegs, X87FpuInternalRegs, F80};
 
 /// 32-bit x86 core registers (+ SSE extensions).
 ///

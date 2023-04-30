@@ -1,7 +1,7 @@
 use super::prelude::*;
+use crate::arch::Arch;
+use crate::arch::RegId;
 use crate::protocol::commands::ext::SingleRegisterAccess;
-
-use crate::arch::{Arch, RegId};
 use crate::target::ext::base::BaseOps;
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {

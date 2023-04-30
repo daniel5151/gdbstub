@@ -1,5 +1,4 @@
 use core::convert::TryInto;
-
 use gdbstub::arch::Registers;
 
 /// AArch64 core registers.

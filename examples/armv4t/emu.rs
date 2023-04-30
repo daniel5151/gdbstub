@@ -1,7 +1,11 @@
-use armv4t_emu::{reg, Cpu, ExampleMem, Memory, Mode};
-
-use crate::mem_sniffer::{AccessKind, MemSniffer};
+use crate::mem_sniffer::AccessKind;
+use crate::mem_sniffer::MemSniffer;
 use crate::DynResult;
+use armv4t_emu::reg;
+use armv4t_emu::Cpu;
+use armv4t_emu::ExampleMem;
+use armv4t_emu::Memory;
+use armv4t_emu::Mode;
 use gdbstub::common::Pid;
 
 const HLE_RETURN_ADDR: u32 = 0x12345678;

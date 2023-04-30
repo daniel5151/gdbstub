@@ -1,4 +1,5 @@
-use crate::protocol::common::hex::{decode_hex, decode_hex_buf};
+use crate::protocol::common::hex::decode_hex;
+use crate::protocol::common::hex::decode_hex_buf;
 
 // Breakpoint packets are split up like this:
 //

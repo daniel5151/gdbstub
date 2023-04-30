@@ -1,5 +1,4 @@
 use super::prelude::*;
-
 use crate::protocol::common::lists::ArgListHex;
 
 #[derive(Debug)]

@@ -1,8 +1,7 @@
+use crate::emu::Emu;
 use gdbstub::target;
 use gdbstub::target::ext::breakpoints::WatchKind;
 use gdbstub::target::TargetResult;
-
-use crate::emu::Emu;
 
 impl target::ext::breakpoints::Breakpoints for Emu {
     #[inline(always)]

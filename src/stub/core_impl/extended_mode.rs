@@ -1,6 +1,5 @@
 use super::prelude::*;
 use crate::protocol::commands::ext::ExtendedMode;
-
 use crate::protocol::SpecificIdKind;
 use crate::protocol::SpecificThreadId;
 use crate::target::ext::base::BaseOps;

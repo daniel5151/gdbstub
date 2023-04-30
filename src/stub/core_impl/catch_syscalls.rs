@@ -1,8 +1,7 @@
 use super::prelude::*;
-use crate::protocol::commands::ext::CatchSyscalls;
-
 use crate::arch::Arch;
 use crate::protocol::commands::_QCatchSyscalls::QCatchSyscalls;
+use crate::protocol::commands::ext::CatchSyscalls;
 use crate::target::ext::catch_syscalls::SyscallNumbers;
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {

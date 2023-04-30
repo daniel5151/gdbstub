@@ -1,7 +1,6 @@
-use core::fmt;
-
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
+use core::fmt;
 
 /// Helper struct to send console output to GDB.
 ///

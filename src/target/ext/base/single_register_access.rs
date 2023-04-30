@@ -1,7 +1,8 @@
 //! Support for single-register read/write access.
 
 use crate::arch::Arch;
-use crate::target::{Target, TargetResult};
+use crate::target::Target;
+use crate::target::TargetResult;
 
 /// Target Extension - Support for single-register access.
 ///

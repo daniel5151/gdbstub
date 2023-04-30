@@ -1,9 +1,8 @@
+use super::copy_range_to_buf;
+use crate::emu::Emu;
 use gdbstub::common::Pid;
 use gdbstub::target;
 use gdbstub::target::TargetResult;
-
-use super::copy_range_to_buf;
-use crate::emu::Emu;
 
 impl target::ext::exec_file::ExecFile for Emu {
     fn get_exec_file(

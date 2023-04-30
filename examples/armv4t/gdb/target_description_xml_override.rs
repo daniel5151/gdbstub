@@ -1,9 +1,8 @@
+use super::copy_range_to_buf;
+use crate::emu::Emu;
 use gdbstub::target;
 use gdbstub::target::TargetError;
 use gdbstub::target::TargetResult;
-
-use super::copy_range_to_buf;
-use crate::emu::Emu;
 
 impl target::ext::target_description_xml_override::TargetDescriptionXmlOverride for Emu {
     fn target_description_xml(

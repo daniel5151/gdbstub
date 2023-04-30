@@ -1,7 +1,9 @@
-use core::fmt::{self, Debug, Display};
-
-use crate::protocol::{PacketParseError, ResponseWriterError};
+use crate::protocol::PacketParseError;
+use crate::protocol::ResponseWriterError;
 use crate::util::managed_vec::CapacityError;
+use core::fmt::Debug;
+use core::fmt::Display;
+use core::fmt::{self};
 
 /// An error that may occur while interacting with a
 /// [`Connection`](crate::conn::Connection).

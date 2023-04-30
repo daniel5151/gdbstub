@@ -1,5 +1,6 @@
 //! Provide a memory map for the target.
-use crate::target::{Target, TargetResult};
+use crate::target::Target;
+use crate::target::TargetResult;
 
 /// Target Extension - Read the target's memory map.
 pub trait MemoryMap: Target {

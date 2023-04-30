@@ -1,13 +1,17 @@
 use super::prelude::*;
-use crate::protocol::commands::ext::Base;
-
-use crate::arch::{Arch, Registers};
-use crate::common::{Pid, Tid};
-use crate::protocol::{IdKind, SpecificIdKind, SpecificThreadId};
-use crate::target::ext::base::{BaseOps, ResumeOps};
-use crate::{FAKE_PID, SINGLE_THREAD_TID};
-
 use super::DisconnectReason;
+use crate::arch::Arch;
+use crate::arch::Registers;
+use crate::common::Pid;
+use crate::common::Tid;
+use crate::protocol::commands::ext::Base;
+use crate::protocol::IdKind;
+use crate::protocol::SpecificIdKind;
+use crate::protocol::SpecificThreadId;
+use crate::target::ext::base::BaseOps;
+use crate::target::ext::base::ResumeOps;
+use crate::FAKE_PID;
+use crate::SINGLE_THREAD_TID;
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     #[inline(always)]

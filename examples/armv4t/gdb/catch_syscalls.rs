@@ -1,7 +1,6 @@
+use crate::gdb::Emu;
 use gdbstub::target;
 use gdbstub::target::ext::catch_syscalls::SyscallNumbers;
-
-use crate::gdb::Emu;
 
 // This implementation is for illustrative purposes only. If the target doesn't
 // support syscalls then there is no need to implement this extension

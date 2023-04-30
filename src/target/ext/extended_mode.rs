@@ -3,7 +3,8 @@
 //! spawning new processes and/or attaching to existing processes.
 
 use crate::common::*;
-use crate::target::{Target, TargetResult};
+use crate::target::Target;
+use crate::target::TargetResult;
 
 /// Returned from `ExtendedMode::kill`
 ///

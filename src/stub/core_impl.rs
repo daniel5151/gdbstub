@@ -1,12 +1,14 @@
-use core::marker::PhantomData;
-
-use crate::common::{Signal, Tid};
+use crate::common::Signal;
+use crate::common::Tid;
 use crate::conn::Connection;
 use crate::protocol::commands::Command;
-use crate::protocol::{Packet, ResponseWriter, SpecificIdKind};
+use crate::protocol::Packet;
+use crate::protocol::ResponseWriter;
+use crate::protocol::SpecificIdKind;
 use crate::stub::error::InternalError;
 use crate::target::Target;
 use crate::SINGLE_THREAD_TID;
+use core::marker::PhantomData;
 
 /// Common imports used by >50% of all extensions.
 ///
@@ -16,7 +18,8 @@ mod prelude {
     pub(super) use crate::internal::BeBytes;
     pub(super) use crate::protocol::ResponseWriter;
     pub(super) use crate::stub::core_impl::target_result_ext::TargetResultExt;
-    pub(super) use crate::stub::core_impl::{GdbStubImpl, HandlerStatus};
+    pub(super) use crate::stub::core_impl::GdbStubImpl;
+    pub(super) use crate::stub::core_impl::HandlerStatus;
     pub(super) use crate::stub::error::InternalError as Error;
     pub(super) use crate::target::Target;
 }

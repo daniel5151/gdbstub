@@ -1,12 +1,11 @@
 use super::prelude::*;
-use crate::protocol::commands::ext::{ReverseCont, ReverseStep};
-
 use crate::arch::Arch;
 use crate::common::Tid;
+use crate::protocol::commands::ext::ReverseCont;
+use crate::protocol::commands::ext::ReverseStep;
 use crate::protocol::SpecificIdKind;
-use crate::target::ext::base::reverse_exec::{
-    ReverseCont as ReverseContTrait, ReverseStep as ReverseStepTrait,
-};
+use crate::target::ext::base::reverse_exec::ReverseCont as ReverseContTrait;
+use crate::target::ext::base::reverse_exec::ReverseStep as ReverseStepTrait;
 use crate::target::ext::base::ResumeOps;
 
 macro_rules! defn_ops {

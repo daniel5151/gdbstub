@@ -1,6 +1,5 @@
 use super::prelude::*;
 use crate::protocol::commands::ext::MonitorCmd;
-
 use crate::protocol::ConsoleOutput;
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {

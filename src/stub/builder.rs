@@ -1,13 +1,11 @@
-use core::fmt::{self, Display};
-use core::marker::PhantomData;
-
-use managed::ManagedSlice;
-
-use crate::conn::Connection;
-use crate::target::Target;
-
 use super::core_impl::GdbStubImpl;
 use super::GdbStub;
+use crate::conn::Connection;
+use crate::target::Target;
+use core::fmt::Display;
+use core::fmt::{self};
+use core::marker::PhantomData;
+use managed::ManagedSlice;
 
 /// An error which may occur when building a [`GdbStub`].
 #[derive(Debug)]

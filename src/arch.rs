@@ -15,12 +15,13 @@
 //! > Having community-created `Arch` implementations distributed in a separate
 //! crate helps minimize any unnecessary "version churn" in `gdbstub` core.
 
+use crate::internal::BeBytes;
+use crate::internal::LeBytes;
 use core::fmt::Debug;
 use core::num::NonZeroUsize;
-
-use num_traits::{FromPrimitive, PrimInt, Unsigned};
-
-use crate::internal::{BeBytes, LeBytes};
+use num_traits::FromPrimitive;
+use num_traits::PrimInt;
+use num_traits::Unsigned;
 
 /// Register identifier for target registers.
 ///

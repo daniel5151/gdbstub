@@ -1,9 +1,7 @@
 use core::convert::TryInto;
-
-use num_traits::PrimInt;
-
 use gdbstub::arch::Registers;
 use gdbstub::internal::LeBytes;
+use num_traits::PrimInt;
 
 /// MIPS registers.
 ///

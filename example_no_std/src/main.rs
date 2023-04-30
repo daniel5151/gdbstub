@@ -4,15 +4,15 @@
 #![no_std]
 #![no_main]
 
+use crate::print_str::print_str;
 use gdbstub::stub::state_machine::GdbStubStateMachine;
+use gdbstub::stub::DisconnectReason;
+use gdbstub::stub::GdbStubBuilder;
 use gdbstub::stub::MultiThreadStopReason;
-use gdbstub::stub::{DisconnectReason, GdbStubBuilder};
 
 mod conn;
 mod gdb;
 mod print_str;
-
-use crate::print_str::print_str;
 
 #[panic_handler]
 fn panic(_info: &core::panic::PanicInfo<'_>) -> ! {

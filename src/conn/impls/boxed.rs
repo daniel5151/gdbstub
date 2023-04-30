@@ -1,6 +1,5 @@
 use crate::conn::Connection;
 use crate::conn::ConnectionExt;
-
 use alloc::boxed::Box;
 
 impl<E> Connection for Box<dyn Connection<Error = E>> {

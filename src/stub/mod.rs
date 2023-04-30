@@ -1,11 +1,14 @@
 //! The core [`GdbStub`] type, used to drive a GDB debugging session for a
 //! particular [`Target`] over a given [`Connection`].
 
-use managed::ManagedSlice;
-
-use self::error::InternalError;
-use crate::conn::{Connection, ConnectionExt};
-use crate::target::Target;
+pub use builder::GdbStubBuilder;
+pub use builder::GdbStubBuilderError;
+pub use core_impl::DisconnectReason;
+pub use error::GdbStubError;
+pub use stop_reason::BaseStopReason;
+pub use stop_reason::IntoStopReason;
+pub use stop_reason::MultiThreadStopReason;
+pub use stop_reason::SingleThreadStopReason;
 
 mod builder;
 mod core_impl;
@@ -14,17 +17,15 @@ mod stop_reason;
 
 pub mod state_machine;
 
-pub use builder::{GdbStubBuilder, GdbStubBuilderError};
-pub use core_impl::DisconnectReason;
-pub use error::GdbStubError;
-pub use stop_reason::{
-    BaseStopReason, IntoStopReason, MultiThreadStopReason, SingleThreadStopReason,
-};
+use self::error::InternalError;
+use crate::conn::Connection;
+use crate::conn::ConnectionExt;
+use crate::target::Target;
+use managed::ManagedSlice;
 
 /// Types and traits related to the [`GdbStub::run_blocking`] interface.
 pub mod run_blocking {
     use super::*;
-
     use crate::conn::ConnectionExt;
 
     /// A set of user-provided methods required to run a GDB debugging session
@@ -184,7 +185,8 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
                 }
 
                 state_machine::GdbStubStateMachine::Running(mut gdb) => {
-                    use run_blocking::{Event as BlockingEventLoopEvent, WaitForStopReasonError};
+                    use run_blocking::Event as BlockingEventLoopEvent;
+                    use run_blocking::WaitForStopReasonError;
 
                     // block waiting for the target to return a stop reason
                     let event = E::wait_for_stop_reason(target, gdb.borrow_conn());

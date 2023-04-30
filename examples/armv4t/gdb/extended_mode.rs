@@ -1,9 +1,10 @@
+use crate::emu::Emu;
 use gdbstub::common::Pid;
 use gdbstub::target;
-use gdbstub::target::ext::extended_mode::{Args, AttachKind, ShouldTerminate};
+use gdbstub::target::ext::extended_mode::Args;
+use gdbstub::target::ext::extended_mode::AttachKind;
+use gdbstub::target::ext::extended_mode::ShouldTerminate;
 use gdbstub::target::TargetResult;
-
-use crate::emu::Emu;
 
 /*=====================================
 =            Extended Mode            =

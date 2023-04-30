@@ -1,7 +1,6 @@
 use super::prelude::*;
-use crate::protocol::commands::ext::TargetXml;
-
 use crate::arch::Arch;
+use crate::protocol::commands::ext::TargetXml;
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     pub(crate) fn handle_target_xml(

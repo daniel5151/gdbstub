@@ -1,7 +1,7 @@
 use super::prelude::*;
+use crate::arch::Arch;
+use crate::arch::BreakpointKind;
 use crate::protocol::commands::ext::Breakpoints;
-
-use crate::arch::{Arch, BreakpointKind};
 
 enum CmdKind {
     Add,

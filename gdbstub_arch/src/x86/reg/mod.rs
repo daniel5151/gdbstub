@@ -1,7 +1,6 @@
 //! `Register` structs for x86 architectures.
 
 use core::convert::TryInto;
-
 use gdbstub::arch::Registers;
 
 /// `RegId` definitions for x86 architectures.

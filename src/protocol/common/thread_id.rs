@@ -1,7 +1,7 @@
-use core::convert::{TryFrom, TryInto};
-use core::num::NonZeroUsize;
-
 use crate::protocol::common::hex::decode_hex;
+use core::convert::TryFrom;
+use core::convert::TryInto;
+use core::num::NonZeroUsize;
 
 /// Tid/Pid Selector.
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]

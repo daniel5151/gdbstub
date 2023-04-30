@@ -1,5 +1,4 @@
 use core::num::NonZeroUsize;
-
 use gdbstub::arch::RegId;
 
 /// TI-MSP430 register identifier.

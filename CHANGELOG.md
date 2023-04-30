@@ -9,11 +9,16 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - `GdbStubError` has been overhauled. Instead of being an `enum`, it is now an opaque `struct` with a handful of methods to extract concrete user-defined error data.
   - _This change will enable future versions of `gdbstub` to fearlessly improve error messages and infrastructure without making semver breaking changes._
 - `Signal` is not longer an `enum`, and is instead a `struct` with a single `pub u8` field + a collection of associated constants.
+  - _As a result, yet another instance of `unsafe` could be removed from the codebase!_
 - `Arch` API:
   - Entirely removed `single_step_behavior`. See [\#132](https://github.com/daniel5151/gdbstub/pull/132) for details and rationale
 - `Target` APIs:
   - `SingleThreadBase`/`MultiThreadBase`
     - `read_addrs` now returns a `usize` instead of a `()`, allowing implementations to report cases where only a subset of memory could be read.
+
+#### Internal Improvements
+
+- `rustfmt`: Switched to using `imports_granularity = "Item"`
 
 # 0.6.6
 

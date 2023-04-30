@@ -1,7 +1,6 @@
+use crate::gdb::Emu;
 use gdbstub::target;
 use gdbstub::target::ext::section_offsets::Offsets;
-
-use crate::gdb::Emu;
 
 // This implementation is for illustrative purposes only. If the offsets are
 // guaranteed to be zero, this extension does not need to be implemented.

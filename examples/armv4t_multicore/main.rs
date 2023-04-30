@@ -3,15 +3,20 @@
 //! `gdbstub`'s multi-process support. It's not modeled after any real-world
 //! system.
 
-use std::net::{TcpListener, TcpStream};
-
-#[cfg(unix)]
-use std::os::unix::net::{UnixListener, UnixStream};
-
 use gdbstub::common::Signal;
-use gdbstub::conn::{Connection, ConnectionExt};
-use gdbstub::stub::{run_blocking, DisconnectReason, GdbStub, MultiThreadStopReason};
+use gdbstub::conn::Connection;
+use gdbstub::conn::ConnectionExt;
+use gdbstub::stub::run_blocking;
+use gdbstub::stub::DisconnectReason;
+use gdbstub::stub::GdbStub;
+use gdbstub::stub::MultiThreadStopReason;
 use gdbstub::target::Target;
+use std::net::TcpListener;
+use std::net::TcpStream;
+#[cfg(unix)]
+use std::os::unix::net::UnixListener;
+#[cfg(unix)]
+use std::os::unix::net::UnixStream;
 
 type DynResult<T> = Result<T, Box<dyn std::error::Error>>;
 

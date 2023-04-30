@@ -1,13 +1,18 @@
-use std::io::{Read, Seek, Write};
-
-use gdbstub::target;
-use gdbstub::target::ext::host_io::{
-    FsKind, HostIoErrno, HostIoError, HostIoOpenFlags, HostIoOpenMode, HostIoResult, HostIoStat,
-};
-
-use super::{copy_range_to_buf, copy_to_buf};
+use super::copy_range_to_buf;
+use super::copy_to_buf;
 use crate::emu::Emu;
 use crate::TEST_PROGRAM_ELF;
+use gdbstub::target;
+use gdbstub::target::ext::host_io::FsKind;
+use gdbstub::target::ext::host_io::HostIoErrno;
+use gdbstub::target::ext::host_io::HostIoError;
+use gdbstub::target::ext::host_io::HostIoOpenFlags;
+use gdbstub::target::ext::host_io::HostIoOpenMode;
+use gdbstub::target::ext::host_io::HostIoResult;
+use gdbstub::target::ext::host_io::HostIoStat;
+use std::io::Read;
+use std::io::Seek;
+use std::io::Write;
 
 const FD_RESERVED: u32 = 1;
 

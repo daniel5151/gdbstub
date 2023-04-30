@@ -1,17 +1,17 @@
-use paste::paste;
-
 use crate::protocol::packet::PacketBuf;
 use crate::target::Target;
+use paste::paste;
 
 /// Common imports used by >50% of all packet parsers.
 ///
 /// Do not clutter this prelude with types only used by a few packets.
 pub(self) mod prelude {
-    pub use core::convert::{TryFrom, TryInto};
-
     pub use crate::protocol::commands::ParseCommand;
-    pub use crate::protocol::common::hex::{decode_hex, decode_hex_buf};
+    pub use crate::protocol::common::hex::decode_hex;
+    pub use crate::protocol::common::hex::decode_hex_buf;
     pub use crate::protocol::packet::PacketBuf;
+    pub use core::convert::TryFrom;
+    pub use core::convert::TryInto;
 }
 
 pub trait ParseCommand<'a>: Sized {

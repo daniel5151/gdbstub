@@ -1,8 +1,11 @@
 use super::prelude::*;
-use crate::protocol::commands::ext::LldbRegisterInfo;
-
-use crate::arch::lldb::{Encoding, Format, Generic, Register, RegisterInfo as LLDBRegisterInfo};
+use crate::arch::lldb::Encoding;
+use crate::arch::lldb::Format;
+use crate::arch::lldb::Generic;
+use crate::arch::lldb::Register;
+use crate::arch::lldb::RegisterInfo as LLDBRegisterInfo;
 use crate::arch::Arch;
+use crate::protocol::commands::ext::LldbRegisterInfo;
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     pub(crate) fn handle_lldb_register_info(
@@ -112,9 +115,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     }
                 };
                 if let Some(ops) = target.support_lldb_register_info_override() {
-                    use crate::target::ext::lldb_register_info_override::{
-                        Callback, CallbackToken,
-                    };
+                    use crate::target::ext::lldb_register_info_override::Callback;
+                    use crate::target::ext::lldb_register_info_override::CallbackToken;
 
                     ops.lldb_register_info(
                         cmd.reg_id,

@@ -2,7 +2,8 @@
 
 use crate::arch::Arch;
 use crate::common::Signal;
-use crate::target::{Target, TargetResult};
+use crate::target::Target;
+use crate::target::TargetResult;
 
 /// Base required debugging operations for single threaded targets.
 pub trait SingleThreadBase: Target {

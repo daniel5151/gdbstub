@@ -1,5 +1,4 @@
 use core::num::NonZeroUsize;
-
 use gdbstub::arch::RegId;
 
 /// 32-bit ARM core register identifier.

@@ -1,5 +1,4 @@
 use super::prelude::*;
-
 use crate::protocol::common::hex::decode_bin_buf;
 
 #[derive(Debug)]

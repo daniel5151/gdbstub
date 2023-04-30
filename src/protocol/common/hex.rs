@@ -1,4 +1,7 @@
-use num_traits::{CheckedAdd, CheckedMul, FromPrimitive, Zero};
+use num_traits::CheckedAdd;
+use num_traits::CheckedMul;
+use num_traits::FromPrimitive;
+use num_traits::Zero;
 
 #[derive(Debug)]
 pub enum DecodeHexError {

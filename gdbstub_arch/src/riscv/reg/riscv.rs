@@ -1,7 +1,6 @@
-use num_traits::PrimInt;
-
 use gdbstub::arch::Registers;
 use gdbstub::internal::LeBytes;
+use num_traits::PrimInt;
 
 /// RISC-V Integer registers.
 ///

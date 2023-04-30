@@ -1,5 +1,6 @@
 //! Access the target’s auxiliary vector.
-use crate::target::{Target, TargetResult};
+use crate::target::Target;
+use crate::target::TargetResult;
 
 /// Target Extension - Access the target’s auxiliary vector.
 pub trait Auxv: Target {

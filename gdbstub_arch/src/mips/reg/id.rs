@@ -1,5 +1,4 @@
 use core::num::NonZeroUsize;
-
 use gdbstub::arch::RegId;
 
 /// MIPS register identifier.

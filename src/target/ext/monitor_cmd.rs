@@ -1,10 +1,11 @@
 //! Create custom target-specific debugging commands accessible via GDB's
 //! `monitor` command!
 
-use crate::target::Target;
-
+pub use crate::output;
+pub use crate::outputln;
 pub use crate::protocol::ConsoleOutput;
-pub use crate::{output, outputln};
+
+use crate::target::Target;
 
 /// Target Extension - Handle custom GDB `monitor` commands.
 pub trait MonitorCmd: Target {

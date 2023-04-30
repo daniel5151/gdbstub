@@ -1,6 +1,7 @@
 //! Implementations for various PowerPC architectures.
 
-use gdbstub::arch::{Arch, RegId};
+use gdbstub::arch::Arch;
+use gdbstub::arch::RegId;
 
 pub mod reg;
 

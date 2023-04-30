@@ -1,16 +1,16 @@
 use super::prelude::*;
-use crate::protocol::commands::ext::Resume;
-
+use super::DisconnectReason;
 use crate::arch::Arch;
-use crate::common::{Signal, Tid};
+use crate::common::Signal;
+use crate::common::Tid;
 use crate::protocol::commands::_vCont::Actions;
-use crate::protocol::{SpecificIdKind, SpecificThreadId};
+use crate::protocol::commands::ext::Resume;
+use crate::protocol::SpecificIdKind;
+use crate::protocol::SpecificThreadId;
 use crate::stub::MultiThreadStopReason;
 use crate::target::ext::base::reverse_exec::ReplayLogPosition;
 use crate::target::ext::base::ResumeOps;
 use crate::target::ext::catch_syscalls::CatchSyscallPosition;
-
-use super::DisconnectReason;
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     pub(crate) fn handle_stop_resume(

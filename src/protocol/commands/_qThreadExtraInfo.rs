@@ -1,5 +1,4 @@
 use super::prelude::*;
-
 use crate::protocol::common::thread_id::ThreadId;
 use crate::protocol::ConcreteThreadId;
 

@@ -1,7 +1,8 @@
 //! Add/Remove various kinds of breakpoints.
 
 use crate::arch::Arch;
-use crate::target::{Target, TargetResult};
+use crate::target::Target;
+use crate::target::TargetResult;
 
 /// Target Extension - Set/Remove Breakpoints.
 pub trait Breakpoints: Target {

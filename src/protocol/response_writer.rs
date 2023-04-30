@@ -1,14 +1,14 @@
+use crate::conn::Connection;
+use crate::internal::BeBytes;
+use crate::protocol::SpecificIdKind;
+use crate::protocol::SpecificThreadId;
 #[cfg(feature = "trace-pkt")]
 use alloc::string::String;
 #[cfg(feature = "trace-pkt")]
 use alloc::vec::Vec;
-
 use num_traits::identities::one;
-use num_traits::{CheckedRem, PrimInt};
-
-use crate::conn::Connection;
-use crate::internal::BeBytes;
-use crate::protocol::{SpecificIdKind, SpecificThreadId};
+use num_traits::CheckedRem;
+use num_traits::PrimInt;
 
 /// Newtype around a Connection error. Having a newtype allows implementing a
 /// `From<ResponseWriterError<C>> for crate::Error<T, C>`, which greatly

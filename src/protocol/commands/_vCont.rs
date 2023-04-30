@@ -1,8 +1,8 @@
 use super::prelude::*;
-
 use crate::common::Signal;
 use crate::protocol::common::hex::HexString;
-use crate::protocol::common::thread_id::{SpecificThreadId, ThreadId};
+use crate::protocol::common::thread_id::SpecificThreadId;
+use crate::protocol::common::thread_id::ThreadId;
 
 // TODO?: instead of lazily parsing data, parse the strings into a compressed
 // binary representations that can be stuffed back into the packet buffer and

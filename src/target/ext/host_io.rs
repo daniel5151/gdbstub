@@ -1,8 +1,7 @@
 //! Provide Host I/O operations for the target.
-use bitflags::bitflags;
-
 use crate::arch::Arch;
 use crate::target::Target;
+use bitflags::bitflags;
 
 bitflags! {
     /// Host flags for opening files.

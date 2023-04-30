@@ -1,7 +1,7 @@
 //! Provide exec-file path for the target.
-use crate::target::{Target, TargetResult};
-
 use crate::common::Pid;
+use crate::target::Target;
+use crate::target::TargetResult;
 
 /// Target Extension - Provide current exec-file.
 ///

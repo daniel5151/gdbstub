@@ -1,7 +1,6 @@
 use super::prelude::*;
-use crate::protocol::commands::ext::XUpcasePacket;
-
 use crate::arch::Arch;
+use crate::protocol::commands::ext::XUpcasePacket;
 use crate::target::ext::base::BaseOps;
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {

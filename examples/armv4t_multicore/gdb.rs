@@ -1,12 +1,17 @@
-use armv4t_emu::{reg, Memory};
-
-use gdbstub::common::{Signal, Tid};
+use crate::emu::CpuId;
+use crate::emu::Emu;
+use crate::emu::ExecMode;
+use armv4t_emu::reg;
+use armv4t_emu::Memory;
+use gdbstub::common::Signal;
+use gdbstub::common::Tid;
 use gdbstub::target;
-use gdbstub::target::ext::base::multithread::{MultiThreadBase, MultiThreadResume};
+use gdbstub::target::ext::base::multithread::MultiThreadBase;
+use gdbstub::target::ext::base::multithread::MultiThreadResume;
 use gdbstub::target::ext::breakpoints::WatchKind;
-use gdbstub::target::{Target, TargetError, TargetResult};
-
-use crate::emu::{CpuId, Emu, ExecMode};
+use gdbstub::target::Target;
+use gdbstub::target::TargetError;
+use gdbstub::target::TargetResult;
 
 pub fn cpuid_to_tid(id: CpuId) -> Tid {
     match id {

@@ -1,6 +1,6 @@
 // use super::prelude::*; // unused
-
-use crate::protocol::common::qxfer::{ParseAnnex, QXferReadBase};
+use crate::protocol::common::qxfer::ParseAnnex;
+use crate::protocol::common::qxfer::QXferReadBase;
 
 pub type qXferMemoryMapRead<'a> = QXferReadBase<'a, MemoryMapAnnex>;
 

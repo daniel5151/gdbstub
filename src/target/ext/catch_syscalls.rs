@@ -1,7 +1,8 @@
 //! Enable or disable catching syscalls from the inferior process.
 
 use crate::arch::Arch;
-use crate::target::{Target, TargetResult};
+use crate::target::Target;
+use crate::target::TargetResult;
 
 /// Target Extension - Enable and disable catching syscalls from the inferior
 /// process.

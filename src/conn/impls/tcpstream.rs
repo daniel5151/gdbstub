@@ -1,7 +1,6 @@
-use std::net::TcpStream;
-
 use crate::conn::Connection;
 use crate::conn::ConnectionExt;
+use std::net::TcpStream;
 
 impl Connection for TcpStream {
     type Error = std::io::Error;

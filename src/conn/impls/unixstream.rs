@@ -1,8 +1,7 @@
-use std::io;
-use std::os::unix::net::UnixStream;
-
 use crate::conn::Connection;
 use crate::conn::ConnectionExt;
+use std::io;
+use std::os::unix::net::UnixStream;
 
 // TODO: Remove PeekExt once rust-lang/rust#73761 is stabilized
 trait PeekExt {

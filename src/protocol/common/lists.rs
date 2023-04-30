@@ -1,4 +1,5 @@
-use crate::protocol::common::hex::{decode_hex_buf, is_hex};
+use crate::protocol::common::hex::decode_hex_buf;
+use crate::protocol::common::hex::is_hex;
 
 /// A wrapper type around a list of hex encoded arguments separated by `;`.
 #[derive(Debug)]

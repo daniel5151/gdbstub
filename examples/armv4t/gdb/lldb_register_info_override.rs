@@ -1,11 +1,14 @@
-use gdbstub::arch::lldb::{Encoding, Format, Generic, Register};
-use gdbstub::arch::RegId;
-use gdbstub::target;
-use gdbstub::target::ext::lldb_register_info_override::{Callback, CallbackToken};
-use gdbstub_arch::arm::reg::id::ArmCoreRegId;
-
 use crate::gdb::custom_arch::ArmCoreRegIdCustom;
 use crate::gdb::Emu;
+use gdbstub::arch::lldb::Encoding;
+use gdbstub::arch::lldb::Format;
+use gdbstub::arch::lldb::Generic;
+use gdbstub::arch::lldb::Register;
+use gdbstub::arch::RegId;
+use gdbstub::target;
+use gdbstub::target::ext::lldb_register_info_override::Callback;
+use gdbstub::target::ext::lldb_register_info_override::CallbackToken;
+use gdbstub_arch::arm::reg::id::ArmCoreRegId;
 
 // (LLDB extension) This implementation is for illustrative purposes only.
 //

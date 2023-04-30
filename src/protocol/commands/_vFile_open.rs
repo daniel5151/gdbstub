@@ -1,6 +1,6 @@
 use super::prelude::*;
-
-use crate::target::ext::host_io::{HostIoOpenFlags, HostIoOpenMode};
+use crate::target::ext::host_io::HostIoOpenFlags;
+use crate::target::ext::host_io::HostIoOpenMode;
 
 #[derive(Debug)]
 pub struct vFileOpen<'a> {

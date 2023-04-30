@@ -33,19 +33,21 @@
 //! [`BlockingEventLoop`]: super::run_blocking::BlockingEventLoop
 //! [`GdbStub::run_blocking`]: super::GdbStub::run_blocking
 
-use managed::ManagedSlice;
-
+use super::core_impl::FinishExecStatus;
+use super::core_impl::GdbStubImpl;
+use super::core_impl::State;
+use super::DisconnectReason;
+use super::GdbStub;
 use crate::arch::Arch;
 use crate::conn::Connection;
 use crate::protocol::recv_packet::RecvPacketStateMachine;
-use crate::protocol::{Packet, ResponseWriter};
+use crate::protocol::Packet;
+use crate::protocol::ResponseWriter;
 use crate::stub::error::GdbStubError;
 use crate::stub::error::InternalError;
 use crate::stub::stop_reason::IntoStopReason;
 use crate::target::Target;
-
-use super::core_impl::{FinishExecStatus, GdbStubImpl, State};
-use super::{DisconnectReason, GdbStub};
+use managed::ManagedSlice;
 
 /// State-machine interface to `GdbStub`.
 ///
@@ -79,7 +81,6 @@ where
 // payloads, which are used when transitioning between states.
 pub mod state {
     use super::*;
-
     use crate::stub::stop_reason::MultiThreadStopReason;
 
     // used internally when logging state transitions

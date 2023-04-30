@@ -1,13 +1,16 @@
+use crate::emu::Emu;
+use crate::emu::ExecMode;
+use armv4t_emu::reg;
+use armv4t_emu::Memory;
 use core::convert::TryInto;
-
-use armv4t_emu::{reg, Memory};
 use gdbstub::common::Signal;
 use gdbstub::target;
-use gdbstub::target::ext::base::singlethread::{SingleThreadBase, SingleThreadResume};
-use gdbstub::target::{Target, TargetError, TargetResult};
+use gdbstub::target::ext::base::singlethread::SingleThreadBase;
+use gdbstub::target::ext::base::singlethread::SingleThreadResume;
+use gdbstub::target::Target;
+use gdbstub::target::TargetError;
+use gdbstub::target::TargetResult;
 use gdbstub_arch::arm::reg::id::ArmCoreRegId;
-
-use crate::emu::{Emu, ExecMode};
 
 // Additional GDB extensions
 
@@ -390,10 +393,14 @@ impl target::ext::base::singlethread::SingleThreadRangeStepping for Emu {
 
 mod custom_arch {
     use core::num::NonZeroUsize;
-
-    use gdbstub::arch::lldb::{Encoding, Format, Generic, Register, RegisterInfo};
-    use gdbstub::arch::{Arch, RegId, Registers};
-
+    use gdbstub::arch::lldb::Encoding;
+    use gdbstub::arch::lldb::Format;
+    use gdbstub::arch::lldb::Generic;
+    use gdbstub::arch::lldb::Register;
+    use gdbstub::arch::lldb::RegisterInfo;
+    use gdbstub::arch::Arch;
+    use gdbstub::arch::RegId;
+    use gdbstub::arch::Registers;
     use gdbstub_arch::arm::reg::id::ArmCoreRegId;
     use gdbstub_arch::arm::reg::ArmCoreRegs;
     use gdbstub_arch::arm::ArmBreakpointKind;

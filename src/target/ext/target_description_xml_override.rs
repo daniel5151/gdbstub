@@ -1,5 +1,6 @@
 //! Override the target description XML specified by `Target::Arch`.
-use crate::target::{Target, TargetResult};
+use crate::target::Target;
+use crate::target::TargetResult;
 
 /// Target Extension - Override the target description XML specified by
 /// `Target::Arch`.

@@ -1,8 +1,8 @@
 use super::prelude::*;
-use crate::protocol::commands::ext::HostIo;
-
 use crate::arch::Arch;
-use crate::target::ext::host_io::{HostIoError, HostIoStat};
+use crate::protocol::commands::ext::HostIo;
+use crate::target::ext::host_io::HostIoError;
+use crate::target::ext::host_io::HostIoStat;
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     pub(crate) fn handle_host_io(
