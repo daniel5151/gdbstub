@@ -3,6 +3,7 @@
 
 use managed::ManagedSlice;
 
+use self::error::InternalError;
 use crate::conn::{Connection, ConnectionExt};
 use crate::target::Target;
 
@@ -19,8 +20,6 @@ pub use error::GdbStubError;
 pub use stop_reason::{
     BaseStopReason, IntoStopReason, MultiThreadStopReason, SingleThreadStopReason,
 };
-
-use GdbStubError as Error;
 
 /// Types and traits related to the [`GdbStub::run_blocking`] interface.
 pub mod run_blocking {
@@ -157,7 +156,7 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
     pub fn run_blocking<E>(
         self,
         target: &mut T,
-    ) -> Result<DisconnectReason, Error<T::Error, C::Error>>
+    ) -> Result<DisconnectReason, GdbStubError<T::Error, C::Error>>
     where
         C: ConnectionExt,
         E: run_blocking::BlockingEventLoop<Target = T, Connection = C>,
@@ -167,7 +166,7 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
             gdb = match gdb {
                 state_machine::GdbStubStateMachine::Idle(mut gdb) => {
                     // needs more data, so perform a blocking read on the connection
-                    let byte = gdb.borrow_conn().read().map_err(Error::ConnectionRead)?;
+                    let byte = gdb.borrow_conn().read().map_err(InternalError::conn_read)?;
                     gdb.incoming_data(target, byte)?
                 }
 
@@ -179,7 +178,8 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
 
                 state_machine::GdbStubStateMachine::CtrlCInterrupt(gdb) => {
                     // defer to the implementation on how it wants to handle the interrupt
-                    let stop_reason = E::on_interrupt(target).map_err(Error::TargetError)?;
+                    let stop_reason =
+                        E::on_interrupt(target).map_err(InternalError::TargetError)?;
                     gdb.interrupt_handled(target, stop_reason)?
                 }
 
@@ -198,10 +198,10 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
                         }
 
                         Err(WaitForStopReasonError::Target(e)) => {
-                            break Err(Error::TargetError(e));
+                            break Err(InternalError::TargetError(e).into());
                         }
                         Err(WaitForStopReasonError::Connection(e)) => {
-                            break Err(Error::ConnectionRead(e));
+                            break Err(InternalError::conn_read(e).into());
                         }
                     }
                 }
@@ -216,7 +216,8 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
     pub fn run_state_machine(
         mut self,
         target: &mut T,
-    ) -> Result<state_machine::GdbStubStateMachine<'a, T, C>, Error<T::Error, C::Error>> {
+    ) -> Result<state_machine::GdbStubStateMachine<'a, T, C>, GdbStubError<T::Error, C::Error>>
+    {
         // Check if the target hasn't explicitly opted into implicit sw breakpoints
         {
             let support_software_breakpoints = target
@@ -225,7 +226,7 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
                 .unwrap_or(false);
 
             if !support_software_breakpoints && !target.guard_rail_implicit_sw_breakpoints() {
-                return Err(Error::ImplicitSwBreakpoints);
+                return Err(InternalError::ImplicitSwBreakpoints.into());
             }
         }
 
@@ -233,7 +234,7 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
         {
             self.conn
                 .on_session_start()
-                .map_err(Error::ConnectionInit)?;
+                .map_err(InternalError::conn_init)?;
         }
 
         Ok(state_machine::GdbStubStateMachineInner::from_plain_gdbstub(self).into())

@@ -169,7 +169,7 @@
 //! #
 //! use gdbstub::common::Signal;
 //! use gdbstub::conn::{Connection, ConnectionExt}; // note the use of `ConnectionExt`
-//! use gdbstub::stub::{run_blocking, DisconnectReason, GdbStub, GdbStubError};
+//! use gdbstub::stub::{run_blocking, DisconnectReason, GdbStub, GdbStubErrorKind};
 //! use gdbstub::stub::SingleThreadStopReason;
 //! use gdbstub::target::Target;
 //!
@@ -251,7 +251,7 @@
 //!             }
 //!             DisconnectReason::Kill => println!("GDB sent a kill command"),
 //!         },
-//!         Err(GdbStubError::TargetError(e)) => {
+//!         Err(GdbStubErrorKind::TargetError(e)) => {
 //!             println!("target encountered a fatal error: {}", e)
 //!         }
 //!         Err(e) => {
@@ -304,6 +304,7 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(feature = "paranoid_unsafe", forbid(unsafe_code))]
+#![warn(missing_docs)]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;

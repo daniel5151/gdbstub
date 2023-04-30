@@ -39,7 +39,8 @@ use crate::arch::Arch;
 use crate::conn::Connection;
 use crate::protocol::recv_packet::RecvPacketStateMachine;
 use crate::protocol::{Packet, ResponseWriter};
-use crate::stub::error::GdbStubError as Error;
+use crate::stub::error::GdbStubError;
+use crate::stub::error::InternalError;
 use crate::stub::stop_reason::IntoStopReason;
 use crate::target::Target;
 
@@ -212,13 +213,13 @@ impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::Idle<T>, 
         mut self,
         target: &mut T,
         byte: u8,
-    ) -> Result<GdbStubStateMachine<'a, T, C>, Error<T::Error, C::Error>> {
+    ) -> Result<GdbStubStateMachine<'a, T, C>, GdbStubError<T::Error, C::Error>> {
         let packet_buffer = match self.i.recv_packet.pump(&mut self.i.packet_buffer, byte)? {
             Some(buf) => buf,
             None => return Ok(self.into()),
         };
 
-        let packet = Packet::from_buf(target, packet_buffer).map_err(Error::PacketParse)?;
+        let packet = Packet::from_buf(target, packet_buffer).map_err(InternalError::PacketParse)?;
         let state = self
             .i
             .inner
@@ -254,10 +255,10 @@ impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::Running, 
         mut self,
         target: &mut T,
         reason: impl IntoStopReason<T>,
-    ) -> Result<GdbStubStateMachine<'a, T, C>, Error<T::Error, C::Error>> {
+    ) -> Result<GdbStubStateMachine<'a, T, C>, GdbStubError<T::Error, C::Error>> {
         let mut res = ResponseWriter::new(&mut self.i.conn, target.use_rle());
         let event = self.i.inner.finish_exec(&mut res, target, reason.into())?;
-        res.flush()?;
+        res.flush().map_err(InternalError::from)?;
 
         Ok(match event {
             FinishExecStatus::Handled => self
@@ -276,13 +277,13 @@ impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::Running, 
         mut self,
         target: &mut T,
         byte: u8,
-    ) -> Result<GdbStubStateMachine<'a, T, C>, Error<T::Error, C::Error>> {
+    ) -> Result<GdbStubStateMachine<'a, T, C>, GdbStubError<T::Error, C::Error>> {
         let packet_buffer = match self.i.recv_packet.pump(&mut self.i.packet_buffer, byte)? {
             Some(buf) => buf,
             None => return Ok(self.into()),
         };
 
-        let packet = Packet::from_buf(target, packet_buffer).map_err(Error::PacketParse)?;
+        let packet = Packet::from_buf(target, packet_buffer).map_err(InternalError::PacketParse)?;
         let state = self
             .i
             .inner
@@ -329,7 +330,7 @@ impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::CtrlCInte
         self,
         target: &mut T,
         stop_reason: Option<impl IntoStopReason<T>>,
-    ) -> Result<GdbStubStateMachine<'a, T, C>, Error<T::Error, C::Error>> {
+    ) -> Result<GdbStubStateMachine<'a, T, C>, GdbStubError<T::Error, C::Error>> {
         if self.state.from_idle {
             // target is stopped - we cannot report the stop reason yet
             Ok(self

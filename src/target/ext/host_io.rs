@@ -176,7 +176,7 @@ pub enum HostIoError<E> {
     /// A target-specific fatal error.
     ///
     /// **WARNING:** Returning this error will immediately halt the target's
-    /// execution and return a `GdbStubError::TargetError`!
+    /// execution and return a [`GdbStubError`](crate::stub::GdbStubError)!
     ///
     /// Note that returning this error will _not_ notify the GDB client that the
     /// debugging session has been terminated, making it possible to resume

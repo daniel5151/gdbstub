@@ -321,7 +321,8 @@ pub enum TargetError<E> {
     /// A target-specific fatal error.
     ///
     /// **WARNING:** Returning this error will immediately terminate the GDB
-    /// debugging session, and return a top-level `GdbStubError::TargetError`!
+    /// debugging session, and return a
+    /// [`GdbStubError`](crate::stub::GdbStubError)!
     Fatal(E),
 }
 
@@ -430,10 +431,6 @@ pub trait Target {
     /// handler must explicitly **opt-in** to this somewhat surprising GDB
     /// feature by overriding this method to return `true`.
     ///
-    /// If you are reading these docs after having encountered a
-    /// [`GdbStubError::ImplicitSwBreakpoints`] error, it's quite likely that
-    /// you'll want to implement explicit support for software breakpoints.
-    ///
     /// # Context
     ///
     /// An "implicit" software breakpoint is set by the GDB client by manually
@@ -483,9 +480,6 @@ pub trait Target {
     /// e.g: On targets without native support for hardware single-stepping,
     /// calling `stepi` in GDB will result in the GDB client setting a temporary
     /// breakpoint on the next instruction + resuming via `continue` instead.
-    ///
-    /// [`GdbStubError::ImplicitSwBreakpoints`]:
-    /// crate::stub::GdbStubError::ImplicitSwBreakpoints
     #[inline(always)]
     fn guard_rail_implicit_sw_breakpoints(&self) -> bool {
         false

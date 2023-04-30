@@ -6,7 +6,7 @@
 
 use gdbstub::stub::state_machine::GdbStubStateMachine;
 use gdbstub::stub::MultiThreadStopReason;
-use gdbstub::stub::{DisconnectReason, GdbStubBuilder, GdbStubError};
+use gdbstub::stub::{DisconnectReason, GdbStubBuilder};
 
 mod conn;
 mod gdb;
@@ -75,11 +75,12 @@ fn rust_main() -> Result<(), i32> {
             DisconnectReason::TargetTerminated(_) => print_str("Target halted"),
             DisconnectReason::Kill => print_str("GDB sent a kill command"),
         },
-        Err(GdbStubError::TargetError(_e)) => {
-            print_str("Target raised a fatal error");
-        }
-        Err(_e) => {
-            print_str("gdbstub internal error");
+        Err(e) => {
+            if e.is_target_error() {
+                print_str("Target raised a fatal error");
+            } else {
+                print_str("gdbstub internal error");
+            }
         }
     }
 

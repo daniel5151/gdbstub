@@ -4,7 +4,7 @@ use crate::common::{Signal, Tid};
 use crate::conn::Connection;
 use crate::protocol::commands::Command;
 use crate::protocol::{Packet, ResponseWriter, SpecificIdKind};
-use crate::stub::GdbStubError as Error;
+use crate::stub::error::InternalError;
 use crate::target::Target;
 use crate::SINGLE_THREAD_TID;
 
@@ -17,7 +17,7 @@ mod prelude {
     pub(super) use crate::protocol::ResponseWriter;
     pub(super) use crate::stub::core_impl::target_result_ext::TargetResultExt;
     pub(super) use crate::stub::core_impl::{GdbStubImpl, HandlerStatus};
-    pub(super) use crate::stub::error::GdbStubError as Error;
+    pub(super) use crate::stub::error::InternalError as Error;
     pub(super) use crate::target::Target;
 }
 
@@ -43,7 +43,7 @@ mod x_upcase_packet;
 pub(crate) use resume::FinishExecStatus;
 
 pub(crate) mod target_result_ext {
-    use crate::stub::GdbStubError;
+    use crate::stub::error::InternalError;
     use crate::target::TargetError;
 
     /// Extension trait to ease working with `TargetResult` in the GdbStub
@@ -52,14 +52,14 @@ pub(crate) mod target_result_ext {
         /// Encapsulates the boilerplate associated with handling
         /// `TargetError`s, such as bailing-out on Fatal errors, or
         /// returning response codes.
-        fn handle_error(self) -> Result<V, GdbStubError<T, C>>;
+        fn handle_error(self) -> Result<V, InternalError<T, C>>;
     }
 
     impl<V, T, C> TargetResultExt<V, T, C> for Result<V, TargetError<T>> {
-        fn handle_error(self) -> Result<V, GdbStubError<T, C>> {
+        fn handle_error(self) -> Result<V, InternalError<T, C>> {
             let code = match self {
                 Ok(v) => return Ok(v),
-                Err(TargetError::Fatal(e)) => return Err(GdbStubError::TargetError(e)),
+                Err(TargetError::Fatal(e)) => return Err(InternalError::TargetError(e)),
                 // Recoverable errors:
                 // Error code 121 corresponds to `EREMOTEIO` lol
                 Err(TargetError::NonFatal) => 121,
@@ -68,7 +68,7 @@ pub(crate) mod target_result_ext {
                 Err(TargetError::Io(e)) => e.raw_os_error().unwrap_or(121) as u8,
             };
 
-            Err(GdbStubError::NonFatalError(code))
+            Err(InternalError::NonFatalError(code))
         }
     }
 }
@@ -93,7 +93,7 @@ pub enum State {
     Disconnect(DisconnectReason),
 }
 
-pub struct GdbStubImpl<T: Target, C: Connection> {
+pub(crate) struct GdbStubImpl<T: Target, C: Connection> {
     _target: PhantomData<T>,
     _connection: PhantomData<C>,
 
@@ -134,10 +134,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         target: &mut T,
         conn: &mut C,
         packet: Packet<'_>,
-    ) -> Result<State, Error<T::Error, C::Error>> {
+    ) -> Result<State, InternalError<T::Error, C::Error>> {
         match packet {
             Packet::Ack => Ok(State::Pump),
-            Packet::Nack => Err(Error::ClientSentNack),
+            Packet::Nack => Err(InternalError::ClientSentNack),
             Packet::Interrupt => {
                 debug!("<-- interrupt packet");
                 Ok(State::CtrlCInterrupt)
@@ -145,7 +145,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             Packet::Command(command) => {
                 // Acknowledge the command
                 if !self.features.no_ack_mode() {
-                    conn.write(b'+').map_err(Error::ConnectionWrite)?;
+                    conn.write(b'+').map_err(InternalError::conn_write)?;
                 }
 
                 let mut res = ResponseWriter::new(conn, target.use_rle());
@@ -159,7 +159,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     Ok(HandlerStatus::Disconnect(reason)) => Some(reason),
                     // HACK: handling this "dummy" error is required as part of the
                     // `TargetResultExt::handle_error()` machinery.
-                    Err(Error::NonFatalError(code)) => {
+                    Err(InternalError::NonFatalError(code)) => {
                         res.write_str("E")?;
                         res.write_num(code)?;
                         None
@@ -189,7 +189,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         res: &mut ResponseWriter<'_, C>,
         target: &mut T,
         cmd: Command<'_>,
-    ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
+    ) -> Result<HandlerStatus, InternalError<T::Error, C::Error>> {
         match cmd {
             // `handle_X` methods are defined in the `ext` module
             Command::Base(cmd) => self.handle_base(res, target, cmd),
