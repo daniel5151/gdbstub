@@ -169,7 +169,7 @@
 //! #
 //! use gdbstub::common::Signal;
 //! use gdbstub::conn::{Connection, ConnectionExt}; // note the use of `ConnectionExt`
-//! use gdbstub::stub::{run_blocking, DisconnectReason, GdbStub, GdbStubErrorKind};
+//! use gdbstub::stub::{run_blocking, DisconnectReason, GdbStub};
 //! use gdbstub::stub::SingleThreadStopReason;
 //! use gdbstub::target::Target;
 //!
@@ -251,11 +251,18 @@
 //!             }
 //!             DisconnectReason::Kill => println!("GDB sent a kill command"),
 //!         },
-//!         Err(GdbStubErrorKind::TargetError(e)) => {
-//!             println!("target encountered a fatal error: {}", e)
-//!         }
 //!         Err(e) => {
-//!             println!("gdbstub encountered a fatal error: {}", e)
+//!             if e.is_target_error() {
+//!                 println!(
+//!                     "target encountered a fatal error: {}",
+//!                     e.into_target_error().unwrap()
+//!                 )
+//!             } else if e.is_connection_error() {
+//!                 let (e, kind) = e.into_connection_error().unwrap();
+//!                 println!("connection error: {:?} - {}", kind, e,)
+//!             } else {
+//!                 println!("gdbstub encountered a fatal error: {}", e)
+//!             }
 //!         }
 //!     }
 //! }
