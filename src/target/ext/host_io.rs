@@ -3,16 +3,18 @@ use crate::arch::Arch;
 use crate::target::Target;
 use bitflags::bitflags;
 
+/// Host flags for opening files.
+///
+/// Extracted from the GDB documentation at
+/// [Open Flags](https://sourceware.org/gdb/current/onlinedocs/gdb/Open-Flags.html#Open-Flags),
+/// and the LLDB source code at
+/// [`lldb/include/lldb/Host/File.h`](https://github.com/llvm/llvm-project/blob/ec642ceebc1aacc8b16249df7734b8cf90ae2963/lldb/include/lldb/Host/File.h#L47-L66)
+#[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[repr(transparent)]
+pub struct HostIoOpenFlags(u32);
+
 bitflags! {
-    /// Host flags for opening files.
-    ///
-    /// Extracted from the GDB documentation at
-    /// [Open Flags](https://sourceware.org/gdb/current/onlinedocs/gdb/Open-Flags.html#Open-Flags),
-    /// and the LLDB source code at
-    /// [`lldb/include/lldb/Host/File.h`](https://github.com/llvm/llvm-project/blob/ec642ceebc1aacc8b16249df7734b8cf90ae2963/lldb/include/lldb/Host/File.h#L47-L66)
-    #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[repr(transparent)]
-    pub struct HostIoOpenFlags: u32 {
+    impl HostIoOpenFlags: u32 {
         /// A read-only file.
         const O_RDONLY = 0x0;
         /// A write-only file.
@@ -39,14 +41,16 @@ bitflags! {
     }
 }
 
+/// Host file permissions.
+///
+/// Extracted from the GDB documentation at
+/// [mode_t Values](https://sourceware.org/gdb/current/onlinedocs/gdb/mode_005ft-Values.html#mode_005ft-Values)
+#[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[repr(transparent)]
+pub struct HostIoOpenMode(u32);
+
 bitflags! {
-    /// Host file permissions.
-    ///
-    /// Extracted from the GDB documentation at
-    /// [mode_t Values](https://sourceware.org/gdb/current/onlinedocs/gdb/mode_005ft-Values.html#mode_005ft-Values)
-    #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[repr(transparent)]
-    pub struct HostIoOpenMode: u32 {
+    impl HostIoOpenMode: u32 {
         /// A regular file.
         const S_IFREG = 0o100000;
         /// A directory.
