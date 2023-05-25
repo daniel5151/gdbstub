@@ -249,11 +249,15 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     }
 }
 
+#[derive(Copy, Clone)]
+#[repr(transparent)]
+struct ProtocolFeatures(u8);
+
 // This bitflag is not part of the protocol - it is an internal implementation
 // detail. The alternative would be to use multiple `bool` fields, which wastes
 // space in minimal `gdbstub` configurations.
 bitflags::bitflags! {
-    struct ProtocolFeatures: u8 {
+    impl ProtocolFeatures: u8 {
         const NO_ACK_MODE = 1 << 0;
         const MULTIPROCESS = 1 << 1;
     }
