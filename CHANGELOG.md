@@ -14,9 +14,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   - Entirely removed `single_step_behavior`. See [\#132](https://github.com/daniel5151/gdbstub/pull/132) for details and rationale
 - `Target` APIs:
   - `SingleThreadBase`/`MultiThreadBase`
-    - `read_addrs` now returns a `usize` instead of a `()`, allowing implementations to report cases where only a subset of memory could be read.
+    - `read_addrs` now returns a `usize` instead of a `()`, allowing implementations to report cases where only a subset of memory could be read. [\#115](https://github.com/daniel5151/gdbstub/pull/115) ([geigerzaehler](https://github.com/geigerzaehler))
   - `HostIo`
-    - `bitflags` has been updated from `1.x` to `2.x`, affecting the type of `HostIoOpenFlags` and `HostIoOpenMode`
+    - `bitflags` has been updated from `1.x` to `2.x`, affecting the type of `HostIoOpenFlags` and `HostIoOpenMode` [\#138](https://github.com/daniel5151/gdbstub/pull/138) ([qwandor](https://github.com/qwandor))
 
 #### Internal Improvements
 
