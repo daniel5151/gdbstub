@@ -56,4 +56,5 @@ rustflags = [
     #   type StopReason = MultiThreadStopReason<<Self::Arch as Arch>::Usize>>;
     #   Result<Option<StopReason>, Self::Error>
     "-Aclippy::type_complexity",
+    "-Aclippy::manual_range_patterns",
 ]

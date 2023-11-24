@@ -5,7 +5,7 @@ use paste::paste;
 /// Common imports used by >50% of all packet parsers.
 ///
 /// Do not clutter this prelude with types only used by a few packets.
-pub(self) mod prelude {
+pub mod prelude {
     pub use crate::protocol::commands::ParseCommand;
     pub use crate::protocol::common::hex::decode_hex;
     pub use crate::protocol::common::hex::decode_hex_buf;
