@@ -2,7 +2,7 @@
 name = "gdbstub_arch"
 description = "Implementations of `gdbstub::arch::Arch` for various architectures."
 authors = ["Daniel Prilik <danielprilik@gmail.com>"]
-version = "0.2.4"
+version = "0.3.0"
 license = "MIT OR Apache-2.0"
 edition = "2018"
 readme = "README.md"
@@ -13,6 +13,6 @@ keywords = ["gdb", "emulation", "no_std", "debugging"]
 categories = ["development-tools::debugging", "embedded", "emulators", "no-std"]
 
 [dependencies]
-gdbstub = { path = "../", version = "0.6", default-features = false }
+gdbstub = { path = "../", version = "0.7", default-features = false }
 
 num-traits = { version = "0.2", default-features = false }
