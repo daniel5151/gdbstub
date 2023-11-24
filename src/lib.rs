@@ -1,6 +1,6 @@
-//! An ergonomic and easy-to-integrate implementation of the
-//! [GDB Remote Serial Protocol](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Protocol.html#Remote-Protocol)
-//! in Rust, with full `#![no_std]` support.
+//! An ergonomic, featureful, and easy-to-integrate implementation of the [GDB
+//! Remote Serial Protocol](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Protocol.html#Remote-Protocol)
+//! in Rust, with no-compromises `#![no_std]` support.
 //!
 //! ## Feature flags
 //!
@@ -86,8 +86,8 @@
 //!
 //! ### The `Target` Trait
 //!
-//! The [`Target`](target::Target) trait describes how to control and modify
-//! a system's execution state during a GDB debugging session, and serves as the
+//! The [`Target`](target::Target) trait describes how to control and modify a
+//! system's execution state during a GDB debugging session, and serves as the
 //! primary bridge between `gdbstub`'s generic GDB protocol implementation and a
 //! specific target's project/platform-specific code.
 //!

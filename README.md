@@ -4,13 +4,13 @@
 [![](https://docs.rs/gdbstub/badge.svg)](https://docs.rs/gdbstub)
 [![](https://img.shields.io/badge/license-MIT%2FApache-blue.svg)](./LICENSE)
 
-An ergonomic and easy-to-integrate implementation of the [GDB Remote Serial Protocol](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Protocol.html#Remote-Protocol) in Rust, with full `#![no_std]` support.
+An ergonomic, featureful, and easy-to-integrate implementation of the [GDB Remote Serial Protocol](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Protocol.html#Remote-Protocol) in Rust, with _no-compromises_ `#![no_std]` support.
 
 `gdbstub`  makes it easy to integrate powerful guest debugging support to your emulator / hypervisor / debugger / embedded project. By implementing just a few basic methods of the [`gdbstub::Target`](https://docs.rs/gdbstub/latest/gdbstub/target/ext/base/singlethread/trait.SingleThreadBase.html) trait, you can have a rich GDB debugging session up and running in no time!
 
 `gdbstub`'s API makes extensive use of a technique called [**Inlineable Dyn Extension Traits**](#zero-overhead-protocol-extensions) (IDETs) to expose fine-grained, zero-cost control over enabled GDB protocol features _without_ relying on compile-time features flags. Aside from making it effortless to toggle enabled protocol features, IDETs also ensure that any unimplemented features are guaranteed to be dead-code-eliminated in release builds!
 
-**If you're looking for a quick snippet of example code to see what a typical `gdbstub` integration might look like, check out [examples/armv4t/gdb/mod.rs](https://github.com/daniel5151/gdbstub/blob/master/examples/armv4t/gdb/mod.rs)**
+**If you're looking for a quick snippet of example code to see what a featureful `gdbstub` integration might look like, check out [examples/armv4t/gdb/mod.rs](https://github.com/daniel5151/gdbstub/blob/master/examples/armv4t/gdb/mod.rs)**
 
 -   [Documentation (gdbstub)](https://docs.rs/gdbstub)
 -   [Documentation (gdbstub_arch)](https://docs.rs/gdbstub_arch)

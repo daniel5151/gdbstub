@@ -6,19 +6,21 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 #### Breaking API Changes
 
-- `GdbStubError` has been overhauled. Instead of being an `enum`, it is now an opaque `struct` with a handful of methods to extract concrete user-defined error data.
-  - _This change will enable future versions of `gdbstub` to fearlessly improve error messages and infrastructure without making semver breaking changes._
-- `Signal` is not longer an `enum`, and is instead a `struct` with a single `pub u8` field + a collection of associated constants.
+- `stub::GdbStubError` is now an opaque `struct` with a handful of methods to extract user-defined context (as opposed to being an `enum` that directly exposed all error internals to the user).
+  - _This change will enable future versions of `gdbstub` to fearlessly improve error messages and infrastructure without making semver breaking changes. See [\#112](https://github.com/daniel5151/gdbstub/pull/132) for more._
+- `common::Signal` is not longer an `enum`, and is instead a `struct` with a single `pub u8` field + a collection of associated constants.
   - _As a result, yet another instance of `unsafe` could be removed from the codebase!_
 - `Arch` API:
   - Entirely removed `single_step_behavior`. See [\#132](https://github.com/daniel5151/gdbstub/pull/132) for details and rationale
 - `Target` APIs:
   - `SingleThreadBase`/`MultiThreadBase`
     - `read_addrs` now returns a `usize` instead of a `()`, allowing implementations to report cases where only a subset of memory could be read.
+  - `HostIo`
+    - `bitflags` has been updated from `1.x` to `2.x`, affecting the type of `HostIoOpenFlags` and `HostIoOpenMode`
 
 #### Internal Improvements
 
-- `rustfmt`: Switched to using `imports_granularity = "Item"`
+- Reformatted codebase with nightly rustfmt using `imports_granularity = "Item"`
 
 # 0.6.6
 

@@ -6,6 +6,76 @@ This document does _not_ discuss any new features that might have been added bet
 
 > _Note:_ after reading through this doc, you may also find it helpful to refer to the in-tree `armv4t` and `armv4t_multicore` examples when transitioning between versions.
 
+## `0.6` -> `0.7`
+
+`0.7` is a fairly minimal "cleanup" release, landing a collection of small breaking changes that collectively improve various ergonomic issues in `gdbstub`'s API.
+
+The breaking changes introduced in `0.7` are generally trivial to fix, and porting from `0.6` to `0.7` shouldn't take more than ~10 minutes, at most.
+
+##### `stub::GdbStubError` Changes
+
+`stub::GdbStubError` is now an opaque `struct` with a handful of methods to extract user-defined context.
+
+**Please file an issue if your code required matching on concrete error variants aside from `TargetError` and `ConnectionError`!**.
+
+In contrast with the old version - which was an `enum` that directly exposed all error internals to the user - this new type will enable future versions of `gdbstub` to fearlessly improve error infrastructure without requiring semver breaking changes. See [\#112](https://github.com/daniel5151/gdbstub/pull/132) for more.
+
+Assuming you stuck to the example error handling described in the `gdbstub` getting started guide, adapting to the new type should be quite straightforward.
+
+
+```rust
+// ==== 0.6.x ==== //
+
+match gdb.run_blocking::<EmuGdbEventLoop>(&mut emu) {
+    Ok(disconnect_reason) => { ... },
+    Err(GdbStubError::TargetError(e)) => {
+        println!("target encountered a fatal error: {}", e)
+    }
+    Err(e) => {
+        println!("gdbstub encountered a fatal error: {}", e)
+    }
+}
+
+// ==== 0.7.0 ==== //
+
+match gdb.run_blocking::<EmuGdbEventLoop>(&mut emu) {
+    Ok(disconnect_reason) => { ... },
+    Err(e) => {
+        if e.is_target_error() {
+            println!(
+                "target encountered a fatal error: {}",
+                e.into_target_error().unwrap()
+            )
+        } else if e.is_connection_error() {
+            let (e, kind) = e.into_connection_error().unwrap();
+            println!("connection error: {:?} - {}", kind, e,)
+        } else {
+            println!("gdbstub encountered a fatal error: {}", e)
+        }
+    }
+}
+```
+
+
+##### `{Single, Multi}ThreadBase::read_addrs` return value
+
+`read_addrs` now returns a `usize` instead of a `()`, allowing implementations to report cases where only a subset of memory could be read.
+
+In the past, the only way to handle these cases was by returning a `TargetError`. This provides an alternative mechanism, which may or may not be more appropriate for your particular use-case.
+
+When upgrading, the Rust compiler will emit a clear error message pointing out the updated function signature. The fix should be trivial.
+
+##### Removal of `Arch::single_step_behavior`
+
+See [\#132](https://github.com/daniel5151/gdbstub/pull/132) for more discussion on why this API was removed.
+
+This change only affects you if you're maintaining a custom `Arch` implementation (vs. using a community-maintained one via `gdbstub_arch`).
+
+The fix here is to simply remove the `Arch::single_step_behavior` impl.
+
+That's it! It's that easy.
+
+
 ## `0.5` -> `0.6`
 
 `0.6` introduces a large number of breaking changes to the public APIs, and will require quite a bit more more "hands on" porting than previous `gdbstub` upgrades.
