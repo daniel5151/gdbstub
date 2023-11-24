@@ -38,10 +38,9 @@ impl<'a> Callback<'a> {
 /// runtime-configurable target, it's unlikely that you'll need to implement
 /// this extension.
 pub trait LldbRegisterInfoOverride: Target {
-    /// Invoke `reg_info.write(reg)` where `reg` is a
-    /// [`Register`](crate::arch::lldb::Register) struct to write information of
-    /// a single register or `reg_info.done()` if you want to end the
-    /// `qRegisterInfo` packet exchange.
+    /// Invoke `reg_info.write(reg)` where `reg` is a [`Register`] struct to
+    /// write information of a single register or `reg_info.done()` if you want
+    /// to end the `qRegisterInfo` packet exchange.
     fn lldb_register_info<'a>(
         &mut self,
         reg_id: usize,
