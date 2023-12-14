@@ -676,6 +676,19 @@ pub trait Target {
     fn support_auxv(&mut self) -> Option<ext::auxv::AuxvOps<'_, Self>> {
         None
     }
+
+    /// Support for reading a list of libraries non-SVR4 platforms.
+    #[inline(always)]
+    fn support_libraries(&mut self) -> Option<ext::libraries::LibrariesOps<'_, Self>> {
+        None
+    }
+
+    /// Support for reading a list of libraries for SVR4 (System-V/Unix)
+    /// platforms.
+    #[inline(always)]
+    fn support_libraries_svr4(&mut self) -> Option<ext::libraries::LibrariesSvr4Ops<'_, Self>> {
+        None
+    }
 }
 
 macro_rules! __delegate {

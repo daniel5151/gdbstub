@@ -31,6 +31,7 @@ mod catch_syscalls;
 mod exec_file;
 mod extended_mode;
 mod host_io;
+mod libraries;
 mod lldb_register_info;
 mod memory_map;
 mod monitor_cmd;
@@ -216,6 +217,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             Command::Auxv(cmd) => self.handle_auxv(res, target, cmd),
             Command::ThreadExtraInfo(cmd) => self.handle_thread_extra_info(res, target, cmd),
             Command::LldbRegisterInfo(cmd) => self.handle_lldb_register_info(res, target, cmd),
+            Command::Libraries(cmd) => self.handle_libraries(res, target, cmd),
+            Command::LibrariesSvr4(cmd) => self.handle_libraries_svr4(res, target, cmd),
             // in the worst case, the command could not be parsed...
             Command::Unknown(cmd) => {
                 // HACK: if the user accidentally sends a resume command to a
