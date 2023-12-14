@@ -1,5 +1,6 @@
 use super::prelude::*;
-use crate::protocol::commands::ext::{Libraries, LibrariesSvr4};
+use crate::protocol::commands::ext::Libraries;
+use crate::protocol::commands::ext::LibrariesSvr4;
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     pub(crate) fn handle_libraries(
