@@ -677,12 +677,6 @@ pub trait Target {
         None
     }
 
-    /// Support for reading a list of libraries non-SVR4 platforms.
-    #[inline(always)]
-    fn support_libraries(&mut self) -> Option<ext::libraries::LibrariesOps<'_, Self>> {
-        None
-    }
-
     /// Support for reading a list of libraries for SVR4 (System-V/Unix)
     /// platforms.
     #[inline(always)]

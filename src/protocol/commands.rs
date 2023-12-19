@@ -331,10 +331,6 @@ commands! {
         "qRegisterInfo" => _qRegisterInfo::qRegisterInfo,
     }
 
-    libraries use 'a {
-        "qXfer:libraries:read" => _qXfer_libraries_read::qXferLibrariesRead<'a>,
-    }
-
     libraries_svr4 use 'a {
         "qXfer:libraries-svr4:read" => _qXfer_libraries_svr4_read::qXferLibrariesSvr4Read<'a>,
     }

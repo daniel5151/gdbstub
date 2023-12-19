@@ -217,7 +217,6 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             Command::Auxv(cmd) => self.handle_auxv(res, target, cmd),
             Command::ThreadExtraInfo(cmd) => self.handle_thread_extra_info(res, target, cmd),
             Command::LldbRegisterInfo(cmd) => self.handle_lldb_register_info(res, target, cmd),
-            Command::Libraries(cmd) => self.handle_libraries(res, target, cmd),
             Command::LibrariesSvr4(cmd) => self.handle_libraries_svr4(res, target, cmd),
             // in the worst case, the command could not be parsed...
             Command::Unknown(cmd) => {

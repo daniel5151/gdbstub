@@ -3,29 +3,6 @@ use crate::emu::Emu;
 use gdbstub::target;
 use gdbstub::target::TargetResult;
 
-impl target::ext::libraries::Libraries for Emu {
-    fn get_libraries(
-        &self,
-        offset: u64,
-        length: usize,
-        buf: &mut [u8],
-    ) -> TargetResult<usize, Self> {
-        if true {
-            panic!()
-        }
-        let xml = r#"
-<library-list>
-  <library name="/test.elf">
-    <segment address="0"/>
-  </library>
-</library-list>
-"#
-        .trim()
-        .as_bytes();
-        Ok(copy_range_to_buf(xml, offset, length, buf))
-    }
-}
-
 impl target::ext::libraries::LibrariesSvr4 for Emu {
     fn get_libraries_svr4(
         &self,

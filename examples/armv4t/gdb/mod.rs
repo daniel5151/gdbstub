@@ -156,11 +156,6 @@ impl Target for Emu {
     }
 
     #[inline(always)]
-    fn support_libraries(&mut self) -> Option<target::ext::libraries::LibrariesOps<'_, Self>> {
-        Some(self)
-    }
-
-    #[inline(always)]
     fn support_libraries_svr4(
         &mut self,
     ) -> Option<target::ext::libraries::LibrariesSvr4Ops<'_, Self>> {
