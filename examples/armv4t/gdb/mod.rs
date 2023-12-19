@@ -20,6 +20,7 @@ mod catch_syscalls;
 mod exec_file;
 mod extended_mode;
 mod host_io;
+mod libraries;
 mod lldb_register_info_override;
 mod memory_map;
 mod monitor_cmd;
@@ -151,6 +152,18 @@ impl Target for Emu {
 
     #[inline(always)]
     fn support_auxv(&mut self) -> Option<target::ext::auxv::AuxvOps<'_, Self>> {
+        Some(self)
+    }
+
+    #[inline(always)]
+    fn support_libraries(&mut self) -> Option<target::ext::libraries::LibrariesOps<'_, Self>> {
+        Some(self)
+    }
+
+    #[inline(always)]
+    fn support_libraries_svr4(
+        &mut self,
+    ) -> Option<target::ext::libraries::LibrariesSvr4Ops<'_, Self>> {
         Some(self)
     }
 }
