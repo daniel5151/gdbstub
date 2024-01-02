@@ -1,4 +1,6 @@
-//! TODO
+//! Report information about the loaded shared libraries for targets where there
+//! are possibly multiple files to be debugged mapped into the same address
+//! space.
 
 use crate::target::Target;
 use crate::target::TargetResult;
