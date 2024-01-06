@@ -8,6 +8,13 @@
 //! limited to reporting the offsets for code, data and bss, and is
 //! generally considered a legacy feature.
 //!
+//! For System-V architectures GDB may use the `qXfer:libraries-svr4:read`
+//! command to try to learn about loaded libraries and this can be implemented
+//! with the [`LibrariesSvr4`
+//! trait](crate::target::ext::libraries::LibrariesSvr4). Note that not all
+//! targets may query this and it may not be applicable in all situations
+//! either.
+//!
 //! For targets where library offsets are maintained externally (e.g. Windows)
 //! you should consider implementing the more flexible `qXfer:library:read`.
 //! See issue [#20](https://github.com/daniel5151/gdbstub/issues/20) for more

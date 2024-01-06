@@ -265,6 +265,7 @@ pub mod catch_syscalls;
 pub mod exec_file;
 pub mod extended_mode;
 pub mod host_io;
+pub mod libraries;
 pub mod lldb_register_info_override;
 pub mod memory_map;
 pub mod monitor_cmd;
