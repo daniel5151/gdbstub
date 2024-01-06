@@ -2,6 +2,12 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+# 0.7.1
+
+#### New Protocol Extensions
+
+- `LibrariesSvr4` - List an SVR4 (System-V/Unix) target's libraries. [\#142](https://github.com/daniel5151/gdbstub/pull/142) ([alexcrichton](https://github.com/alexcrichton))
+
 # 0.7.0
 
 #### Breaking API Changes
