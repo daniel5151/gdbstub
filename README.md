@@ -132,11 +132,10 @@ If you end up using `gdbstub` in your project, consider opening a PR and adding 
 -   Virtual Machine Monitors (VMMs)
     -   [crosvm](https://google.github.io/crosvm/running_crosvm/advanced_usage.html#gdb-support) - The Chrome OS VMM
     -   [cloud-hypervisor](https://github.com/cloud-hypervisor/cloud-hypervisor) - A VMM for modern cloud workloads
-    -   [Firecracker](https://firecracker-microvm.github.io/) - A lightweight VMM developed by AWS (feature is in [PR](https://github.com/firecracker-microvm/firecracker/pull/2333))
     -   [uhyve](https://github.com/hermitcore/uhyve) - A minimal hypervisor for [RustyHermit](https://github.com/hermitcore/rusty-hermit)
 -   OS Kernels (using `gdbstub` on `no_std`)
     -   [`betrusted-io/xous-core`](https://github.com/betrusted-io/xous-core/blob/b471b604/kernel/src/debug/gdb.rs) - The Xous microkernel operating system
-    -   [`vmware-labs/node-replicated-kernel`](https://github.com/vmware-labs/node-replicated-kernel/tree/4326704/kernel/src/arch/x86_64/gdb) - An (experimental) research OS kernel for x86-64 (amd64) machines
+    -   [`vmware-labs/node-replicated-kernel`](https://github.com/vmware-labs/node-replicated-kernel/tree/57f953c2/kernel/src/arch/x86_64/gdb) - An (experimental) research OS kernel for x86-64 (amd64) machines
 -   Emulators
     -   [solana_rbpf](https://github.com/solana-labs/rbpf) - VM and JIT compiler for eBPF programs
     -   [rustyboyadvance-ng](https://github.com/michelhe/rustboyadvance-ng/) - Nintendo Gameboy Advance emulator and debugger (ARMv4T)
@@ -151,6 +150,7 @@ If you end up using `gdbstub` in your project, consider opening a PR and adding 
     -   [probe-rs](https://probe.rs/) - A modern, embedded debugging toolkit
     -   [udbserver](https://github.com/bet4it/udbserver) - Plug-in GDB debugging for the [Unicorn Engine](https://www.unicorn-engine.org/) (Multi Architecture)
     -   [enarx](https://github.com/enarx/enarx) - An open source framework for running applications in Trusted Execution Environments
+    -   [icicle-emu](https://github.com/icicle-emu/icicle-emu) - An experimental fuzzing-specific, multi-architecture emulation framework
 
 ### In-tree "Toy" Examples
 
