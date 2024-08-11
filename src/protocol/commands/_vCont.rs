@@ -3,6 +3,7 @@ use crate::common::Signal;
 use crate::protocol::common::hex::HexString;
 use crate::protocol::common::thread_id::SpecificThreadId;
 use crate::protocol::common::thread_id::ThreadId;
+use crate::protocol::IdKind;
 
 // TODO?: instead of lazily parsing data, parse the strings into a compressed
 // binary representations that can be stuffed back into the packet buffer and
@@ -75,7 +76,53 @@ impl<'a> ActionsBuf<'a> {
             let mut s = act.split(|b| *b == b':');
             let kind = s.next()?;
             let thread = match s.next() {
-                Some(s) => Some(SpecificThreadId::try_from(ThreadId::try_from(s).ok()?).ok()?),
+                Some(s) => {
+                    let mut tid = ThreadId::try_from(s).ok()?;
+
+                    // Based on my (somewhat superficial) readings of the
+                    // `gdbserver` and `gdb` codebases, it doesn't seem like
+                    // there's any consensus on how vCont packets with a TID of
+                    // `Any` should be be handled.
+                    //
+                    // `gdbserver` delegates the handling of this packet to
+                    // individual targets, and in-turn, it seems most targets
+                    // don't actually do any special handling of the 'Any' TID.
+                    // They'll explicitly check for the 'All' TID, but then
+                    // proceed to erroneously treat the 'Any' TID as though it
+                    // was simply a request for a TID with ID of '0' to be
+                    // resumed (which is prohibited by the GDB RSP spec).
+                    //
+                    // This behavior makes sense, given the context that AFAIK,
+                    // upstream GDB never actually sends vCont packets with a
+                    // 'Any' TID! Instead, upstream GDB will first query the
+                    // remote to obtain a list of valid TIDs, and then send over
+                    // a vCont packet with a specific TID selected.
+
+                    // So, with all that said - how should `gdbstub` handle
+                    // these sorts of packets?
+                    //
+                    // Unfortunately, it seems like there are some weird
+                    // third-party GDB clients out there that do in-fact send an
+                    // 'Any' TID as part of a vCont packet.
+                    //
+                    // See issue #150 for more info.
+                    //
+                    // As a workaround for these weird GDB clients, `gdbstub`
+                    // takes the pragmatic approach of treating this request as
+                    // though it the client requested _all_ threads to be
+                    // resumed.
+                    //
+                    // If this turns out to be wrong... `gdbstub` can explore a
+                    // more involved fix, whereby we bubble-up this `Any`
+                    // request to the stub code itself, whereupon the stub can
+                    // attempt to pick a "reasonable" TID to individually
+                    // resume.
+                    if tid.tid == IdKind::Any {
+                        tid.tid = IdKind::All;
+                    }
+
+                    Some(SpecificThreadId::try_from(tid).ok()?)
+                }
                 None => None,
             };
 
