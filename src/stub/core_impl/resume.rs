@@ -61,14 +61,20 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             // annoying...
             //
             // TODO: add `support_legacy_s_c_packets` flag (similar to `use_X_packet`)
-            Resume::c(_) => Actions::new_continue(SpecificThreadId {
-                pid: None,
-                tid: self.current_resume_tid,
-            }),
-            Resume::s(_) => Actions::new_step(SpecificThreadId {
-                pid: None,
-                tid: self.current_resume_tid,
-            }),
+            Resume::c(cmd) => {
+                let _addr = cmd.addr;
+                Actions::new_continue(SpecificThreadId {
+                    pid: None,
+                    tid: self.current_resume_tid,
+                })
+            }
+            Resume::s(cmd) => {
+                let _addr = cmd.addr;
+                Actions::new_step(SpecificThreadId {
+                    pid: None,
+                    tid: self.current_resume_tid,
+                })
+            }
         };
 
         self.do_vcont(ops, actions)

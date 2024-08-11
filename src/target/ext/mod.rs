@@ -3,8 +3,8 @@
 //!
 //! ### Note: Missing Protocol Extensions
 //!
-//! `gdbstub`'s development is guided by the needs of its contributors, with
-//! new features being added on an "as-needed" basis.
+//! `gdbstub`'s development is guided by the needs of its contributors, with new
+//! features being added on an "as-needed" basis.
 //!
 //! If there's a GDB protocol extensions you're interested in that hasn't been
 //! implemented in `gdbstub` yet, (e.g: remote filesystem access, tracepoint
@@ -41,8 +41,8 @@
 //!            incorrect for a target to implement both.
 //!
 //! At first blush, it seems the the solution to all these issues is obvious:
-//! simply tie each protocol extension to a `cargo` feature! And yes, while
-//! this would indeed work, there would be several serious ergonomic drawbacks:
+//! simply tie each protocol extension to a `cargo` feature! And yes, while this
+//! would indeed work, there would be several serious ergonomic drawbacks:
 //!
 //! - There would be _hundreds_ of individual feature flags that would need to
 //!   be toggled by end users.
@@ -56,13 +56,13 @@
 //! features, using a technique called **Inlineable Dyn Extension Traits**.
 //!
 //! > _Author's note:_ As far as I can tell, this isn't a very well-known trick,
-//! or at the very least, I've personally never encountered any library that
-//! uses this sort of API. As such, I've decided to be a bit cheeky and give it
-//! a name! At some point, I'm hoping to write a standalone blog post which
-//! further explores this technique, comparing it to other/existing approaches,
-//! and diving into details of the how the compiler optimizes this sort of code.
-//! In fact, I've already got a [very rough github repo](https://github.com/daniel5151/optional-trait-methods) with some of my
-//! findings.
+//! > or at the very least, I've personally never encountered any library that
+//! > uses this sort of API. As such, I've decided to be a bit cheeky and give
+//! > it a name! At some point, I'm hoping to write a standalone blog post which
+//! > further explores this technique, comparing it to other/existing
+//! > approaches, and diving into details of the how the compiler optimizes this
+//! > sort of code. In fact, I've already got a [very rough github repo](https://github.com/daniel5151/optional-trait-methods)
+//! > with some of my findings.
 //!
 //! So, what are "Inlineable Dyn Extension Traits"? Well, let's break it down:
 //!
@@ -161,9 +161,9 @@
 //! ```
 //!
 //! > Please note the use of `#[inline(always)]` when enabling IDET methods.
-//! While LLVM is usually smart enough to inline single-level IDETs (such as in
-//! the example above), nested IDETs will often require a bit of "help" from the
-//! `inline` directive to be correctly optimized.
+//! > While LLVM is usually smart enough to inline single-level IDETs (such as
+//! > in the example above), nested IDETs will often require a bit of "help"
+//! > from the `inline` directive to be correctly optimized.
 //!
 //! Now, here's where IDETs really shine: If the user didn't implement
 //! `ProtocolExt`, but _did_ try to enable the feature by overriding

@@ -8,12 +8,13 @@
 //! implementations for most common architectures!
 //!
 //! > _Note:_ Prior to `gdbstub 0.5`, `Arch` implementations were distributed as
-//! a part of the main `gdbstub` crate (under the `gdbstub::arch` module). This
-//! wasn't ideal, any `gdbstub::arch`-level breaking-changes forced the _entire_
-//! `gdbstub` crate to release a new (potentially breaking!) version.
-//!
+//! > a part of the main `gdbstub` crate (under the `gdbstub::arch` module).
+//! >
+//! > This wasn't ideal, any `gdbstub::arch`-level breaking-changes forced the
+//! > _entire_ `gdbstub` crate to release a new (potentially breaking!) version.
+//! >
 //! > Having community-created `Arch` implementations distributed in a separate
-//! crate helps minimize any unnecessary "version churn" in `gdbstub` core.
+//! > crate helps minimize any unnecessary "version churn" in `gdbstub` core.
 
 use crate::internal::BeBytes;
 use crate::internal::LeBytes;
@@ -135,9 +136,9 @@ pub trait Arch {
     /// Used to access individual registers via `Target::read/write_register`.
     ///
     /// > NOTE: An arch's `RegId` type is not strictly required to have a 1:1
-    /// correspondence with the `Registers` type, and may include register
-    /// identifiers which are separate from the main `Registers` structure.
-    /// (e.g: the RISC-V Control and Status registers)
+    /// > correspondence with the `Registers` type, and may include register
+    /// > identifiers which are separate from the main `Registers` structure.
+    /// > (e.g: the RISC-V Control and Status registers)
     type RegId: RegId;
 
     /// (optional) Return the arch's description XML file (`target.xml`).

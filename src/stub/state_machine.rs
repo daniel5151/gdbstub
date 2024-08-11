@@ -23,9 +23,7 @@
 //! - Implementations of [`BlockingEventLoop`] used alongside
 //!   `GdbStub::run_blocking` (e.g: the in-tree `armv4t` / `armv4t_multicore`
 //!   examples)
-//! - Real-world projects using the API
-//!     - The best example of this (at the time of writing) is the code at
-//!     [`vmware-labs/node-replicated-kernel`](https://github.com/vmware-labs/node-replicated-kernel/blob/4326704aaf3c0052e614dcde2a788a8483224394/kernel/src/arch/x86_64/gdb/mod.rs#L106)
+//! - Real-world projects using the API (see the repo's README.md)
 //!
 //! If you have any questions, feel free to open a discussion thread over at the
 //! [`gdbstub` GitHub repo](https://github.com/daniel5151/gdbstub/).

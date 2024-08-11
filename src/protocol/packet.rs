@@ -5,11 +5,16 @@ use crate::target::Target;
 /// Packet parse error.
 #[derive(Debug)]
 pub enum PacketParseError {
-    ChecksumMismatched { checksum: u8, calculated: u8 },
+    #[allow(dead_code)] // used as part of Debug impl
+    ChecksumMismatched {
+        checksum: u8,
+        calculated: u8,
+    },
     EmptyBuf,
     MissingChecksum,
     MalformedChecksum,
     MalformedCommand,
+    #[allow(dead_code)] // used as part of Debug impl
     UnexpectedHeader(u8),
 }
 

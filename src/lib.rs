@@ -339,6 +339,7 @@ macro_rules! unwrap {
     ($e:expr $(,)*) => {
         match $e {
             ::core::option::Option::Some(x) => x,
+            #[allow(clippy::out_of_bounds_indexing)]
             ::core::option::Option::None => {
                 ["tried to unwrap a None"][99];
                 loop {}

@@ -61,6 +61,8 @@ macro_rules! commands {
             pub enum Breakpoints<'a> {
                 z(BasicBreakpoint<'a>),
                 Z(BasicBreakpoint<'a>),
+                // Bytecode hasn't yet been plumbed all the way through
+                #[allow(dead_code)]
                 ZWithBytecode(BytecodeBreakpoint<'a>),
             }
 
@@ -116,7 +118,7 @@ macro_rules! commands {
                     fn support_lldb_register_info(&mut self) -> Option<()> {
                         use crate::arch::Arch;
                         if self.use_lldb_register_info()
-                            && (T::Arch::lldb_register_info(usize::max_value()).is_some()
+                            && (T::Arch::lldb_register_info(usize::MAX).is_some()
                                 || self.support_lldb_register_info_override().is_some())
                         {
                             Some(())

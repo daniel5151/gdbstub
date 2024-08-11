@@ -33,6 +33,7 @@ impl<'a> BasicBreakpoint<'a> {
     }
 }
 
+#[allow(dead_code)] // Bytecode hasn't yet been plumbed all the way through
 #[derive(Debug)]
 pub struct BytecodeBreakpoint<'a> {
     pub base: BasicBreakpoint<'a>,

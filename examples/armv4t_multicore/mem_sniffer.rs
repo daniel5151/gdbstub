@@ -10,7 +10,10 @@ pub enum AccessKind {
 pub struct Access {
     pub kind: AccessKind,
     pub addr: u32,
+    // allow(dead_code) because the emulator is so simple that it doesn't matter
+    #[allow(dead_code)]
     pub val: u32,
+    #[allow(dead_code)]
     pub len: usize,
 }
 
