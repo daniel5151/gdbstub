@@ -2,6 +2,10 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+# 0.3.1
+
+- RISC-V: List all integer registers (for lldb compatibility) [\#149](https://github.com/daniel5151/gdbstub/pull/149) ([danlehmann](https://github.com/danlehmann))
+
 # 0.3.0
 
 #### Breaking Arch Changes

@@ -2,6 +2,19 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+# 0.7.2
+
+#### Bugfixes
+
+- Add workaround for vCont packets that specify a '0' (Any) thread-id
+  - For more context, see [`e9a5296c`](https://github.com/daniel5151/gdbstub/commit/e9a5296c4d02f4b5b73d5738654a33d01afa8711)
+
+#### Internal Improvements
+
+- Various README tweaks
+- Various clippy lint fixes
+- Fix incorrect valid-addr check in armv4t example
+
 # 0.7.1
 
 #### New Protocol Extensions
@@ -179,8 +192,6 @@ Cheers!
 - Use stable `clippy` in CI
 - Enable logging for responses with only alloc [\#78](https://github.com/daniel5151/gdbstub/pull/78) ([gz](https://github.com/gz))
 - Lots of internal refactoring and cleanup
-
-#### Bugfixes
 
 # 0.5.0
 
