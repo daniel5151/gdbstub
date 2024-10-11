@@ -369,7 +369,12 @@ pub trait Target {
     type Arch: Arch;
 
     /// A target-specific **fatal** error.
+    #[cfg(not(feature = "core_error"))]
     type Error;
+
+    /// A target-specific **fatal** error.
+    #[cfg(feature = "core_error")]
+    type Error: core::error::Error;
 
     /// Base operations such as reading/writing from memory/registers,
     /// stopping/resuming the target, etc....
