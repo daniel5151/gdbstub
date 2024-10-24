@@ -27,6 +27,9 @@
 //! - `paranoid_unsafe`
 //!     - Please refer to the [`unsafe` in `gdbstub`](https://github.com/daniel5151/gdbstub#unsafe-in-gdbstub)
 //!       section of the README.md for more details.
+//! - `core_error`
+//!     - Make `GdbStubError` implement [`core::error::Error`](https://doc.rust-lang.org/core/error/trait.Error.html)
+//!       instead of `std::error::Error`.
 //!
 //! ## Getting Started
 //!

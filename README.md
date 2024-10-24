@@ -120,6 +120,8 @@ When using `gdbstub` in `#![no_std]` contexts, make sure to set `default-feature
     -   Add a `TargetError::Io` variant to simplify `std::io::Error` handling from Target methods.
 -   `paranoid_unsafe`
     -   Please refer to the [`unsafe` in `gdbstub`](#unsafe-in-gdbstub) section below for more details.
+-   `core_error`
+    -   Make `GdbStubError` implement [`core::error::Error`](https://doc.rust-lang.org/core/error/trait.Error.html) instead of `std::error::Error`.
 
 ## Examples
 
