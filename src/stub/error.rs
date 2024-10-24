@@ -1,13 +1,13 @@
 use crate::protocol::PacketParseError;
 use crate::protocol::ResponseWriterError;
 use crate::util::managed_vec::CapacityError;
+#[cfg(feature = "core_error")]
+use core::error::Error as CoreError;
 use core::fmt::Debug;
 use core::fmt::Display;
 use core::fmt::{self};
 #[cfg(all(feature = "std", not(feature = "core_error")))]
 use std::error::Error as CoreError;
-#[cfg(feature = "core_error")]
-use core::error::Error as CoreError;
 
 /// An error that may occur while interacting with a
 /// [`Connection`](crate::conn::Connection).
