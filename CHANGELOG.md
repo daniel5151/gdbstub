@@ -2,6 +2,16 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+# 0.7.3
+
+#### New Features
+
+- Add new `core_error` feature, to have `GdbStubError` impl `core::error::Error`. [\#154](https://github.com/daniel5151/gdbstub/pull/154) ([ultimaweapon](https://github.com/ultimaweapon))
+  - _Note:_ Out of an abundance of caution, this has been put behind a
+    feature-flag, as while `gdbstub` doesn't claim a strict MSRV at this time,
+    it seemed unwise to have a PATCH release break folks stuck on a pre-1.81
+    Rust toolchain.
+
 # 0.7.2
 
 #### Bugfixes
