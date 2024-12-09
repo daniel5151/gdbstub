@@ -51,6 +51,7 @@ macro_rules! commands {
         pub mod ext {
             $(
                 #[allow(non_camel_case_types, clippy::enum_variant_names)]
+                #[derive(Debug)]
                 pub enum [<$ext:camel>] $(<$lt>)? {
                     $($command(super::$mod::$command<$($lifetime)?>),)*
                 }
@@ -58,6 +59,7 @@ macro_rules! commands {
 
             use super::breakpoint::{BasicBreakpoint, BytecodeBreakpoint};
             #[allow(non_camel_case_types)]
+            #[derive(Debug)]
             pub enum Breakpoints<'a> {
                 z(BasicBreakpoint<'a>),
                 Z(BasicBreakpoint<'a>),
@@ -69,6 +71,7 @@ macro_rules! commands {
         }
 
         /// GDB commands
+        #[derive(Debug)]
         pub enum Command<'a> {
             $(
                 [<$ext:camel>](ext::[<$ext:camel>]$(<$lt>)?),
@@ -335,5 +338,22 @@ commands! {
 
     libraries_svr4 use 'a {
         "qXfer:libraries-svr4:read" => _qXfer_libraries_svr4_read::qXferLibrariesSvr4Read<'a>,
+    }
+
+    tracepoints use 'a {
+        "QTDP" => _QTDP::QTDP<'a>,
+        "QTinit" => _QTinit::QTinit,
+        "QTBuffer" => _QTBuffer::QTBuffer<'a>,
+        // TODO: QTNotes?
+        "QTStart" => _QTStart::QTStart,
+        "QTStop" => _QTStop::QTStop,
+        "QTFrame" => _QTFrame::QTFrame<'a>,
+
+        "qTStatus" => _qTStatus::qTStatus,
+        "qTP" => _qTP::qTP<'a>,
+        "qTfP" => _qTfP::qTfP,
+        "qTsP" => _qTsP::qTsP,
+        "qTfV" => _qTfV::qTfV,
+        "qTsV" => _qTsV::qTsV,
     }
 }

@@ -172,6 +172,11 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     }
                 }
 
+                if let Some(_ops) = target.support_tracepoints() {
+                    res.write_str(";InstallInTrace+")?;
+                    res.write_str(";QTBuffer:size+")?;
+                }
+
                 if target.support_catch_syscalls().is_some() {
                     res.write_str(";QCatchSyscalls+")?;
                 }
