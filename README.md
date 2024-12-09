@@ -89,6 +89,9 @@ Of course, most use-cases will want to support additional debugging features as 
 -   Read auxiliary vector (`info auxv`)
 -   Extra thread info (`info threads`)
 -   Extra library information (`info sharedlibraries`)
+-   Tracepoints
+    - Configure tracepoints and actions to perform when hit
+    - Select and interrogate collected trace frames
 
 _Note:_ GDB features are implemented on an as-needed basis by `gdbstub`'s contributors. If there's a missing GDB feature that you'd like `gdbstub` to implement, please file an issue and/or open a PR!
 
