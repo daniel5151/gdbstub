@@ -15,6 +15,7 @@ use crate::target::ext::tracepoints::NewTracepoint;
 use crate::target::ext::tracepoints::TracepointAction;
 use crate::target::ext::tracepoints::TracepointActionList;
 use crate::target::ext::tracepoints::TracepointItem;
+use managed::ManagedSlice;
 
 impl<U: BeBytes> NewTracepoint<U> {
     /// Parse from a raw CreateTDP packet.
@@ -39,7 +40,7 @@ impl<'a, U: BeBytes> DefineTracepoint<'a, U> {
         Some(Self {
             number: dtdp.number,
             addr: arch_int(dtdp.addr).ok()?,
-            actions: TracepointActionList::Raw { data: dtdp.actions },
+            actions: TracepointActionList::Raw { data: ManagedSlice::Borrowed(dtdp.actions) },
         })
     }
 
@@ -52,7 +53,7 @@ impl<'a, U: BeBytes> DefineTracepoint<'a, U> {
     /// tracepoint.
     pub fn actions(self, mut f: impl FnMut(&TracepointAction<'_, U>)) -> Option<bool> {
         match self.actions {
-            TracepointActionList::Raw { data } => Self::parse_raw_actions(data, f),
+            TracepointActionList::Raw { mut data } => Self::parse_raw_actions(&mut data, f),
             TracepointActionList::Parsed { mut actions, more } => {
                 for action in actions.iter_mut() {
                     (f)(action);
@@ -98,7 +99,7 @@ impl<'a, U: BeBytes> DefineTracepoint<'a, U> {
                         unparsed = None;
                         decode_hex_buf(mask).ok()?
                     };
-                    (f)(&TracepointAction::Registers { mask });
+                    (f)(&TracepointAction::Registers { mask: ManagedSlice::Borrowed(mask) });
                 }
                 Some([b'M', _mem_args @ ..]) => {
                     // Unimplemented: even simple actions like `collect *(int*)0x0`
@@ -111,7 +112,7 @@ impl<'a, U: BeBytes> DefineTracepoint<'a, U> {
                     let len: usize = decode_hex(len_bytes).ok()?;
                     let (expr_bytes, next_bytes) = rem.split_at_mut(len * 2);
                     let expr = decode_hex_buf(expr_bytes).ok()?;
-                    (f)(&TracepointAction::Expression { expr });
+                    (f)(&TracepointAction::Expression { expr: ManagedSlice::Borrowed(expr) });
                     unparsed = Some(next_bytes);
                 }
                 Some([b'-']) => {

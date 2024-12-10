@@ -1,5 +1,6 @@
 use crate::mem_sniffer::AccessKind;
 use crate::mem_sniffer::MemSniffer;
+use crate::gdb::tracepoints::TraceFrame;
 use crate::DynResult;
 use armv4t_emu::reg;
 use armv4t_emu::Cpu;
@@ -7,6 +8,8 @@ use armv4t_emu::ExampleMem;
 use armv4t_emu::Memory;
 use armv4t_emu::Mode;
 use gdbstub::common::Pid;
+use gdbstub::target::ext::tracepoints::{Tracepoint, TracepointItem};
+use std::collections::HashMap;
 
 const HLE_RETURN_ADDR: u32 = 0x12345678;
 
@@ -40,6 +43,12 @@ pub struct Emu {
     pub(crate) watchpoints: Vec<u32>,
     pub(crate) breakpoints: Vec<u32>,
     pub(crate) files: Vec<Option<std::fs::File>>,
+
+    pub(crate) tracepoints: HashMap<u32, Vec<TracepointItem<'static, u32>>>,
+    pub(crate) traceframes: Vec<TraceFrame>,
+    pub(crate) tracepoint_enumerate_machine: (Vec<TracepointItem<'static, u32>>, usize),
+    pub(crate) tracing: bool,
+    pub(crate) selected_frame: Option<usize>,
 
     pub(crate) reported_pid: Pid,
 }
@@ -92,6 +101,12 @@ impl Emu {
             watchpoints: Vec::new(),
             breakpoints: Vec::new(),
             files: Vec::new(),
+
+            tracepoints: HashMap::new(),
+            traceframes: Vec::new(),
+            tracepoint_enumerate_machine: (Vec::new(), 0),
+            tracing: false,
+            selected_frame: None,
 
             reported_pid: Pid::new(1).unwrap(),
         })
