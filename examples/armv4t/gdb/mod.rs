@@ -26,6 +26,7 @@ mod memory_map;
 mod monitor_cmd;
 mod section_offsets;
 mod target_description_xml_override;
+pub(crate) mod tracepoints;
 
 /// Turn a `ArmCoreRegId` into an internal register number of `armv4t_emu`.
 fn cpu_reg_id(id: ArmCoreRegId) -> Option<u8> {
@@ -159,6 +160,13 @@ impl Target for Emu {
     fn support_libraries_svr4(
         &mut self,
     ) -> Option<target::ext::libraries::LibrariesSvr4Ops<'_, Self>> {
+        Some(self)
+    }
+
+    #[inline(always)]
+    fn support_tracepoints(
+        &mut self,
+    ) -> Option<target::ext::tracepoints::TracepointsOps<'_, Self>> {
         Some(self)
     }
 }

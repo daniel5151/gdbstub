@@ -7,6 +7,7 @@ use crate::target::Target;
 use crate::target::TargetResult;
 use managed::ManagedSlice;
 use num_traits::PrimInt;
+use std::ops::Deref;
 
 /// A tracepoint, identified by a unique number.
 #[derive(Debug, Clone, Copy)]
@@ -19,7 +20,7 @@ pub struct StateVariable(usize);
 /// Describes a new tracepoint. It may be configured by later
 /// [DefineTracepoint] structs. GDB may ask for the state of current
 /// tracepoints, which are described with this same structure.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct NewTracepoint<U> {
     /// The tracepoint number
     pub number: Tracepoint,
@@ -34,6 +35,14 @@ pub struct NewTracepoint<U> {
     /// If there will be tracepoint "define" packets that follow this.
     pub more: bool,
 }
+
+#[cfg(feature = "alloc")]
+impl<U: Copy> NewTracepoint<U> {
+    pub fn get_owned(&self) -> NewTracepoint<U> {
+        self.clone()
+    }
+}
+
 
 impl<U: crate::internal::BeBytes + num_traits::Zero + PrimInt> NewTracepoint<U> {
     pub(crate) fn write<C: Connection>(
@@ -67,7 +76,7 @@ impl<U: crate::internal::BeBytes + num_traits::Zero + PrimInt> NewTracepoint<U> 
 pub enum TracepointAction<'a, U> {
     /// Collect the registers whose bits are set in `mask` (big endian).
     /// Note that `mask` may be larger than the word length.
-    Registers { mask: &'a [u8] },
+    Registers { mask: ManagedSlice<'a, u8> },
     /// Collect `len` bytes of memory starting at the address in register number
     /// `basereg`, plus `offset`. If `basereg` is None, then treat it as a fixed
     /// address.
@@ -78,7 +87,18 @@ pub enum TracepointAction<'a, U> {
     },
     /// Evaluate `expr`, which is a GDB agent bytecode expression, and collect
     /// memory as it directs.
-    Expression { expr: &'a [u8] },
+    Expression { expr: ManagedSlice<'a, u8> },
+}
+
+#[cfg(feature = "alloc")]
+impl<'a, U: Copy> TracepointAction<'a, U> {
+    pub fn new_owned(&self) -> TracepointAction<'static, U> {
+        match self {
+            TracepointAction::Registers { mask } => TracepointAction::Registers { mask: ManagedSlice::Owned(mask.deref().into()) },
+            TracepointAction::Memory { basereg, offset, length } => TracepointAction::Memory { basereg: *basereg, offset: *offset, length: *length },
+            TracepointAction::Expression { expr } => TracepointAction::Expression { expr: ManagedSlice::Owned(expr.deref().into()) },
+        }
+    }
 }
 
 impl<'a, U: crate::internal::BeBytes + num_traits::Zero + PrimInt> TracepointAction<'a, U> {
@@ -124,16 +144,29 @@ impl<'a, U: crate::internal::BeBytes + num_traits::Zero + PrimInt> TracepointAct
 /// tracepoints.
 #[derive(Debug)]
 #[allow(missing_docs)]
-pub enum TracepointActionList<'a, U> {
+pub enum TracepointActionList<'a, 'b, U> {
     /// Raw and unparsed actions, such as from GDB.
-    Raw { data: &'a mut [u8] },
+    Raw { data: ManagedSlice<'a, u8> },
     /// A slice of parsed actions, such as what may be returned by a target when
     /// enumerating tracepoints. `more` must be set if there will be another
     /// "tracepoint definition" with more actions for this tracepoint.
     Parsed {
-        actions: ManagedSlice<'a, TracepointAction<'a, U>>,
+        actions: ManagedSlice<'a, TracepointAction<'b, U>>,
         more: bool,
     },
+}
+
+#[cfg(feature = "alloc")]
+impl<'a, 'b, U: Copy> TracepointActionList<'a, 'b, U> {
+    pub fn get_owned(&self) -> TracepointActionList<'static, 'static, U> {
+        match self {
+            TracepointActionList::Raw { data } => TracepointActionList::Raw { data: ManagedSlice::Owned(data.deref().into()) },
+            TracepointActionList::Parsed { actions, more } => TracepointActionList::Parsed {
+                actions: ManagedSlice::Owned(actions.iter().map(|action| action.new_owned()).collect()),
+                more: *more
+            },
+        }
+    }
 }
 
 /// Definition data for a tracepoint. A tracepoint may have more than one define
@@ -146,7 +179,18 @@ pub struct DefineTracepoint<'a, U> {
     /// The PC address of the tracepoint that is being defined.
     pub addr: U,
     /// A list of actions that should be appended to the tracepoint.
-    pub actions: TracepointActionList<'a, U>,
+    pub actions: TracepointActionList<'a, 'a, U>,
+}
+
+#[cfg(feature = "alloc")]
+impl<'a, U: Copy> DefineTracepoint<'a, U> {
+    pub fn get_owned(&self) -> DefineTracepoint<'static, U> {
+        DefineTracepoint {
+            number: self.number,
+            addr: self.addr,
+            actions: self.actions.get_owned()
+        }
+    }
 }
 
 impl<'a, U: crate::internal::BeBytes + num_traits::Zero + PrimInt> DefineTracepoint<'a, U> {
@@ -196,6 +240,17 @@ pub enum TracepointItem<'a, U> {
     /// for this tracepoint.
     Define(DefineTracepoint<'a, U>),
 }
+
+#[cfg(feature = "alloc")]
+impl<'a, U: Copy> TracepointItem<'a, U> {
+    pub fn get_owned(&self) -> TracepointItem<'static, U> {
+        match self {
+            TracepointItem::New(n) => TracepointItem::New(n.get_owned()),
+            TracepointItem::Define(d) => TracepointItem::Define(d.get_owned()),
+        }
+    }
+}
+
 
 /// Description of the currently running trace experiment.
 pub struct ExperimentStatus<'a> {
