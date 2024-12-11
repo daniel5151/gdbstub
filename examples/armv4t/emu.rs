@@ -44,7 +44,7 @@ pub struct Emu {
     pub(crate) breakpoints: Vec<u32>,
     pub(crate) files: Vec<Option<std::fs::File>>,
 
-    pub(crate) tracepoints: HashMap<u32, Vec<TracepointItem<'static, u32>>>,
+    pub(crate) tracepoints: HashMap<Tracepoint, Vec<TracepointItem<'static, u32>>>,
     pub(crate) traceframes: Vec<TraceFrame>,
     pub(crate) tracepoint_enumerate_machine: (Vec<TracepointItem<'static, u32>>, usize),
     pub(crate) tracing: bool,
@@ -121,6 +121,28 @@ impl Emu {
 
     /// single-step the interpreter
     pub fn step(&mut self) -> Option<Event> {
+        if self.tracing {
+            let pc = self.cpu.reg_get(self.cpu.mode(), reg::PC);
+            let frames: Vec<_> = self.tracepoints.iter().filter(|(_tracepoint, definition)| {
+                if let Some(TracepointItem::New(new)) = definition.get(0) {
+                    new.enabled && new.addr == pc
+                } else {
+                    false
+                }
+            }).map(|(tracepoint, _definition)| {
+                // our `tracepoint_define` restricts our loaded tracepoints to only contain
+                // register collect actions. instead of only collecting the registers requested
+                // in the register mask and recording a minimal trace frame, we just collect
+                // all of them by cloning the cpu itself.
+                TraceFrame {
+                    number: *tracepoint,
+                    addr: pc,
+                    snapshot: self.cpu.clone(),
+                }
+            }).collect();
+            self.traceframes.extend(frames);
+        }
+
         let mut hit_watchpoint = None;
 
         let mut sniffer = MemSniffer::new(&mut self.mem, &self.watchpoints, |access| {
