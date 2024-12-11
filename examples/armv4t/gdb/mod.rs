@@ -177,11 +177,11 @@ impl SingleThreadBase for Emu {
         regs: &mut custom_arch::ArmCoreRegsCustom,
     ) -> TargetResult<(), Self> {
         // if we selected a frame from a tracepoint, return registers from that snapshot
-        let cpu = self.selected_frame.and_then(|selected| {
-            self.traceframes.get(selected)
-        }).map(|frame| {
-            frame.snapshot
-        }).unwrap_or_else(|| self.cpu);
+        let cpu = self
+            .selected_frame
+            .and_then(|selected| self.traceframes.get(selected))
+            .map(|frame| frame.snapshot)
+            .unwrap_or_else(|| self.cpu);
         let mode = cpu.mode();
 
         for i in 0..13 {
@@ -230,7 +230,7 @@ impl SingleThreadBase for Emu {
             // we only support register collection actions for our tracepoint frames.
             // if we have a selected frame, then we don't have any memory we can
             // return from the frame snapshot.
-            return Ok(0)
+            return Ok(0);
         }
         // this is a simple emulator, with RAM covering the entire 32 bit address space
         for (addr, val) in (start_addr..).zip(data.iter_mut()) {

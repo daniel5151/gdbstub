@@ -40,7 +40,9 @@ impl<'a, U: BeBytes> DefineTracepoint<'a, U> {
         Some(Self {
             number: dtdp.number,
             addr: arch_int(dtdp.addr).ok()?,
-            actions: TracepointActionList::Raw { data: ManagedSlice::Borrowed(dtdp.actions) },
+            actions: TracepointActionList::Raw {
+                data: ManagedSlice::Borrowed(dtdp.actions),
+            },
         })
     }
 
@@ -99,7 +101,9 @@ impl<'a, U: BeBytes> DefineTracepoint<'a, U> {
                         unparsed = None;
                         decode_hex_buf(mask).ok()?
                     };
-                    (f)(&TracepointAction::Registers { mask: ManagedSlice::Borrowed(mask) });
+                    (f)(&TracepointAction::Registers {
+                        mask: ManagedSlice::Borrowed(mask),
+                    });
                 }
                 Some([b'M', _mem_args @ ..]) => {
                     // Unimplemented: even simple actions like `collect *(int*)0x0`
@@ -112,7 +116,9 @@ impl<'a, U: BeBytes> DefineTracepoint<'a, U> {
                     let len: usize = decode_hex(len_bytes).ok()?;
                     let (expr_bytes, next_bytes) = rem.split_at_mut(len * 2);
                     let expr = decode_hex_buf(expr_bytes).ok()?;
-                    (f)(&TracepointAction::Expression { expr: ManagedSlice::Borrowed(expr) });
+                    (f)(&TracepointAction::Expression {
+                        expr: ManagedSlice::Borrowed(expr),
+                    });
                     unparsed = Some(next_bytes);
                 }
                 Some([b'-']) => {
