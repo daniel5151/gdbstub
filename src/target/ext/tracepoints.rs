@@ -43,7 +43,6 @@ impl<U: Copy> NewTracepoint<U> {
     }
 }
 
-
 impl<U: crate::internal::BeBytes + num_traits::Zero + PrimInt> NewTracepoint<U> {
     pub(crate) fn write<C: Connection>(
         &self,
@@ -96,9 +95,21 @@ impl<'a, U: Copy> TracepointAction<'a, U> {
     pub fn get_owned<'b>(&self) -> TracepointAction<'b, U> {
         use core::ops::Deref;
         match self {
-            TracepointAction::Registers { mask } => TracepointAction::Registers { mask: ManagedSlice::Owned(mask.deref().into()) },
-            TracepointAction::Memory { basereg, offset, length } => TracepointAction::Memory { basereg: *basereg, offset: *offset, length: *length },
-            TracepointAction::Expression { expr } => TracepointAction::Expression { expr: ManagedSlice::Owned(expr.deref().into()) },
+            TracepointAction::Registers { mask } => TracepointAction::Registers {
+                mask: ManagedSlice::Owned(mask.deref().into()),
+            },
+            TracepointAction::Memory {
+                basereg,
+                offset,
+                length,
+            } => TracepointAction::Memory {
+                basereg: *basereg,
+                offset: *offset,
+                length: *length,
+            },
+            TracepointAction::Expression { expr } => TracepointAction::Expression {
+                expr: ManagedSlice::Owned(expr.deref().into()),
+            },
         }
     }
 }
@@ -164,10 +175,14 @@ impl<'a, U: Copy> TracepointActionList<'a, U> {
     pub fn get_owned<'b>(&self) -> TracepointActionList<'b, U> {
         use core::ops::Deref;
         match self {
-            TracepointActionList::Raw { data } => TracepointActionList::Raw { data: ManagedSlice::Owned(data.deref().into()) },
+            TracepointActionList::Raw { data } => TracepointActionList::Raw {
+                data: ManagedSlice::Owned(data.deref().into()),
+            },
             TracepointActionList::Parsed { actions, more } => TracepointActionList::Parsed {
-                actions: ManagedSlice::Owned(actions.iter().map(|action| action.get_owned()).collect()),
-                more: *more
+                actions: ManagedSlice::Owned(
+                    actions.iter().map(|action| action.get_owned()).collect(),
+                ),
+                more: *more,
             },
         }
     }
@@ -193,7 +208,7 @@ impl<'a, U: Copy> DefineTracepoint<'a, U> {
         DefineTracepoint {
             number: self.number,
             addr: self.addr,
-            actions: self.actions.get_owned()
+            actions: self.actions.get_owned(),
         }
     }
 }
@@ -235,14 +250,14 @@ impl<'a, U: crate::internal::BeBytes + num_traits::Zero + PrimInt> DefineTracepo
 #[derive(Debug)]
 pub enum TracepointItem<'a, U> {
     /// Introduce a new tracepoint and describe its properties. This must be
-    /// emitted before any [TracepointItem::Define] items that use the same tracepoint
-    /// number, and must have the `more` flag set if it will be followed by
-    /// [TracepointItem::Define] items for this tracepoint.
+    /// emitted before any [TracepointItem::Define] items that use the same
+    /// tracepoint number, and must have the `more` flag set if it will be
+    /// followed by [TracepointItem::Define] items for this tracepoint.
     New(NewTracepoint<U>),
     /// Define additional data for a tracepoint. This must be emitted after a
-    /// [TracepointItem::New] item that introduces the tracepoint number, and must have
-    /// the `more` flag set if it will be followed by more [TracepointItem::Define] items
-    /// for this tracepoint.
+    /// [TracepointItem::New] item that introduces the tracepoint number, and
+    /// must have the `more` flag set if it will be followed by more
+    /// [TracepointItem::Define] items for this tracepoint.
     Define(DefineTracepoint<'a, U>),
 }
 
@@ -256,7 +271,6 @@ impl<'a, U: Copy> TracepointItem<'a, U> {
         }
     }
 }
-
 
 /// Description of the currently running trace experiment.
 pub struct ExperimentStatus<'a> {
@@ -460,8 +474,8 @@ pub trait Tracepoints: Target {
 
     /// Begin enumerating tracepoints. The target implementation should
     /// initialize a state machine that is stepped by
-    /// [Tracepoints::tracepoint_enumerate_step], and returns TracepointItems that
-    /// correspond with the currently configured tracepoints.
+    /// [Tracepoints::tracepoint_enumerate_step], and returns TracepointItems
+    /// that correspond with the currently configured tracepoints.
     fn tracepoint_enumerate_start(
         &mut self,
     ) -> TargetResult<Option<TracepointItem<'_, <Self::Arch as Arch>::Usize>>, Self>;

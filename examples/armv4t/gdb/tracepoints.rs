@@ -1,8 +1,17 @@
 use crate::emu::Emu;
 use gdbstub::target;
-use gdbstub::target::TargetResult;
+use gdbstub::target::ext::tracepoints::DefineTracepoint;
+use gdbstub::target::ext::tracepoints::ExperimentExplanation;
+use gdbstub::target::ext::tracepoints::ExperimentStatus;
+use gdbstub::target::ext::tracepoints::FrameDescription;
+use gdbstub::target::ext::tracepoints::FrameRequest;
+use gdbstub::target::ext::tracepoints::NewTracepoint;
+use gdbstub::target::ext::tracepoints::TraceBuffer;
+use gdbstub::target::ext::tracepoints::Tracepoint;
+use gdbstub::target::ext::tracepoints::TracepointAction;
+use gdbstub::target::ext::tracepoints::TracepointItem;
 use gdbstub::target::TargetError;
-use gdbstub::target::ext::tracepoints::{Tracepoint, TracepointItem, NewTracepoint, DefineTracepoint, ExperimentStatus, FrameRequest, FrameDescription, TraceBuffer, ExperimentExplanation, TracepointAction};
+use gdbstub::target::TargetResult;
 use managed::ManagedSlice;
 
 use armv4t_emu::Cpu;
@@ -21,7 +30,8 @@ impl target::ext::tracepoints::Tracepoints for Emu {
     }
 
     fn tracepoint_create(&mut self, tp: NewTracepoint<u32>) -> TargetResult<(), Self> {
-        self.tracepoints.insert(tp.number, vec![TracepointItem::New(tp)]);
+        self.tracepoints
+            .insert(tp.number, vec![TracepointItem::New(tp)]);
         Ok(())
     }
 
@@ -30,18 +40,22 @@ impl target::ext::tracepoints::Tracepoints for Emu {
         let mut valid = true;
         tp.actions(|action| {
             if let TracepointAction::Registers { mask: _ } = action {
-                // we only handle register collection actions for the simple case
+                // we only handle register collection actions for the simple
+                // case
             } else {
                 valid = false;
             }
         });
         if !valid {
-            return Err(TargetError::NonFatal)
+            return Err(TargetError::NonFatal);
         }
-        self.tracepoints.get_mut(&tp_copy.number).map(move |existing| {
-            existing.push(TracepointItem::Define(tp_copy));
-            ()
-        }).ok_or_else(move || TargetError::Fatal("define on non-existing tracepoint"))
+        self.tracepoints
+            .get_mut(&tp_copy.number)
+            .map(move |existing| {
+                existing.push(TracepointItem::Define(tp_copy));
+                ()
+            })
+            .ok_or_else(move || TargetError::Fatal("define on non-existing tracepoint"))
     }
 
     fn tracepoint_status(&self, tp: Tracepoint, _addr: u32) -> TargetResult<(u64, u64), Self> {
@@ -49,13 +63,23 @@ impl target::ext::tracepoints::Tracepoints for Emu {
         // and say the number of bytes is always 0.
         // Because we don't implement "while-stepping" actions, we don't need to
         // also check that `addr` matches.
-        Ok((self.traceframes.iter().filter(|frame| frame.number.0 == tp.0).count() as u64, 0))
+        Ok((
+            self.traceframes
+                .iter()
+                .filter(|frame| frame.number.0 == tp.0)
+                .count() as u64,
+            0,
+        ))
     }
 
-    fn tracepoint_enumerate_start(&mut self) -> TargetResult<Option<TracepointItem<'_, u32>>, Self> {
-        let tracepoints: Vec<_> = self.tracepoints.iter().flat_map(|(_key, value)| {
-            value.iter().map(|item| item.get_owned())
-        }).collect();
+    fn tracepoint_enumerate_start(
+        &mut self,
+    ) -> TargetResult<Option<TracepointItem<'_, u32>>, Self> {
+        let tracepoints: Vec<_> = self
+            .tracepoints
+            .iter()
+            .flat_map(|(_key, value)| value.iter().map(|item| item.get_owned()))
+            .collect();
         self.tracepoint_enumerate_machine = (tracepoints, 0);
 
         self.tracepoint_enumerate_step()
@@ -74,7 +98,8 @@ impl target::ext::tracepoints::Tracepoints for Emu {
     }
 
     fn trace_buffer_configure(&mut self, _tb: TraceBuffer) -> TargetResult<(), Self> {
-        // we don't collect a "real" trace buffer, so just ignore configuration attempts.
+        // we don't collect a "real" trace buffer, so just ignore configuration
+        // attempts.
         Ok(())
     }
 
@@ -92,7 +117,9 @@ impl target::ext::tracepoints::Tracepoints for Emu {
         // For a bare-bones example, we don't provide in-depth status explanations.
         Ok(ExperimentStatus {
             running: self.tracing,
-            explanations: ManagedSlice::Owned(vec![ExperimentExplanation::Frames(self.traceframes.len())]),
+            explanations: ManagedSlice::Owned(vec![ExperimentExplanation::Frames(
+                self.traceframes.len(),
+            )]),
         })
     }
 
@@ -101,20 +128,29 @@ impl target::ext::tracepoints::Tracepoints for Emu {
         frame: FrameRequest<u32>,
         report: &mut dyn FnMut(FrameDescription),
     ) -> TargetResult<(), Self> {
-        // For a bare-bones example, we only support `tfind <number>` and `tfind tracepoint <tpnum>`
-        // style frame selection and not the more complicated ones.
+        // For a bare-bones example, we only support `tfind <number>` and `tfind
+        // tracepoint <tpnum>` style frame selection and not the more
+        // complicated ones.
         let found = match frame {
-            FrameRequest::Select(n) => {
-                self.traceframes.iter().nth(n as usize).map(|frame| (n, frame))
-            },
+            FrameRequest::Select(n) => self
+                .traceframes
+                .iter()
+                .nth(n as usize)
+                .map(|frame| (n, frame)),
             FrameRequest::Hit(tp) => {
-                let start = self.selected_frame.map(|selected| selected + 1).unwrap_or(0);
+                let start = self
+                    .selected_frame
+                    .map(|selected| selected + 1)
+                    .unwrap_or(0);
                 self.traceframes.get(start..).and_then(|frames| {
-                    frames.iter().enumerate().filter(|(_n, frame)| {
-                        frame.number == tp
-                    }).map(|(n, frame)| ((start + n) as u64, frame) ).next()
+                    frames
+                        .iter()
+                        .enumerate()
+                        .filter(|(_n, frame)| frame.number == tp)
+                        .map(|(n, frame)| ((start + n) as u64, frame))
+                        .next()
                 })
-            },
+            }
             _ => return Err(TargetError::NonFatal),
         };
         if let Some((n, frame)) = found {
@@ -138,4 +174,3 @@ impl target::ext::tracepoints::Tracepoints for Emu {
         Ok(())
     }
 }
-

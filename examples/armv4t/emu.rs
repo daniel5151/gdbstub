@@ -1,6 +1,6 @@
+use crate::gdb::tracepoints::TraceFrame;
 use crate::mem_sniffer::AccessKind;
 use crate::mem_sniffer::MemSniffer;
-use crate::gdb::tracepoints::TraceFrame;
 use crate::DynResult;
 use armv4t_emu::reg;
 use armv4t_emu::Cpu;
@@ -8,7 +8,8 @@ use armv4t_emu::ExampleMem;
 use armv4t_emu::Memory;
 use armv4t_emu::Mode;
 use gdbstub::common::Pid;
-use gdbstub::target::ext::tracepoints::{Tracepoint, TracepointItem};
+use gdbstub::target::ext::tracepoints::Tracepoint;
+use gdbstub::target::ext::tracepoints::TracepointItem;
 use std::collections::HashMap;
 
 const HLE_RETURN_ADDR: u32 = 0x12345678;
@@ -123,23 +124,28 @@ impl Emu {
     pub fn step(&mut self) -> Option<Event> {
         if self.tracing {
             let pc = self.cpu.reg_get(self.cpu.mode(), reg::PC);
-            let frames: Vec<_> = self.tracepoints.iter().filter(|(_tracepoint, definition)| {
-                if let Some(TracepointItem::New(new)) = definition.get(0) {
-                    new.enabled && new.addr == pc
-                } else {
-                    false
-                }
-            }).map(|(tracepoint, _definition)| {
-                // our `tracepoint_define` restricts our loaded tracepoints to only contain
-                // register collect actions. instead of only collecting the registers requested
-                // in the register mask and recording a minimal trace frame, we just collect
-                // all of them by cloning the cpu itself.
-                TraceFrame {
-                    number: *tracepoint,
-                    addr: pc,
-                    snapshot: self.cpu.clone(),
-                }
-            }).collect();
+            let frames: Vec<_> = self
+                .tracepoints
+                .iter()
+                .filter(|(_tracepoint, definition)| {
+                    if let Some(TracepointItem::New(new)) = definition.get(0) {
+                        new.enabled && new.addr == pc
+                    } else {
+                        false
+                    }
+                })
+                .map(|(tracepoint, _definition)| {
+                    // our `tracepoint_define` restricts our loaded tracepoints to only contain
+                    // register collect actions. instead of only collecting the registers requested
+                    // in the register mask and recording a minimal trace frame, we just collect
+                    // all of them by cloning the cpu itself.
+                    TraceFrame {
+                        number: *tracepoint,
+                        addr: pc,
+                        snapshot: self.cpu.clone(),
+                    }
+                })
+                .collect();
             self.traceframes.extend(frames);
         }
 
