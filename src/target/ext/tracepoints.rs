@@ -7,14 +7,13 @@ use crate::target::Target;
 use crate::target::TargetResult;
 use managed::ManagedSlice;
 use num_traits::PrimInt;
-use std::ops::Deref;
 
 /// A tracepoint, identified by a unique number.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Tracepoint(pub usize);
 
 /// A state variable, identified by a unique number.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct StateVariable(usize);
 
 /// Describes a new tracepoint. It may be configured by later
@@ -38,6 +37,7 @@ pub struct NewTracepoint<U> {
 
 #[cfg(feature = "alloc")]
 impl<U: Copy> NewTracepoint<U> {
+    /// Allocate an owned copy of this structure.
     pub fn get_owned(&self) -> NewTracepoint<U> {
         self.clone()
     }
@@ -92,7 +92,9 @@ pub enum TracepointAction<'a, U> {
 
 #[cfg(feature = "alloc")]
 impl<'a, U: Copy> TracepointAction<'a, U> {
-    pub fn new_owned(&self) -> TracepointAction<'static, U> {
+    /// Allocate an owned copy of this structure.
+    pub fn get_owned<'b>(&self) -> TracepointAction<'b, U> {
+        use core::ops::Deref;
         match self {
             TracepointAction::Registers { mask } => TracepointAction::Registers { mask: ManagedSlice::Owned(mask.deref().into()) },
             TracepointAction::Memory { basereg, offset, length } => TracepointAction::Memory { basereg: *basereg, offset: *offset, length: *length },
@@ -144,25 +146,27 @@ impl<'a, U: crate::internal::BeBytes + num_traits::Zero + PrimInt> TracepointAct
 /// tracepoints.
 #[derive(Debug)]
 #[allow(missing_docs)]
-pub enum TracepointActionList<'a, 'b, U> {
+pub enum TracepointActionList<'a, U> {
     /// Raw and unparsed actions, such as from GDB.
     Raw { data: ManagedSlice<'a, u8> },
     /// A slice of parsed actions, such as what may be returned by a target when
     /// enumerating tracepoints. `more` must be set if there will be another
     /// "tracepoint definition" with more actions for this tracepoint.
     Parsed {
-        actions: ManagedSlice<'a, TracepointAction<'b, U>>,
+        actions: ManagedSlice<'a, TracepointAction<'a, U>>,
         more: bool,
     },
 }
 
 #[cfg(feature = "alloc")]
-impl<'a, 'b, U: Copy> TracepointActionList<'a, 'b, U> {
-    pub fn get_owned(&self) -> TracepointActionList<'static, 'static, U> {
+impl<'a, U: Copy> TracepointActionList<'a, U> {
+    /// Allocate an owned copy of this structure.
+    pub fn get_owned<'b>(&self) -> TracepointActionList<'b, U> {
+        use core::ops::Deref;
         match self {
             TracepointActionList::Raw { data } => TracepointActionList::Raw { data: ManagedSlice::Owned(data.deref().into()) },
             TracepointActionList::Parsed { actions, more } => TracepointActionList::Parsed {
-                actions: ManagedSlice::Owned(actions.iter().map(|action| action.new_owned()).collect()),
+                actions: ManagedSlice::Owned(actions.iter().map(|action| action.get_owned()).collect()),
                 more: *more
             },
         }
@@ -179,12 +183,13 @@ pub struct DefineTracepoint<'a, U> {
     /// The PC address of the tracepoint that is being defined.
     pub addr: U,
     /// A list of actions that should be appended to the tracepoint.
-    pub actions: TracepointActionList<'a, 'a, U>,
+    pub actions: TracepointActionList<'a, U>,
 }
 
 #[cfg(feature = "alloc")]
 impl<'a, U: Copy> DefineTracepoint<'a, U> {
-    pub fn get_owned(&self) -> DefineTracepoint<'static, U> {
+    /// Allocate an owned copy of this structure.
+    pub fn get_owned<'b>(&self) -> DefineTracepoint<'b, U> {
         DefineTracepoint {
             number: self.number,
             addr: self.addr,
@@ -243,7 +248,8 @@ pub enum TracepointItem<'a, U> {
 
 #[cfg(feature = "alloc")]
 impl<'a, U: Copy> TracepointItem<'a, U> {
-    pub fn get_owned(&self) -> TracepointItem<'static, U> {
+    /// Allocate an owned copy of this structure.
+    pub fn get_owned<'b>(&self) -> TracepointItem<'b, U> {
         match self {
             TracepointItem::New(n) => TracepointItem::New(n.get_owned()),
             TracepointItem::Define(d) => TracepointItem::Define(d.get_owned()),
