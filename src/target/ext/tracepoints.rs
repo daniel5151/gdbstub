@@ -51,11 +51,7 @@ impl<U: crate::internal::BeBytes + num_traits::Zero + PrimInt> NewTracepoint<U> 
         res.write_str("QTDP:")?;
         res.write_num(self.number.0)?;
         res.write_str(":")?;
-        let mut buf = [0; 8];
-        self.addr
-            .to_be_bytes(&mut buf)
-            .ok_or_else(|| unreachable!())?;
-        res.write_hex_buf(&buf)?;
+        res.write_num(self.addr)?;
         res.write_str(":")?;
         res.write_str(if self.enabled { "E" } else { "D" })?;
         res.write_str(":")?;
@@ -135,9 +131,7 @@ impl<'a, U: crate::internal::BeBytes + num_traits::Zero + PrimInt> TracepointAct
                     None => res.write_str("-1"),
                 }?;
                 res.write_str(",")?;
-                let mut buf = [0; 8];
-                offset.to_be_bytes(&mut buf).ok_or_else(|| unreachable!())?;
-                res.write_hex_buf(&buf)?;
+                res.write_num(*offset)?;
                 res.write_str(",")?;
                 res.write_num(*length)?;
             }
@@ -221,11 +215,7 @@ impl<'a, U: crate::internal::BeBytes + num_traits::Zero + PrimInt> DefineTracepo
         res.write_str("QTDP:-")?;
         res.write_num(self.number.0)?;
         res.write_str(":")?;
-        let mut buf = [0; 8];
-        self.addr
-            .to_be_bytes(&mut buf)
-            .ok_or_else(|| unreachable!())?;
-        res.write_hex_buf(&buf)?;
+        res.write_num(self.addr)?;
         res.write_str(":")?;
         let mut err = None;
         let more = self.actions(|action| {
