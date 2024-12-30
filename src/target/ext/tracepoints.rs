@@ -121,7 +121,7 @@ impl<'a, U: crate::internal::BeBytes + num_traits::Zero + PrimInt> TracepointAct
     ) -> Result<(), ResponseWriterError<C::Error>> {
         match self {
             TracepointAction::Registers { mask } => {
-                res.write_str("R ")?;
+                res.write_str("R")?;
                 res.write_hex_buf(mask)?;
             }
             TracepointAction::Memory {
@@ -129,7 +129,7 @@ impl<'a, U: crate::internal::BeBytes + num_traits::Zero + PrimInt> TracepointAct
                 offset,
                 length,
             } => {
-                res.write_str("M ")?;
+                res.write_str("M")?;
                 match basereg {
                     Some(r) => res.write_num(*r),
                     None => res.write_str("-1"),
@@ -142,7 +142,7 @@ impl<'a, U: crate::internal::BeBytes + num_traits::Zero + PrimInt> TracepointAct
                 res.write_num(*length)?;
             }
             TracepointAction::Expression { expr } => {
-                res.write_str("X ")?;
+                res.write_str("X")?;
                 res.write_num(expr.len())?;
                 res.write_str(",")?;
                 res.write_hex_buf(expr)?;

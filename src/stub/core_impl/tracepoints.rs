@@ -239,7 +239,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     let e = (|| -> Result<_, _> {
                         match desc {
                             FrameDescription::FrameNumber(n) => {
-                                res.write_str("F ")?;
+                                res.write_str("F")?;
                                 if let Some(n) = n {
                                     res.write_num(n)?;
                                 } else {
@@ -247,7 +247,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                                 }
                             }
                             FrameDescription::Hit(tdp) => {
-                                res.write_str("T ")?;
+                                res.write_str("T")?;
                                 res.write_num(tdp.0)?;
                             }
                         }
@@ -260,7 +260,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 })
                 .handle_error()?;
                 if !any_results {
-                    res.write_str("F -1")?;
+                    res.write_str("F-1")?;
                 }
             }
             // The GDB protocol for this is very weird: it sends this first packet
