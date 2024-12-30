@@ -159,8 +159,9 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             }
             Tracepoints::qTStatus(_) => {
                 let status = ops.trace_experiment_status().handle_error()?;
-                res.write_str("T")?;
-                res.write_dec(if status.running { 1 } else { 0 })?;
+                // Write stop status
+                status.state.write(res)?;
+                // And then all the optional statistical information
                 for explanation in status.explanations.iter() {
                     res.write_str(";")?;
                     explanation.write(res)?;
