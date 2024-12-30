@@ -274,15 +274,20 @@ impl<'a, U: Copy> TracepointItem<'a, U> {
 
 /// Description of the currently running trace experiment.
 pub struct ExperimentStatus<'a> {
-    /// If a trace is presently running
-    pub running: bool,
+    /// The running state of the experiment.
+    pub state: ExperimentState<'a>,
     /// A list of optional explanations for the trace status.
     pub explanations: ManagedSlice<'a, ExperimentExplanation<'a>>,
 }
 
-/// An explanation of some detail of the currently running trace experiment.
+/// The state of the trace experiment.
 #[derive(Debug)]
-pub enum ExperimentExplanation<'a> {
+pub enum ExperimentState<'a> {
+    /// The experiment is currently running
+    Running,
+    /// The experiment is not currently running, with no more information given
+    /// as to why.
+    NotRunning,
     /// No trace has been ran yet.
     NotRun,
     /// The trace was stopped by the user. May contain an optional user-supplied
@@ -299,8 +304,11 @@ pub enum ExperimentExplanation<'a> {
     Error(&'a [u8], Tracepoint),
     /// The trace stopped for some other reason.
     Unknown,
+}
 
-    // Statistical information
+/// An explanation of some detail of the currently running trace experiment.
+#[derive(Debug)]
+pub enum ExperimentExplanation<'a> {
     /// The number of trace frames in the buffer.
     Frames(usize),
     /// The total number of trace frames created during the run. This may be
@@ -324,6 +332,54 @@ pub enum ExperimentExplanation<'a> {
     Other(managed::Managed<'a, str>),
 }
 
+impl<'a> ExperimentState<'a> {
+    pub(crate) fn write<C: Connection>(
+        &self,
+        res: &mut ResponseWriter<'_, C>,
+    ) -> Result<(), ResponseWriterError<C::Error>> {
+        use ExperimentState::*;
+        if let Running = self {
+            return res.write_str("T1");
+        }
+        // We're stopped for some reason, and may have an explanation for why
+        res.write_str("T0")?;
+        match self {
+            Running => {
+                /* unreachable */
+                ()
+            }
+            NotRunning => {
+                /* no information */
+                ()
+            }
+            NotRun => res.write_str(";tnotrun:0")?,
+            Stop(ref t) => match t {
+                Some(text) => {
+                    res.write_str(";tstop:")?;
+                    res.write_hex_buf(text)?;
+                    res.write_str(":0")?;
+                }
+                None => res.write_str(";tstop:0")?,
+            },
+            Full => res.write_str(";tfull:0")?,
+            Disconnected => res.write_str(";tdisconnected:0")?,
+            PassCount(tpnum) => {
+                res.write_str(";tpasscount:")?;
+                res.write_num(tpnum.0)?;
+            }
+            Error(text, tpnum) => {
+                res.write_str(";terror:")?;
+                res.write_hex_buf(text)?;
+                res.write_str(":")?;
+                res.write_num(tpnum.0)?;
+            }
+            Unknown => res.write_str(";tunknown:0")?,
+        }
+
+        Ok(())
+    }
+}
+
 impl<'a> ExperimentExplanation<'a> {
     pub(crate) fn write<C: Connection>(
         &self,
@@ -331,29 +387,6 @@ impl<'a> ExperimentExplanation<'a> {
     ) -> Result<(), ResponseWriterError<C::Error>> {
         use ExperimentExplanation::*;
         match self {
-            NotRun => res.write_str("tnotrun:0")?,
-            Stop(ref t) => match t {
-                Some(text) => {
-                    res.write_str("tstop:")?;
-                    res.write_hex_buf(text)?;
-                    res.write_str(":0")?;
-                }
-                None => res.write_str("tstop:0")?,
-            },
-            Full => res.write_str("tfull:0")?,
-            Disconnected => res.write_str("tdisconnected:0")?,
-            PassCount(tpnum) => {
-                res.write_str("tpasscount:")?;
-                res.write_num(tpnum.0)?;
-            }
-            Error(text, tpnum) => {
-                res.write_str("terror:")?;
-                res.write_hex_buf(text)?;
-                res.write_str(":")?;
-                res.write_num(tpnum.0)?;
-            }
-            Unknown => res.write_str("tunknown:0")?,
-
             Frames(u) => {
                 res.write_str("tframes:")?;
                 res.write_num(*u)?;
