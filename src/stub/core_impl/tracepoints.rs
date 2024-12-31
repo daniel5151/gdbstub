@@ -89,7 +89,6 @@ impl<'a, U: BeBytes> DefineTracepoint<'a, U> {
                 Some([b'R', mask @ ..]) => {
                     let mask_end = mask
                         .iter()
-                        .cloned()
                         .enumerate()
                         .find(|(_i, b)| matches!(b, b'S' | b'R' | b'M' | b'X' | b'-'));
                     // We may or may not have another action after our mask
