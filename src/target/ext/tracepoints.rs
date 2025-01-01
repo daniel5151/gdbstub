@@ -262,17 +262,9 @@ impl<'a, U: Copy> TracepointItem<'a, U> {
     }
 }
 
-/// Description of the currently running trace experiment.
-pub struct ExperimentStatus<'a> {
-    /// The running state of the experiment.
-    pub state: ExperimentState<'a>,
-    /// A list of optional explanations for the trace status.
-    pub explanations: ManagedSlice<'a, ExperimentExplanation<'a>>,
-}
-
-/// The state of the trace experiment.
+/// The running state of a trace experiment.
 #[derive(Debug)]
-pub enum ExperimentState<'a> {
+pub enum ExperimentStatus<'a> {
     /// The experiment is currently running
     Running,
     /// The experiment is not currently running, with no more information given
@@ -322,12 +314,12 @@ pub enum ExperimentExplanation<'a> {
     Other(managed::Managed<'a, str>),
 }
 
-impl<'a> ExperimentState<'a> {
+impl<'a> ExperimentStatus<'a> {
     pub(crate) fn write<C: Connection>(
         &self,
         res: &mut ResponseWriter<'_, C>,
     ) -> Result<(), ResponseWriterError<C::Error>> {
-        use ExperimentState::*;
+        use ExperimentStatus::*;
         if let Running = self {
             return res.write_str("T1");
         }
@@ -525,6 +517,12 @@ pub trait Tracepoints: Target {
 
     /// Return the status of the current trace experiment.
     fn trace_experiment_status(&self) -> TargetResult<ExperimentStatus<'_>, Self>;
+    /// List any statistical information for the current trace experiment, by
+    /// calling `report` with each [ExperimentExplanation] item.
+    fn trace_experiment_info(
+        &self,
+        report: &mut dyn FnMut(ExperimentExplanation<'_>),
+    ) -> TargetResult<(), Self>;
     /// Start a new trace experiment.
     fn trace_experiment_start(&mut self) -> TargetResult<(), Self>;
     /// Stop the currently running trace experiment.

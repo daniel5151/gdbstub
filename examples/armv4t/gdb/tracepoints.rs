@@ -2,7 +2,6 @@ use crate::emu::Emu;
 use gdbstub::target;
 use gdbstub::target::ext::tracepoints::DefineTracepoint;
 use gdbstub::target::ext::tracepoints::ExperimentExplanation;
-use gdbstub::target::ext::tracepoints::ExperimentState;
 use gdbstub::target::ext::tracepoints::ExperimentStatus;
 use gdbstub::target::ext::tracepoints::FrameDescription;
 use gdbstub::target::ext::tracepoints::FrameRequest;
@@ -13,7 +12,6 @@ use gdbstub::target::ext::tracepoints::TracepointAction;
 use gdbstub::target::ext::tracepoints::TracepointItem;
 use gdbstub::target::TargetError;
 use gdbstub::target::TargetResult;
-use managed::ManagedSlice;
 
 use armv4t_emu::Cpu;
 #[derive(Debug)]
@@ -116,16 +114,20 @@ impl target::ext::tracepoints::Tracepoints for Emu {
 
     fn trace_experiment_status(&self) -> TargetResult<ExperimentStatus<'_>, Self> {
         // For a bare-bones example, we don't provide in-depth status explanations.
-        Ok(ExperimentStatus {
-            state: if self.tracing {
-                ExperimentState::Running
-            } else {
-                ExperimentState::NotRunning
-            },
-            explanations: ManagedSlice::Owned(vec![ExperimentExplanation::Frames(
-                self.traceframes.len(),
-            )]),
+        Ok(if self.tracing {
+            ExperimentStatus::Running
+        } else {
+            ExperimentStatus::NotRunning
         })
+    }
+
+    fn trace_experiment_info(
+        &self,
+        report: &mut dyn FnMut(ExperimentExplanation<'_>),
+    ) -> TargetResult<(), Self> {
+        (report)(ExperimentExplanation::Frames(self.traceframes.len()));
+
+        Ok(())
     }
 
     fn select_frame(
