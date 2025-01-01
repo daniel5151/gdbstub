@@ -9,6 +9,7 @@ use crate::protocol::commands::_QTDP::CreateTDP;
 use crate::protocol::commands::_QTDP::DefineTDP;
 use crate::protocol::commands::_QTDP::QTDP;
 use crate::target::ext::tracepoints::DefineTracepoint;
+use crate::target::ext::tracepoints::ExperimentExplanation;
 use crate::target::ext::tracepoints::FrameDescription;
 use crate::target::ext::tracepoints::FrameRequest;
 use crate::target::ext::tracepoints::NewTracepoint;
@@ -158,13 +159,24 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             }
             Tracepoints::qTStatus(_) => {
                 let status = ops.trace_experiment_status().handle_error()?;
-                // Write stop status
-                status.state.write(res)?;
-                // And then all the optional statistical information
-                for explanation in status.explanations.iter() {
-                    res.write_str(";")?;
-                    explanation.write(res)?;
+                status.write(res)?;
+                let mut err = None;
+                ops.trace_experiment_info(&mut |explanation: ExperimentExplanation<'_>| {
+                    if let Err(e) = explanation.write(res) {
+                        err = Some(e)
+                    }
+                })
+                .handle_error()?;
+                if let Some(e) = err {
+                    return Err(e.into());
                 }
+                //// Write stop status
+                //status.state.write(res)?;
+                //// And then all the optional statistical information
+                //status.explanations(|explanation| {
+                //    res.write_str(";")?;
+                //    explanation.write(res)?;
+                //})?;
             }
             Tracepoints::qTP(qtp) => {
                 let addr = <T::Arch as Arch>::Usize::from_be_bytes(qtp.addr)
