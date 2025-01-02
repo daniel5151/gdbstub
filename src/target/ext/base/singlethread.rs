@@ -4,6 +4,7 @@ use crate::arch::Arch;
 use crate::common::Signal;
 use crate::target::Target;
 use crate::target::TargetResult;
+use maybe_async::maybe_async;
 
 /// Base required debugging operations for single threaded targets.
 pub trait SingleThreadBase: Target {
@@ -71,6 +72,7 @@ pub trait SingleThreadBase: Target {
 }
 
 /// Target extension - support for resuming single threaded targets.
+#[maybe_async]
 pub trait SingleThreadResume: Target {
     /// Resume execution on the target.
     ///
@@ -92,7 +94,7 @@ pub trait SingleThreadResume: Target {
     ///
     /// Omitting PC adjustment may result in unexpected execution flow and/or
     /// breakpoints not appearing to work correctly.
-    fn resume(&mut self, signal: Option<Signal>) -> Result<(), Self::Error>;
+    async fn resume(&mut self, signal: Option<Signal>) -> Result<(), Self::Error>;
 
     /// Support for optimized [single stepping].
     ///

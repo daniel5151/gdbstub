@@ -43,8 +43,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 let ops = ops.support_hw_breakpoint().unwrap();
                 let bp_kind = bp_kind!();
                 match cmd_kind {
-                    CmdKind::Add => ops.add_hw_breakpoint(addr, bp_kind),
-                    CmdKind::Remove => ops.remove_hw_breakpoint(addr, bp_kind),
+                    CmdKind::Add => ops.add_hw_breakpoint(addr, bp_kind).await,
+                    CmdKind::Remove => ops.remove_hw_breakpoint(addr, bp_kind).await,
                 }
             }
             2 | 3 | 4 if ops.support_hw_watchpoint().is_some() => {
@@ -60,8 +60,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     .ok_or(Error::TargetMismatch)?;
                 let ops = ops.support_hw_watchpoint().unwrap();
                 match cmd_kind {
-                    CmdKind::Add => ops.add_hw_watchpoint(addr, len, kind),
-                    CmdKind::Remove => ops.remove_hw_watchpoint(addr, len, kind),
+                    CmdKind::Add => ops.add_hw_watchpoint(addr, len, kind).await,
+                    CmdKind::Remove => ops.remove_hw_watchpoint(addr, len, kind).await,
                 }
             }
             // explicitly handle unguarded variants of known breakpoint types

@@ -200,7 +200,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             // `handle_X` methods are defined in the `ext` module
             Command::Base(cmd) => self.handle_base(res, target, cmd),
             Command::TargetXml(cmd) => self.handle_target_xml(res, target, cmd),
-            Command::Resume(cmd) => self.handle_stop_resume(res, target, cmd),
+            Command::Resume(cmd) => self.handle_stop_resume(res, target, cmd).await,
             Command::NoAckMode(cmd) => self.handle_no_ack_mode(res, target, cmd),
             Command::XUpcasePacket(cmd) => self.handle_x_upcase_packet(res, target, cmd),
             Command::SingleRegisterAccess(cmd) => {

@@ -12,8 +12,11 @@ use crate::target::ext::base::reverse_exec::ReplayLogPosition;
 use crate::target::ext::base::ResumeOps;
 use crate::target::ext::catch_syscalls::CatchSyscallPosition;
 
+use maybe_async::maybe_async;
+
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
-    pub(crate) fn handle_stop_resume(
+    #[maybe_async]
+    pub(crate) async fn handle_stop_resume(
         &mut self,
         res: &mut ResponseWriter<'_, C>,
         target: &mut T,
@@ -77,10 +80,11 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             }
         };
 
-        self.do_vcont(ops, actions)
+        self.do_vcont(ops, actions).await
     }
 
-    fn do_vcont_single_thread(
+    #[maybe_async]
+    async fn do_vcont_single_thread(
         ops: &mut dyn crate::target::ext::base::singlethread::SingleThreadResume<
             Arch = T::Arch,
             Error = T::Error,
@@ -122,7 +126,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     _ => None,
                 };
 
-                ops.resume(signal).map_err(Error::TargetError)?;
+                ops.resume(signal).await.map_err(Error::TargetError)?;
                 Ok(())
             }
             VContKind::Step | VContKind::StepWithSig(_) if ops.support_single_step().is_some() => {
@@ -254,13 +258,14 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         ops.resume().map_err(Error::TargetError)
     }
 
-    fn do_vcont(
+    #[maybe_async]
+    async fn do_vcont(
         &mut self,
         ops: ResumeOps<'_, T::Arch, T::Error>,
         actions: Actions<'_>,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
         match ops {
-            ResumeOps::SingleThread(ops) => Self::do_vcont_single_thread(ops, &actions)?,
+            ResumeOps::SingleThread(ops) => Self::do_vcont_single_thread(ops, &actions).await?,
             ResumeOps::MultiThread(ops) => Self::do_vcont_multi_thread(ops, &actions)?,
         };
 
