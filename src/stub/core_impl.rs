@@ -44,6 +44,7 @@ mod target_xml;
 mod thread_extra_info;
 mod x_upcase_packet;
 
+use maybe_async::maybe_async;
 pub(crate) use resume::FinishExecStatus;
 
 pub(crate) mod target_result_ext {
@@ -113,6 +114,7 @@ pub enum HandlerStatus {
     Disconnect(DisconnectReason),
 }
 
+#[maybe_async]
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     pub fn new() -> GdbStubImpl<T, C> {
         GdbStubImpl {
@@ -133,7 +135,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         }
     }
 
-    pub fn handle_packet(
+    pub async fn handle_packet(
         &mut self,
         target: &mut T,
         conn: &mut C,
@@ -153,7 +155,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 }
 
                 let mut res = ResponseWriter::new(conn, target.use_rle());
-                let disconnect_reason = match self.handle_command(&mut res, target, command) {
+                let disconnect_reason = match self.handle_command(&mut res, target, command).await {
                     Ok(HandlerStatus::Handled) => None,
                     Ok(HandlerStatus::NeedsOk) => {
                         res.write_str("OK")?;
@@ -188,7 +190,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         }
     }
 
-    fn handle_command(
+    async fn handle_command(
         &mut self,
         res: &mut ResponseWriter<'_, C>,
         target: &mut T,
@@ -204,7 +206,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             Command::SingleRegisterAccess(cmd) => {
                 self.handle_single_register_access(res, target, cmd)
             }
-            Command::Breakpoints(cmd) => self.handle_breakpoints(res, target, cmd),
+            Command::Breakpoints(cmd) => self.handle_breakpoints(res, target, cmd).await,
             Command::CatchSyscalls(cmd) => self.handle_catch_syscalls(res, target, cmd),
             Command::ExtendedMode(cmd) => self.handle_extended_mode(res, target, cmd),
             Command::MonitorCmd(cmd) => self.handle_monitor_cmd(res, target, cmd),

@@ -2,15 +2,17 @@ use super::prelude::*;
 use crate::arch::Arch;
 use crate::arch::BreakpointKind;
 use crate::protocol::commands::ext::Breakpoints;
+use maybe_async::maybe_async;
 
 enum CmdKind {
     Add,
     Remove,
 }
 
+#[maybe_async]
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     #[inline(always)]
-    fn handle_breakpoint_common(
+    async fn handle_breakpoint_common(
         &mut self,
         ops: crate::target::ext::breakpoints::BreakpointsOps<'_, T>,
         cmd: crate::protocol::commands::breakpoint::BasicBreakpoint<'_>,
@@ -35,6 +37,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     CmdKind::Add => ops.add_sw_breakpoint(addr, bp_kind),
                     CmdKind::Remove => ops.remove_sw_breakpoint(addr, bp_kind),
                 }
+                .await
             }
             1 if ops.support_hw_breakpoint().is_some() => {
                 let ops = ops.support_hw_breakpoint().unwrap();
@@ -76,7 +79,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         }
     }
 
-    pub(crate) fn handle_breakpoints(
+    pub(crate) async fn handle_breakpoints(
         &mut self,
         _res: &mut ResponseWriter<'_, C>,
         target: &mut T,
@@ -90,8 +93,14 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         crate::__dead_code_marker!("breakpoints", "impl");
 
         let handler_status = match command {
-            Breakpoints::z(cmd) => self.handle_breakpoint_common(ops, cmd, CmdKind::Remove)?,
-            Breakpoints::Z(cmd) => self.handle_breakpoint_common(ops, cmd, CmdKind::Add)?,
+            Breakpoints::z(cmd) => {
+                self.handle_breakpoint_common(ops, cmd, CmdKind::Remove)
+                    .await?
+            }
+            Breakpoints::Z(cmd) => {
+                self.handle_breakpoint_common(ops, cmd, CmdKind::Add)
+                    .await?
+            }
             // TODO: handle ZWithBytecode once agent expressions are implemented
             _ => HandlerStatus::Handled,
         };

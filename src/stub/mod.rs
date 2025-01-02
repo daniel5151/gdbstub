@@ -5,6 +5,7 @@ pub use builder::GdbStubBuilder;
 pub use builder::GdbStubBuilderError;
 pub use core_impl::DisconnectReason;
 pub use error::GdbStubError;
+use maybe_async::maybe_async;
 pub use stop_reason::BaseStopReason;
 pub use stop_reason::IntoStopReason;
 pub use stop_reason::MultiThreadStopReason;
@@ -154,7 +155,8 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
     /// etc...) you will need to interface with the underlying
     /// [`GdbStubStateMachine`](state_machine::GdbStubStateMachine) API
     /// directly.
-    pub fn run_blocking<E>(
+    #[maybe_async]
+    pub async fn run_blocking<E>(
         self,
         target: &mut T,
     ) -> Result<DisconnectReason, GdbStubError<T::Error, C::Error>>
@@ -168,7 +170,7 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
                 state_machine::GdbStubStateMachine::Idle(mut gdb) => {
                     // needs more data, so perform a blocking read on the connection
                     let byte = gdb.borrow_conn().read().map_err(InternalError::conn_read)?;
-                    gdb.incoming_data(target, byte)?
+                    gdb.incoming_data(target, byte).await?
                 }
 
                 state_machine::GdbStubStateMachine::Disconnected(gdb) => {
@@ -196,7 +198,7 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
                         }
 
                         Ok(BlockingEventLoopEvent::IncomingData(byte)) => {
-                            gdb.incoming_data(target, byte)?
+                            gdb.incoming_data(target, byte).await?
                         }
 
                         Err(WaitForStopReasonError::Target(e)) => {

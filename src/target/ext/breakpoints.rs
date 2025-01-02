@@ -3,6 +3,7 @@
 use crate::arch::Arch;
 use crate::target::Target;
 use crate::target::TargetResult;
+use maybe_async::maybe_async;
 
 /// Target Extension - Set/Remove Breakpoints.
 pub trait Breakpoints: Target {
@@ -36,11 +37,12 @@ define_ext!(BreakpointsOps, Breakpoints);
 /// using an _interpreted_ CPU (as opposed to a JIT), the simplest way to
 /// implement "software" breakpoints would be to check the `PC` value after each
 /// CPU cycle, ignoring the specified breakpoint `kind` entirely.
+#[maybe_async]
 pub trait SwBreakpoint: Target + Breakpoints {
     /// Add a new software breakpoint.
     ///
     /// Return `Ok(false)` if the operation could not be completed.
-    fn add_sw_breakpoint(
+    async fn add_sw_breakpoint(
         &mut self,
         addr: <Self::Arch as Arch>::Usize,
         kind: <Self::Arch as Arch>::BreakpointKind,
@@ -49,7 +51,7 @@ pub trait SwBreakpoint: Target + Breakpoints {
     /// Remove an existing software breakpoint.
     ///
     /// Return `Ok(false)` if the operation could not be completed.
-    fn remove_sw_breakpoint(
+    async fn remove_sw_breakpoint(
         &mut self,
         addr: <Self::Arch as Arch>::Usize,
         kind: <Self::Arch as Arch>::BreakpointKind,

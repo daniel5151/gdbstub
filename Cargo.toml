@@ -14,10 +14,12 @@ categories = ["development-tools::debugging", "embedded", "emulators", "network-
 exclude = ["examples/**/*.elf", "examples/**/*.o"]
 
 [dependencies]
+async-trait = "0.1.83"
 bitflags = "2.3.1"
 cfg-if = "1.0"
 log = "0.4"
 managed = { version = "0.8", default-features = false }
+maybe-async = { version = "0.2.10" }
 num-traits = { version = "0.2", default-features = false }
 paste = "1.0"
 
@@ -35,6 +37,7 @@ std = ["alloc"]
 trace-pkt = ["alloc"]
 paranoid_unsafe = []
 core_error = []
+sync = ["maybe-async/is_sync"]
 
 # INTERNAL: enables the `__dead_code_marker!` macro.
 # used as part of the `scripts/test_dead_code_elim.sh`

@@ -46,6 +46,7 @@ use crate::stub::error::InternalError;
 use crate::stub::stop_reason::IntoStopReason;
 use crate::target::Target;
 use managed::ManagedSlice;
+use maybe_async::maybe_async;
 
 /// State-machine interface to `GdbStub`.
 ///
@@ -208,7 +209,8 @@ impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::Idle<T>, 
     }
 
     /// Pass a byte to the GDB stub.
-    pub fn incoming_data(
+    #[maybe_async]
+    pub async fn incoming_data(
         mut self,
         target: &mut T,
         byte: u8,
@@ -222,7 +224,8 @@ impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::Idle<T>, 
         let state = self
             .i
             .inner
-            .handle_packet(target, &mut self.i.conn, packet)?;
+            .handle_packet(target, &mut self.i.conn, packet)
+            .await?;
         Ok(match state {
             State::Pump => self.into(),
             State::Disconnect(reason) => self.transition(state::Disconnected { reason }).into(),
@@ -248,6 +251,7 @@ impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::Idle<T>, 
 
 /// Methods which can only be called from the
 /// [`GdbStubStateMachine::Running`] state.
+#[maybe_async]
 impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::Running, T, C> {
     /// Report a target stop reason back to GDB.
     pub fn report_stop(
@@ -272,7 +276,7 @@ impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::Running, 
     }
 
     /// Pass a byte to the GDB stub.
-    pub fn incoming_data(
+    pub async fn incoming_data(
         mut self,
         target: &mut T,
         byte: u8,
@@ -286,7 +290,8 @@ impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::Running, 
         let state = self
             .i
             .inner
-            .handle_packet(target, &mut self.i.conn, packet)?;
+            .handle_packet(target, &mut self.i.conn, packet)
+            .await?;
         Ok(match state {
             State::Pump => self.transition(state::Running {}).into(),
             State::Disconnect(reason) => self.transition(state::Disconnected { reason }).into(),
