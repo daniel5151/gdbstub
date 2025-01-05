@@ -180,7 +180,7 @@ pub struct GdbStubStateMachineInner<'a, S, T: Target, C: Connection> {
 }
 
 /// Methods which can be called regardless of the current state.
-impl<'a, S, T: Target, C: Connection> GdbStubStateMachineInner<'a, S, T, C> {
+impl<S, T: Target, C: Connection> GdbStubStateMachineInner<'_, S, T, C> {
     /// Return a mutable reference to the underlying connection.
     pub fn borrow_conn(&mut self) -> &mut C {
         &mut self.i.conn

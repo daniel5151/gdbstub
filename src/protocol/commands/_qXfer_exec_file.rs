@@ -10,7 +10,7 @@ pub struct ExecFileAnnex {
     pub pid: Option<Pid>,
 }
 
-impl<'a> ParseAnnex<'a> for ExecFileAnnex {
+impl ParseAnnex<'_> for ExecFileAnnex {
     #[inline(always)]
     fn from_buf(buf: &[u8]) -> Option<Self> {
         let pid = match buf {

@@ -68,7 +68,7 @@ macro_rules! impl_memsniff_w {
     };
 }
 
-impl<'a, M: Memory, F: FnMut(Access)> Memory for MemSniffer<'a, M, F> {
+impl<M: Memory, F: FnMut(Access)> Memory for MemSniffer<'_, M, F> {
     impl_memsniff_r!(r8, u8);
     impl_memsniff_r!(r16, u16);
     impl_memsniff_r!(r32, u32);

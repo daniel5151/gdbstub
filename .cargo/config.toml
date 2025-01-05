@@ -5,6 +5,7 @@ rustflags = [
     "-Drust_2018_idioms",
 
     "-Wmissing_docs",
+    "-Wunexpected_cfgs",
     "-Wunsafe_op_in_unsafe_fn",
 
     "-Wclippy::dbg_macro",
@@ -20,7 +21,6 @@ rustflags = [
     "-Wclippy::macro_use_imports",
     "-Wclippy::map_flatten",
     "-Wclippy::match_on_vec_items",
-    "-Wclippy::mismatched_target_os",
     "-Wclippy::needless_borrow",
     "-Wclippy::needless_continue",
     "-Wclippy::option_option",
@@ -31,7 +31,7 @@ rustflags = [
     "-Wclippy::verbose_file_reads",
 #   "-Wclippy::unused_self", # might be interesting to explore this...
 
-    # deny exlicit panic paths
+    # deny explicit panic paths
     "-Wclippy::panic",
     "-Wclippy::todo",
     "-Wclippy::unimplemented",

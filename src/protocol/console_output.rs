@@ -24,7 +24,7 @@ pub struct ConsoleOutput<'a> {
     callback: &'a mut dyn FnMut(&[u8]),
 }
 
-impl<'a> fmt::Write for ConsoleOutput<'a> {
+impl fmt::Write for ConsoleOutput<'_> {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         self.write_raw(s.as_bytes());
         Ok(())
