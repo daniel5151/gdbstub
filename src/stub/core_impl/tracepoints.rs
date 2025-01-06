@@ -169,13 +169,6 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 if let Some(e) = err {
                     return Err(e.into());
                 }
-                //// Write stop status
-                //status.state.write(res)?;
-                //// And then all the optional statistical information
-                //status.explanations(|explanation| {
-                //    res.write_str(";")?;
-                //    explanation.write(res)?;
-                //})?;
             }
             Tracepoints::qTP(qtp) => {
                 let addr = <T::Arch as Arch>::Usize::from_be_bytes(qtp.addr)
@@ -279,21 +272,35 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             // which means we can't really setup the state machine ourselves or
             // turn it into a nicer API.
             Tracepoints::qTfP(_) => {
-                let tp = ops.tracepoint_enumerate_start().handle_error()?;
-                if let Some(tp) = tp {
-                    match tp {
-                        TracepointItem::New(ctp) => ctp.write(res)?,
-                        TracepointItem::Define(dtp) => dtp.write(res)?,
+                let mut err = None;
+                ops.tracepoint_enumerate_start(&mut |tp| {
+                    let e = match tp {
+                        TracepointItem::New(ctp) => ctp.write(res),
+                        TracepointItem::Define(dtp) => dtp.write(res),
+                    };
+                    if let Err(e) = e {
+                        err = Some(e)
                     }
+                })
+                .handle_error()?;
+                if let Some(e) = err {
+                    return Err(e.into());
                 }
             }
             Tracepoints::qTsP(_) => {
-                let tp = ops.tracepoint_enumerate_step().handle_error()?;
-                if let Some(tp) = tp {
-                    match tp {
-                        TracepointItem::New(ctp) => ctp.write(res)?,
-                        TracepointItem::Define(dtp) => dtp.write(res)?,
+                let mut err = None;
+                ops.tracepoint_enumerate_step(&mut |tp| {
+                    let e = match tp {
+                        TracepointItem::New(ctp) => ctp.write(res),
+                        TracepointItem::Define(dtp) => dtp.write(res),
+                    };
+                    if let Err(e) = e {
+                        err = Some(e)
                     }
+                })
+                .handle_error()?;
+                if let Some(e) = err {
+                    return Err(e.into());
                 }
             }
 
