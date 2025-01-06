@@ -45,8 +45,13 @@ impl<'a> ParseCommand<'a> for QTDP<'a> {
                 }))
             },
             [b':', tracepoint @ ..] => {
-                let more = tracepoint.ends_with(&[b'-']);
-                let mut params = tracepoint.splitn_mut(6, |b| matches!(*b, b':' | b'-'));
+                // Strip off the trailing '-' that indicates if there will be
+                // more packets after this
+                let (tracepoint, more) = match tracepoint {
+                    [rest @ .., b'-'] => (rest, true),
+                    x => (x, false)
+                };
+                let mut params = tracepoint.splitn_mut(6, |b| *b == b':');
                 let n = Tracepoint(decode_hex(params.next()?).ok()?);
                 let addr = decode_hex_buf(params.next()?).ok()?;
                 let ena = params.next()?;
