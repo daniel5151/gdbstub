@@ -21,10 +21,9 @@ use managed::ManagedSlice;
 impl<U: BeBytes> NewTracepoint<U> {
     /// Parse from a raw CreateTDP packet.
     pub fn from_tdp(ctdp: CreateTDP<'_>) -> Option<Self> {
-        let arch_int = |b: &[u8]| -> Result<U, ()> { U::from_be_bytes(b).ok_or(()) };
         Some(Self {
             number: ctdp.number,
-            addr: arch_int(ctdp.addr).ok()?,
+            addr: U::from_be_bytes(ctdp.addr)?,
             enabled: ctdp.enable,
             pass_count: ctdp.pass,
             step_count: ctdp.step,
@@ -36,11 +35,9 @@ impl<U: BeBytes> NewTracepoint<U> {
 impl<'a, U: BeBytes> DefineTracepoint<'a, U> {
     /// Parse from a raw DefineTDP packet.
     pub fn from_tdp(dtdp: DefineTDP<'a>) -> Option<Self> {
-        let arch_int = |b: &[u8]| -> Result<U, ()> { U::from_be_bytes(b).ok_or(()) };
-
         Some(Self {
             number: dtdp.number,
-            addr: arch_int(dtdp.addr).ok()?,
+            addr: U::from_be_bytes(dtdp.addr)?,
             actions: TracepointActionList::Raw {
                 data: ManagedSlice::Borrowed(dtdp.actions),
             },
