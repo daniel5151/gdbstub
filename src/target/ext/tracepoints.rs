@@ -35,37 +35,48 @@ pub struct NewTracepoint<U> {
 /// it is attached to is hit. A tracepoint may have more than one action
 /// attached.
 #[derive(Debug)]
-#[allow(missing_docs)]
 pub enum TracepointAction<'a, U> {
-    /// Collect the registers whose bits are set in `mask` (big endian).
-    /// Note that `mask` may be larger than the word length.
-    Registers { mask: ManagedSlice<'a, u8> },
-    /// Collect `len` bytes of memory starting at the address in register number
+    /// Collect registers.
+    Registers {
+        /// A bitmask of which registers should be collected. The least significant
+        /// bit is numberered zero. Note that the mask may be larger than the word length.
+        mask: ManagedSlice<'a, u8>
+    },
+    /// Collect memory.`len` bytes of memory starting at the address in register number
     /// `basereg`, plus `offset`. If `basereg` is None, then treat it as a fixed
     /// address.
     Memory {
+        /// If `Some`, then calculate the address of memory to collect relative to
+        /// the value of this register number. If `None` then memory should be
+        /// collected from a fixed address.
         basereg: Option<u64>,
+        /// The offset used to calculate the address to collect memory from.
         offset: U,
+        /// How many bytes of memory to collect.
         length: u64,
     },
-    /// Evaluate `expr`, which is a GDB agent bytecode expression, and collect
-    /// memory as it directs.
-    Expression { expr: ManagedSlice<'a, u8> },
+    /// Collect data according to an agent bytecode program.
+    Expression {
+        /// The GDB agent bytecode program to evaluate.
+        expr: ManagedSlice<'a, u8>
+    },
 }
 
-/// A list of TracepointActions, either raw and unparsed from a GDB packet, or
-/// a slice of parsed structures like which may be returned from enumerating
-/// tracepoints.
+/// A list of TracepointActions.
 #[derive(Debug)]
-#[allow(missing_docs)]
 pub enum TracepointActionList<'a, U> {
     /// Raw and unparsed actions, such as from GDB.
-    Raw { data: ManagedSlice<'a, u8> },
+    Raw {
+        /// The unparsed action data.
+        data: ManagedSlice<'a, u8>
+    },
     /// A slice of parsed actions, such as what may be returned by a target when
-    /// enumerating tracepoints. `more` must be set if there will be another
-    /// "tracepoint definition" with more actions for this tracepoint.
+    /// enumerating tracepoints.
     Parsed {
+        /// The parsed actions.
         actions: ManagedSlice<'a, TracepointAction<'a, U>>,
+        /// Indicate if there will be additional "tracepoint definitions" with
+        /// more actions for this tracepoint.
         more: bool,
     },
 }
