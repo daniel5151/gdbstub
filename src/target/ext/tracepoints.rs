@@ -1,12 +1,8 @@
 //! Provide tracepoints for the target.
-use crate::conn::Connection;
-use crate::protocol::ResponseWriter;
-use crate::protocol::ResponseWriterError;
 use crate::target::Arch;
 use crate::target::Target;
 use crate::target::TargetResult;
 use managed::ManagedSlice;
-use num_traits::PrimInt;
 
 /// A tracepoint, identified by a unique number.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -35,34 +31,6 @@ pub struct NewTracepoint<U> {
     pub more: bool,
 }
 
-#[cfg(feature = "alloc")]
-impl<U: Copy> NewTracepoint<U> {
-    /// Allocate an owned copy of this structure.
-    pub fn get_owned(&self) -> NewTracepoint<U> {
-        self.clone()
-    }
-}
-
-impl<U: crate::internal::BeBytes + num_traits::Zero + PrimInt> NewTracepoint<U> {
-    pub(crate) fn write<C: Connection>(
-        &self,
-        res: &mut ResponseWriter<'_, C>,
-    ) -> Result<(), ResponseWriterError<C::Error>> {
-        res.write_str("QTDP:")?;
-        res.write_num(self.number.0)?;
-        res.write_str(":")?;
-        res.write_num(self.addr)?;
-        res.write_str(":")?;
-        res.write_str(if self.enabled { "E" } else { "D" })?;
-        res.write_str(":")?;
-        res.write_num(self.step_count)?;
-        res.write_str(":")?;
-        res.write_num(self.pass_count)?;
-
-        Ok(())
-    }
-}
-
 /// Describes how to collect information for a trace frame when the tracepoint
 /// it is attached to is hit. A tracepoint may have more than one action
 /// attached.
@@ -85,67 +53,6 @@ pub enum TracepointAction<'a, U> {
     Expression { expr: ManagedSlice<'a, u8> },
 }
 
-#[cfg(feature = "alloc")]
-impl<'a, U: Copy> TracepointAction<'a, U> {
-    /// Allocate an owned copy of this structure.
-    pub fn get_owned<'b>(&self) -> TracepointAction<'b, U> {
-        use core::ops::Deref;
-        match self {
-            TracepointAction::Registers { mask } => TracepointAction::Registers {
-                mask: ManagedSlice::Owned(mask.deref().into()),
-            },
-            TracepointAction::Memory {
-                basereg,
-                offset,
-                length,
-            } => TracepointAction::Memory {
-                basereg: *basereg,
-                offset: *offset,
-                length: *length,
-            },
-            TracepointAction::Expression { expr } => TracepointAction::Expression {
-                expr: ManagedSlice::Owned(expr.deref().into()),
-            },
-        }
-    }
-}
-
-impl<'a, U: crate::internal::BeBytes + num_traits::Zero + PrimInt> TracepointAction<'a, U> {
-    pub(crate) fn write<C: Connection>(
-        &self,
-        res: &mut ResponseWriter<'_, C>,
-    ) -> Result<(), ResponseWriterError<C::Error>> {
-        match self {
-            TracepointAction::Registers { mask } => {
-                res.write_str("R")?;
-                res.write_hex_buf(mask)?;
-            }
-            TracepointAction::Memory {
-                basereg,
-                offset,
-                length,
-            } => {
-                res.write_str("M")?;
-                match basereg {
-                    Some(r) => res.write_num(*r),
-                    None => res.write_str("-1"),
-                }?;
-                res.write_str(",")?;
-                res.write_num(*offset)?;
-                res.write_str(",")?;
-                res.write_num(*length)?;
-            }
-            TracepointAction::Expression { expr } => {
-                res.write_str("X")?;
-                res.write_num(expr.len())?;
-                res.write_str(",")?;
-                res.write_hex_buf(expr)?;
-            }
-        }
-        Ok(())
-    }
-}
-
 /// A list of TracepointActions, either raw and unparsed from a GDB packet, or
 /// a slice of parsed structures like which may be returned from enumerating
 /// tracepoints.
@@ -163,25 +70,6 @@ pub enum TracepointActionList<'a, U> {
     },
 }
 
-#[cfg(feature = "alloc")]
-impl<'a, U: Copy> TracepointActionList<'a, U> {
-    /// Allocate an owned copy of this structure.
-    pub fn get_owned<'b>(&self) -> TracepointActionList<'b, U> {
-        use core::ops::Deref;
-        match self {
-            TracepointActionList::Raw { data } => TracepointActionList::Raw {
-                data: ManagedSlice::Owned(data.deref().into()),
-            },
-            TracepointActionList::Parsed { actions, more } => TracepointActionList::Parsed {
-                actions: ManagedSlice::Owned(
-                    actions.iter().map(|action| action.get_owned()).collect(),
-                ),
-                more: *more,
-            },
-        }
-    }
-}
-
 /// Definition data for a tracepoint. A tracepoint may have more than one define
 /// structure for all of its data. GDB may ask for the state of current
 /// tracepoints, which are described with this same structure.
@@ -193,45 +81,6 @@ pub struct DefineTracepoint<'a, U> {
     pub addr: U,
     /// A list of actions that should be appended to the tracepoint.
     pub actions: TracepointActionList<'a, U>,
-}
-
-#[cfg(feature = "alloc")]
-impl<'a, U: Copy> DefineTracepoint<'a, U> {
-    /// Allocate an owned copy of this structure.
-    pub fn get_owned<'b>(&self) -> DefineTracepoint<'b, U> {
-        DefineTracepoint {
-            number: self.number,
-            addr: self.addr,
-            actions: self.actions.get_owned(),
-        }
-    }
-}
-
-impl<'a, U: crate::internal::BeBytes + num_traits::Zero + PrimInt> DefineTracepoint<'a, U> {
-    pub(crate) fn write<C: Connection>(
-        self,
-        res: &mut ResponseWriter<'_, C>,
-    ) -> Result<(), ResponseWriterError<C::Error>> {
-        res.write_str("QTDP:-")?;
-        res.write_num(self.number.0)?;
-        res.write_str(":")?;
-        res.write_num(self.addr)?;
-        res.write_str(":")?;
-        let mut err = None;
-        let more = self.actions(|action| {
-            if let Err(e) = action.write(res) {
-                err = Some(e)
-            }
-        });
-        if let Some(e) = err {
-            return Err(e);
-        }
-        if let Some(true) = more {
-            res.write_str("-")?;
-        }
-
-        Ok(())
-    }
 }
 
 /// An item from a stream of tracepoint descriptions. Enumerating tracepoints
@@ -249,17 +98,6 @@ pub enum TracepointItem<'a, U> {
     /// must have the `more` flag set if it will be followed by more
     /// [TracepointItem::Define] items for this tracepoint.
     Define(DefineTracepoint<'a, U>),
-}
-
-#[cfg(feature = "alloc")]
-impl<'a, U: Copy> TracepointItem<'a, U> {
-    /// Allocate an owned copy of this structure.
-    pub fn get_owned<'b>(&self) -> TracepointItem<'b, U> {
-        match self {
-            TracepointItem::New(n) => TracepointItem::New(n.get_owned()),
-            TracepointItem::Define(d) => TracepointItem::Define(d.get_owned()),
-        }
-    }
 }
 
 /// The running state of a trace experiment.
@@ -314,92 +152,6 @@ pub enum ExperimentExplanation<'a> {
     Other(managed::Managed<'a, str>),
 }
 
-impl<'a> ExperimentStatus<'a> {
-    pub(crate) fn write<C: Connection>(
-        &self,
-        res: &mut ResponseWriter<'_, C>,
-    ) -> Result<(), ResponseWriterError<C::Error>> {
-        use ExperimentStatus::*;
-        if let Running = self {
-            return res.write_str("T1");
-        }
-        // We're stopped for some reason, and may have an explanation for why
-        res.write_str("T0")?;
-        match self {
-            Running => {
-                /* unreachable */
-                ()
-            }
-            NotRunning => {
-                /* no information */
-                ()
-            }
-            NotRun => res.write_str(";tnotrun:0")?,
-            Stop(ref t) => match t {
-                Some(text) => {
-                    res.write_str(";tstop:")?;
-                    res.write_hex_buf(text)?;
-                    res.write_str(":0")?;
-                }
-                None => res.write_str(";tstop:0")?,
-            },
-            Full => res.write_str(";tfull:0")?,
-            Disconnected => res.write_str(";tdisconnected:0")?,
-            PassCount(tpnum) => {
-                res.write_str(";tpasscount:")?;
-                res.write_num(tpnum.0)?;
-            }
-            Error(text, tpnum) => {
-                res.write_str(";terror:")?;
-                res.write_hex_buf(text)?;
-                res.write_str(":")?;
-                res.write_num(tpnum.0)?;
-            }
-            Unknown => res.write_str(";tunknown:0")?,
-        }
-
-        Ok(())
-    }
-}
-
-impl<'a> ExperimentExplanation<'a> {
-    pub(crate) fn write<C: Connection>(
-        &self,
-        res: &mut ResponseWriter<'_, C>,
-    ) -> Result<(), ResponseWriterError<C::Error>> {
-        use ExperimentExplanation::*;
-        match self {
-            Frames(u) => {
-                res.write_str("tframes:")?;
-                res.write_num(*u)?;
-            }
-            Created(u) => {
-                res.write_str("tcreated:")?;
-                res.write_num(*u)?;
-            }
-            Size(u) => {
-                res.write_str("tsize:")?;
-                res.write_num(*u)?;
-            }
-            Free(u) => {
-                res.write_str("tfree:")?;
-                res.write_num(*u)?;
-            }
-            Circular(u) => {
-                res.write_str("circular:")?;
-                res.write_num(if *u { 1 } else { 0 })?;
-            }
-            Disconn(dis) => match dis {
-                true => res.write_str("disconn:1")?,
-                false => res.write_str("disconn:0")?,
-            },
-            Other(body) => res.write_str(body.as_ref())?,
-        };
-
-        Ok(())
-    }
-}
-
 /// Shape of the trace buffer
 #[derive(Debug)]
 pub enum BufferShape {
@@ -436,22 +188,6 @@ pub enum FrameRequest<U> {
     /// Select a tracepoint frame that has a PC outside the range of addresses
     /// (exclusive).
     Outside(U, U),
-}
-
-impl<'a, U: crate::internal::BeBytes> From<FrameRequest<&'a mut [u8]>> for Option<FrameRequest<U>> {
-    fn from(s: FrameRequest<&'a mut [u8]>) -> Self {
-        Some(match s {
-            FrameRequest::Select(u) => FrameRequest::Select(u),
-            FrameRequest::AtPC(u) => FrameRequest::AtPC(U::from_be_bytes(u)?),
-            FrameRequest::Hit(tp) => FrameRequest::Hit(tp),
-            FrameRequest::Between(s, e) => {
-                FrameRequest::Between(U::from_be_bytes(s)?, U::from_be_bytes(e)?)
-            }
-            FrameRequest::Outside(s, e) => {
-                FrameRequest::Outside(U::from_be_bytes(s)?, U::from_be_bytes(e)?)
-            }
-        })
-    }
 }
 
 /// Describes a detail of a frame from the trace buffer

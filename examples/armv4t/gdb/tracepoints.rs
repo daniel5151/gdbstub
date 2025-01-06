@@ -37,14 +37,16 @@ impl target::ext::tracepoints::Tracepoints for Emu {
     fn tracepoint_define(&mut self, tp: DefineTracepoint<'_, u32>) -> TargetResult<(), Self> {
         let tp_copy = tp.get_owned();
         let mut valid = true;
-        tp.actions(|action| {
-            if let TracepointAction::Registers { mask: _ } = action {
-                // we only handle register collection actions for the simple
-                // case
-            } else {
-                valid = false;
-            }
-        });
+        let _more = tp
+            .actions(|action| {
+                if let TracepointAction::Registers { mask: _ } = action {
+                    // we only handle register collection actions for the simple
+                    // case
+                } else {
+                    valid = false;
+                }
+            })
+            .map_err(|_e| TargetError::Fatal("unable to parse actions"))?;
         if !valid {
             return Err(TargetError::NonFatal);
         }
