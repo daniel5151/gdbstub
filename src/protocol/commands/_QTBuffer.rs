@@ -1,8 +1,8 @@
 use super::prelude::*;
-use crate::target::ext::tracepoints::{BufferShape, TraceBuffer};
+use crate::target::ext::tracepoints::{BufferShape, TraceBufferConfig};
 
 #[derive(Debug)]
-pub struct QTBuffer(pub TraceBuffer);
+pub struct QTBuffer(pub TraceBufferConfig);
 
 impl ParseCommand<'_> for QTBuffer {
     #[inline(always)]
@@ -14,7 +14,7 @@ impl ParseCommand<'_> for QTBuffer {
                 match opt.as_ref() {
                     b"circular" => {
                         let shape = s.next()?;
-                        Some(QTBuffer(TraceBuffer::Shape(match shape {
+                        Some(QTBuffer(TraceBufferConfig::Shape(match shape {
                             [b'1'] => Some(BufferShape::Circular),
                             [b'0'] => Some(BufferShape::Linear),
                             _ => None,
@@ -22,7 +22,7 @@ impl ParseCommand<'_> for QTBuffer {
                     },
                     b"size" => {
                         let size = s.next()?;
-                        Some(QTBuffer(TraceBuffer::Size(match size {
+                        Some(QTBuffer(TraceBufferConfig::Size(match size {
                             [b'-', b'1'] => None,
                             i => Some(decode_hex(i).ok()?)
                         })))

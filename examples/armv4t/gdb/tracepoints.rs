@@ -6,7 +6,7 @@ use gdbstub::target::ext::tracepoints::ExperimentStatus;
 use gdbstub::target::ext::tracepoints::FrameDescription;
 use gdbstub::target::ext::tracepoints::FrameRequest;
 use gdbstub::target::ext::tracepoints::NewTracepoint;
-use gdbstub::target::ext::tracepoints::TraceBuffer;
+use gdbstub::target::ext::tracepoints::TraceBufferConfig;
 use gdbstub::target::ext::tracepoints::Tracepoint;
 use gdbstub::target::ext::tracepoints::TracepointAction;
 use gdbstub::target::ext::tracepoints::TracepointItem;
@@ -96,7 +96,7 @@ impl target::ext::tracepoints::Tracepoints for Emu {
         }
     }
 
-    fn trace_buffer_configure(&mut self, _tb: TraceBuffer) -> TargetResult<(), Self> {
+    fn trace_buffer_configure(&mut self, _config: TraceBufferConfig) -> TargetResult<(), Self> {
         // we don't collect a "real" trace buffer, so just ignore configuration
         // attempts.
         Ok(())

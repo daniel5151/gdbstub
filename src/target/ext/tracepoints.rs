@@ -411,7 +411,7 @@ pub enum BufferShape {
 
 /// Configuration for the trace buffer.
 #[derive(Debug)]
-pub enum TraceBuffer {
+pub enum TraceBufferConfig {
     /// Set the buffer's shape.
     Shape(BufferShape),
     /// Set the buffer's size in bytes. If None, the target should use whatever
@@ -502,7 +502,7 @@ pub trait Tracepoints: Target {
     ) -> TargetResult<Option<TracepointItem<'_, <Self::Arch as Arch>::Usize>>, Self>;
 
     /// Reconfigure the trace buffer to include or modify an attribute.
-    fn trace_buffer_configure(&mut self, tb: TraceBuffer) -> TargetResult<(), Self>;
+    fn trace_buffer_configure(&mut self, config: TraceBufferConfig) -> TargetResult<(), Self>;
 
     /// Return up to `len` bytes from the trace buffer, starting at `offset`.
     /// The trace buffer is treated as a contiguous collection of traceframes,
