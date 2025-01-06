@@ -344,7 +344,6 @@ commands! {
         "QTDP" => _QTDP::QTDP<'a>,
         "QTinit" => _QTinit::QTinit,
         "QTBuffer" => _QTBuffer::QTBuffer<'a>,
-        // TODO: QTNotes?
         "QTStart" => _QTStart::QTStart,
         "QTStop" => _QTStop::QTStop,
         "QTFrame" => _QTFrame::QTFrame<'a>,
@@ -353,6 +352,10 @@ commands! {
         "qTP" => _qTP::qTP<'a>,
         "qTfP" => _qTfP::qTfP,
         "qTsP" => _qTsP::qTsP,
+
+        // These are currently stubbed out to no-ops for tracepoints v1: they're
+        // needed to suppress "not implemented" errors.
+        // QTDV is unimplemented.
         "qTfV" => _qTfV::qTfV,
         "qTsV" => _qTsV::qTsV,
     }
