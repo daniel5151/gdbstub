@@ -70,7 +70,10 @@ impl<'a, U: BeBytes> DefineTracepoint<'a, U> {
         actions: &mut [u8],
         mut f: impl FnMut(&TracepointAction<'_, U>),
     ) -> Option<bool> {
-        let mut more = false;
+        let (actions, more) = match actions {
+            [rest @ .., b'-'] => (rest, true),
+            x => (x, false),
+        };
         let mut unparsed: Option<&mut [u8]> = Some(actions);
         loop {
             match unparsed {
@@ -91,7 +94,7 @@ impl<'a, U: BeBytes> DefineTracepoint<'a, U> {
                     let mask_end = mask
                         .iter()
                         .enumerate()
-                        .find(|(_i, b)| matches!(b, b'S' | b'R' | b'M' | b'X' | b'-'));
+                        .find(|(_i, b)| matches!(b, b'S' | b'R' | b'M' | b'X'));
                     // We may or may not have another action after our mask
                     let mask = if let Some(mask_end) = mask_end {
                         let (mask_bytes, next) = mask.split_at_mut(mask_end.0);
@@ -120,10 +123,6 @@ impl<'a, U: BeBytes> DefineTracepoint<'a, U> {
                         expr: ManagedSlice::Borrowed(expr),
                     });
                     unparsed = Some(next_bytes);
-                }
-                Some([b'-']) => {
-                    more = true;
-                    break;
                 }
                 Some([]) | None => {
                     break;
