@@ -79,8 +79,8 @@ impl<'a, U: BeBytes> DefineTracepoint<'a, U> {
     /// Parse the actions that should be added to the definition of this
     /// tracepoint, calling `f` on each action.
     ///
-    /// Returns None if parsing of actions failed, or hit unsupported actions.
-    /// Return `Some(more)` on success, where `more` is a bool indicating if
+    /// Returns `Err` if parsing of actions failed, or hit unsupported actions.
+    /// Return `Ok(more)` on success, where `more` is a bool indicating if
     /// there will be additional "tracepoint define" packets for this
     /// tracepoint.
     pub fn actions(
