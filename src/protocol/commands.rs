@@ -343,11 +343,12 @@ commands! {
     tracepoints use 'a {
         "QTDP" => _QTDP::QTDP<'a>,
         "QTinit" => _QTinit::QTinit,
-        "QTBuffer" => _QTBuffer::QTBuffer<'a>,
+        "QTBuffer" => _QTBuffer::QTBuffer,
         "QTStart" => _QTStart::QTStart,
         "QTStop" => _QTStop::QTStop,
         "QTFrame" => _QTFrame::QTFrame<'a>,
 
+        "qTBuffer" => _qTBuffer::qTBuffer<'a>,
         "qTStatus" => _qTStatus::qTStatus,
         "qTP" => _qTP::qTP<'a>,
         "qTfP" => _qTfP::qTfP,

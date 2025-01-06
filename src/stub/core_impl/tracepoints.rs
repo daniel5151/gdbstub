@@ -1,7 +1,7 @@
 use super::prelude::*;
 use crate::arch::Arch;
 use crate::internal::BeBytes;
-use crate::protocol::commands::_QTBuffer::QTBuffer;
+use crate::protocol::commands::_qTBuffer::qTBuffer;
 use crate::protocol::commands::ext::Tracepoints;
 use crate::protocol::commands::prelude::decode_hex;
 use crate::protocol::commands::prelude::decode_hex_buf;
@@ -162,7 +162,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 status.write(res)?;
                 let mut err = None;
                 ops.trace_experiment_info(&mut |explanation: ExperimentExplanation<'_>| {
-                    if let Err(e) = explanation.write(res) {
+                    if let Err(e) = res.write_str(";").and_then(|()| explanation.write(res)) {
                         err = Some(e)
                     }
                 })
@@ -205,27 +205,24 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 // TODO: support qRelocInsn?
                 return Ok(HandlerStatus::NeedsOk);
             }
-            Tracepoints::QTBuffer(buf) => {
-                match buf {
-                    QTBuffer::Request {
-                        offset,
-                        length,
-                        data,
-                    } => {
-                        let read = ops
-                            .trace_buffer_request(offset, length, data)
-                            .handle_error()?;
-                        if let Some(read) = read {
-                            let read = read.min(data.len());
-                            res.write_hex_buf(&data[..read])?;
-                        } else {
-                            res.write_str("l")?;
-                        }
-                    }
-                    QTBuffer::Configure { buffer } => {
-                        ops.trace_buffer_configure(buffer).handle_error()?;
-                    }
+            Tracepoints::qTBuffer(buf) => {
+                let qTBuffer {
+                    offset,
+                    length,
+                    data,
+                } = buf;
+                let read = ops
+                    .trace_buffer_request(offset, length, data)
+                    .handle_error()?;
+                if let Some(read) = read {
+                    let read = read.min(data.len());
+                    res.write_hex_buf(&data[..read])?;
+                } else {
+                    res.write_str("l")?;
                 }
+            }
+            Tracepoints::QTBuffer(conf) => {
+                ops.trace_buffer_configure(conf.0).handle_error()?;
                 // Documentation doesn't mention this, but it needs OK
                 return Ok(HandlerStatus::NeedsOk);
             }
