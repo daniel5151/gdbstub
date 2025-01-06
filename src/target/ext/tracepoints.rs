@@ -489,17 +489,20 @@ pub trait Tracepoints: Target {
 
     /// Begin enumerating tracepoints. The target implementation should
     /// initialize a state machine that is stepped by
-    /// [Tracepoints::tracepoint_enumerate_step], and returns TracepointItems
-    /// that correspond with the currently configured tracepoints.
+    /// [Tracepoints::tracepoint_enumerate_step], and call `f` with the first
+    /// [TracepointItem] that corresponds with the currently configured
+    /// tracepoints.
     fn tracepoint_enumerate_start(
         &mut self,
-    ) -> TargetResult<Option<TracepointItem<'_, <Self::Arch as Arch>::Usize>>, Self>;
+        f: &mut dyn FnMut(TracepointItem<'_, <Self::Arch as Arch>::Usize>),
+    ) -> TargetResult<(), Self>;
     /// Step the tracepoint enumeration state machine. The target implementation
-    /// should return TracepointItems that correspond with the currently
-    /// configured tracepoints.
+    /// should call `f` with the next TracepointItem that correspond with the
+    /// currently configured tracepoints.
     fn tracepoint_enumerate_step(
         &mut self,
-    ) -> TargetResult<Option<TracepointItem<'_, <Self::Arch as Arch>::Usize>>, Self>;
+        f: &mut dyn FnMut(TracepointItem<'_, <Self::Arch as Arch>::Usize>),
+    ) -> TargetResult<(), Self>;
 
     /// Reconfigure the trace buffer to include or modify an attribute.
     fn trace_buffer_configure(&mut self, config: TraceBufferConfig) -> TargetResult<(), Self>;

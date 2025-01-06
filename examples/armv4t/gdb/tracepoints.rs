@@ -73,7 +73,8 @@ impl target::ext::tracepoints::Tracepoints for Emu {
 
     fn tracepoint_enumerate_start(
         &mut self,
-    ) -> TargetResult<Option<TracepointItem<'_, u32>>, Self> {
+        f: &mut dyn FnMut(TracepointItem<'_, u32>),
+    ) -> TargetResult<(), Self> {
         let tracepoints: Vec<_> = self
             .tracepoints
             .iter()
@@ -81,19 +82,20 @@ impl target::ext::tracepoints::Tracepoints for Emu {
             .collect();
         self.tracepoint_enumerate_machine = (tracepoints, 0);
 
-        self.tracepoint_enumerate_step()
+        self.tracepoint_enumerate_step(f)
     }
 
     fn tracepoint_enumerate_step<'a>(
         &'a mut self,
-    ) -> TargetResult<Option<TracepointItem<'a, u32>>, Self> {
+        f: &mut dyn FnMut(TracepointItem<'_, u32>),
+    ) -> TargetResult<(), Self> {
         let (tracepoints, index) = &mut self.tracepoint_enumerate_machine;
         if let Some(item) = tracepoints.iter().nth(*index) {
             *index += 1;
-            Ok(Some(item.get_owned()))
-        } else {
-            Ok(None)
+            f(item.get_owned())
         }
+
+        Ok(())
     }
 
     fn trace_buffer_configure(&mut self, _config: TraceBufferConfig) -> TargetResult<(), Self> {
