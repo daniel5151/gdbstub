@@ -33,7 +33,7 @@ impl<'a> ParseCommand<'a> for QTDP<'a> {
         let body = buf.into_body();
         match body {
             [b':', b'-', actions @ ..] => {
-                let mut params = actions.splitn_mut(4, |b| matches!(*b, b':'));
+                let mut params = actions.splitn_mut(4, |b| *b == b':');
                 let number = Tracepoint(decode_hex(params.next()?).ok()?);
                 let addr = decode_hex_buf(params.next()?).ok()?;
                 let actions = params.next()?;
