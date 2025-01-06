@@ -12,6 +12,7 @@ use gdbstub::target::ext::breakpoints::WatchKind;
 use gdbstub::target::Target;
 use gdbstub::target::TargetError;
 use gdbstub::target::TargetResult;
+use maybe_async::maybe_async;
 
 pub fn cpuid_to_tid(id: CpuId) -> Tid {
     match id {
@@ -217,8 +218,9 @@ impl target::ext::breakpoints::Breakpoints for Emu {
     }
 }
 
+#[maybe_async]
 impl target::ext::breakpoints::SwBreakpoint for Emu {
-    fn add_sw_breakpoint(
+    async fn add_sw_breakpoint(
         &mut self,
         addr: u32,
         _kind: gdbstub_arch::arm::ArmBreakpointKind,
@@ -227,7 +229,7 @@ impl target::ext::breakpoints::SwBreakpoint for Emu {
         Ok(true)
     }
 
-    fn remove_sw_breakpoint(
+    async fn remove_sw_breakpoint(
         &mut self,
         addr: u32,
         _kind: gdbstub_arch::arm::ArmBreakpointKind,
@@ -241,8 +243,9 @@ impl target::ext::breakpoints::SwBreakpoint for Emu {
     }
 }
 
+#[maybe_async]
 impl target::ext::breakpoints::HwWatchpoint for Emu {
-    fn add_hw_watchpoint(
+    async fn add_hw_watchpoint(
         &mut self,
         addr: u32,
         _len: u32, // TODO: properly handle `len` parameter
@@ -260,7 +263,7 @@ impl target::ext::breakpoints::HwWatchpoint for Emu {
         Ok(true)
     }
 
-    fn remove_hw_watchpoint(
+    async fn remove_hw_watchpoint(
         &mut self,
         addr: u32,
         _len: u32, // TODO: properly handle `len` parameter

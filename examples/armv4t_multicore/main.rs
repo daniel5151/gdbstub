@@ -169,7 +169,13 @@ fn main() -> DynResult<()> {
 
     let gdb = GdbStub::new(connection);
 
-    match gdb.run_blocking::<EmuGdbEventLoop>(&mut emu) {
+    #[cfg(feature = "sync")]
+    let run = gdb.run_blocking::<EmuGdbEventLoop>(&mut emu);
+    #[cfg(not(feature = "sync"))]
+    let run = tokio::runtime::Runtime::new()
+        .unwrap()
+        .block_on(gdb.run_blocking::<EmuGdbEventLoop>(&mut emu));
+    match run {
         Ok(disconnect_reason) => match disconnect_reason {
             DisconnectReason::Disconnect => {
                 println!("GDB client has disconnected. Running to completion...");

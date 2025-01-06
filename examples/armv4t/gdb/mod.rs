@@ -11,6 +11,7 @@ use gdbstub::target::Target;
 use gdbstub::target::TargetError;
 use gdbstub::target::TargetResult;
 use gdbstub_arch::arm::reg::id::ArmCoreRegId;
+use maybe_async::maybe_async;
 
 // Additional GDB extensions
 
@@ -231,8 +232,9 @@ impl SingleThreadBase for Emu {
     }
 }
 
+#[maybe_async]
 impl SingleThreadResume for Emu {
-    fn resume(&mut self, signal: Option<Signal>) -> Result<(), Self::Error> {
+    async fn resume(&mut self, signal: Option<Signal>) -> Result<(), Self::Error> {
         // Upon returning from the `resume` method, the target being debugged should be
         // configured to run according to whatever resume actions the GDB client has
         // specified (as specified by `set_resume_action`, `resume_range_step`,
