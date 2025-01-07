@@ -16,11 +16,8 @@ impl<'a> ParseCommand<'a> for qTP<'a> {
                 let mut s = body.split_mut(|b| *b == b':');
                 let tracepoint = Tracepoint(decode_hex(s.next()?).ok()?);
                 let addr = decode_hex_buf(s.next()?).ok()?;
-                Some(qTP {
-                    tracepoint,
-                    addr
-                })
-            },
+                Some(qTP { tracepoint, addr })
+            }
             _ => None,
         }
     }

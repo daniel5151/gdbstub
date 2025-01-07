@@ -4,7 +4,7 @@ use super::prelude::*;
 pub struct qTBuffer<'a> {
     pub offset: u64,
     pub length: usize,
-    pub data: &'a mut [u8]
+    pub data: &'a mut [u8],
 }
 
 impl<'a> ParseCommand<'a> for qTBuffer<'a> {
@@ -22,9 +22,13 @@ impl<'a> ParseCommand<'a> for qTBuffer<'a> {
                 // our packet size, which means we actually have half as much space
                 // as our slice would indicate.
                 let (front, _back) = buf.split_at_mut(buf.len() / 2);
-                Some(qTBuffer { offset, length, data: front })
-            },
-            _ => None
+                Some(qTBuffer {
+                    offset,
+                    length,
+                    data: front,
+                })
+            }
+            _ => None,
         }
     }
 }
