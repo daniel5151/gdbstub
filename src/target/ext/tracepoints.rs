@@ -237,7 +237,7 @@ pub trait Tracepoints: Target {
     ) -> TargetResult<(), Self>;
     /// Request the status of tracepoint `tp` at address `addr`.
     ///
-    /// Returns `(number of tracepoint hits, number of bytes used for frames)`.
+    /// Returns a [TracepointStatus] with the requested information.
     fn tracepoint_status(
         &self,
         tp: Tracepoint,
