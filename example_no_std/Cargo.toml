@@ -5,7 +5,7 @@ authors = ["Daniel Prilik <danielprilik@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-gdbstub = { path = "../", default-features = false }
+gdbstub = { path = "../", default-features = false, features = ["sync"] }
 gdbstub_arch = { path = "../gdbstub_arch", default-features = false }
 
 libc = { version = "0.2", default-features = false }
