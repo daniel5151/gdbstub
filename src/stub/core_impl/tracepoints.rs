@@ -19,6 +19,7 @@ use crate::target::ext::tracepoints::NewTracepoint;
 use crate::target::ext::tracepoints::TracepointAction;
 use crate::target::ext::tracepoints::TracepointActionList;
 use crate::target::ext::tracepoints::TracepointItem;
+use crate::target::ext::tracepoints::TracepointStatus;
 use managed::ManagedSlice;
 use num_traits::PrimInt;
 
@@ -449,11 +450,14 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             Tracepoints::qTP(qtp) => {
                 let addr = <T::Arch as Arch>::Usize::from_be_bytes(qtp.addr)
                     .ok_or(Error::TargetMismatch)?;
-                let (hits, usage) = ops.tracepoint_status(qtp.tracepoint, addr).handle_error()?;
+                let TracepointStatus {
+                    hit_count,
+                    bytes_used,
+                } = ops.tracepoint_status(qtp.tracepoint, addr).handle_error()?;
                 res.write_str("V")?;
-                res.write_num(hits)?;
+                res.write_num(hit_count)?;
                 res.write_str(":")?;
-                res.write_num(usage)?;
+                res.write_num(bytes_used)?;
             }
             Tracepoints::QTDP(q) => {
                 match q {
