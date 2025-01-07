@@ -25,7 +25,7 @@ use num_traits::PrimInt;
 
 impl<U: BeBytes> NewTracepoint<U> {
     /// Parse from a raw CreateTDP packet.
-    pub fn from_tdp(ctdp: CreateTDP<'_>) -> Option<Self> {
+    fn from_tdp(ctdp: CreateTDP<'_>) -> Option<Self> {
         Some(Self {
             number: ctdp.number,
             addr: U::from_be_bytes(ctdp.addr)?,
@@ -67,7 +67,7 @@ impl<U: crate::internal::BeBytes + num_traits::Zero + PrimInt> NewTracepoint<U> 
 
 impl<'a, U: BeBytes> DefineTracepoint<'a, U> {
     /// Parse from a raw DefineTDP packet.
-    pub fn from_tdp(dtdp: DefineTDP<'a>) -> Option<Self> {
+    fn from_tdp(dtdp: DefineTDP<'a>) -> Option<Self> {
         Some(Self {
             number: dtdp.number,
             addr: U::from_be_bytes(dtdp.addr)?,
