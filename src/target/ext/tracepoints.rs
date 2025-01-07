@@ -38,17 +38,18 @@ pub struct NewTracepoint<U> {
 pub enum TracepointAction<'a, U> {
     /// Collect registers.
     Registers {
-        /// A bitmask of which registers should be collected. The least significant
-        /// bit is numberered zero. Note that the mask may be larger than the word length.
-        mask: ManagedSlice<'a, u8>
+        /// A bitmask of which registers should be collected. The least
+        /// significant bit is numberered zero. Note that the mask may
+        /// be larger than the word length.
+        mask: ManagedSlice<'a, u8>,
     },
-    /// Collect memory.`len` bytes of memory starting at the address in register number
-    /// `basereg`, plus `offset`. If `basereg` is None, then treat it as a fixed
-    /// address.
+    /// Collect memory.`len` bytes of memory starting at the address in register
+    /// number `basereg`, plus `offset`. If `basereg` is None, then treat it
+    /// as a fixed address.
     Memory {
-        /// If `Some`, then calculate the address of memory to collect relative to
-        /// the value of this register number. If `None` then memory should be
-        /// collected from a fixed address.
+        /// If `Some`, then calculate the address of memory to collect relative
+        /// to the value of this register number. If `None` then memory
+        /// should be collected from a fixed address.
         basereg: Option<u64>,
         /// The offset used to calculate the address to collect memory from.
         offset: U,
@@ -58,7 +59,7 @@ pub enum TracepointAction<'a, U> {
     /// Collect data according to an agent bytecode program.
     Expression {
         /// The GDB agent bytecode program to evaluate.
-        expr: ManagedSlice<'a, u8>
+        expr: ManagedSlice<'a, u8>,
     },
 }
 
@@ -68,7 +69,7 @@ pub enum TracepointActionList<'a, U> {
     /// Raw and unparsed actions, such as from GDB.
     Raw {
         /// The unparsed action data.
-        data: ManagedSlice<'a, u8>
+        data: ManagedSlice<'a, u8>,
     },
     /// A slice of parsed actions, such as what may be returned by a target when
     /// enumerating tracepoints.
@@ -210,6 +211,15 @@ pub enum FrameDescription {
     Hit(Tracepoint),
 }
 
+/// The state of a tracepoint.
+#[derive(Debug)]
+pub struct TracepointStatus {
+    /// The number of times a tracepoint has been hit in a trace run.
+    pub hit_count: u64,
+    /// The number of bytes the tracepoint accounts for in the trace buffer.
+    pub bytes_used: u64,
+}
+
 /// Target Extension - Provide tracepoints.
 pub trait Tracepoints: Target {
     /// Clear any saved tracepoints and empty the trace frame buffer
@@ -232,7 +242,7 @@ pub trait Tracepoints: Target {
         &self,
         tp: Tracepoint,
         addr: <Self::Arch as Arch>::Usize,
-    ) -> TargetResult<(u64, u64), Self>;
+    ) -> TargetResult<TracepointStatus, Self>;
 
     /// Begin enumerating tracepoints. The target implementation should
     /// initialize a state machine that is stepped by
