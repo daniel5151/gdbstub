@@ -1,5 +1,6 @@
 use super::prelude::*;
-use crate::target::ext::tracepoints::{Tracepoint, FrameRequest};
+use crate::target::ext::tracepoints::FrameRequest;
+use crate::target::ext::tracepoints::Tracepoint;
 
 #[derive(Debug)]
 pub struct QTFrame<'a>(pub FrameRequest<&'a mut [u8]>);
@@ -16,26 +17,24 @@ impl<'a> ParseCommand<'a> for QTFrame<'a> {
                     b"pc" => {
                         let addr = decode_hex_buf(s.next()?).ok()?;
                         QTFrame(FrameRequest::AtPC(addr))
-                    },
+                    }
                     b"tdp" => {
                         let tp = Tracepoint(decode_hex(s.next()?).ok()?);
                         QTFrame(FrameRequest::Hit(tp))
-                    },
+                    }
                     b"range" => {
                         let start = decode_hex_buf(s.next()?).ok()?;
                         let end = decode_hex_buf(s.next()?).ok()?;
                         QTFrame(FrameRequest::Between(start, end))
-                    },
+                    }
                     b"outside" => {
                         let start = decode_hex_buf(s.next()?).ok()?;
                         let end = decode_hex_buf(s.next()?).ok()?;
                         QTFrame(FrameRequest::Outside(start, end))
-                    },
-                    n => {
-                        QTFrame(FrameRequest::Select(decode_hex(n).ok()?))
-                    },
+                    }
+                    n => QTFrame(FrameRequest::Select(decode_hex(n).ok()?)),
                 })
-            },
+            }
             _ => None,
         }
     }

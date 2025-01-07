@@ -1,5 +1,6 @@
 use super::prelude::*;
-use crate::target::ext::tracepoints::{BufferShape, TraceBufferConfig};
+use crate::target::ext::tracepoints::BufferShape;
+use crate::target::ext::tracepoints::TraceBufferConfig;
 
 #[derive(Debug)]
 pub struct QTBuffer(pub TraceBufferConfig);
@@ -19,18 +20,17 @@ impl ParseCommand<'_> for QTBuffer {
                             [b'0'] => Some(BufferShape::Linear),
                             _ => None,
                         }?)))
-                    },
+                    }
                     b"size" => {
                         let size = s.next()?;
                         Some(QTBuffer(TraceBufferConfig::Size(match size {
                             [b'-', b'1'] => None,
-                            i => Some(decode_hex(i).ok()?)
+                            i => Some(decode_hex(i).ok()?),
                         })))
-                    },
+                    }
                     _ => None,
                 }
-
-            },
+            }
             _ => None,
         }
     }

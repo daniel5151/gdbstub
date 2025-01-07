@@ -41,15 +41,15 @@ impl<'a> ParseCommand<'a> for QTDP<'a> {
                     number,
                     addr,
                     while_stepping: false,
-                    actions
+                    actions,
                 }))
-            },
+            }
             [b':', tracepoint @ ..] => {
                 // Strip off the trailing '-' that indicates if there will be
                 // more packets after this
                 let (tracepoint, more) = match tracepoint {
                     [rest @ .., b'-'] => (rest, true),
-                    x => (x, false)
+                    x => (x, false),
                 };
                 let mut params = tracepoint.splitn_mut(6, |b| *b == b':');
                 let n = Tracepoint(decode_hex(params.next()?).ok()?);
@@ -64,7 +64,11 @@ impl<'a> ParseCommand<'a> for QTDP<'a> {
                 return Some(QTDP::Create(CreateTDP {
                     number: n,
                     addr,
-                    enable: match ena { [b'E'] => Some(true), [b'D'] => Some(false), _ => None }?,
+                    enable: match ena {
+                        [b'E'] => Some(true),
+                        [b'D'] => Some(false),
+                        _ => None,
+                    }?,
                     step,
                     pass,
                     more,
@@ -72,8 +76,8 @@ impl<'a> ParseCommand<'a> for QTDP<'a> {
                     // TODO: populate tracepoint conditions
                     fast: None,
                     condition: None,
-                }))
-            },
+                }));
+            }
             _ => None,
         }
     }
