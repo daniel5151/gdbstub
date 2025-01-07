@@ -1,14 +1,14 @@
 use super::prelude::*;
 
 #[derive(Debug)]
-pub struct QTinit {}
+pub struct QTinit;
 
 impl<'a> ParseCommand<'a> for QTinit {
+    #[inline(always)]
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
         if !buf.into_body().is_empty() {
-            None
-        } else {
-            Some(Self {})
+            return None;
         }
+        Some(QTinit)
     }
 }
