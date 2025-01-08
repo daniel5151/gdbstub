@@ -37,14 +37,6 @@ impl<U: BeBytes> NewTracepoint<U> {
     }
 }
 
-#[cfg(feature = "alloc")]
-impl<U: Copy> NewTracepoint<U> {
-    /// Allocate an owned copy of this structure.
-    pub fn get_owned(&self) -> NewTracepoint<U> {
-        self.clone()
-    }
-}
-
 impl<U: crate::internal::BeBytes + num_traits::Zero + PrimInt> NewTracepoint<U> {
     pub(crate) fn write<T: Target, C: Connection>(
         &self,
@@ -237,7 +229,7 @@ impl<'a, U: Copy> TracepointItem<'a, U> {
     /// Allocate an owned copy of this structure.
     pub fn get_owned<'b>(&self) -> TracepointItem<'b, U> {
         match self {
-            TracepointItem::New(n) => TracepointItem::New(n.get_owned()),
+            TracepointItem::New(n) => TracepointItem::New(n.clone()),
             TracepointItem::Define(d) => TracepointItem::Define(d.get_owned()),
         }
     }
