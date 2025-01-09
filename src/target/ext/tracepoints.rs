@@ -92,7 +92,7 @@ pub struct DefineTracepoint<'a, U> {
     /// The PC address of the tracepoint that is being defined.
     pub addr: U,
     /// A list of actions that should be appended to the tracepoint.
-    pub actions: TracepointActionList<'a, U>,
+    pub(crate) actions: TracepointActionList<'a, U>,
 }
 
 /// An item from a stream of tracepoint descriptions. Enumerating tracepoints
@@ -161,7 +161,7 @@ pub enum ExperimentExplanation<'a> {
     Disconn(bool),
 
     /// Report a raw string as a trace status explanation.
-    Other(managed::Managed<'a, str>),
+    Other(&'a str),
 }
 
 /// Shape of the trace buffer
