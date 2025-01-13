@@ -37,7 +37,7 @@ define_ext!(BreakpointsOps, Breakpoints);
 /// using an _interpreted_ CPU (as opposed to a JIT), the simplest way to
 /// implement "software" breakpoints would be to check the `PC` value after each
 /// CPU cycle, ignoring the specified breakpoint `kind` entirely.
-#[maybe_async]
+#[maybe_async(AFIT)]
 pub trait SwBreakpoint: Target + Breakpoints {
     /// Add a new software breakpoint.
     ///
@@ -69,7 +69,7 @@ define_ext!(SwBreakpointOps, SwBreakpoint);
 /// using an _interpreted_ CPU (as opposed to a JIT), there shouldn't be any
 /// reason to implement this extension (as software breakpoints are likely to be
 /// just-as-fast).
-#[maybe_async]
+#[maybe_async(AFIT)]
 pub trait HwBreakpoint: Target + Breakpoints {
     /// Add a new hardware breakpoint.
     ///
@@ -112,7 +112,7 @@ pub enum WatchKind {
 /// _software watchpoints_, which tend to be excruciatingly slow (as hey are
 /// implemented by single-stepping the system, and reading the watched memory
 /// location after each step).
-#[maybe_async]
+#[maybe_async(AFIT)]
 pub trait HwWatchpoint: Target + Breakpoints {
     /// Add a new hardware watchpoint.
     /// The number of bytes to watch is specified by `len`.

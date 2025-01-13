@@ -9,7 +9,7 @@ enum CmdKind {
     Remove,
 }
 
-#[maybe_async]
+#[maybe_async(AFIT)]
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     #[inline(always)]
     async fn handle_breakpoint_common(

@@ -114,7 +114,7 @@ pub enum HandlerStatus {
     Disconnect(DisconnectReason),
 }
 
-#[maybe_async]
+#[maybe_async(AFIT)]
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     pub fn new() -> GdbStubImpl<T, C> {
         GdbStubImpl {

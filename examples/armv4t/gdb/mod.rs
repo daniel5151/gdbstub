@@ -232,7 +232,7 @@ impl SingleThreadBase for Emu {
     }
 }
 
-#[maybe_async]
+#[maybe_async(AFIT)]
 impl SingleThreadResume for Emu {
     async fn resume(&mut self, signal: Option<Signal>) -> Result<(), Self::Error> {
         // Upon returning from the `resume` method, the target being debugged should be

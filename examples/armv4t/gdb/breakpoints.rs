@@ -9,7 +9,8 @@ impl target::ext::breakpoints::Breakpoints for Emu {
     fn support_sw_breakpoint(
         &mut self,
     ) -> Option<target::ext::breakpoints::SwBreakpointOps<'_, Self>> {
-        Some(self)
+        // Some(self)
+        None
     }
 
     #[inline(always)]
@@ -20,7 +21,7 @@ impl target::ext::breakpoints::Breakpoints for Emu {
     }
 }
 
-#[maybe_async]
+#[maybe_async(AFIT)]
 impl target::ext::breakpoints::SwBreakpoint for Emu {
     async fn add_sw_breakpoint(
         &mut self,
@@ -45,7 +46,7 @@ impl target::ext::breakpoints::SwBreakpoint for Emu {
     }
 }
 
-#[maybe_async]
+#[maybe_async(AFIT)]
 impl target::ext::breakpoints::HwWatchpoint for Emu {
     async fn add_hw_watchpoint(
         &mut self,

@@ -15,7 +15,7 @@ use crate::target::ext::catch_syscalls::CatchSyscallPosition;
 use maybe_async::maybe_async;
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
-    #[maybe_async]
+    #[maybe_async(AFIT)]
     pub(crate) async fn handle_stop_resume(
         &mut self,
         res: &mut ResponseWriter<'_, C>,
@@ -83,7 +83,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         self.do_vcont(ops, actions).await
     }
 
-    #[maybe_async]
+    #[maybe_async(AFIT)]
     async fn do_vcont_single_thread(
         ops: &mut dyn crate::target::ext::base::singlethread::SingleThreadResume<
             Arch = T::Arch,
@@ -258,7 +258,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         ops.resume().map_err(Error::TargetError)
     }
 
-    #[maybe_async]
+    #[maybe_async(AFIT)]
     async fn do_vcont(
         &mut self,
         ops: ResumeOps<'_, T::Arch, T::Error>,

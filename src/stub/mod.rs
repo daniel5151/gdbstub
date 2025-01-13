@@ -155,7 +155,7 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
     /// etc...) you will need to interface with the underlying
     /// [`GdbStubStateMachine`](state_machine::GdbStubStateMachine) API
     /// directly.
-    #[maybe_async]
+    #[maybe_async(AFIT)]
     pub async fn run_blocking<E>(
         self,
         target: &mut T,

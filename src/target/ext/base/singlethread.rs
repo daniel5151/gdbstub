@@ -72,7 +72,7 @@ pub trait SingleThreadBase: Target {
 }
 
 /// Target extension - support for resuming single threaded targets.
-#[maybe_async]
+#[maybe_async(AFIT)]
 pub trait SingleThreadResume: Target {
     /// Resume execution on the target.
     ///
