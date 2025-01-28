@@ -6,9 +6,12 @@ use gdbstub::target::ext::tracepoints::ExperimentStatus;
 use gdbstub::target::ext::tracepoints::FrameDescription;
 use gdbstub::target::ext::tracepoints::FrameRequest;
 use gdbstub::target::ext::tracepoints::NewTracepoint;
+use gdbstub::target::ext::tracepoints::SourceTracepoint;
 use gdbstub::target::ext::tracepoints::TraceBufferConfig;
 use gdbstub::target::ext::tracepoints::Tracepoint;
 use gdbstub::target::ext::tracepoints::TracepointAction;
+use gdbstub::target::ext::tracepoints::TracepointEnumerateState;
+use gdbstub::target::ext::tracepoints::TracepointEnumerateStep;
 use gdbstub::target::ext::tracepoints::TracepointItem;
 use gdbstub::target::ext::tracepoints::TracepointStatus;
 use gdbstub::target::TargetError;
@@ -22,6 +25,22 @@ pub struct TraceFrame {
     pub snapshot: Cpu,
 }
 
+impl Emu {
+    fn step_to_next_tracepoint(&self, tp: Tracepoint) -> TracepointEnumerateStep {
+        let (tp_pos, _) = self
+            .tracepoints
+            .keys()
+            .enumerate()
+            .find(|(_i, k)| **k == tp)
+            .unwrap();
+        match self.tracepoints.keys().nth(tp_pos + 1) {
+            // No more tracepoints
+            None => TracepointEnumerateStep::Done,
+            Some(next_tp) => TracepointEnumerateStep::Next(*next_tp),
+        }
+    }
+}
+
 impl target::ext::tracepoints::Tracepoints for Emu {
     fn tracepoints_init(&mut self) -> TargetResult<(), Self> {
         self.tracepoints.clear();
@@ -30,8 +49,7 @@ impl target::ext::tracepoints::Tracepoints for Emu {
     }
 
     fn tracepoint_create(&mut self, tp: NewTracepoint<u32>) -> TargetResult<(), Self> {
-        self.tracepoints
-            .insert(tp.number, vec![TracepointItem::New(tp)]);
+        self.tracepoints.insert(tp.number, (tp, vec![], vec![]));
         Ok(())
     }
 
@@ -53,11 +71,23 @@ impl target::ext::tracepoints::Tracepoints for Emu {
         }
         self.tracepoints
             .get_mut(&tp_copy.number)
-            .map(move |existing| {
-                existing.push(TracepointItem::Define(tp_copy));
+            .map(move |(_ctp, _source, actions)| {
+                actions.push(tp_copy);
                 ()
             })
             .ok_or_else(move || TargetError::Fatal("define on non-existing tracepoint"))
+    }
+
+    fn tracepoint_attach_source(
+        &mut self,
+        src: SourceTracepoint<'_, u32>,
+    ) -> TargetResult<(), Self> {
+        self.tracepoints
+            .get_mut(&src.number)
+            .unwrap()
+            .1
+            .push(src.get_owned());
+        Ok(())
     }
 
     fn tracepoint_status(
@@ -79,31 +109,82 @@ impl target::ext::tracepoints::Tracepoints for Emu {
         })
     }
 
-    fn tracepoint_enumerate_start(
-        &mut self,
-        f: &mut dyn FnMut(TracepointItem<'_, u32>),
-    ) -> TargetResult<(), Self> {
-        let tracepoints: Vec<_> = self
-            .tracepoints
-            .iter()
-            .flat_map(|(_key, value)| value.iter().map(|item| item.get_owned()))
-            .collect();
-        self.tracepoint_enumerate_machine = (tracepoints, 0);
-
-        self.tracepoint_enumerate_step(f)
+    fn tracepoint_enumerate_state(&mut self) -> &mut TracepointEnumerateState {
+        &mut self.tracepoint_enumerate_state
     }
 
-    fn tracepoint_enumerate_step<'a>(
-        &'a mut self,
-        f: &mut dyn FnMut(TracepointItem<'_, u32>),
-    ) -> TargetResult<(), Self> {
-        let (tracepoints, index) = &mut self.tracepoint_enumerate_machine;
-        if let Some(item) = tracepoints.iter().nth(*index) {
-            *index += 1;
-            f(item.get_owned())
-        }
+    fn tracepoint_enumerate_start(
+        &mut self,
+        tp: Option<Tracepoint>,
+        f: &mut dyn FnMut(NewTracepoint<u32>),
+    ) -> TargetResult<TracepointEnumerateStep, Self> {
+        let tp = match tp {
+            Some(tp) => tp,
+            None => {
+                // We have no tracepoints to report
+                if self.tracepoints.len() == 0 {
+                    return Ok(TracepointEnumerateStep::Done);
+                } else {
+                    // Start enumerating at the first one
+                    *self.tracepoints.keys().next().unwrap()
+                }
+            }
+        };
 
-        Ok(())
+        // Report our tracepoint
+        (f)(self.tracepoints[&tp].0.clone());
+
+        match self.tracepoints[&tp].2.get(0) {
+            // We have actions and GDB should step through them
+            Some(next) => Ok(TracepointEnumerateStep::Action),
+            // No actions attached to this tracepoint
+            None => {
+                match self.tracepoints[&tp].1.get(0) {
+                    // We have sources and GDB should step through them
+                    Some(_) => Ok(TracepointEnumerateStep::Source),
+                    // No sources either, we're done
+                    None => Ok(TracepointEnumerateStep::Done),
+                }
+            }
+        }
+    }
+
+    fn tracepoint_enumerate_action(
+        &mut self,
+        tp: Tracepoint,
+        step: u64,
+        f: &mut dyn FnMut(DefineTracepoint<'_, u32>),
+    ) -> TargetResult<TracepointEnumerateStep, Self> {
+        // Report our next action
+        (f)(self.tracepoints[&tp].2[step as usize].get_owned());
+
+        match self.tracepoints[&tp].2.get((step as usize) + 1) {
+            // Continue stepping
+            Some(_) => Ok(TracepointEnumerateStep::Action),
+            // We're done with this tracepoint, try to report source
+            None => match self.tracepoints[&tp].1.get(0) {
+                Some(_) => Ok(TracepointEnumerateStep::Source),
+                // No source, move to the next tracepoint
+                None => Ok(self.step_to_next_tracepoint(tp)),
+            },
+        }
+    }
+
+    fn tracepoint_enumerate_source(
+        &mut self,
+        tp: Tracepoint,
+        step: u64,
+        f: &mut dyn FnMut(SourceTracepoint<'_, u32>),
+    ) -> TargetResult<TracepointEnumerateStep, Self> {
+        // Report our next source item
+        (f)(self.tracepoints[&tp].1[step as usize].get_owned());
+
+        match self.tracepoints[&tp].1.get((step as usize) + 1) {
+            // Continue stepping
+            Some(_) => Ok(TracepointEnumerateStep::Source),
+            // Move to next tracepoint
+            None => Ok(self.step_to_next_tracepoint(tp)),
+        }
     }
 
     fn trace_buffer_configure(&mut self, _config: TraceBufferConfig) -> TargetResult<(), Self> {

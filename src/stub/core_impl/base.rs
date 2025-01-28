@@ -187,9 +187,11 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     // For now, gdbstub doesn't provide trait extensions for these
                     // options and so we don't report support. We do report support
                     // for one extension however:
-                    // * `QTBuffer:size` for configuring the trace buffer size, since
-                    //   the target is allowed to implement it as a no-op.
+                    // * `QTBuffer:size` for configuring the trace buffer size, since the target is
+                    //   allowed to implement it as a no-op.
                     res.write_str(";QTBuffer:size+")?;
+                    // TODO: gate this behind a support method
+                    res.write_str(";TracepointSource+")?;
                 }
 
                 if target.support_catch_syscalls().is_some() {

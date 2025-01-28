@@ -95,6 +95,23 @@ pub struct DefineTracepoint<'a, U> {
     pub(crate) actions: TracepointActionList<'a, U>,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum TracepointSourceType {
+    At,
+    Cond,
+    Cmd,
+}
+
+#[derive(Debug)]
+pub struct SourceTracepoint<'a, U> {
+    pub number: Tracepoint,
+    pub addr: U,
+    pub r#type: TracepointSourceType,
+    pub start: u32,
+    pub slen: u32,
+    pub bytes: ManagedSlice<'a, u8>,
+}
+
 /// An item from a stream of tracepoint descriptions. Enumerating tracepoints
 /// should emit a sequence of Create and Define items for all the tracepoints
 /// that are loaded.
@@ -220,6 +237,26 @@ pub struct TracepointStatus {
     pub bytes_used: u64,
 }
 
+#[derive(Debug)]
+pub(crate) enum TracepointEnumerateCursor {
+    New(Tracepoint),
+    Action(Tracepoint, u64),
+    Source(Tracepoint, u64),
+}
+
+#[derive(Debug, Default)]
+pub struct TracepointEnumerateState {
+    pub(crate) cursor: Option<TracepointEnumerateCursor>,
+}
+
+#[derive(Debug)]
+pub enum TracepointEnumerateStep {
+    Action,
+    Source,
+    Next(Tracepoint),
+    Done,
+}
+
 /// Target Extension - Provide tracepoints.
 pub trait Tracepoints: Target {
     /// Clear any saved tracepoints and empty the trace frame buffer
@@ -235,6 +272,10 @@ pub trait Tracepoints: Target {
         &mut self,
         dtdp: DefineTracepoint<'_, <Self::Arch as Arch>::Usize>,
     ) -> TargetResult<(), Self>;
+    fn tracepoint_attach_source(
+        &mut self,
+        src: SourceTracepoint<'_, <Self::Arch as Arch>::Usize>,
+    ) -> TargetResult<(), Self>;
     /// Request the status of tracepoint `tp` at address `addr`.
     ///
     /// Returns a [TracepointStatus] with the requested information.
@@ -244,6 +285,8 @@ pub trait Tracepoints: Target {
         addr: <Self::Arch as Arch>::Usize,
     ) -> TargetResult<TracepointStatus, Self>;
 
+    fn tracepoint_enumerate_state(&mut self) -> &mut TracepointEnumerateState;
+
     /// Begin enumerating tracepoints. The target implementation should
     /// initialize a state machine that is stepped by
     /// [Tracepoints::tracepoint_enumerate_step], and call `f` with the first
@@ -251,15 +294,24 @@ pub trait Tracepoints: Target {
     /// tracepoints.
     fn tracepoint_enumerate_start(
         &mut self,
-        f: &mut dyn FnMut(TracepointItem<'_, <Self::Arch as Arch>::Usize>),
-    ) -> TargetResult<(), Self>;
+        tp: Option<Tracepoint>,
+        f: &mut dyn FnMut(NewTracepoint<<Self::Arch as Arch>::Usize>),
+    ) -> TargetResult<TracepointEnumerateStep, Self>;
     /// Step the tracepoint enumeration state machine. The target implementation
     /// should call `f` with the next TracepointItem that correspond with the
     /// currently configured tracepoints.
-    fn tracepoint_enumerate_step(
+    fn tracepoint_enumerate_action(
         &mut self,
-        f: &mut dyn FnMut(TracepointItem<'_, <Self::Arch as Arch>::Usize>),
-    ) -> TargetResult<(), Self>;
+        tp: Tracepoint,
+        step: u64,
+        f: &mut dyn FnMut(DefineTracepoint<'_, <Self::Arch as Arch>::Usize>),
+    ) -> TargetResult<TracepointEnumerateStep, Self>;
+    fn tracepoint_enumerate_source(
+        &mut self,
+        tp: Tracepoint,
+        step: u64,
+        f: &mut dyn FnMut(SourceTracepoint<'_, <Self::Arch as Arch>::Usize>),
+    ) -> TargetResult<TracepointEnumerateStep, Self>;
 
     /// Reconfigure the trace buffer to include or modify an attribute.
     fn trace_buffer_configure(&mut self, config: TraceBufferConfig) -> TargetResult<(), Self>;
