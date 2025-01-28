@@ -338,6 +338,7 @@ commands! {
     }
 
     tracepoints use 'a {
+        "QTDPsrc" => _QTDPsrc::QTDPsrc<'a>,
         "QTDP" => _QTDP::QTDP<'a>,
         "QTinit" => _QTinit::QTinit,
         "QTBuffer" => _QTBuffer::QTBuffer,

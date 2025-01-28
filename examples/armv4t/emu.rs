@@ -8,7 +8,11 @@ use armv4t_emu::ExampleMem;
 use armv4t_emu::Memory;
 use armv4t_emu::Mode;
 use gdbstub::common::Pid;
+use gdbstub::target::ext::tracepoints::DefineTracepoint;
+use gdbstub::target::ext::tracepoints::NewTracepoint;
+use gdbstub::target::ext::tracepoints::SourceTracepoint;
 use gdbstub::target::ext::tracepoints::Tracepoint;
+use gdbstub::target::ext::tracepoints::TracepointEnumerateState;
 use gdbstub::target::ext::tracepoints::TracepointItem;
 use std::collections::HashMap;
 
@@ -45,9 +49,16 @@ pub struct Emu {
     pub(crate) breakpoints: Vec<u32>,
     pub(crate) files: Vec<Option<std::fs::File>>,
 
-    pub(crate) tracepoints: HashMap<Tracepoint, Vec<TracepointItem<'static, u32>>>,
+    pub(crate) tracepoints: HashMap<
+        Tracepoint,
+        (
+            NewTracepoint<u32>,
+            Vec<SourceTracepoint<'static, u32>>,
+            Vec<DefineTracepoint<'static, u32>>,
+        ),
+    >,
     pub(crate) traceframes: Vec<TraceFrame>,
-    pub(crate) tracepoint_enumerate_machine: (Vec<TracepointItem<'static, u32>>, usize),
+    pub(crate) tracepoint_enumerate_state: TracepointEnumerateState,
     pub(crate) tracing: bool,
     pub(crate) selected_frame: Option<usize>,
 
@@ -105,7 +116,7 @@ impl Emu {
 
             tracepoints: HashMap::new(),
             traceframes: Vec::new(),
-            tracepoint_enumerate_machine: (Vec::new(), 0),
+            tracepoint_enumerate_state: Default::default(),
             tracing: false,
             selected_frame: None,
 
@@ -127,13 +138,7 @@ impl Emu {
             let frames: Vec<_> = self
                 .tracepoints
                 .iter()
-                .filter(|(_tracepoint, definition)| {
-                    if let Some(TracepointItem::New(new)) = definition.get(0) {
-                        new.enabled && new.addr == pc
-                    } else {
-                        false
-                    }
-                })
+                .filter(|(_tracepoint, (ctp, source, actions))| ctp.enabled && ctp.addr == pc)
                 .map(|(tracepoint, _definition)| {
                     // our `tracepoint_define` restricts our loaded tracepoints to only contain
                     // register collect actions. instead of only collecting the registers requested
