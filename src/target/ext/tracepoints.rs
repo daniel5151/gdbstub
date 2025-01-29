@@ -95,20 +95,38 @@ pub struct DefineTracepoint<'a, U> {
     pub(crate) actions: TracepointActionList<'a, U>,
 }
 
+/// What type of information a tracepoint source item is about.
 #[derive(Debug, Clone, Copy)]
 pub enum TracepointSourceType {
+    /// Describes the location the tracepoint is at.
     At,
+    /// Describes the conditional expression for a tracepoint.
     Cond,
+    /// Describes the action command that should be executed when a tracepoint
+    /// is hit.
     Cmd,
 }
 
 #[derive(Debug)]
+/// Source string fragment for a tracepoint. A tracepoint may have more than one
+/// source string, such as being describes by one source string for the location
+/// and another for the actions, or by GDB splitting a larger source string
+/// into multiple fragments. GDB may ask for the source of current tracepoints,
+/// which are described by this same structure.
 pub struct SourceTracepoint<'a, U> {
+    /// The tracepoint that the source string is specifying.
     pub number: Tracepoint,
+    /// The PC address of the tracepoint that the source string is specifying.
     pub addr: U,
+    /// What type of information for this tracepoint the string fragment is
+    /// about.
     pub r#type: TracepointSourceType,
+    /// The offset in bytes within the overall source string this fragment is
+    /// within.
     pub start: u32,
+    /// The total length of the overall source string this fragment is within.
     pub slen: u32,
+    /// The data for this source string fragment.
     pub bytes: ManagedSlice<'a, u8>,
 }
 
@@ -244,34 +262,54 @@ pub(crate) enum TracepointEnumerateCursor {
     Source(Tracepoint, u64),
 }
 
+/// The current state of enumerating tracepoints. gdbstub uses it as an opaque
+/// bookkeeping record for what information has already been reported when GDB
+/// downloads tracepoints on attachment.
 #[derive(Debug, Default)]
 pub struct TracepointEnumerateState {
     pub(crate) cursor: Option<TracepointEnumerateCursor>,
 }
 
+/// How to transition the [TracepointEnumerateState] state machine after
+/// reporting an item for tracepoint enumeration.
 #[derive(Debug)]
 pub enum TracepointEnumerateStep {
+    /// The current tracepoint that is being enumerated has more actions.
+    ///
+    /// Increments the step counter if the state machine was already
+    /// enumerating actions, otherwise it is reset to 0 and GDB will start
+    /// enumerating actions.
     Action,
+    /// The current tracepoint that is being enumerated has more source strings.
+    ///
+    /// Increments the step counter if the state machine was already
+    /// enumerating sources strings, otherwise it is reset to 0 and GDB will
+    /// start enumerating source strings.
     Source,
+    /// The current tracepoint has been enumerated, and GDB should next
+    /// enumerate a different one.
     Next(Tracepoint),
+    /// All tracepoints have been enumerated, and the state machine is done.
     Done,
 }
 
 /// Target Extension - Provide tracepoints.
 pub trait Tracepoints: Target {
-    /// Clear any saved tracepoints and empty the trace frame buffer
+    /// Clear any saved tracepoints and empty the trace frame buffer.
     fn tracepoints_init(&mut self) -> TargetResult<(), Self>;
 
-    /// Create a new tracepoint according to the description `tdp`
+    /// Create a new tracepoint according to the description `tdp`.
     fn tracepoint_create(
         &mut self,
         tdp: NewTracepoint<<Self::Arch as Arch>::Usize>,
     ) -> TargetResult<(), Self>;
-    /// Configure an existing tracepoint, appending new actions
+    /// Configure an existing tracepoint, appending new actions.
     fn tracepoint_define(
         &mut self,
         dtdp: DefineTracepoint<'_, <Self::Arch as Arch>::Usize>,
     ) -> TargetResult<(), Self>;
+    /// Configure an existing tracepoint, appending a new source string
+    /// fragment.
     fn tracepoint_attach_source(
         &mut self,
         src: SourceTracepoint<'_, <Self::Arch as Arch>::Usize>,
@@ -285,27 +323,46 @@ pub trait Tracepoints: Target {
         addr: <Self::Arch as Arch>::Usize,
     ) -> TargetResult<TracepointStatus, Self>;
 
+    /// Return the stub's tracepoint enumeration state. gdbstub internally
+    /// uses this state to support GDB downloading tracepoints on attachment,
+    /// but requires the target implementation to provide storage for it.
+    ///
+    /// The state instance that this returns should be the same across multiple
+    /// calls and unmodified, or else gdbstub will be unable to transition the
+    /// state machine during enumeration correctly.
     fn tracepoint_enumerate_state(&mut self) -> &mut TracepointEnumerateState;
 
-    /// Begin enumerating tracepoints. The target implementation should
-    /// initialize a state machine that is stepped by
-    /// [Tracepoints::tracepoint_enumerate_step], and call `f` with the first
-    /// [TracepointItem] that corresponds with the currently configured
-    /// tracepoints.
+    /// Begin enumerating a new tracepoint. If `tp` is None, then the first
+    /// tracepoint recorded should be reported via `f`, otherwise the requested
+    /// tracepoint should be.
+    ///
+    /// After reporting a tracepoint, [TracepointEnumerateStep] describes what
+    /// information is still available.
     fn tracepoint_enumerate_start(
         &mut self,
         tp: Option<Tracepoint>,
         f: &mut dyn FnMut(NewTracepoint<<Self::Arch as Arch>::Usize>),
     ) -> TargetResult<TracepointEnumerateStep, Self>;
-    /// Step the tracepoint enumeration state machine. The target implementation
-    /// should call `f` with the next TracepointItem that correspond with the
-    /// currently configured tracepoints.
+    /// Enumerate the actions attached to a tracepoint. `step` is which action
+    /// item is being asked for, so that the implementation can respond with
+    /// multiple items across multiple function calls. Each action should be
+    /// reported via `f`.
+    ///
+    /// After reporting a tracepoint action, [TracepointEnumerateStep] describes
+    /// what information will next be enumerated.
     fn tracepoint_enumerate_action(
         &mut self,
         tp: Tracepoint,
         step: u64,
         f: &mut dyn FnMut(DefineTracepoint<'_, <Self::Arch as Arch>::Usize>),
     ) -> TargetResult<TracepointEnumerateStep, Self>;
+    /// Enumerate the source strings that describe a tracepoint. `step` is which
+    /// source string is being asked for, so that the implementation can
+    /// respond with multiple items across multiple function calls. Each
+    /// source string should be reported via `f`.
+    ///
+    /// After reporting a tracepoint source string, [TracepointEnumerateStep]
+    /// describes what source string will next be enumerated.
     fn tracepoint_enumerate_source(
         &mut self,
         tp: Tracepoint,
