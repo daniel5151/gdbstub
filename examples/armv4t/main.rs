@@ -150,55 +150,50 @@ fn main() -> DynResult<()> {
 
     let mut emu = emu::Emu::new(TEST_PROGRAM_ELF)?;
 
-    'client: loop {
-        let connection: Box<dyn ConnectionExt<Error = std::io::Error>> = {
-            if std::env::args().nth(1) == Some("--uds".to_string()) {
-                #[cfg(not(unix))]
-                {
-                    return Err("Unix Domain Sockets can only be used on Unix".into());
-                }
-                #[cfg(unix)]
-                {
-                    Box::new(wait_for_uds("/tmp/armv4t_gdb")?)
-                }
-            } else {
-                Box::new(wait_for_tcp(9001)?)
+    let connection: Box<dyn ConnectionExt<Error = std::io::Error>> = {
+        if std::env::args().nth(1) == Some("--uds".to_string()) {
+            #[cfg(not(unix))]
+            {
+                return Err("Unix Domain Sockets can only be used on Unix".into());
             }
-        };
+            #[cfg(unix)]
+            {
+                Box::new(wait_for_uds("/tmp/armv4t_gdb")?)
+            }
+        } else {
+            Box::new(wait_for_tcp(9001)?)
+        }
+    };
 
-        let gdb = GdbStub::new(connection);
+    let gdb = GdbStub::new(connection);
 
-        match gdb.run_blocking::<EmuGdbEventLoop>(&mut emu) {
-            Ok(disconnect_reason) => match disconnect_reason {
-                DisconnectReason::Disconnect => {
-                    //println!("GDB client has disconnected. Running to completion...");
-                    //while emu.step() != Some(emu::Event::Halted) {}
-                    println!("GDB client has disconnected. Waiting for another...");
-                    continue 'client;
-                }
-                DisconnectReason::TargetExited(code) => {
-                    println!("Target exited with code {}!", code)
-                }
-                DisconnectReason::TargetTerminated(sig) => {
-                    println!("Target terminated with signal {}!", sig)
-                }
-                DisconnectReason::Kill => println!("GDB sent a kill command!"),
-            },
-            Err(e) => {
-                if e.is_target_error() {
-                    println!(
-                        "target encountered a fatal error: {}",
-                        e.into_target_error().unwrap()
-                    )
-                } else if e.is_connection_error() {
-                    let (e, kind) = e.into_connection_error().unwrap();
-                    println!("connection error: {:?} - {}", kind, e,)
-                } else {
-                    println!("gdbstub encountered a fatal error: {}", e)
-                }
+    match gdb.run_blocking::<EmuGdbEventLoop>(&mut emu) {
+        Ok(disconnect_reason) => match disconnect_reason {
+            DisconnectReason::Disconnect => {
+                println!("GDB client has disconnected. Running to completion...");
+                while emu.step() != Some(emu::Event::Halted) {}
+            }
+            DisconnectReason::TargetExited(code) => {
+                println!("Target exited with code {}!", code)
+            }
+            DisconnectReason::TargetTerminated(sig) => {
+                println!("Target terminated with signal {}!", sig)
+            }
+            DisconnectReason::Kill => println!("GDB sent a kill command!"),
+        },
+        Err(e) => {
+            if e.is_target_error() {
+                println!(
+                    "target encountered a fatal error: {}",
+                    e.into_target_error().unwrap()
+                )
+            } else if e.is_connection_error() {
+                let (e, kind) = e.into_connection_error().unwrap();
+                println!("connection error: {:?} - {}", kind, e,)
+            } else {
+                println!("gdbstub encountered a fatal error: {}", e)
             }
         }
-        break 'client;
     }
 
     let ret = emu.cpu.reg_get(armv4t_emu::Mode::User, 0);
