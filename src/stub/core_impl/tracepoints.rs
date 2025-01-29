@@ -21,7 +21,6 @@ use crate::target::ext::tracepoints::SourceTracepoint;
 use crate::target::ext::tracepoints::TracepointAction;
 use crate::target::ext::tracepoints::TracepointActionList;
 use crate::target::ext::tracepoints::TracepointEnumerateCursor;
-use crate::target::ext::tracepoints::TracepointEnumerateState;
 use crate::target::ext::tracepoints::TracepointEnumerateStep;
 use crate::target::ext::tracepoints::TracepointItem;
 use crate::target::ext::tracepoints::TracepointSourceType;
@@ -649,7 +648,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     ops.tracepoint_enumerate_state().cursor =
                         Some(TracepointEnumerateCursor::New(started));
                 }
-                self.handle_tracepoint_state_machine_step(res, target, step)?;
+                self.handle_tracepoint_state_machine_step(target, step)?;
             }
             Tracepoints::qTsP(_) => {
                 let state = ops.tracepoint_enumerate_state();
@@ -703,7 +702,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     return Err(e.into());
                 }
                 if let Some(step) = step {
-                    self.handle_tracepoint_state_machine_step(res, target, step)?;
+                    self.handle_tracepoint_state_machine_step(target, step)?;
                 }
             }
 
@@ -722,7 +721,6 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
     fn handle_tracepoint_state_machine_step(
         &mut self,
-        res: &mut ResponseWriter<'_, C>,
         target: &mut T,
         step: TracepointEnumerateStep,
     ) -> Result<(), Error<T::Error, C::Error>> {
