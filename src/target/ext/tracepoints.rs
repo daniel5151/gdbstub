@@ -12,8 +12,7 @@ pub struct Tracepoint(pub usize);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct StateVariable(usize);
 
-/// Describes a new tracepoint. It may be configured by later
-/// [ExtendTracepoint] structs. GDB may ask for the state of current
+/// Describes a new tracepoint. GDB may ask for the state of current
 /// tracepoints, which are described with this same structure.
 #[derive(Debug, Clone)]
 pub struct NewTracepoint<U> {
@@ -64,34 +63,16 @@ pub enum TracepointAction<'a, U> {
     },
 }
 
-/// A list of TracepointActions.
+/// A list of actions that a tracepoint should be extended with.
 #[derive(Debug)]
-pub(crate) enum TracepointActionList<'a, U> {
-    /// Raw and unparsed actions, such as from GDB.
-    Raw {
-        /// The unparsed action data.
-        data: ManagedSlice<'a, u8>,
-    },
-    /// A slice of parsed actions, such as what may be returned by a target when
-    /// enumerating tracepoints.
-    #[cfg(feature = "alloc")]
-    Parsed {
-        /// The parsed actions.
-        actions: ManagedSlice<'a, TracepointAction<'a, U>>,
-    },
-}
-
-/// Definition data for a tracepoint. A tracepoint may have more than one extend
-/// structure for all of its data. GDB may ask for the state of current
-/// tracepoints, which are described with this same structure.
-#[derive(Debug)]
-pub struct ExtendTracepoint<'a, U> {
+pub(crate) struct ExtendTracepoint<'a, U> {
     /// The tracepoint that is having actions appended to its definition.
     pub number: Tracepoint,
     /// The PC address of the tracepoint that is being extended.
+    #[allow(dead_code)]
     pub addr: U,
-    /// A list of actions that should be appended to the tracepoint.
-    pub(crate) actions: TracepointActionList<'a, U>,
+    /// The unparsed action data.
+    pub data: ManagedSlice<'a, u8>,
 }
 
 /// What type of information a tracepoint source item is about.
@@ -270,7 +251,12 @@ pub enum TracepointEnumerateStep<U> {
     Source,
     /// The current tracepoint has been enumerated, and GDB should next
     /// enumerate a different one.
-    Next { tp: Tracepoint, addr: U },
+    Next {
+        /// The next tracepoint to move to.
+        tp: Tracepoint,
+        /// The PC of the next tracepoint.
+        addr: U,
+    },
     /// All tracepoints have been enumerated, and the state machine is done.
     Done,
 }
@@ -290,16 +276,11 @@ pub trait Tracepoints: Target {
     fn tracepoint_create_continue(
         &mut self,
         tp: Tracepoint,
-        addr: <Self::Arch as Arch>::Usize,
         action: &TracepointAction<'_, <Self::Arch as Arch>::Usize>,
     ) -> TargetResult<(), Self>;
     /// Complete the creation of a tracepoint. All of its actions are expected
     /// to have been received.
-    fn tracepoint_create_complete(
-        &mut self,
-        tp: Tracepoint,
-        addr: <Self::Arch as Arch>::Usize,
-    ) -> TargetResult<(), Self>;
+    fn tracepoint_create_complete(&mut self, tp: Tracepoint) -> TargetResult<(), Self>;
     /// Configure an existing tracepoint, appending a new source string
     /// fragment.
     fn tracepoint_attach_source(
@@ -347,7 +328,6 @@ pub trait Tracepoints: Target {
     fn tracepoint_enumerate_action(
         &mut self,
         tp: Tracepoint,
-        addr: <Self::Arch as Arch>::Usize,
         step: u64,
         f: &mut dyn FnMut(TracepointAction<'_, <Self::Arch as Arch>::Usize>),
     ) -> TargetResult<TracepointEnumerateStep<<Self::Arch as Arch>::Usize>, Self>;
@@ -361,7 +341,6 @@ pub trait Tracepoints: Target {
     fn tracepoint_enumerate_source(
         &mut self,
         tp: Tracepoint,
-        addr: <Self::Arch as Arch>::Usize,
         step: u64,
         f: &mut dyn FnMut(SourceTracepoint<'_, <Self::Arch as Arch>::Usize>),
     ) -> TargetResult<TracepointEnumerateStep<<Self::Arch as Arch>::Usize>, Self>;

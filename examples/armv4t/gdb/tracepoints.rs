@@ -2,7 +2,6 @@ use crate::emu::Emu;
 use gdbstub::target;
 use gdbstub::target::ext::tracepoints::ExperimentExplanation;
 use gdbstub::target::ext::tracepoints::ExperimentStatus;
-use gdbstub::target::ext::tracepoints::ExtendTracepoint;
 use gdbstub::target::ext::tracepoints::FrameDescription;
 use gdbstub::target::ext::tracepoints::FrameRequest;
 use gdbstub::target::ext::tracepoints::NewTracepoint;
@@ -58,7 +57,6 @@ impl target::ext::tracepoints::Tracepoints for Emu {
     fn tracepoint_create_continue(
         &mut self,
         tp: Tracepoint,
-        addr: u32,
         action: &TracepointAction<'_, u32>,
     ) -> TargetResult<(), Self> {
         if let &TracepointAction::Registers { mask: _ } = &action {
@@ -76,7 +74,7 @@ impl target::ext::tracepoints::Tracepoints for Emu {
             .ok_or_else(move || TargetError::Fatal("extend on non-existing tracepoint"))
     }
 
-    fn tracepoint_create_complete(&mut self, tp: Tracepoint, addr: u32) -> TargetResult<(), Self> {
+    fn tracepoint_create_complete(&mut self, _tp: Tracepoint) -> TargetResult<(), Self> {
         /* nothing to do */
         Ok(())
     }
@@ -139,7 +137,7 @@ impl target::ext::tracepoints::Tracepoints for Emu {
 
         match self.tracepoints[&tp].2.get(0) {
             // We have actions and GDB should step through them
-            Some(next) => Ok(TracepointEnumerateStep::Action),
+            Some(_next) => Ok(TracepointEnumerateStep::Action),
             // No actions attached to this tracepoint
             None => {
                 match self.tracepoints[&tp].1.get(0) {
@@ -155,7 +153,6 @@ impl target::ext::tracepoints::Tracepoints for Emu {
     fn tracepoint_enumerate_action(
         &mut self,
         tp: Tracepoint,
-        addr: u32,
         step: u64,
         f: &mut dyn FnMut(TracepointAction<'_, u32>),
     ) -> TargetResult<TracepointEnumerateStep<u32>, Self> {
@@ -177,7 +174,6 @@ impl target::ext::tracepoints::Tracepoints for Emu {
     fn tracepoint_enumerate_source(
         &mut self,
         tp: Tracepoint,
-        addr: u32,
         step: u64,
         f: &mut dyn FnMut(SourceTracepoint<'_, u32>),
     ) -> TargetResult<TracepointEnumerateStep<u32>, Self> {

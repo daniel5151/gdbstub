@@ -20,7 +20,6 @@ use crate::target::ext::tracepoints::NewTracepoint;
 use crate::target::ext::tracepoints::SourceTracepoint;
 use crate::target::ext::tracepoints::Tracepoint;
 use crate::target::ext::tracepoints::TracepointAction;
-use crate::target::ext::tracepoints::TracepointActionList;
 use crate::target::ext::tracepoints::TracepointEnumerateCursor;
 use crate::target::ext::tracepoints::TracepointEnumerateStep;
 use crate::target::ext::tracepoints::TracepointSourceType;
@@ -69,9 +68,7 @@ impl<'a, U: BeBytes> ExtendTracepoint<'a, U> {
         Some(Self {
             number: dtdp.number,
             addr: U::from_be_bytes(dtdp.addr)?,
-            actions: TracepointActionList::Raw {
-                data: ManagedSlice::Borrowed(dtdp.actions),
-            },
+            data: ManagedSlice::Borrowed(dtdp.actions),
         })
     }
 
@@ -83,19 +80,10 @@ impl<'a, U: BeBytes> ExtendTracepoint<'a, U> {
     /// expect in later packets. If the actions weren't from a GDB packet, more
     /// is None.
     pub(crate) fn actions(
-        self,
-        mut f: impl FnMut(&TracepointAction<'_, U>),
+        mut self,
+        f: impl FnMut(&TracepointAction<'_, U>),
     ) -> Result<Option<bool>, PacketParseError> {
-        match self.actions {
-            TracepointActionList::Raw { mut data } => Self::parse_raw_actions(&mut data, f),
-            #[cfg(feature = "alloc")]
-            TracepointActionList::Parsed { mut actions } => {
-                for action in actions.iter_mut() {
-                    (f)(action);
-                }
-                Ok(None)
-            }
-        }
+        Self::parse_raw_actions(&mut self.data, f)
     }
 
     fn parse_raw_actions(
@@ -173,32 +161,6 @@ impl<'a, U: BeBytes> ExtendTracepoint<'a, U> {
         }
 
         Ok(Some(more))
-    }
-}
-#[cfg(feature = "alloc")]
-impl<'a, U: Copy> ExtendTracepoint<'a, U> {
-    /// Allocate an owned copy of this structure.
-    pub fn get_owned<'b>(&self) -> ExtendTracepoint<'b, U> {
-        ExtendTracepoint {
-            number: self.number,
-            addr: self.addr,
-            actions: self.actions.get_owned(),
-        }
-    }
-
-    /// Construct a ExtendTracepoint with specified list of actions.
-    pub fn new_from_actions(
-        number: Tracepoint,
-        addr: U,
-        actions: Vec<TracepointAction<'a, U>>,
-    ) -> Self {
-        ExtendTracepoint {
-            number,
-            addr,
-            actions: TracepointActionList::Parsed {
-                actions: managed::ManagedSlice::Owned(actions),
-            },
-        }
     }
 }
 
@@ -282,24 +244,6 @@ impl<'a, U: Copy> TracepointAction<'a, U> {
             },
             TracepointAction::Expression { expr } => TracepointAction::Expression {
                 expr: ManagedSlice::Owned(expr.deref().into()),
-            },
-        }
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl<'a, U: Copy> TracepointActionList<'a, U> {
-    /// Allocate an owned copy of this structure.
-    pub fn get_owned<'b>(&self) -> TracepointActionList<'b, U> {
-        use core::ops::Deref;
-        match self {
-            TracepointActionList::Raw { data } => TracepointActionList::Raw {
-                data: ManagedSlice::Owned(data.deref().into()),
-            },
-            TracepointActionList::Parsed { actions } => TracepointActionList::Parsed {
-                actions: ManagedSlice::Owned(
-                    actions.iter().map(|action| action.get_owned()).collect(),
-                ),
             },
         }
     }
@@ -504,11 +448,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                             NewTracepoint::<<T::Arch as Arch>::Usize>::from_tdp(ctdp)
                                 .ok_or(Error::TargetMismatch)?;
                         let tp = new_tracepoint.number;
-                        let addr = new_tracepoint.addr;
                         let more = new_tracepoint.more;
                         ops.tracepoint_create_begin(new_tracepoint).handle_error()?;
                         if !more {
-                            ops.tracepoint_create_complete(tp, addr).handle_error()?;
+                            ops.tracepoint_create_complete(tp).handle_error()?;
                         }
                     }
                     QTDP::Extend(dtdp) => {
@@ -516,12 +459,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                             ExtendTracepoint::<<T::Arch as Arch>::Usize>::from_tdp(dtdp)
                                 .ok_or(Error::TargetMismatch)?;
                         let tp = extend_tracepoint.number;
-                        let addr = extend_tracepoint.addr;
                         let mut err: Option<Error<T::Error, C::Error>> = None;
                         let more = extend_tracepoint.actions(|action| {
-                            if let Err(e) = ops
-                                .tracepoint_create_continue(tp, addr, action)
-                                .handle_error()
+                            if let Err(e) =
+                                ops.tracepoint_create_continue(tp, action).handle_error()
                             {
                                 err = Some(e)
                             }
@@ -535,7 +476,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                                 // complete it yet.
                             }
                             Ok(None) | Ok(Some(false)) => {
-                                ops.tracepoint_create_complete(tp, addr).handle_error()?;
+                                ops.tracepoint_create_complete(tp).handle_error()?;
                             }
                             Err(e) => {
                                 return Err(Error::PacketParse(e));
@@ -665,7 +606,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         // anything else to report.
                         None
                     }
-                    Some(TracepointEnumerateCursor::New { tp, addr }) => {
+                    Some(TracepointEnumerateCursor::New { tp, .. }) => {
                         // If we don't have any progress, the last packet was
                         // a Next(tp) and we need to start reporting a new tracepoint
                         Some(
@@ -681,7 +622,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     Some(TracepointEnumerateCursor::Action { tp, addr, step }) => {
                         // Otherwise we should be continuing the advance the current tracepoint.
                         Some(
-                            ops.tracepoint_enumerate_action(tp, addr, step, &mut |action| {
+                            ops.tracepoint_enumerate_action(tp, step, &mut |action| {
                                 let e = action.write::<T, C>(tp, addr, res);
                                 if let Err(e) = e {
                                     err = Some(e)
@@ -691,8 +632,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         )
                     }
                     // TODO: figure out how to gate this behind a supports method?
-                    Some(TracepointEnumerateCursor::Source { tp, addr, step }) => Some(
-                        ops.tracepoint_enumerate_source(tp, addr, step, &mut |src| {
+                    Some(TracepointEnumerateCursor::Source { tp, step, .. }) => Some(
+                        ops.tracepoint_enumerate_source(tp, step, &mut |src| {
                             let e = src.write::<T, C>(res);
                             if let Err(e) = e {
                                 err = Some(e)
