@@ -137,7 +137,7 @@ impl Emu {
             let frames: Vec<_> = self
                 .tracepoints
                 .iter()
-                .filter(|(_tracepoint, (ctp, source, actions))| ctp.enabled && ctp.addr == pc)
+                .filter(|(_tracepoint, (ctp, _source, _actions))| ctp.enabled && ctp.addr == pc)
                 .map(|(tracepoint, _definition)| {
                     // our `tracepoint_define` restricts our loaded tracepoints to only contain
                     // register collect actions. instead of only collecting the registers requested
