@@ -73,6 +73,7 @@ pub enum TracepointActionList<'a, U> {
     },
     /// A slice of parsed actions, such as what may be returned by a target when
     /// enumerating tracepoints.
+    #[cfg(feature = "alloc")]
     Parsed {
         /// The parsed actions.
         actions: ManagedSlice<'a, TracepointAction<'a, U>>,

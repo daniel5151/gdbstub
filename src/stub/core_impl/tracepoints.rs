@@ -88,6 +88,7 @@ impl<'a, U: BeBytes> DefineTracepoint<'a, U> {
     ) -> Result<bool, PacketParseError> {
         match self.actions {
             TracepointActionList::Raw { mut data } => Self::parse_raw_actions(&mut data, f),
+            #[cfg(feature = "alloc")]
             TracepointActionList::Parsed { mut actions, more } => {
                 for action in actions.iter_mut() {
                     (f)(action);
@@ -319,7 +320,7 @@ impl<'a, U: crate::internal::BeBytes + num_traits::Zero + PrimInt> DefineTracepo
             }
         });
         if let Some(e) = err {
-            return Err(e.into());
+            return Err(e);
         }
         match more {
             Ok(true) =>
@@ -328,7 +329,7 @@ impl<'a, U: crate::internal::BeBytes + num_traits::Zero + PrimInt> DefineTracepo
                 Ok(())
             }
             Ok(false) => Ok(()),
-            e => e.map(|_| ()).map_err(|e| Error::PacketParse(e)),
+            e => e.map(|_| ()).map_err(Error::PacketParse),
         }
     }
 }
@@ -382,14 +383,8 @@ impl<'a> ExperimentStatus<'a> {
         // We're stopped for some reason, and may have an explanation for why
         res.write_str("T0")?;
         match self {
-            Running => {
-                /* unreachable */
-                ()
-            }
-            NotRunning => {
-                /* no information */
-                ()
-            }
+            Running => { /* unreachable */ }
+            NotRunning => { /* no information */ }
             NotRun => res.write_str(";tnotrun:0")?,
             Stop(ref t) => match t {
                 Some(text) => {
@@ -508,7 +503,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 })
                 .handle_error()?;
                 if let Some(e) = err {
-                    return Err(e.into());
+                    return Err(e);
                 }
             }
             Tracepoints::qTP(qtp) => {
@@ -619,9 +614,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             // to initialize a state machine on our stub, and then sends the subsequent
             // packets N times in order to drive the state machine to the end in
             // order to ask for all our tracepoints and their actions. gdbstub
-            // is agnostic about the end-user state and shouldn't allocate, however,
-            // which means we can't really setup the state machine ourselves or
-            // turn it into a nicer API.
+            // uses a target allocated state machine that it drives in response
+            // to these packets, so that it can provide a nice typed API.
             Tracepoints::qTfP(_) => {
                 // Reset our state machine
                 let state = ops.tracepoint_enumerate_state();
@@ -642,7 +636,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     })
                     .handle_error()?;
                 if let Some(e) = err {
-                    return Err(e.into());
+                    return Err(e);
                 }
                 if let Some(started) = started {
                     ops.tracepoint_enumerate_state().cursor =
@@ -655,7 +649,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 let mut err: Option<Error<T::Error, C::Error>> = None;
                 let step = match state.cursor {
                     None => {
-                        // If we don't have a current_tracepoint, than the last
+                        // If we don't have a cursor, than the last
                         // packet responded
                         // with a TracepointEnumerateStep::Done. We don't have
                         // anything else to report.
@@ -699,7 +693,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 };
 
                 if let Some(e) = err {
-                    return Err(e.into());
+                    return Err(e);
                 }
                 if let Some(step) = step {
                     self.handle_tracepoint_state_machine_step(target, step)?;
