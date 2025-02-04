@@ -352,8 +352,6 @@ commands! {
         "qTfP" => _qTfP::qTfP,
         "qTsP" => _qTsP::qTsP,
 
-        // These are currently stubbed out to no-ops for tracepoints v1: they're
-        // needed to suppress "not implemented" errors.
         // QTDV is unimplemented.
         "qTfV" => _qTfV::qTfV,
         "qTsV" => _qTsV::qTsV,
