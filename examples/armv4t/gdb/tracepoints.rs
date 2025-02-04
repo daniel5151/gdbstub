@@ -1,8 +1,8 @@
 use crate::emu::Emu;
 use gdbstub::target;
-use gdbstub::target::ext::tracepoints::DefineTracepoint;
 use gdbstub::target::ext::tracepoints::ExperimentExplanation;
 use gdbstub::target::ext::tracepoints::ExperimentStatus;
+use gdbstub::target::ext::tracepoints::ExtendTracepoint;
 use gdbstub::target::ext::tracepoints::FrameDescription;
 use gdbstub::target::ext::tracepoints::FrameRequest;
 use gdbstub::target::ext::tracepoints::NewTracepoint;
@@ -12,7 +12,6 @@ use gdbstub::target::ext::tracepoints::Tracepoint;
 use gdbstub::target::ext::tracepoints::TracepointAction;
 use gdbstub::target::ext::tracepoints::TracepointEnumerateState;
 use gdbstub::target::ext::tracepoints::TracepointEnumerateStep;
-use gdbstub::target::ext::tracepoints::TracepointItem;
 use gdbstub::target::ext::tracepoints::TracepointStatus;
 use gdbstub::target::TargetError;
 use gdbstub::target::TargetResult;
@@ -26,7 +25,7 @@ pub struct TraceFrame {
 }
 
 impl Emu {
-    fn step_to_next_tracepoint(&self, tp: Tracepoint) -> TracepointEnumerateStep {
+    fn step_to_next_tracepoint(&self, tp: Tracepoint) -> TracepointEnumerateStep<u32> {
         let (tp_pos, _) = self
             .tracepoints
             .keys()
@@ -36,7 +35,10 @@ impl Emu {
         match self.tracepoints.keys().nth(tp_pos + 1) {
             // No more tracepoints
             None => TracepointEnumerateStep::Done,
-            Some(next_tp) => TracepointEnumerateStep::Next(*next_tp),
+            Some(next_tp) => TracepointEnumerateStep::Next {
+                tp: *next_tp,
+                addr: self.tracepoints[next_tp].0.addr,
+            },
         }
     }
 }
@@ -48,34 +50,35 @@ impl target::ext::tracepoints::Tracepoints for Emu {
         Ok(())
     }
 
-    fn tracepoint_create(&mut self, tp: NewTracepoint<u32>) -> TargetResult<(), Self> {
+    fn tracepoint_create_begin(&mut self, tp: NewTracepoint<u32>) -> TargetResult<(), Self> {
         self.tracepoints.insert(tp.number, (tp, vec![], vec![]));
         Ok(())
     }
 
-    fn tracepoint_define(&mut self, tp: DefineTracepoint<'_, u32>) -> TargetResult<(), Self> {
-        let tp_copy = tp.get_owned();
-        let mut valid = true;
-        let _more = tp
-            .actions(|action| {
-                if let TracepointAction::Registers { mask: _ } = action {
-                    // we only handle register collection actions for the simple
-                    // case
-                } else {
-                    valid = false;
-                }
-            })
-            .map_err(|_e| TargetError::Fatal("unable to parse actions"))?;
-        if !valid {
+    fn tracepoint_create_continue(
+        &mut self,
+        tp: Tracepoint,
+        addr: u32,
+        action: &TracepointAction<'_, u32>,
+    ) -> TargetResult<(), Self> {
+        if let &TracepointAction::Registers { mask: _ } = &action {
+            // we only handle register collection actions for the simple
+            // case
+        } else {
             return Err(TargetError::NonFatal);
         }
         self.tracepoints
-            .get_mut(&tp_copy.number)
+            .get_mut(&tp)
             .map(move |(_ctp, _source, actions)| {
-                actions.push(tp_copy);
+                actions.push(action.get_owned());
                 ()
             })
-            .ok_or_else(move || TargetError::Fatal("define on non-existing tracepoint"))
+            .ok_or_else(move || TargetError::Fatal("extend on non-existing tracepoint"))
+    }
+
+    fn tracepoint_create_complete(&mut self, tp: Tracepoint, addr: u32) -> TargetResult<(), Self> {
+        /* nothing to do */
+        Ok(())
     }
 
     fn tracepoint_attach_source(
@@ -109,7 +112,7 @@ impl target::ext::tracepoints::Tracepoints for Emu {
         })
     }
 
-    fn tracepoint_enumerate_state(&mut self) -> &mut TracepointEnumerateState {
+    fn tracepoint_enumerate_state(&mut self) -> &mut TracepointEnumerateState<u32> {
         &mut self.tracepoint_enumerate_state
     }
 
@@ -117,7 +120,7 @@ impl target::ext::tracepoints::Tracepoints for Emu {
         &mut self,
         tp: Option<Tracepoint>,
         f: &mut dyn FnMut(NewTracepoint<u32>),
-    ) -> TargetResult<TracepointEnumerateStep, Self> {
+    ) -> TargetResult<TracepointEnumerateStep<u32>, Self> {
         let tp = match tp {
             Some(tp) => tp,
             None => {
@@ -152,9 +155,10 @@ impl target::ext::tracepoints::Tracepoints for Emu {
     fn tracepoint_enumerate_action(
         &mut self,
         tp: Tracepoint,
+        addr: u32,
         step: u64,
-        f: &mut dyn FnMut(DefineTracepoint<'_, u32>),
-    ) -> TargetResult<TracepointEnumerateStep, Self> {
+        f: &mut dyn FnMut(TracepointAction<'_, u32>),
+    ) -> TargetResult<TracepointEnumerateStep<u32>, Self> {
         // Report our next action
         (f)(self.tracepoints[&tp].2[step as usize].get_owned());
 
@@ -173,9 +177,10 @@ impl target::ext::tracepoints::Tracepoints for Emu {
     fn tracepoint_enumerate_source(
         &mut self,
         tp: Tracepoint,
+        addr: u32,
         step: u64,
         f: &mut dyn FnMut(SourceTracepoint<'_, u32>),
-    ) -> TargetResult<TracepointEnumerateStep, Self> {
+    ) -> TargetResult<TracepointEnumerateStep<u32>, Self> {
         // Report our next source item
         (f)(self.tracepoints[&tp].1[step as usize].get_owned());
 
