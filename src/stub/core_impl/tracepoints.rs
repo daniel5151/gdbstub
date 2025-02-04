@@ -18,6 +18,7 @@ use crate::target::ext::tracepoints::FrameDescription;
 use crate::target::ext::tracepoints::FrameRequest;
 use crate::target::ext::tracepoints::NewTracepoint;
 use crate::target::ext::tracepoints::SourceTracepoint;
+use crate::target::ext::tracepoints::Tracepoint;
 use crate::target::ext::tracepoints::TracepointAction;
 use crate::target::ext::tracepoints::TracepointActionList;
 use crate::target::ext::tracepoints::TracepointEnumerateCursor;
@@ -79,21 +80,19 @@ impl<'a, U: BeBytes> DefineTracepoint<'a, U> {
     /// tracepoint, calling `f` on each action.
     ///
     /// Returns `Err` if parsing of actions failed, or hit unsupported actions.
-    /// Return `Ok(more)` on success, where `more` is a bool indicating if
-    /// there will be additional "tracepoint define" packets for this
-    /// tracepoint.
+    /// Return `Ok(())` on success.
     pub fn actions(
         self,
         mut f: impl FnMut(&TracepointAction<'_, U>),
-    ) -> Result<bool, PacketParseError> {
+    ) -> Result<(), PacketParseError> {
         match self.actions {
             TracepointActionList::Raw { mut data } => Self::parse_raw_actions(&mut data, f),
             #[cfg(feature = "alloc")]
-            TracepointActionList::Parsed { mut actions, more } => {
+            TracepointActionList::Parsed { mut actions } => {
                 for action in actions.iter_mut() {
                     (f)(action);
                 }
-                Ok(more)
+                Ok(())
             }
         }
     }
@@ -101,8 +100,8 @@ impl<'a, U: BeBytes> DefineTracepoint<'a, U> {
     fn parse_raw_actions(
         actions: &mut [u8],
         mut f: impl FnMut(&TracepointAction<'_, U>),
-    ) -> Result<bool, PacketParseError> {
-        let (actions, more) = match actions {
+    ) -> Result<(), PacketParseError> {
+        let (actions, _more) = match actions {
             [rest @ .., b'-'] => (rest, true),
             x => (x, false),
         };
@@ -172,7 +171,7 @@ impl<'a, U: BeBytes> DefineTracepoint<'a, U> {
             }
         }
 
-        Ok(more)
+        Ok(())
     }
 }
 #[cfg(feature = "alloc")]
@@ -183,6 +182,21 @@ impl<'a, U: Copy> DefineTracepoint<'a, U> {
             number: self.number,
             addr: self.addr,
             actions: self.actions.get_owned(),
+        }
+    }
+
+    /// Construct a DefineTracepoint with specified list of actions.
+    pub fn new_from_actions(
+        number: Tracepoint,
+        addr: U,
+        actions: Vec<TracepointAction<'a, U>>,
+    ) -> Self {
+        DefineTracepoint {
+            number,
+            addr,
+            actions: TracepointActionList::Parsed {
+                actions: managed::ManagedSlice::Owned(actions),
+            },
         }
     }
 }
@@ -281,11 +295,10 @@ impl<'a, U: Copy> TracepointActionList<'a, U> {
             TracepointActionList::Raw { data } => TracepointActionList::Raw {
                 data: ManagedSlice::Owned(data.deref().into()),
             },
-            TracepointActionList::Parsed { actions, more } => TracepointActionList::Parsed {
+            TracepointActionList::Parsed { actions } => TracepointActionList::Parsed {
                 actions: ManagedSlice::Owned(
                     actions.iter().map(|action| action.get_owned()).collect(),
                 ),
-                more: *more,
             },
         }
     }
@@ -314,7 +327,7 @@ impl<'a, U: crate::internal::BeBytes + num_traits::Zero + PrimInt> DefineTracepo
         res.write_num(self.addr)?;
         res.write_str(":")?;
         let mut err = None;
-        let more = self.actions(|action| {
+        let _more = self.actions(|action| {
             if let Err(e) = action.write::<T, C>(res) {
                 err = Some(e)
             }
@@ -322,15 +335,7 @@ impl<'a, U: crate::internal::BeBytes + num_traits::Zero + PrimInt> DefineTracepo
         if let Some(e) = err {
             return Err(e);
         }
-        match more {
-            Ok(true) =>
-            /* Ok(res.write_str("-")?) */
-            {
-                Ok(())
-            }
-            Ok(false) => Ok(()),
-            e => e.map(|_| ()).map_err(Error::PacketParse),
-        }
+        Ok(())
     }
 }
 
