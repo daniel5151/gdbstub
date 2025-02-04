@@ -65,7 +65,7 @@ pub enum TracepointAction<'a, U> {
 
 /// A list of TracepointActions.
 #[derive(Debug)]
-pub enum TracepointActionList<'a, U> {
+pub(crate) enum TracepointActionList<'a, U> {
     /// Raw and unparsed actions, such as from GDB.
     Raw {
         /// The unparsed action data.
@@ -77,9 +77,6 @@ pub enum TracepointActionList<'a, U> {
     Parsed {
         /// The parsed actions.
         actions: ManagedSlice<'a, TracepointAction<'a, U>>,
-        /// Indicate if there will be additional "tracepoint definitions" with
-        /// more actions for this tracepoint.
-        more: bool,
     },
 }
 
