@@ -1,4 +1,3 @@
-use crate::gdb::tracepoints::TraceFrame;
 use crate::mem_sniffer::AccessKind;
 use crate::mem_sniffer::MemSniffer;
 use crate::DynResult;
@@ -30,6 +29,13 @@ pub enum ExecMode {
     Step,
     Continue,
     RangeStep(u32, u32),
+}
+
+#[derive(Debug)]
+pub struct TraceFrame {
+    pub number: Tracepoint,
+    pub addr: u32,
+    pub snapshot: Cpu,
 }
 
 /// incredibly barebones armv4t-based emulator
