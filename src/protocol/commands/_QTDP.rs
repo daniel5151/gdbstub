@@ -4,7 +4,7 @@ use crate::target::ext::tracepoints::Tracepoint;
 #[derive(Debug)]
 pub enum QTDP<'a> {
     Create(CreateTDP<'a>),
-    Define(DefineTDP<'a>),
+    Extend(ExtendTDP<'a>),
 }
 
 #[derive(Debug)]
@@ -20,7 +20,7 @@ pub struct CreateTDP<'a> {
 }
 
 #[derive(Debug)]
-pub struct DefineTDP<'a> {
+pub struct ExtendTDP<'a> {
     pub number: Tracepoint,
     pub addr: &'a [u8],
     pub while_stepping: bool,
@@ -37,7 +37,7 @@ impl<'a> ParseCommand<'a> for QTDP<'a> {
                 let number = Tracepoint(decode_hex(params.next()?).ok()?);
                 let addr = decode_hex_buf(params.next()?).ok()?;
                 let actions = params.next()?;
-                Some(QTDP::Define(DefineTDP {
+                Some(QTDP::Extend(ExtendTDP {
                     number,
                     addr,
                     while_stepping: false,

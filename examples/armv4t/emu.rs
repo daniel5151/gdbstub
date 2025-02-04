@@ -8,12 +8,11 @@ use armv4t_emu::ExampleMem;
 use armv4t_emu::Memory;
 use armv4t_emu::Mode;
 use gdbstub::common::Pid;
-use gdbstub::target::ext::tracepoints::DefineTracepoint;
 use gdbstub::target::ext::tracepoints::NewTracepoint;
 use gdbstub::target::ext::tracepoints::SourceTracepoint;
 use gdbstub::target::ext::tracepoints::Tracepoint;
+use gdbstub::target::ext::tracepoints::TracepointAction;
 use gdbstub::target::ext::tracepoints::TracepointEnumerateState;
-use gdbstub::target::ext::tracepoints::TracepointItem;
 use std::collections::HashMap;
 
 const HLE_RETURN_ADDR: u32 = 0x12345678;
@@ -54,11 +53,11 @@ pub struct Emu {
         (
             NewTracepoint<u32>,
             Vec<SourceTracepoint<'static, u32>>,
-            Vec<DefineTracepoint<'static, u32>>,
+            Vec<TracepointAction<'static, u32>>,
         ),
     >,
     pub(crate) traceframes: Vec<TraceFrame>,
-    pub(crate) tracepoint_enumerate_state: TracepointEnumerateState,
+    pub(crate) tracepoint_enumerate_state: TracepointEnumerateState<u32>,
     pub(crate) tracing: bool,
     pub(crate) selected_frame: Option<usize>,
 

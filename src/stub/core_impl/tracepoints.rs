@@ -7,13 +7,13 @@ use crate::protocol::commands::ext::Tracepoints;
 use crate::protocol::commands::prelude::decode_hex;
 use crate::protocol::commands::prelude::decode_hex_buf;
 use crate::protocol::commands::_QTDP::CreateTDP;
-use crate::protocol::commands::_QTDP::DefineTDP;
+use crate::protocol::commands::_QTDP::ExtendTDP;
 use crate::protocol::commands::_QTDP::QTDP;
 use crate::protocol::PacketParseError;
 use crate::protocol::ResponseWriterError;
-use crate::target::ext::tracepoints::DefineTracepoint;
 use crate::target::ext::tracepoints::ExperimentExplanation;
 use crate::target::ext::tracepoints::ExperimentStatus;
+use crate::target::ext::tracepoints::ExtendTracepoint;
 use crate::target::ext::tracepoints::FrameDescription;
 use crate::target::ext::tracepoints::FrameRequest;
 use crate::target::ext::tracepoints::NewTracepoint;
@@ -23,7 +23,6 @@ use crate::target::ext::tracepoints::TracepointAction;
 use crate::target::ext::tracepoints::TracepointActionList;
 use crate::target::ext::tracepoints::TracepointEnumerateCursor;
 use crate::target::ext::tracepoints::TracepointEnumerateStep;
-use crate::target::ext::tracepoints::TracepointItem;
 use crate::target::ext::tracepoints::TracepointSourceType;
 use crate::target::ext::tracepoints::TracepointStatus;
 use managed::ManagedSlice;
@@ -64,9 +63,9 @@ impl<U: crate::internal::BeBytes + num_traits::Zero + PrimInt> NewTracepoint<U> 
     }
 }
 
-impl<'a, U: BeBytes> DefineTracepoint<'a, U> {
-    /// Parse from a raw DefineTDP packet.
-    fn from_tdp(dtdp: DefineTDP<'a>) -> Option<Self> {
+impl<'a, U: BeBytes> ExtendTracepoint<'a, U> {
+    /// Parse from a raw ExtendTDP packet.
+    fn from_tdp(dtdp: ExtendTDP<'a>) -> Option<Self> {
         Some(Self {
             number: dtdp.number,
             addr: U::from_be_bytes(dtdp.addr)?,
@@ -80,11 +79,13 @@ impl<'a, U: BeBytes> DefineTracepoint<'a, U> {
     /// tracepoint, calling `f` on each action.
     ///
     /// Returns `Err` if parsing of actions failed, or hit unsupported actions.
-    /// Return `Ok(())` on success.
-    pub fn actions(
+    /// Return `Ok(more)` on success, where more indicates if more actions are
+    /// expect in later packets. If the actions weren't from a GDB packet, more
+    /// is None.
+    pub(crate) fn actions(
         self,
         mut f: impl FnMut(&TracepointAction<'_, U>),
-    ) -> Result<(), PacketParseError> {
+    ) -> Result<Option<bool>, PacketParseError> {
         match self.actions {
             TracepointActionList::Raw { mut data } => Self::parse_raw_actions(&mut data, f),
             #[cfg(feature = "alloc")]
@@ -92,7 +93,7 @@ impl<'a, U: BeBytes> DefineTracepoint<'a, U> {
                 for action in actions.iter_mut() {
                     (f)(action);
                 }
-                Ok(())
+                Ok(None)
             }
         }
     }
@@ -100,8 +101,8 @@ impl<'a, U: BeBytes> DefineTracepoint<'a, U> {
     fn parse_raw_actions(
         actions: &mut [u8],
         mut f: impl FnMut(&TracepointAction<'_, U>),
-    ) -> Result<(), PacketParseError> {
-        let (actions, _more) = match actions {
+    ) -> Result<Option<bool>, PacketParseError> {
+        let (actions, more) = match actions {
             [rest @ .., b'-'] => (rest, true),
             x => (x, false),
         };
@@ -116,7 +117,7 @@ impl<'a, U: BeBytes> DefineTracepoint<'a, U> {
                     // future packets should be interpreted, but as a trait we
                     // can't keep a flag around for that (unless we specifically
                     // have a `mark_while_stepping` callback for the target to
-                    // keep track future tracepoint_defines should be treated different).
+                    // keep track future tracepoint_extends should be treated different).
                     // If we go that route we also would need to return two vectors
                     // here, "normal" actions and "while stepping" actions...but
                     // "normals" actions may still be "while stepping" actions,
@@ -171,27 +172,27 @@ impl<'a, U: BeBytes> DefineTracepoint<'a, U> {
             }
         }
 
-        Ok(())
+        Ok(Some(more))
     }
 }
 #[cfg(feature = "alloc")]
-impl<'a, U: Copy> DefineTracepoint<'a, U> {
+impl<'a, U: Copy> ExtendTracepoint<'a, U> {
     /// Allocate an owned copy of this structure.
-    pub fn get_owned<'b>(&self) -> DefineTracepoint<'b, U> {
-        DefineTracepoint {
+    pub fn get_owned<'b>(&self) -> ExtendTracepoint<'b, U> {
+        ExtendTracepoint {
             number: self.number,
             addr: self.addr,
             actions: self.actions.get_owned(),
         }
     }
 
-    /// Construct a DefineTracepoint with specified list of actions.
+    /// Construct a ExtendTracepoint with specified list of actions.
     pub fn new_from_actions(
         number: Tracepoint,
         addr: U,
         actions: Vec<TracepointAction<'a, U>>,
     ) -> Self {
-        DefineTracepoint {
+        ExtendTracepoint {
             number,
             addr,
             actions: TracepointActionList::Parsed {
@@ -304,47 +305,20 @@ impl<'a, U: Copy> TracepointActionList<'a, U> {
     }
 }
 
-#[cfg(feature = "alloc")]
-impl<'a, U: Copy> TracepointItem<'a, U> {
-    /// Allocate an owned copy of this structure.
-    pub fn get_owned<'b>(&self) -> TracepointItem<'b, U> {
-        match self {
-            TracepointItem::New(n) => TracepointItem::New(n.clone()),
-            TracepointItem::Define(d) => TracepointItem::Define(d.get_owned()),
-        }
-    }
-}
-
-impl<'a, U: crate::internal::BeBytes + num_traits::Zero + PrimInt> DefineTracepoint<'a, U> {
-    /// Write this as a qTfP/qTsP response
-    pub(crate) fn write<T: Target, C: Connection>(
-        self,
-        res: &mut ResponseWriter<'_, C>,
-    ) -> Result<(), Error<T::Error, C::Error>> {
-        res.write_str("A")?;
-        res.write_num(self.number.0)?;
-        res.write_str(":")?;
-        res.write_num(self.addr)?;
-        res.write_str(":")?;
-        let mut err = None;
-        let _more = self.actions(|action| {
-            if let Err(e) = action.write::<T, C>(res) {
-                err = Some(e)
-            }
-        });
-        if let Some(e) = err {
-            return Err(e);
-        }
-        Ok(())
-    }
-}
-
 impl<'a, U: crate::internal::BeBytes + num_traits::Zero + PrimInt> TracepointAction<'a, U> {
     /// Write this as a qTfP/qTsP response
     pub(crate) fn write<T: Target, C: Connection>(
         &self,
+        tp: Tracepoint,
+        addr: U,
         res: &mut ResponseWriter<'_, C>,
     ) -> Result<(), Error<T::Error, C::Error>> {
+        res.write_str("A")?;
+        res.write_num(tp.0)?;
+        res.write_str(":")?;
+        res.write_num(addr)?;
+        res.write_str(":")?;
+
         match self {
             TracepointAction::Registers { mask } => {
                 res.write_str("R")?;
@@ -529,13 +503,44 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         let new_tracepoint =
                             NewTracepoint::<<T::Arch as Arch>::Usize>::from_tdp(ctdp)
                                 .ok_or(Error::TargetMismatch)?;
-                        ops.tracepoint_create(new_tracepoint).handle_error()?
+                        let tp = new_tracepoint.number;
+                        let addr = new_tracepoint.addr;
+                        let more = new_tracepoint.more;
+                        ops.tracepoint_create_begin(new_tracepoint).handle_error()?;
+                        if !more {
+                            ops.tracepoint_create_complete(tp, addr).handle_error()?;
+                        }
                     }
-                    QTDP::Define(dtdp) => {
-                        let define_tracepoint =
-                            DefineTracepoint::<<T::Arch as Arch>::Usize>::from_tdp(dtdp)
+                    QTDP::Extend(dtdp) => {
+                        let extend_tracepoint =
+                            ExtendTracepoint::<<T::Arch as Arch>::Usize>::from_tdp(dtdp)
                                 .ok_or(Error::TargetMismatch)?;
-                        ops.tracepoint_define(define_tracepoint).handle_error()?
+                        let tp = extend_tracepoint.number;
+                        let addr = extend_tracepoint.addr;
+                        let mut err: Option<Error<T::Error, C::Error>> = None;
+                        let more = extend_tracepoint.actions(|action| {
+                            if let Err(e) = ops
+                                .tracepoint_create_continue(tp, addr, action)
+                                .handle_error()
+                            {
+                                err = Some(e)
+                            }
+                        });
+                        if let Some(e) = err {
+                            return Err(e);
+                        }
+                        match more {
+                            Ok(Some(true)) => {
+                                // We expect additional QTDP packets, so don't
+                                // complete it yet.
+                            }
+                            Ok(None) | Ok(Some(false)) => {
+                                ops.tracepoint_create_complete(tp, addr).handle_error()?;
+                            }
+                            Err(e) => {
+                                return Err(Error::PacketParse(e));
+                            }
+                        }
                     }
                 };
                 // TODO: support qRelocInsn?
@@ -633,7 +638,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         // We need to know what tracepoint to begin stepping, since the
                         // target will just tell us there's TracepointEnumerateStep::More
                         // otherwise.
-                        started = Some(ctp.number);
+                        started = Some((ctp.number, ctp.addr));
                         let e = ctp.write::<T, C>(res);
                         if let Err(e) = e {
                             err = Some(e)
@@ -643,9 +648,9 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 if let Some(e) = err {
                     return Err(e);
                 }
-                if let Some(started) = started {
+                if let Some((tp, addr)) = started {
                     ops.tracepoint_enumerate_state().cursor =
-                        Some(TracepointEnumerateCursor::New(started));
+                        Some(TracepointEnumerateCursor::New { tp, addr });
                 }
                 self.handle_tracepoint_state_machine_step(target, step)?;
             }
@@ -660,7 +665,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         // anything else to report.
                         None
                     }
-                    Some(TracepointEnumerateCursor::New(tp)) => {
+                    Some(TracepointEnumerateCursor::New { tp, addr }) => {
                         // If we don't have any progress, the last packet was
                         // a Next(tp) and we need to start reporting a new tracepoint
                         Some(
@@ -673,11 +678,11 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                             .handle_error()?,
                         )
                     }
-                    Some(TracepointEnumerateCursor::Action(tp, progress)) => {
+                    Some(TracepointEnumerateCursor::Action { tp, addr, step }) => {
                         // Otherwise we should be continuing the advance the current tracepoint.
                         Some(
-                            ops.tracepoint_enumerate_action(tp, progress, &mut |dtp| {
-                                let e = dtp.write::<T, C>(res);
+                            ops.tracepoint_enumerate_action(tp, addr, step, &mut |action| {
+                                let e = action.write::<T, C>(tp, addr, res);
                                 if let Err(e) = e {
                                     err = Some(e)
                                 }
@@ -686,8 +691,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         )
                     }
                     // TODO: figure out how to gate this behind a supports method?
-                    Some(TracepointEnumerateCursor::Source(tp, progress)) => Some(
-                        ops.tracepoint_enumerate_source(tp, progress, &mut |src| {
+                    Some(TracepointEnumerateCursor::Source { tp, addr, step }) => Some(
+                        ops.tracepoint_enumerate_source(tp, addr, step, &mut |src| {
                             let e = src.write::<T, C>(res);
                             if let Err(e) = e {
                                 err = Some(e)
@@ -721,42 +726,55 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     fn handle_tracepoint_state_machine_step(
         &mut self,
         target: &mut T,
-        step: TracepointEnumerateStep,
+        step: TracepointEnumerateStep<<T::Arch as Arch>::Usize>,
     ) -> Result<(), Error<T::Error, C::Error>> {
         let ops = match target.support_tracepoints() {
             Some(ops) => ops,
             None => return Ok(()),
         };
         let state = ops.tracepoint_enumerate_state();
-        let next = match (&state.cursor, step) {
+        let next = match (state.cursor.as_ref(), step) {
             (None, _) => None,
             (Some(_), TracepointEnumerateStep::Done) => None,
 
             // Transition to enumerating actions
-            (Some(TracepointEnumerateCursor::New(tp)), TracepointEnumerateStep::Action) => {
-                Some(TracepointEnumerateCursor::Action(*tp, 0))
-            }
-            (Some(TracepointEnumerateCursor::Source(tp, _)), TracepointEnumerateStep::Action) => {
-                Some(TracepointEnumerateCursor::Action(*tp, 0))
-            }
             (
-                Some(TracepointEnumerateCursor::Action(tp, step)),
+                Some(&TracepointEnumerateCursor::New { tp, addr }),
                 TracepointEnumerateStep::Action,
-            ) => Some(TracepointEnumerateCursor::Action(*tp, step + 1)),
+            ) => Some(TracepointEnumerateCursor::Action { tp, addr, step: 0 }),
+            (
+                Some(&TracepointEnumerateCursor::Source { tp, addr, .. }),
+                TracepointEnumerateStep::Action,
+            ) => Some(TracepointEnumerateCursor::Action { tp, addr, step: 0 }),
+            (
+                Some(&TracepointEnumerateCursor::Action { tp, addr, step }),
+                TracepointEnumerateStep::Action,
+            ) => Some(TracepointEnumerateCursor::Action {
+                tp,
+                addr,
+                step: step + 1,
+            }),
 
             // Transition to enumerating sources
             (
-                Some(TracepointEnumerateCursor::New(tp) | TracepointEnumerateCursor::Action(tp, _)),
+                Some(
+                    &TracepointEnumerateCursor::New { tp, addr }
+                    | &TracepointEnumerateCursor::Action { tp, addr, .. },
+                ),
                 TracepointEnumerateStep::Source,
-            ) => Some(TracepointEnumerateCursor::Source(*tp, 0)),
+            ) => Some(TracepointEnumerateCursor::Source { tp, addr, step: 0 }),
             (
-                Some(TracepointEnumerateCursor::Source(tp, step)),
+                Some(&TracepointEnumerateCursor::Source { tp, addr, step }),
                 TracepointEnumerateStep::Source,
-            ) => Some(TracepointEnumerateCursor::Source(*tp, step + 1)),
+            ) => Some(TracepointEnumerateCursor::Source {
+                tp,
+                addr,
+                step: step + 1,
+            }),
 
             // Transition to the next tracepoint
-            (Some(_), TracepointEnumerateStep::Next(next)) => {
-                Some(TracepointEnumerateCursor::New(next))
+            (Some(_), TracepointEnumerateStep::Next { tp, addr }) => {
+                Some(TracepointEnumerateCursor::New { tp, addr })
             }
         };
         state.cursor = next;
