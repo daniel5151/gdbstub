@@ -15,14 +15,6 @@ use gdbstub::target::ext::tracepoints::TracepointStatus;
 use gdbstub::target::TargetError;
 use gdbstub::target::TargetResult;
 
-use armv4t_emu::Cpu;
-#[derive(Debug)]
-pub struct TraceFrame {
-    pub number: Tracepoint,
-    pub addr: u32,
-    pub snapshot: Cpu,
-}
-
 impl Emu {
     fn step_to_next_tracepoint(&self, tp: Tracepoint) -> TracepointEnumerateStep<u32> {
         let (tp_pos, _) = self
