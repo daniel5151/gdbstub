@@ -117,7 +117,7 @@ impl target::ext::tracepoints::Tracepoints for Emu {
     fn tracepoint_enumerate_start(
         &mut self,
         tp: Option<Tracepoint>,
-        f: &mut dyn FnMut(NewTracepoint<u32>),
+        f: &mut dyn FnMut(&NewTracepoint<u32>),
     ) -> TargetResult<TracepointEnumerateStep<u32>, Self> {
         let tp = match tp {
             Some(tp) => tp,
@@ -133,7 +133,7 @@ impl target::ext::tracepoints::Tracepoints for Emu {
         };
 
         // Report our tracepoint
-        (f)(self.tracepoints[&tp].0.clone());
+        (f)(&self.tracepoints[&tp].0);
 
         match self.tracepoints[&tp].2.get(0) {
             // We have actions and GDB should step through them
@@ -154,10 +154,10 @@ impl target::ext::tracepoints::Tracepoints for Emu {
         &mut self,
         tp: Tracepoint,
         step: u64,
-        f: &mut dyn FnMut(TracepointAction<'_, u32>),
+        f: &mut dyn FnMut(&TracepointAction<'_, u32>),
     ) -> TargetResult<TracepointEnumerateStep<u32>, Self> {
         // Report our next action
-        (f)(self.tracepoints[&tp].2[step as usize].get_owned());
+        (f)(&self.tracepoints[&tp].2[step as usize]);
 
         match self.tracepoints[&tp].2.get((step as usize) + 1) {
             // Continue stepping
@@ -175,10 +175,10 @@ impl target::ext::tracepoints::Tracepoints for Emu {
         &mut self,
         tp: Tracepoint,
         step: u64,
-        f: &mut dyn FnMut(SourceTracepoint<'_, u32>),
+        f: &mut dyn FnMut(&SourceTracepoint<'_, u32>),
     ) -> TargetResult<TracepointEnumerateStep<u32>, Self> {
         // Report our next source item
-        (f)(self.tracepoints[&tp].1[step as usize].get_owned());
+        (f)(&self.tracepoints[&tp].1[step as usize]);
 
         match self.tracepoints[&tp].1.get((step as usize) + 1) {
             // Continue stepping

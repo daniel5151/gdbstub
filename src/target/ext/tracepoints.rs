@@ -316,7 +316,7 @@ pub trait Tracepoints: Target {
     fn tracepoint_enumerate_start(
         &mut self,
         tp: Option<Tracepoint>,
-        f: &mut dyn FnMut(NewTracepoint<<Self::Arch as Arch>::Usize>),
+        f: &mut dyn FnMut(&NewTracepoint<<Self::Arch as Arch>::Usize>),
     ) -> TargetResult<TracepointEnumerateStep<<Self::Arch as Arch>::Usize>, Self>;
     /// Enumerate an action attached to a tracepoint. `step` is which action
     /// item is being asked for, so that the implementation can respond with
@@ -329,7 +329,7 @@ pub trait Tracepoints: Target {
         &mut self,
         tp: Tracepoint,
         step: u64,
-        f: &mut dyn FnMut(TracepointAction<'_, <Self::Arch as Arch>::Usize>),
+        f: &mut dyn FnMut(&TracepointAction<'_, <Self::Arch as Arch>::Usize>),
     ) -> TargetResult<TracepointEnumerateStep<<Self::Arch as Arch>::Usize>, Self>;
     /// Enumerate the source strings that describe a tracepoint. `step` is which
     /// source string is being asked for, so that the implementation can
@@ -342,7 +342,7 @@ pub trait Tracepoints: Target {
         &mut self,
         tp: Tracepoint,
         step: u64,
-        f: &mut dyn FnMut(SourceTracepoint<'_, <Self::Arch as Arch>::Usize>),
+        f: &mut dyn FnMut(&SourceTracepoint<'_, <Self::Arch as Arch>::Usize>),
     ) -> TargetResult<TracepointEnumerateStep<<Self::Arch as Arch>::Usize>, Self>;
 
     /// Reconfigure the trace buffer to include or modify an attribute.
