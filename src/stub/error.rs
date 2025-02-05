@@ -41,6 +41,7 @@ pub(crate) enum InternalError<T, C> {
     // I'll find the time to cut a breaking release of gdbstub, I'd prefer to
     // push out this feature as a non-breaking change now.
     MissingCurrentActivePidImpl,
+    TracepointFeatureUnimplemented,
 
     // Internal - A non-fatal error occurred (with errno-style error code)
     //
@@ -143,6 +144,7 @@ where
 
             ImplicitSwBreakpoints => write!(f, "Warning: The target has not opted into using implicit software breakpoints. See `Target::guard_rail_implicit_sw_breakpoints` for more information"),
             MissingCurrentActivePidImpl => write!(f, "GDB client attempted to attach to a new process, but the target has not implemented support for `ExtendedMode::support_current_active_pid`"),
+            TracepointFeatureUnimplemented => write!(f, "GDB client sent us a tracepoint packet, but `gdbstub` doesn't implement some of the features used."),
 
             NonFatalError(_) => write!(f, "Internal non-fatal error. You should never see this! Please file an issue if you do!"),
         }
