@@ -12,7 +12,7 @@ use gdbstub::target::ext::tracepoints::SourceTracepoint;
 use gdbstub::target::ext::tracepoints::Tracepoint;
 use gdbstub::target::ext::tracepoints::TracepointAction;
 use gdbstub::target::ext::tracepoints::TracepointEnumerateState;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 const HLE_RETURN_ADDR: u32 = 0x12345678;
 
@@ -54,7 +54,7 @@ pub struct Emu {
     pub(crate) breakpoints: Vec<u32>,
     pub(crate) files: Vec<Option<std::fs::File>>,
 
-    pub(crate) tracepoints: HashMap<
+    pub(crate) tracepoints: BTreeMap<
         Tracepoint,
         (
             NewTracepoint<u32>,
@@ -119,7 +119,7 @@ impl Emu {
             breakpoints: Vec::new(),
             files: Vec::new(),
 
-            tracepoints: HashMap::new(),
+            tracepoints: BTreeMap::new(),
             traceframes: Vec::new(),
             tracepoint_enumerate_state: Default::default(),
             tracing: false,
