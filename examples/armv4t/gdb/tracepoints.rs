@@ -127,19 +127,15 @@ impl target::ext::tracepoints::Tracepoints for Emu {
         // Report our tracepoint
         (f)(&self.tracepoints[&tp].0);
 
-        match self.tracepoints[&tp].2.get(0) {
-            // We have actions and GDB should step through them
-            Some(_next) => Ok(TracepointEnumerateStep::Action),
-            // No actions attached to this tracepoint
-            None => {
-                match self.tracepoints[&tp].1.get(0) {
-                    // We have sources and GDB should step through them
-                    Some(_) => Ok(TracepointEnumerateStep::Source),
-                    // No sources either, we're done
-                    None => Ok(TracepointEnumerateStep::Done),
-                }
-            }
-        }
+        let ret = if !self.tracepoints[&tp].1.is_empty() {
+            TracepointEnumerateStep::Source
+        } else if !self.tracepoints[&tp].2.is_empty() {
+            TracepointEnumerateStep::Action
+        } else {
+            TracepointEnumerateStep::Done
+        };
+
+        Ok(ret)
     }
 
     fn tracepoint_enumerate_action(
@@ -151,16 +147,18 @@ impl target::ext::tracepoints::Tracepoints for Emu {
         // Report our next action
         (f)(&self.tracepoints[&tp].2[step as usize]);
 
-        match self.tracepoints[&tp].2.get((step as usize) + 1) {
+        let ret = if let Some(_) = self.tracepoints[&tp].2.get((step as usize) + 1) {
             // Continue stepping
-            Some(_) => Ok(TracepointEnumerateStep::Action),
-            // We're done with this tracepoint, try to report source
-            None => match self.tracepoints[&tp].1.get(0) {
-                Some(_) => Ok(TracepointEnumerateStep::Source),
-                // No source, move to the next tracepoint
-                None => Ok(self.step_to_next_tracepoint(tp)),
-            },
-        }
+            TracepointEnumerateStep::Action
+        } else if !self.tracepoints[&tp].1.is_empty() {
+            // We're done with this tracepoint, report source
+            TracepointEnumerateStep::Source
+        } else {
+            // No sources, move to the next tracepoint
+            self.step_to_next_tracepoint(tp)
+        };
+
+        Ok(ret)
     }
 
     fn tracepoint_enumerate_source(
@@ -172,12 +170,15 @@ impl target::ext::tracepoints::Tracepoints for Emu {
         // Report our next source item
         (f)(&self.tracepoints[&tp].1[step as usize]);
 
-        match self.tracepoints[&tp].1.get((step as usize) + 1) {
+        let ret = if let Some(_) = self.tracepoints[&tp].1.get((step as usize) + 1) {
             // Continue stepping
-            Some(_) => Ok(TracepointEnumerateStep::Source),
+            TracepointEnumerateStep::Source
+        } else {
             // Move to next tracepoint
-            None => Ok(self.step_to_next_tracepoint(tp)),
-        }
+            self.step_to_next_tracepoint(tp)
+        };
+
+        Ok(ret)
     }
 
     fn trace_buffer_configure(&mut self, _config: TraceBufferConfig) -> TargetResult<(), Self> {
