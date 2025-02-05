@@ -444,6 +444,11 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             Tracepoints::QTDP(q) => {
                 match q {
                     QTDP::Create(ctdp) => {
+                        if ctdp.unsupported_options {
+                            // We have some options we don't know how to process, so bail out.
+                            return Err(Error::TracepointFeatureUnimplemented);
+                        }
+
                         let new_tracepoint =
                             NewTracepoint::<<T::Arch as Arch>::Usize>::from_tdp(ctdp)
                                 .ok_or(Error::TargetMismatch)?;
