@@ -17,19 +17,15 @@ use gdbstub::target::TargetResult;
 
 impl Emu {
     fn step_to_next_tracepoint(&self, tp: Tracepoint) -> TracepointEnumerateStep<u32> {
-        let (tp_pos, _) = self
-            .tracepoints
-            .keys()
-            .enumerate()
-            .find(|(_i, k)| **k == tp)
-            .unwrap();
-        match self.tracepoints.keys().nth(tp_pos + 1) {
+        let next_tp = self.tracepoints.range(tp..).nth(1);
+        if let Some((tp, (new_tp, _, _))) = next_tp {
+            TracepointEnumerateStep::Next {
+                tp: *tp,
+                addr: new_tp.addr,
+            }
+        } else {
             // No more tracepoints
-            None => TracepointEnumerateStep::Done,
-            Some(next_tp) => TracepointEnumerateStep::Next {
-                tp: *next_tp,
-                addr: self.tracepoints[next_tp].0.addr,
-            },
+            TracepointEnumerateStep::Done
         }
     }
 }
