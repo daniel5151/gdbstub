@@ -9,7 +9,6 @@ use crate::protocol::commands::prelude::decode_hex_buf;
 use crate::protocol::commands::_QTDP::CreateTDP;
 use crate::protocol::commands::_QTDP::ExtendTDP;
 use crate::protocol::commands::_QTDP::QTDP;
-use crate::protocol::PacketParseError;
 use crate::protocol::ResponseWriterError;
 use crate::target::ext::tracepoints::ExperimentExplanation;
 use crate::target::ext::tracepoints::ExperimentStatus;
@@ -94,17 +93,17 @@ impl<'a, U: BeBytes> ExtendTracepoint<'a, U> {
     /// Return `Ok(more)` on success, where more indicates if more actions are
     /// expect in later packets. If the actions weren't from a GDB packet, more
     /// is None.
-    pub(crate) fn actions(
+    pub(crate) fn actions<T, C>(
         mut self,
         f: impl FnMut(&TracepointAction<'_, U>),
-    ) -> Result<Option<bool>, PacketParseError> {
+    ) -> Result<Option<bool>, Error<T, C>> {
         Self::parse_raw_actions(&mut self.data, f)
     }
 
-    fn parse_raw_actions(
+    fn parse_raw_actions<T, C>(
         actions: &mut [u8],
         mut f: impl FnMut(&TracepointAction<'_, U>),
-    ) -> Result<Option<bool>, PacketParseError> {
+    ) -> Result<Option<bool>, Error<T, C>> {
         let (actions, more) = match actions {
             [rest @ .., b'-'] => (rest, true),
             x => (x, false),
@@ -126,7 +125,10 @@ impl<'a, U: BeBytes> ExtendTracepoint<'a, U> {
                     // "normals" actions may still be "while stepping" actions,
                     // just continued from the previous packet, which we forgot
                     // about!
-                    return Err(MalformedCommand);
+                    //
+                    // We use 'W' to indicate "while-stepping", since we're already
+                    // using 'S' elsewhere for static tracepoints.
+                    return Err(Error::TracepointFeatureUnimplemented(b'W'));
                 }
                 Some([b'R', mask @ ..]) => {
                     let mask_end = mask
@@ -137,10 +139,10 @@ impl<'a, U: BeBytes> ExtendTracepoint<'a, U> {
                     let mask = if let Some(mask_end) = mask_end {
                         let (mask_bytes, next) = mask.split_at_mut(mask_end.0);
                         unparsed = Some(next);
-                        decode_hex_buf(mask_bytes).or(Err(MalformedCommand))?
+                        decode_hex_buf(mask_bytes).or(Err(Error::PacketParse(MalformedCommand)))?
                     } else {
                         unparsed = None;
-                        decode_hex_buf(mask).or(Err(MalformedCommand))?
+                        decode_hex_buf(mask).or(Err(Error::PacketParse(MalformedCommand)))?
                     };
                     (f)(&TracepointAction::Registers {
                         mask: ManagedSlice::Borrowed(mask),
@@ -149,20 +151,22 @@ impl<'a, U: BeBytes> ExtendTracepoint<'a, U> {
                 Some([b'M', _mem_args @ ..]) => {
                     // Unimplemented: even simple actions like `collect *(int*)0x0`
                     // are actually assembled as `X` bytecode actions
-                    return Err(MalformedCommand);
+                    return Err(Error::TracepointFeatureUnimplemented(b'M'));
                 }
                 Some([b'X', eval_args @ ..]) => {
                     let mut len_end = eval_args.splitn_mut(2, |b| *b == b',');
                     let (len_bytes, rem) = (
-                        len_end.next().ok_or(MalformedCommand)?,
-                        len_end.next().ok_or(MalformedCommand)?,
+                        len_end.next().ok_or(Error::PacketParse(MalformedCommand))?,
+                        len_end.next().ok_or(Error::PacketParse(MalformedCommand))?,
                     );
-                    let len: usize = decode_hex(len_bytes).or(Err(MalformedCommand))?;
+                    let len: usize =
+                        decode_hex(len_bytes).or(Err(Error::PacketParse(MalformedCommand)))?;
                     if rem.len() < len * 2 {
-                        return Err(MalformedCommand);
+                        return Err(Error::PacketParse(MalformedCommand));
                     }
                     let (expr_bytes, next_bytes) = rem.split_at_mut(len * 2);
-                    let expr = decode_hex_buf(expr_bytes).or(Err(MalformedCommand))?;
+                    let expr =
+                        decode_hex_buf(expr_bytes).or(Err(Error::PacketParse(MalformedCommand)))?;
                     (f)(&TracepointAction::Expression {
                         expr: ManagedSlice::Borrowed(expr),
                     });
@@ -171,7 +175,7 @@ impl<'a, U: BeBytes> ExtendTracepoint<'a, U> {
                 Some([]) | None => {
                     break;
                 }
-                _ => return Err(MalformedCommand),
+                _ => return Err(Error::PacketParse(MalformedCommand)),
             }
         }
 
@@ -459,9 +463,9 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             Tracepoints::QTDP(q) => {
                 match q {
                     QTDP::Create(ctdp) => {
-                        if ctdp.unsupported_options {
+                        if let Some(feat) = ctdp.unsupported_option {
                             // We have some options we don't know how to process, so bail out.
-                            return Err(Error::TracepointFeatureUnimplemented);
+                            return Err(Error::TracepointFeatureUnimplemented(feat));
                         }
 
                         let (new_tracepoint, more) =
@@ -498,7 +502,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                                 ops.tracepoint_create_complete(tp).handle_error()?;
                             }
                             Err(e) => {
-                                return Err(Error::PacketParse(e));
+                                return Err(e);
                             }
                         }
                     }
@@ -550,8 +554,6 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 let mut err: Result<_, Error<T::Error, C::Error>> = Ok(());
                 let mut any_results = false;
                 ops.select_frame(parsed_req, &mut |desc| {
-                    // TODO: bubble up the C::Error from this closure? list_thread_active does this
-                    // instead
                     let e = (|| -> Result<_, _> {
                         match desc {
                             FrameDescription::FrameNumber(n) => {
