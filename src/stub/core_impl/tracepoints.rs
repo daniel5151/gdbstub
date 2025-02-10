@@ -13,7 +13,6 @@ use crate::protocol::PacketParseError;
 use crate::protocol::ResponseWriterError;
 use crate::target::ext::tracepoints::ExperimentExplanation;
 use crate::target::ext::tracepoints::ExperimentStatus;
-use crate::target::ext::tracepoints::ExtendTracepoint;
 use crate::target::ext::tracepoints::FrameDescription;
 use crate::target::ext::tracepoints::FrameRequest;
 use crate::target::ext::tracepoints::NewTracepoint;
@@ -29,15 +28,17 @@ use num_traits::PrimInt;
 
 impl<U: BeBytes> NewTracepoint<U> {
     /// Parse from a raw CreateTDP packet.
-    fn from_tdp(ctdp: CreateTDP<'_>) -> Option<Self> {
-        Some(Self {
-            number: ctdp.number,
-            addr: U::from_be_bytes(ctdp.addr)?,
-            enabled: ctdp.enable,
-            pass_count: ctdp.pass,
-            step_count: ctdp.step,
-            more: ctdp.more,
-        })
+    fn from_tdp(ctdp: CreateTDP<'_>) -> Option<(Self, bool)> {
+        Some((
+            Self {
+                number: ctdp.number,
+                addr: U::from_be_bytes(ctdp.addr)?,
+                enabled: ctdp.enable,
+                pass_count: ctdp.pass,
+                step_count: ctdp.step,
+            },
+            ctdp.more,
+        ))
     }
 }
 
@@ -60,6 +61,20 @@ impl<U: crate::internal::BeBytes + num_traits::Zero + PrimInt> NewTracepoint<U> 
 
         Ok(())
     }
+}
+
+/// A list of actions that a tracepoint should be extended with.
+#[derive(Debug)]
+pub(crate) struct ExtendTracepoint<'a, U> {
+    /// The tracepoint that is having actions appended to its definition.
+    pub number: Tracepoint,
+    /// The PC address of the tracepoint that is being extended.
+    /// This is currently unused information sent as part of the packet by GDB,
+    /// but may be required for implementing while-stepping actions later.
+    #[allow(dead_code)]
+    pub addr: U,
+    /// The unparsed action data.
+    pub data: ManagedSlice<'a, u8>,
 }
 
 impl<'a, U: BeBytes> ExtendTracepoint<'a, U> {
@@ -170,7 +185,7 @@ impl<'a, U: BeBytes> SourceTracepoint<'a, U> {
         Some(Self {
             number: src.number,
             addr: U::from_be_bytes(src.addr)?,
-            r#type: src.r#type,
+            kind: src.kind,
             start: src.start,
             slen: src.slen,
             bytes: ManagedSlice::Borrowed(src.bytes),
@@ -188,7 +203,7 @@ impl<U: crate::internal::BeBytes + num_traits::Zero + PrimInt> SourceTracepoint<
         res.write_str(":")?;
         res.write_num(self.addr)?;
         res.write_str(":")?;
-        res.write_str(match self.r#type {
+        res.write_str(match self.kind {
             TracepointSourceType::At => "at",
             TracepointSourceType::Cond => "cond",
             TracepointSourceType::Cmd => "cmd",
@@ -216,7 +231,7 @@ impl<'a, U: Copy> SourceTracepoint<'a, U> {
         SourceTracepoint {
             number: self.number,
             addr: self.addr,
-            r#type: self.r#type,
+            kind: self.kind,
             start: self.start,
             slen: self.slen,
             bytes: ManagedSlice::Owned(self.bytes.to_owned()),
@@ -449,11 +464,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                             return Err(Error::TracepointFeatureUnimplemented);
                         }
 
-                        let new_tracepoint =
+                        let (new_tracepoint, more) =
                             NewTracepoint::<<T::Arch as Arch>::Usize>::from_tdp(ctdp)
                                 .ok_or(Error::TargetMismatch)?;
                         let tp = new_tracepoint.number;
-                        let more = new_tracepoint.more;
                         ops.tracepoint_create_begin(new_tracepoint).handle_error()?;
                         if !more {
                             ops.tracepoint_create_complete(tp).handle_error()?;
@@ -500,18 +514,17 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 return Ok(HandlerStatus::NeedsOk);
             }
             Tracepoints::qTBuffer(buf) => {
-                let qTBuffer {
-                    offset,
-                    length,
-                    data,
-                } = buf;
-                let read = ops
-                    .trace_buffer_request(offset, length, data)
-                    .handle_error()?;
-                if let Some(read) = read {
-                    let read = read.min(data.len());
-                    res.write_hex_buf(&data[..read])?;
-                } else {
+                let qTBuffer { offset, length } = buf;
+                let mut wrote: Result<bool, Error<T::Error, C::Error>> = Ok(false);
+                ops.trace_buffer_request(offset, length, &mut |data| {
+                    if let Err(e) = res.write_hex_buf(data) {
+                        wrote = Err(e.into())
+                    } else {
+                        wrote = Ok(true)
+                    }
+                })
+                .handle_error()?;
+                if !wrote? {
                     res.write_str("l")?;
                 }
             }
@@ -543,18 +556,14 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         match desc {
                             FrameDescription::FrameNumber(n) => {
                                 res.write_str("F")?;
-                                if let Some(n) = n {
-                                    res.write_num(n)?;
-                                } else {
-                                    res.write_str("-1")?;
-                                }
+                                res.write_num(n)?;
+                                any_results = true;
                             }
                             FrameDescription::Hit(tdp) => {
                                 res.write_str("T")?;
                                 res.write_num(tdp.0)?;
                             }
                         }
-                        any_results = true;
                         Ok(())
                     })();
                     if let Err(e) = e {
