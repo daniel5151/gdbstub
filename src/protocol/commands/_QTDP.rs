@@ -14,7 +14,7 @@ pub struct CreateTDP<'a> {
     pub enable: bool,
     pub step: u64,
     pub pass: u64,
-    pub unsupported_options: bool,
+    pub unsupported_option: Option<u8>,
     pub more: bool,
 }
 
@@ -60,24 +60,24 @@ impl<'a> ParseCommand<'a> for QTDP<'a> {
                 // TODO: parse `F` fast tracepoint options
                 // TODO: parse `X` tracepoint conditions
                 let options = params.next();
-                let unsupported_options = match options {
+                let unsupported_option = match options {
                     Some([b'F', ..]) => {
                         /* TODO: fast tracepoints support */
-                        true
+                        Some(b'F')
                     }
                     Some([b'S']) => {
                         /* TODO: static tracepoint support */
-                        true
+                        Some(b'S')
                     }
                     Some([b'X', ..]) => {
                         /* TODO: trace conditions support */
-                        true
+                        Some(b'X')
                     }
                     Some(_) => {
                         /* invalid option */
                         return None;
                     }
-                    None => false,
+                    None => None,
                 };
                 return Some(QTDP::Create(CreateTDP {
                     number: n,
@@ -90,7 +90,7 @@ impl<'a> ParseCommand<'a> for QTDP<'a> {
                     step,
                     pass,
                     more,
-                    unsupported_options,
+                    unsupported_option,
                 }));
             }
             _ => None,
