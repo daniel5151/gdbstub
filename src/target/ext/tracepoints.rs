@@ -26,9 +26,6 @@ pub struct NewTracepoint<U> {
     pub step_count: u64,
     /// The tracepoint's pass count.
     pub pass_count: u64,
-    /// If ExtendTracepoint packets are expected to expand this tracepoint's
-    /// definition.
-    pub(crate) more: bool,
 }
 
 /// Describes how to collect information for a trace frame when the tracepoint
@@ -63,18 +60,6 @@ pub enum TracepointAction<'a, U> {
     },
 }
 
-/// A list of actions that a tracepoint should be extended with.
-#[derive(Debug)]
-pub(crate) struct ExtendTracepoint<'a, U> {
-    /// The tracepoint that is having actions appended to its definition.
-    pub number: Tracepoint,
-    /// The PC address of the tracepoint that is being extended.
-    #[allow(dead_code)]
-    pub addr: U,
-    /// The unparsed action data.
-    pub data: ManagedSlice<'a, u8>,
-}
-
 /// What type of information a tracepoint source item is about.
 #[derive(Debug, Clone, Copy)]
 pub enum TracepointSourceType {
@@ -87,12 +72,12 @@ pub enum TracepointSourceType {
     Cmd,
 }
 
-#[derive(Debug)]
 /// Source string fragment for a tracepoint. A tracepoint may have more than one
 /// source string, such as being describes by one source string for the location
 /// and another for the actions, or by GDB splitting a larger source string
 /// into multiple fragments. GDB may ask for the source of current tracepoints,
 /// which are described by this same structure.
+#[derive(Debug)]
 pub struct SourceTracepoint<'a, U> {
     /// The tracepoint that the source string is specifying.
     pub number: Tracepoint,
@@ -100,7 +85,7 @@ pub struct SourceTracepoint<'a, U> {
     pub addr: U,
     /// What type of information for this tracepoint the string fragment is
     /// about.
-    pub r#type: TracepointSourceType,
+    pub kind: TracepointSourceType,
     /// The offset in bytes within the overall source string this fragment is
     /// within.
     pub start: u32,
@@ -204,7 +189,7 @@ pub enum FrameRequest<U> {
 #[derive(Debug)]
 pub enum FrameDescription {
     /// The frame is at the specified index in the trace buffer
-    FrameNumber(Option<u64>),
+    FrameNumber(u64),
     /// The frame is a hit of the specified tracepoint
     Hit(Tracepoint),
 }
@@ -348,16 +333,17 @@ pub trait Tracepoints: Target {
     /// Reconfigure the trace buffer to include or modify an attribute.
     fn trace_buffer_configure(&mut self, config: TraceBufferConfig) -> TargetResult<(), Self>;
 
-    /// Return up to `len` bytes from the trace buffer, starting at `offset`.
+    /// Read up to `len` bytes from the trace buffer, starting at `offset`.
     /// The trace buffer is treated as a contiguous collection of traceframes,
     /// as per [GDB's trace file format](https://sourceware.org/gdb/current/onlinedocs/gdb.html/Trace-File-Format.html).
-    /// The return value should be the number of bytes written.
+    /// The function `f` should be called to report as many bytes from
+    /// the trace buffer that were requested as possible.
     fn trace_buffer_request(
         &mut self,
         offset: u64,
         len: usize,
-        buf: &mut [u8],
-    ) -> TargetResult<Option<usize>, Self>;
+        f: &mut dyn FnMut(&mut [u8]),
+    ) -> TargetResult<(), Self>;
 
     /// Return the status of the current trace experiment.
     fn trace_experiment_status(&self) -> TargetResult<ExperimentStatus<'_>, Self>;

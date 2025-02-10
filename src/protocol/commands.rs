@@ -346,7 +346,7 @@ commands! {
         "QTStop" => _QTStop::QTStop,
         "QTFrame" => _QTFrame::QTFrame<'a>,
 
-        "qTBuffer" => _qTBuffer::qTBuffer<'a>,
+        "qTBuffer" => _qTBuffer::qTBuffer,
         "qTStatus" => _qTStatus::qTStatus,
         "qTP" => _qTP::qTP<'a>,
         "qTfP" => _qTfP::qTfP,

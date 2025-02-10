@@ -187,10 +187,10 @@ impl target::ext::tracepoints::Tracepoints for Emu {
         &mut self,
         _offset: u64,
         _len: usize,
-        _buf: &mut [u8],
-    ) -> TargetResult<Option<usize>, Self> {
-        // We don't have a "real" trace buffer, so fail all raw read requests.
-        Ok(None)
+        _f: &mut dyn FnMut(&mut [u8]),
+    ) -> TargetResult<(), Self> {
+        // We don't have a "real" trace buffer, so just don't report any data
+        Ok(())
     }
 
     fn trace_experiment_status(&self) -> TargetResult<ExperimentStatus<'_>, Self> {
@@ -242,11 +242,10 @@ impl target::ext::tracepoints::Tracepoints for Emu {
             _ => return Err(TargetError::NonFatal),
         };
         if let Some((n, frame)) = found {
-            (report)(FrameDescription::FrameNumber(Some(n)));
+            (report)(FrameDescription::FrameNumber(n));
             (report)(FrameDescription::Hit(frame.number));
             self.selected_frame = Some(n as usize);
         } else {
-            (report)(FrameDescription::FrameNumber(None));
             self.selected_frame = None;
         }
         Ok(())
