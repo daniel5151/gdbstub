@@ -67,18 +67,6 @@ impl target::ext::tracepoints::Tracepoints for Emu {
         Ok(())
     }
 
-    fn tracepoint_attach_source(
-        &mut self,
-        src: SourceTracepoint<'_, u32>,
-    ) -> TargetResult<(), Self> {
-        self.tracepoints
-            .get_mut(&src.number)
-            .unwrap()
-            .1
-            .push(src.get_owned());
-        Ok(())
-    }
-
     fn tracepoint_status(
         &self,
         tp: Tracepoint,
@@ -157,24 +145,11 @@ impl target::ext::tracepoints::Tracepoints for Emu {
         Ok(ret)
     }
 
-    fn tracepoint_enumerate_source(
+    #[inline(always)]
+    fn support_tracepoint_source(
         &mut self,
-        tp: Tracepoint,
-        step: u64,
-        f: &mut dyn FnMut(&SourceTracepoint<'_, u32>),
-    ) -> TargetResult<TracepointEnumerateStep<u32>, Self> {
-        // Report our next source item
-        (f)(&self.tracepoints[&tp].1[step as usize]);
-
-        let ret = if let Some(_) = self.tracepoints[&tp].1.get((step as usize) + 1) {
-            // Continue stepping
-            TracepointEnumerateStep::Source
-        } else {
-            // Move to next tracepoint
-            self.step_to_next_tracepoint(tp)
-        };
-
-        Ok(ret)
+    ) -> Option<target::ext::tracepoints::TracepointSourceOps<'_, Self>> {
+        Some(self)
     }
 
     fn trace_buffer_configure(&mut self, _config: TraceBufferConfig) -> TargetResult<(), Self> {
@@ -258,6 +233,40 @@ impl target::ext::tracepoints::Tracepoints for Emu {
 
     fn trace_experiment_stop(&mut self) -> TargetResult<(), Self> {
         self.tracing = false;
+        Ok(())
+    }
+}
+
+impl target::ext::tracepoints::TracepointSource for Emu {
+    fn tracepoint_enumerate_source(
+        &mut self,
+        tp: Tracepoint,
+        step: u64,
+        f: &mut dyn FnMut(&SourceTracepoint<'_, u32>),
+    ) -> TargetResult<TracepointEnumerateStep<u32>, Self> {
+        // Report our next source item
+        (f)(&self.tracepoints[&tp].1[step as usize]);
+
+        let ret = if let Some(_) = self.tracepoints[&tp].1.get((step as usize) + 1) {
+            // Continue stepping
+            TracepointEnumerateStep::Source
+        } else {
+            // Move to next tracepoint
+            self.step_to_next_tracepoint(tp)
+        };
+
+        Ok(ret)
+    }
+
+    fn tracepoint_attach_source(
+        &mut self,
+        src: SourceTracepoint<'_, u32>,
+    ) -> TargetResult<(), Self> {
+        self.tracepoints
+            .get_mut(&src.number)
+            .unwrap()
+            .1
+            .push(src.get_owned());
         Ok(())
     }
 }
