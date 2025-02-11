@@ -172,7 +172,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     }
                 }
 
-                if let Some(_ops) = target.support_tracepoints() {
+                if let Some(ops) = target.support_tracepoints() {
                     // There are a number of optional tracepoint extensions that
                     // gdbstub should eventually implement.
                     // * `StaticTracepoint` for static tracepoint support.
@@ -190,8 +190,9 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     // * `QTBuffer:size` for configuring the trace buffer size, since the target is
                     //   allowed to implement it as a no-op.
                     res.write_str(";QTBuffer:size+")?;
-                    // TODO: gate this behind a support method
-                    res.write_str(";TracepointSource+")?;
+                    if ops.support_tracepoint_source().is_some() {
+                        res.write_str(";TracepointSource+")?;
+                    }
                 }
 
                 if target.support_catch_syscalls().is_some() {

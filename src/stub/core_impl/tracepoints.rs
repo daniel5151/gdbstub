@@ -511,11 +511,15 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 return Ok(HandlerStatus::NeedsOk);
             }
             Tracepoints::QTDPsrc(src) => {
-                let source = SourceTracepoint::<<T::Arch as Arch>::Usize>::from_src(src)
-                    .ok_or(Error::TargetMismatch)?;
-                ops.tracepoint_attach_source(source).handle_error()?;
-                // Documentation doesn't mention this, but it needs OK
-                return Ok(HandlerStatus::NeedsOk);
+                if let Some(supports_sources) = ops.support_tracepoint_source() {
+                    let source = SourceTracepoint::<<T::Arch as Arch>::Usize>::from_src(src)
+                        .ok_or(Error::TargetMismatch)?;
+                    supports_sources
+                        .tracepoint_attach_source(source)
+                        .handle_error()?;
+                    // Documentation doesn't mention this, but it needs OK
+                    return Ok(HandlerStatus::NeedsOk);
+                }
             }
             Tracepoints::qTBuffer(buf) => {
                 let qTBuffer { offset, length } = buf;
@@ -647,16 +651,25 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                             .handle_error()?,
                         )
                     }
-                    // TODO: figure out how to gate this behind a supports method?
-                    Some(TracepointEnumerateCursor::Source { tp, step, .. }) => Some(
-                        ops.tracepoint_enumerate_source(tp, step, &mut |src| {
-                            let e = src.write::<T, C>(res);
-                            if let Err(e) = e {
-                                err = Some(e)
-                            }
-                        })
-                        .handle_error()?,
-                    ),
+                    Some(TracepointEnumerateCursor::Source { tp, step, .. }) => {
+                        if let Some(supports_sources) = ops.support_tracepoint_source() {
+                            Some(
+                                supports_sources
+                                    .tracepoint_enumerate_source(tp, step, &mut |src| {
+                                        let e = src.write::<T, C>(res);
+                                        if let Err(e) = e {
+                                            err = Some(e)
+                                        }
+                                    })
+                                    .handle_error()?,
+                            )
+                        } else {
+                            // If the target doesn't support tracepoint sources but told
+                            // us to enumerate one anyways, then all we can do is
+                            // stop our state machine.
+                            None
+                        }
+                    }
                 };
 
                 if let Some(e) = err {

@@ -233,6 +233,10 @@ pub enum TracepointEnumerateStep<U> {
     /// Increments the step counter if the state machine was already
     /// enumerating sources strings, otherwise it is reset to 0 and GDB will
     /// start enumerating source strings.
+    ///
+    /// Targets should only return this transition if they implement
+    /// [Tracepoints::support_tracepoint_source], or else it indicates an error
+    /// and the state machine iteration will stop.
     Source,
     /// The current tracepoint has been enumerated, and GDB should next
     /// enumerate a different one.
@@ -266,12 +270,6 @@ pub trait Tracepoints: Target {
     /// Complete the creation of a tracepoint. All of its actions are expected
     /// to have been received.
     fn tracepoint_create_complete(&mut self, tp: Tracepoint) -> TargetResult<(), Self>;
-    /// Configure an existing tracepoint, appending a new source string
-    /// fragment.
-    fn tracepoint_attach_source(
-        &mut self,
-        src: SourceTracepoint<'_, <Self::Arch as Arch>::Usize>,
-    ) -> TargetResult<(), Self>;
     /// Request the status of tracepoint `tp` at address `addr`.
     ///
     /// Returns a [TracepointStatus] with the requested information.
@@ -316,19 +314,6 @@ pub trait Tracepoints: Target {
         step: u64,
         f: &mut dyn FnMut(&TracepointAction<'_, <Self::Arch as Arch>::Usize>),
     ) -> TargetResult<TracepointEnumerateStep<<Self::Arch as Arch>::Usize>, Self>;
-    /// Enumerate the source strings that describe a tracepoint. `step` is which
-    /// source string is being asked for, so that the implementation can
-    /// respond with multiple items across multiple function calls. Each
-    /// source string should be reported via `f`.
-    ///
-    /// After reporting a tracepoint source string, [TracepointEnumerateStep]
-    /// describes what source string will next be enumerated.
-    fn tracepoint_enumerate_source(
-        &mut self,
-        tp: Tracepoint,
-        step: u64,
-        f: &mut dyn FnMut(&SourceTracepoint<'_, <Self::Arch as Arch>::Usize>),
-    ) -> TargetResult<TracepointEnumerateStep<<Self::Arch as Arch>::Usize>, Self>;
 
     /// Reconfigure the trace buffer to include or modify an attribute.
     fn trace_buffer_configure(&mut self, config: TraceBufferConfig) -> TargetResult<(), Self>;
@@ -369,6 +354,43 @@ pub trait Tracepoints: Target {
         frame: FrameRequest<<Self::Arch as Arch>::Usize>,
         report: &mut dyn FnMut(FrameDescription),
     ) -> TargetResult<(), Self>;
+
+    /// Support for setting and enumerating the source strings for tracepoint
+    /// actions.
+    #[inline(always)]
+    fn support_tracepoint_source(&mut self) -> Option<TracepointSourceOps<'_, Self>> {
+        None
+    }
+}
+
+/// Target Extension - Support setting and enumerating source strings for
+/// tracepoint actions.
+///
+/// GDB requires source strings to be accurately reported back to it when it
+/// attaches to a target in order to download tracepoints, or else it will
+/// locally not be able to parse them and throw away the attached actions.
+pub trait TracepointSource: Tracepoints {
+    /// Configure an existing tracepoint, appending a new source string
+    /// fragment.
+    fn tracepoint_attach_source(
+        &mut self,
+        src: SourceTracepoint<'_, <Self::Arch as Arch>::Usize>,
+    ) -> TargetResult<(), Self>;
+
+    /// Enumerate the source strings that describe a tracepoint. `step` is which
+    /// source string is being asked for, so that the implementation can
+    /// respond with multiple items across multiple function calls. Each
+    /// source string should be reported via `f`.
+    ///
+    /// After reporting a tracepoint source string, [TracepointEnumerateStep]
+    /// describes what source string will next be enumerated.
+    fn tracepoint_enumerate_source(
+        &mut self,
+        tp: Tracepoint,
+        step: u64,
+        f: &mut dyn FnMut(&SourceTracepoint<'_, <Self::Arch as Arch>::Usize>),
+    ) -> TargetResult<TracepointEnumerateStep<<Self::Arch as Arch>::Usize>, Self>;
 }
 
 define_ext!(TracepointsOps, Tracepoints);
+define_ext!(TracepointSourceOps, TracepointSource);
