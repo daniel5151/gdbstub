@@ -228,46 +228,6 @@ impl<U: crate::internal::BeBytes + num_traits::Zero + PrimInt> SourceTracepoint<
     }
 }
 
-#[cfg(feature = "alloc")]
-impl<'a, U: Copy> SourceTracepoint<'a, U> {
-    /// Allocate an owned copy of this structure.
-    pub fn get_owned<'b>(&self) -> SourceTracepoint<'b, U> {
-        SourceTracepoint {
-            number: self.number,
-            addr: self.addr,
-            kind: self.kind,
-            start: self.start,
-            slen: self.slen,
-            bytes: ManagedSlice::Owned(self.bytes.to_owned()),
-        }
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl<'a, U: Copy> TracepointAction<'a, U> {
-    /// Allocate an owned copy of this structure.
-    pub fn get_owned<'b>(&self) -> TracepointAction<'b, U> {
-        use core::ops::Deref;
-        match self {
-            TracepointAction::Registers { mask } => TracepointAction::Registers {
-                mask: ManagedSlice::Owned(mask.deref().into()),
-            },
-            TracepointAction::Memory {
-                basereg,
-                offset,
-                length,
-            } => TracepointAction::Memory {
-                basereg: *basereg,
-                offset: *offset,
-                length: *length,
-            },
-            TracepointAction::Expression { expr } => TracepointAction::Expression {
-                expr: ManagedSlice::Owned(expr.deref().into()),
-            },
-        }
-    }
-}
-
 impl<'a, U: crate::internal::BeBytes + num_traits::Zero + PrimInt> TracepointAction<'a, U> {
     /// Write this as a qTfP/qTsP response
     pub(crate) fn write<T: Target, C: Connection>(
