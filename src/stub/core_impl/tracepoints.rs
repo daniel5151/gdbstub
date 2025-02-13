@@ -391,19 +391,36 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 return Ok(HandlerStatus::NeedsOk);
             }
             Tracepoints::qTStatus(_) => {
-                let status = ops.trace_experiment_status().handle_error()?;
-                status.write(res)?;
                 let mut err: Option<Error<T::Error, C::Error>> = None;
-                ops.trace_experiment_info(&mut |explanation: ExperimentExplanation<'_>| {
-                    if let Err(e) = res
-                        .write_str(";")
-                        .map_err(|e| e.into())
-                        .and_then(|()| explanation.write::<T, C>(res))
-                    {
-                        err = Some(e)
+                let mut has_status = false;
+                ops.trace_experiment_status(&mut |status: ExperimentStatus<'_>| {
+                    // If the target implementation calls us multiple times, then
+                    // we would erroneously serialize an invalid response. Guard
+                    // against it in the simplest way.
+                    if has_status {
+                        return;
+                    }
+                    if let Err(e) = status.write(res) {
+                        err = Some(e.into())
+                    } else {
+                        has_status = true;
                     }
                 })
                 .handle_error()?;
+                if has_status {
+                    // Only bother trying to get info if we also have a status
+                    ops.trace_experiment_info(&mut |explanation: ExperimentExplanation<'_>| {
+                        if let Err(e) = res
+                            .write_str(";")
+                            .map_err(|e| e.into())
+                            .and_then(|()| explanation.write::<T, C>(res))
+                        {
+                            err = Some(e)
+                        }
+                    })
+                    .handle_error()?;
+                }
+
                 if let Some(e) = err {
                     return Err(e);
                 }

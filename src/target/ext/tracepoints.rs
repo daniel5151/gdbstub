@@ -371,7 +371,10 @@ pub trait Tracepoints: Target {
     ) -> TargetResult<(), Self>;
 
     /// Return the status of the current trace experiment.
-    fn trace_experiment_status(&self) -> TargetResult<ExperimentStatus<'_>, Self>;
+    fn trace_experiment_status(
+        &self,
+        report: &mut dyn FnMut(ExperimentStatus<'_>),
+    ) -> TargetResult<(), Self>;
     /// List any statistical information for the current trace experiment, by
     /// calling `report` with each [ExperimentExplanation] item.
     fn trace_experiment_info(
