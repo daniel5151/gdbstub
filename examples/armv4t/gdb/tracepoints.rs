@@ -168,13 +168,17 @@ impl target::ext::tracepoints::Tracepoints for Emu {
         Ok(())
     }
 
-    fn trace_experiment_status(&self) -> TargetResult<ExperimentStatus<'_>, Self> {
+    fn trace_experiment_status(
+        &self,
+        report: &mut dyn FnMut(ExperimentStatus<'_>),
+    ) -> TargetResult<(), Self> {
         // For a bare-bones example, we don't provide in-depth status explanations.
-        Ok(if self.tracing {
+        (report)(if self.tracing {
             ExperimentStatus::Running
         } else {
             ExperimentStatus::NotRunning
-        })
+        });
+        Ok(())
     }
 
     fn trace_experiment_info(
