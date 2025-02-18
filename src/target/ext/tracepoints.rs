@@ -181,7 +181,7 @@ pub enum ExperimentExplanation<'a> {
     /// The value of the disconnected tracing flag. True means that tracing will
     /// continue after GDB disconnects, false means that the trace run will
     /// stop.
-    Disconn(bool),
+    DisconnectedTracing(bool),
 
     /// Report a raw string as a trace status explanation.
     Other(&'a str),
@@ -258,7 +258,7 @@ pub struct TracepointEnumerateState<U> {
     pub(crate) cursor: Option<TracepointEnumerateCursor<U>>,
 }
 
-/// How to transition the [TracepointEnumerateState] state machine after
+/// How to transition the [`TracepointEnumerateState`] state machine after
 /// reporting an item for tracepoint enumeration.
 #[derive(Debug)]
 pub enum TracepointEnumerateStep<U> {
@@ -275,10 +275,10 @@ pub enum TracepointEnumerateStep<U> {
     /// start enumerating source strings.
     ///
     /// Targets should only return this transition if they implement
-    /// [Tracepoints::support_tracepoint_source], or else it indicates an error
-    /// and the state machine iteration will stop.
+    /// [`Tracepoints::support_tracepoint_source`], or else it indicates an
+    /// error and the state machine iteration will stop.
     Source,
-    /// The current tracepoint has been enumerated, and GDB should next
+    /// The current tracepoint is done being enumerated, and GDB should next
     /// enumerate a different one.
     Next {
         /// The next tracepoint to move to.
@@ -295,13 +295,17 @@ pub trait Tracepoints: Target {
     /// Clear any saved tracepoints and empty the trace frame buffer.
     fn tracepoints_init(&mut self) -> TargetResult<(), Self>;
 
-    /// Create a new tracepoint according to the description `tdp`.
+    /// Begin creating a new tracepoint according to the description `tdp`.
     fn tracepoint_create_begin(
         &mut self,
         tdp: NewTracepoint<<Self::Arch as Arch>::Usize>,
     ) -> TargetResult<(), Self>;
     /// Configure an existing tracepoint, appending an additional action to its
     /// definition.
+    ///
+    /// This method will only ever be called in-between
+    /// [`tracepoint_create_begin`] and [`tracepoint_create_complete`]
+    /// invocations for a new tracepoint.
     fn tracepoint_create_continue(
         &mut self,
         tp: Tracepoint,
@@ -309,10 +313,14 @@ pub trait Tracepoints: Target {
     ) -> TargetResult<(), Self>;
     /// Complete the creation of a tracepoint. All of its actions are expected
     /// to have been received.
+    ///
+    /// This method will only ever be called after all of the
+    /// [`tracepoint_create_begin`] and [`tracepoint_create_continue`]
+    /// invocations for a new tracepoint.
     fn tracepoint_create_complete(&mut self, tp: Tracepoint) -> TargetResult<(), Self>;
     /// Request the status of tracepoint `tp` at address `addr`.
     ///
-    /// Returns a [TracepointStatus] with the requested information.
+    /// Returns a [`TracepointStatus`] with the requested information.
     fn tracepoint_status(
         &self,
         tp: Tracepoint,
@@ -326,6 +334,32 @@ pub trait Tracepoints: Target {
     /// The state instance that this returns should be the same across multiple
     /// calls and unmodified, or else gdbstub will be unable to transition the
     /// state machine during enumeration correctly.
+    ///
+    /// For the average trait implementations, this will look like:
+    ///
+    /// ```
+    /// struct MyTarget {
+    ///    tracepoint_enumerate_state: TracepointEnumerateState,
+    ///    ...
+    /// }
+    ///
+    /// impl MyTarget {
+    ///    fn new() -> Self {
+    ///        MyTarget {
+    ///            tracepoint_enumerate_state: TracepointEnumerateState::default(),
+    ///            ...
+    ///        }
+    ///    }
+    /// }
+    ///
+    /// impl Tracepoints for MyTarget {
+    ///    fn tracepoint_enumerate_state(
+    ///        &mut self,
+    ///    ) -> &mut TracepointEnumerateState<<Self::Arch as Arch>::Usize> {
+    ///        &mut self.tracepoint_enumerate_state
+    ///    }
+    /// }
+    /// ```
     fn tracepoint_enumerate_state(
         &mut self,
     ) -> &mut TracepointEnumerateState<<Self::Arch as Arch>::Usize>;
@@ -334,8 +368,21 @@ pub trait Tracepoints: Target {
     /// tracepoint recorded should be reported via `f`, otherwise the requested
     /// tracepoint should be.
     ///
-    /// After reporting a tracepoint, [TracepointEnumerateStep] describes what
-    /// information is still available.
+    /// After reporting a tracepoint, [`TracepointEnumerateStep`] describes what
+    /// information is still available. Unlike tracepoint *creation*, which is
+    /// driven by GDB, for *enumeration* it's the responsibility of the trait
+    /// implementation to correctly sequence the state transitions so that
+    /// GDB is able to enumerate all of the information for the tracepoints the
+    /// implementation has saved via the various `tracepoint_enumerate_*`
+    /// methods.
+    ///
+    /// For the average implementation, it should report the requested
+    /// tracepoint, and then return
+    /// [`TracepointEnumerateStep::Action`] to transition to reporting
+    /// actions for the tracepoint. If the trait implements
+    /// [`TracepointSource`], it can instead return
+    /// [`TracepointEnumerateStep::Source`] to begin reporting source items
+    /// instead.
     fn tracepoint_enumerate_start(
         &mut self,
         tp: Option<Tracepoint>,
@@ -346,8 +393,10 @@ pub trait Tracepoints: Target {
     /// multiple items across multiple function calls. Each action should be
     /// reported via `f`.
     ///
-    /// After reporting a tracepoint action, [TracepointEnumerateStep] describes
-    /// what information will next be enumerated.
+    /// After reporting a tracepoint action, [`TracepointEnumerateStep`]
+    /// describes what information will next be enumerated: this may be
+    /// [`TracepointEnumerateStep::Action`] if there are more actions that
+    /// still need to be reported, for example.
     fn tracepoint_enumerate_action(
         &mut self,
         tp: Tracepoint,
@@ -376,7 +425,7 @@ pub trait Tracepoints: Target {
         report: &mut dyn FnMut(ExperimentStatus<'_>),
     ) -> TargetResult<(), Self>;
     /// List any statistical information for the current trace experiment, by
-    /// calling `report` with each [ExperimentExplanation] item.
+    /// calling `report` with each [`ExperimentExplanation`] item.
     fn trace_experiment_info(
         &self,
         report: &mut dyn FnMut(ExperimentExplanation<'_>),
@@ -387,7 +436,7 @@ pub trait Tracepoints: Target {
     fn trace_experiment_stop(&mut self) -> TargetResult<(), Self>;
 
     /// Select a new frame in the trace buffer. The target should attempt to
-    /// fulfill the request according to the [FrameRequest]. If it's
+    /// fulfill the request according to the [`FrameRequest`]. If it's
     /// successful it should call `report` with a series of calls describing
     /// the found frame, and then record it as the currently selected frame.
     /// Future register and memory requests should be fulfilled from the
@@ -425,7 +474,7 @@ pub trait TracepointSource: Tracepoints {
     /// respond with multiple items across multiple function calls. Each
     /// source string should be reported via `f`.
     ///
-    /// After reporting a tracepoint source string, [TracepointEnumerateStep]
+    /// After reporting a tracepoint source string, [`TracepointEnumerateStep`]
     /// describes what source string will next be enumerated.
     fn tracepoint_enumerate_source(
         &mut self,

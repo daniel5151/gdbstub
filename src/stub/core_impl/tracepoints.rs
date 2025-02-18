@@ -342,7 +342,7 @@ impl<'a> ExperimentExplanation<'a> {
                 res.write_str("circular:")?;
                 res.write_num(if *u { 1 } else { 0 })?;
             }
-            Disconn(dis) => match dis {
+            DisconnectedTracing(dis) => match dis {
                 true => res.write_str("disconn:1")?,
                 false => res.write_str("disconn:0")?,
             },
