@@ -451,6 +451,17 @@ pub trait Tracepoints: Target {
 
     /// Support for setting and enumerating the source strings for tracepoint
     /// actions.
+    ///
+    /// The GDB client will attempt to download tracepoints when it attaches to
+    /// the stub, which will trigger the
+    /// `Tracepoints::tracepoint_enumerate_*` state machine enumeration
+    /// codepaths. GDB depends on accurately enumerating source strings for
+    /// tracepoints, or else for agent bytecode programs (which are most
+    /// non-trivial `collect` actions) it won't be able to parse them and
+    /// throw away the actions attached to the tracepoint. [`TracepointSource`]
+    /// allows for recording and then reporting action source
+    /// strings for targets that want to fully support GDB tracepoint
+    /// downloading.
     #[inline(always)]
     fn support_tracepoint_source(&mut self) -> Option<TracepointSourceOps<'_, Self>> {
         None
@@ -463,6 +474,13 @@ pub trait Tracepoints: Target {
 /// GDB requires source strings to be accurately reported back to it when it
 /// attaches to a target in order to download tracepoints, or else it will
 /// locally not be able to parse them and throw away the attached actions.
+///
+/// Downloading tracepoints is only triggered for new GDB clients attaching to a
+/// stub that already has tracepoints loaded, however. An example use case would
+/// be one GDB client attaching, creating tracepoints, disconnecting, and then a
+/// new GDB client starting and connecting to the stub to download the loaded
+/// tracepoints. If supporting that behavior is unimportant and you only need to
+/// work with a single GDB session, it is safe to not implement this extension.
 pub trait TracepointSource: Tracepoints {
     /// Configure an existing tracepoint, appending a new source string
     /// fragment.
