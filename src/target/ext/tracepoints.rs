@@ -304,8 +304,9 @@ pub trait Tracepoints: Target {
     /// definition.
     ///
     /// This method will only ever be called in-between
-    /// [`tracepoint_create_begin`] and [`tracepoint_create_complete`]
-    /// invocations for a new tracepoint.
+    /// [`Tracepoints::tracepoint_create_begin`] and
+    /// [`Tracepoints::tracepoint_create_complete`] invocations for a new
+    /// tracepoint.
     fn tracepoint_create_continue(
         &mut self,
         tp: Tracepoint,
@@ -315,8 +316,9 @@ pub trait Tracepoints: Target {
     /// to have been received.
     ///
     /// This method will only ever be called after all of the
-    /// [`tracepoint_create_begin`] and [`tracepoint_create_continue`]
-    /// invocations for a new tracepoint.
+    /// [`Tracepoints::tracepoint_create_begin`] and
+    /// [`Tracepoints::tracepoint_create_continue`] invocations for a new
+    /// tracepoint.
     fn tracepoint_create_complete(&mut self, tp: Tracepoint) -> TargetResult<(), Self>;
     /// Request the status of tracepoint `tp` at address `addr`.
     ///
