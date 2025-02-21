@@ -124,7 +124,7 @@ pub fn decode_hex_buf(base_buf: &mut [u8]) -> Result<&mut [u8], DecodeHexBufErro
 
         let hi = ascii2byte(hi).ok_or(NotAscii)?;
         let lo = ascii2byte(lo).ok_or(NotAscii)?;
-        *b = hi << 4 | lo;
+        *b = (hi << 4) | lo;
     }
 
     // SAFETY: rustc isn't smart enough to automatically elide this bound check.
