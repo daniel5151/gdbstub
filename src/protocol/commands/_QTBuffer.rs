@@ -12,6 +12,8 @@ impl ParseCommand<'_> for QTBuffer {
             [b':', body @ ..] => {
                 let mut s = body.splitn_mut(2, |b| *b == b':');
                 let opt = s.next()?;
+                // Clippy incorrect thinks this as_ref isn't needed, but it is.
+                #[allow(clippy::useless_asref)]
                 match opt.as_ref() {
                     b"circular" => {
                         let shape = s.next()?;

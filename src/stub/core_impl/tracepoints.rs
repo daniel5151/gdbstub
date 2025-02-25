@@ -642,9 +642,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                             )
                         } else {
                             // If the target doesn't support tracepoint sources but told
-                            // us to enumerate one anyways, then all we can do is
-                            // stop our state machine.
-                            None
+                            // us to enumerate one anyways, then the target has an error.
+                            return Err(Error::TracepointUnsupportedSourceEnumeration);
                         }
                     }
                 };

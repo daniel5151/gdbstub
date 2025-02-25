@@ -339,7 +339,7 @@ pub trait Tracepoints: Target {
     ///
     /// For the average trait implementations, this will look like:
     ///
-    /// ```
+    /// ```rust,ignore
     /// struct MyTarget {
     ///    tracepoint_enumerate_state: TracepointEnumerateState,
     ///    ...

@@ -20,6 +20,8 @@ impl<'a> ParseCommand<'a> for QTDPsrc<'a> {
                 let mut params = info.splitn_mut(7, |b| *b == b':');
                 let number = Tracepoint(decode_hex(params.next()?).ok()?);
                 let addr = decode_hex_buf(params.next()?).ok()?;
+                // Clippy incorrect thinks this as_ref isn't needed, but it is.
+                #[allow(clippy::useless_asref)]
                 let kind = match params.next()?.as_ref() {
                     b"at" => Some(TracepointSourceType::At),
                     b"cond" => Some(TracepointSourceType::Cond),

@@ -13,6 +13,8 @@ impl<'a> ParseCommand<'a> for QTFrame<'a> {
             [b':', body @ ..] => {
                 let mut s = body.split_mut(|b| *b == b':');
                 let selector = s.next()?;
+                // Clippy incorrect thinks this as_ref isn't needed, but it is.
+                #[allow(clippy::useless_asref)]
                 Some(match selector.as_ref() {
                     b"pc" => {
                         let addr = decode_hex_buf(s.next()?).ok()?;

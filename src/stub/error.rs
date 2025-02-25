@@ -42,6 +42,7 @@ pub(crate) enum InternalError<T, C> {
     // push out this feature as a non-breaking change now.
     MissingCurrentActivePidImpl,
     TracepointFeatureUnimplemented(u8),
+    TracepointUnsupportedSourceEnumeration,
 
     // Internal - A non-fatal error occurred (with errno-style error code)
     //
@@ -145,6 +146,7 @@ where
             ImplicitSwBreakpoints => write!(f, "Warning: The target has not opted into using implicit software breakpoints. See `Target::guard_rail_implicit_sw_breakpoints` for more information"),
             MissingCurrentActivePidImpl => write!(f, "GDB client attempted to attach to a new process, but the target has not implemented support for `ExtendedMode::support_current_active_pid`"),
             TracepointFeatureUnimplemented(feat) => write!(f, "GDB client sent us a tracepoint packet using feature {}, but `gdbstub` doesn't implement it. If this is something you require, please file an issue at https://github.com/daniel5151/gdbstub/issues", *feat as char),
+            TracepointUnsupportedSourceEnumeration => write!(f, "The target doesn't support the gdbstub TracepointSource extension, but attempted to transition to enumerating tracepoint sources"),
 
             NonFatalError(_) => write!(f, "Internal non-fatal error. You should never see this! Please file an issue if you do!"),
         }

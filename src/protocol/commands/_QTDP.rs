@@ -2,6 +2,7 @@ use super::prelude::*;
 use crate::target::ext::tracepoints::Tracepoint;
 
 #[derive(Debug)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum QTDP<'a> {
     Create(CreateTDP<'a>),
     Extend(ExtendTDP<'a>),
