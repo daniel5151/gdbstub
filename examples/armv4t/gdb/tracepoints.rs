@@ -55,11 +55,8 @@ impl target::ext::tracepoints::Tracepoints for Emu {
         }
         self.tracepoints
             .get_mut(&tp)
-            .map(move |(_ctp, _source, actions)| {
-                actions.push(action.get_owned());
-                ()
-            })
-            .ok_or_else(move || TargetError::Fatal("extend on non-existing tracepoint"))
+            .map(move |(_ctp, _source, actions)| actions.push(action.get_owned()))
+            .ok_or(TargetError::Fatal("extend on non-existing tracepoint"))
     }
 
     fn tracepoint_create_complete(&mut self, _tp: Tracepoint) -> TargetResult<(), Self> {
@@ -99,7 +96,7 @@ impl target::ext::tracepoints::Tracepoints for Emu {
             Some(tp) => tp,
             None => {
                 // We have no tracepoints to report
-                if self.tracepoints.len() == 0 {
+                if self.tracepoints.is_empty() {
                     return Ok(TracepointEnumerateStep::Done);
                 } else {
                     // Start enumerating at the first one
@@ -131,7 +128,7 @@ impl target::ext::tracepoints::Tracepoints for Emu {
         // Report our next action
         (f)(&self.tracepoints[&tp].2[step as usize]);
 
-        let ret = if let Some(_) = self.tracepoints[&tp].2.get((step as usize) + 1) {
+        let ret = if self.tracepoints[&tp].2.get((step as usize) + 1).is_some() {
             // Continue stepping
             TracepointEnumerateStep::Action
         } else if !self.tracepoints[&tp].1.is_empty() {
@@ -199,11 +196,7 @@ impl target::ext::tracepoints::Tracepoints for Emu {
         // tracepoint <tpnum>` style frame selection and not the more
         // complicated ones.
         let found = match frame {
-            FrameRequest::Select(n) => self
-                .traceframes
-                .iter()
-                .nth(n as usize)
-                .map(|frame| (n, frame)),
+            FrameRequest::Select(n) => self.traceframes.get(n as usize).map(|frame| (n, frame)),
             FrameRequest::Hit(tp) => {
                 let start = self
                     .selected_frame
@@ -251,7 +244,7 @@ impl target::ext::tracepoints::TracepointSource for Emu {
         // Report our next source item
         (f)(&self.tracepoints[&tp].1[step as usize]);
 
-        let ret = if let Some(_) = self.tracepoints[&tp].1.get((step as usize) + 1) {
+        let ret = if self.tracepoints[&tp].1.get((step as usize) + 1).is_some() {
             // Continue stepping
             TracepointEnumerateStep::Source
         } else {

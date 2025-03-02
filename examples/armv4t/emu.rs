@@ -34,7 +34,6 @@ pub enum ExecMode {
 #[derive(Debug)]
 pub struct TraceFrame {
     pub number: Tracepoint,
-    pub addr: u32,
     pub snapshot: Cpu,
 }
 
@@ -151,8 +150,7 @@ impl Emu {
                     // all of them by cloning the cpu itself.
                     TraceFrame {
                         number: *tracepoint,
-                        addr: pc,
-                        snapshot: self.cpu.clone(),
+                        snapshot: self.cpu,
                     }
                 })
                 .collect();
