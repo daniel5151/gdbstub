@@ -228,7 +228,7 @@ impl<U: crate::internal::BeBytes + num_traits::Zero + PrimInt> SourceTracepoint<
     }
 }
 
-impl<'a, U: crate::internal::BeBytes + num_traits::Zero + PrimInt> TracepointAction<'a, U> {
+impl<U: crate::internal::BeBytes + num_traits::Zero + PrimInt> TracepointAction<'_, U> {
     /// Write this as a qTfP/qTsP response
     pub(crate) fn write<T: Target, C: Connection>(
         &self,
@@ -273,7 +273,7 @@ impl<'a, U: crate::internal::BeBytes + num_traits::Zero + PrimInt> TracepointAct
     }
 }
 
-impl<'a> ExperimentStatus<'a> {
+impl ExperimentStatus<'_> {
     pub(crate) fn write<C: Connection>(
         &self,
         res: &mut ResponseWriter<'_, C>,
@@ -315,7 +315,7 @@ impl<'a> ExperimentStatus<'a> {
     }
 }
 
-impl<'a> ExperimentExplanation<'a> {
+impl ExperimentExplanation<'_> {
     pub(crate) fn write<T: Target, C: Connection>(
         &self,
         res: &mut ResponseWriter<'_, C>,

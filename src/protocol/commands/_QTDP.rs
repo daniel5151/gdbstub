@@ -23,7 +23,6 @@ pub struct CreateTDP<'a> {
 pub struct ExtendTDP<'a> {
     pub number: Tracepoint,
     pub addr: &'a [u8],
-    pub while_stepping: bool,
     pub actions: &'a mut [u8],
 }
 
@@ -40,7 +39,6 @@ impl<'a> ParseCommand<'a> for QTDP<'a> {
                 Some(QTDP::Extend(ExtendTDP {
                     number,
                     addr,
-                    while_stepping: false,
                     actions,
                 }))
             }
@@ -80,7 +78,7 @@ impl<'a> ParseCommand<'a> for QTDP<'a> {
                     }
                     None => None,
                 };
-                return Some(QTDP::Create(CreateTDP {
+                Some(QTDP::Create(CreateTDP {
                     number: n,
                     addr,
                     enable: match ena {
@@ -92,7 +90,7 @@ impl<'a> ParseCommand<'a> for QTDP<'a> {
                     pass,
                     more,
                     unsupported_option,
-                }));
+                }))
             }
             _ => None,
         }

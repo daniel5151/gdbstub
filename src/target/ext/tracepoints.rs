@@ -96,7 +96,7 @@ pub struct SourceTracepoint<'a, U> {
 }
 
 #[cfg(feature = "alloc")]
-impl<'a, U: Copy> SourceTracepoint<'a, U> {
+impl<U: Copy> SourceTracepoint<'_, U> {
     /// Allocate an owned copy of this structure.
     pub fn get_owned<'b>(&self) -> SourceTracepoint<'b, U> {
         SourceTracepoint {
@@ -111,7 +111,7 @@ impl<'a, U: Copy> SourceTracepoint<'a, U> {
 }
 
 #[cfg(feature = "alloc")]
-impl<'a, U: Copy> TracepointAction<'a, U> {
+impl<U: Copy> TracepointAction<'_, U> {
     /// Allocate an owned copy of this structure.
     pub fn get_owned<'b>(&self) -> TracepointAction<'b, U> {
         use core::ops::Deref;
