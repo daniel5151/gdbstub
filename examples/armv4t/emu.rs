@@ -7,6 +7,12 @@ use armv4t_emu::ExampleMem;
 use armv4t_emu::Memory;
 use armv4t_emu::Mode;
 use gdbstub::common::Pid;
+use gdbstub::target::ext::tracepoints::NewTracepoint;
+use gdbstub::target::ext::tracepoints::SourceTracepoint;
+use gdbstub::target::ext::tracepoints::Tracepoint;
+use gdbstub::target::ext::tracepoints::TracepointAction;
+use gdbstub::target::ext::tracepoints::TracepointEnumerateState;
+use std::collections::BTreeMap;
 
 const HLE_RETURN_ADDR: u32 = 0x12345678;
 
@@ -25,6 +31,12 @@ pub enum ExecMode {
     RangeStep(u32, u32),
 }
 
+#[derive(Debug)]
+pub struct TraceFrame {
+    pub number: Tracepoint,
+    pub snapshot: Cpu,
+}
+
 /// incredibly barebones armv4t-based emulator
 pub struct Emu {
     start_addr: u32,
@@ -40,6 +52,19 @@ pub struct Emu {
     pub(crate) watchpoints: Vec<u32>,
     pub(crate) breakpoints: Vec<u32>,
     pub(crate) files: Vec<Option<std::fs::File>>,
+
+    pub(crate) tracepoints: BTreeMap<
+        Tracepoint,
+        (
+            NewTracepoint<u32>,
+            Vec<SourceTracepoint<'static, u32>>,
+            Vec<TracepointAction<'static, u32>>,
+        ),
+    >,
+    pub(crate) traceframes: Vec<TraceFrame>,
+    pub(crate) tracepoint_enumerate_state: TracepointEnumerateState<u32>,
+    pub(crate) tracing: bool,
+    pub(crate) selected_frame: Option<usize>,
 
     pub(crate) reported_pid: Pid,
 }
@@ -93,6 +118,12 @@ impl Emu {
             breakpoints: Vec::new(),
             files: Vec::new(),
 
+            tracepoints: BTreeMap::new(),
+            traceframes: Vec::new(),
+            tracepoint_enumerate_state: Default::default(),
+            tracing: false,
+            selected_frame: None,
+
             reported_pid: Pid::new(1).unwrap(),
         })
     }
@@ -106,6 +137,26 @@ impl Emu {
 
     /// single-step the interpreter
     pub fn step(&mut self) -> Option<Event> {
+        if self.tracing {
+            let pc = self.cpu.reg_get(self.cpu.mode(), reg::PC);
+            let frames: Vec<_> = self
+                .tracepoints
+                .iter()
+                .filter(|(_tracepoint, (ctp, _source, _actions))| ctp.enabled && ctp.addr == pc)
+                .map(|(tracepoint, _definition)| {
+                    // our `tracepoint_define` restricts our loaded tracepoints to only contain
+                    // register collect actions. instead of only collecting the registers requested
+                    // in the register mask and recording a minimal trace frame, we just collect
+                    // all of them by cloning the cpu itself.
+                    TraceFrame {
+                        number: *tracepoint,
+                        snapshot: self.cpu,
+                    }
+                })
+                .collect();
+            self.traceframes.extend(frames);
+        }
+
         let mut hit_watchpoint = None;
 
         let mut sniffer = MemSniffer::new(&mut self.mem, &self.watchpoints, |access| {

@@ -172,6 +172,29 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     }
                 }
 
+                if let Some(ops) = target.support_tracepoints() {
+                    // There are a number of optional tracepoint extensions that
+                    // gdbstub should eventually implement.
+                    // * `StaticTracepoint` for static tracepoint support.
+                    // * `EnableDisableTracepoints` for enabling/disabling tracepoints during a
+                    //   trace experiment.
+                    // * `tracenz` for the tracenz agent bytecode operation.
+                    // * The `Qbtrace:*` family for branch tracing.
+                    // * `InstallInTrace` allows for gdbstub to deliver tracepoint configuration
+                    //   commands while the trace experiment is running instead of them only taking
+                    //   affect on the next `tstart` command.
+                    //
+                    // For now, gdbstub doesn't provide trait extensions for these
+                    // options and so we don't report support. We do report support
+                    // for one extension however:
+                    // * `QTBuffer:size` for configuring the trace buffer size, since the target is
+                    //   allowed to implement it as a no-op.
+                    res.write_str(";QTBuffer:size+")?;
+                    if ops.support_tracepoint_source().is_some() {
+                        res.write_str(";TracepointSource+")?;
+                    }
+                }
+
                 if target.support_catch_syscalls().is_some() {
                     res.write_str(";QCatchSyscalls+")?;
                 }

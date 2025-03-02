@@ -50,7 +50,7 @@ macro_rules! commands {
 
         pub mod ext {
             $(
-                #[allow(non_camel_case_types, clippy::enum_variant_names)]
+                #[allow(non_camel_case_types, clippy::enum_variant_names, clippy::upper_case_acronyms)]
                 pub enum [<$ext:camel>] $(<$lt>)? {
                     $($command(super::$mod::$command<$($lifetime)?>),)*
                 }
@@ -335,5 +335,25 @@ commands! {
 
     libraries_svr4 use 'a {
         "qXfer:libraries-svr4:read" => _qXfer_libraries_svr4_read::qXferLibrariesSvr4Read<'a>,
+    }
+
+    tracepoints use 'a {
+        "QTDPsrc" => _QTDPsrc::QTDPsrc<'a>,
+        "QTDP" => _QTDP::QTDP<'a>,
+        "QTinit" => _QTinit::QTinit,
+        "QTBuffer" => _QTBuffer::QTBuffer,
+        "QTStart" => _QTStart::QTStart,
+        "QTStop" => _QTStop::QTStop,
+        "QTFrame" => _QTFrame::QTFrame<'a>,
+
+        "qTBuffer" => _qTBuffer::qTBuffer,
+        "qTStatus" => _qTStatus::qTStatus,
+        "qTP" => _qTP::qTP<'a>,
+        "qTfP" => _qTfP::qTfP,
+        "qTsP" => _qTsP::qTsP,
+
+        // QTDV is unimplemented.
+        "qTfV" => _qTfV::qTfV,
+        "qTsV" => _qTsV::qTsV,
     }
 }

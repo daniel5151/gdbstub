@@ -26,6 +26,7 @@ mod memory_map;
 mod monitor_cmd;
 mod section_offsets;
 mod target_description_xml_override;
+pub(crate) mod tracepoints;
 
 /// Turn a `ArmCoreRegId` into an internal register number of `armv4t_emu`.
 fn cpu_reg_id(id: ArmCoreRegId) -> Option<u8> {
@@ -161,6 +162,13 @@ impl Target for Emu {
     ) -> Option<target::ext::libraries::LibrariesSvr4Ops<'_, Self>> {
         Some(self)
     }
+
+    #[inline(always)]
+    fn support_tracepoints(
+        &mut self,
+    ) -> Option<target::ext::tracepoints::TracepointsOps<'_, Self>> {
+        Some(self)
+    }
 }
 
 impl SingleThreadBase for Emu {
@@ -168,15 +176,21 @@ impl SingleThreadBase for Emu {
         &mut self,
         regs: &mut custom_arch::ArmCoreRegsCustom,
     ) -> TargetResult<(), Self> {
-        let mode = self.cpu.mode();
+        // if we selected a frame from a tracepoint, return registers from that snapshot
+        let cpu = self
+            .selected_frame
+            .and_then(|selected| self.traceframes.get(selected))
+            .map(|frame| frame.snapshot)
+            .unwrap_or_else(|| self.cpu);
+        let mode = cpu.mode();
 
         for i in 0..13 {
-            regs.core.r[i] = self.cpu.reg_get(mode, i as u8);
+            regs.core.r[i] = cpu.reg_get(mode, i as u8);
         }
-        regs.core.sp = self.cpu.reg_get(mode, reg::SP);
-        regs.core.lr = self.cpu.reg_get(mode, reg::LR);
-        regs.core.pc = self.cpu.reg_get(mode, reg::PC);
-        regs.core.cpsr = self.cpu.reg_get(mode, reg::CPSR);
+        regs.core.sp = cpu.reg_get(mode, reg::SP);
+        regs.core.lr = cpu.reg_get(mode, reg::LR);
+        regs.core.pc = cpu.reg_get(mode, reg::PC);
+        regs.core.cpsr = cpu.reg_get(mode, reg::CPSR);
 
         regs.custom = self.custom_reg;
 
@@ -184,6 +198,10 @@ impl SingleThreadBase for Emu {
     }
 
     fn write_registers(&mut self, regs: &custom_arch::ArmCoreRegsCustom) -> TargetResult<(), Self> {
+        if self.selected_frame.is_some() {
+            // we can't modify registers in a tracepoint frame
+            return Err(TargetError::NonFatal);
+        }
         let mode = self.cpu.mode();
 
         for i in 0..13 {
@@ -208,6 +226,12 @@ impl SingleThreadBase for Emu {
     }
 
     fn read_addrs(&mut self, start_addr: u32, data: &mut [u8]) -> TargetResult<usize, Self> {
+        if self.selected_frame.is_some() {
+            // we only support register collection actions for our tracepoint frames.
+            // if we have a selected frame, then we don't have any memory we can
+            // return from the frame snapshot.
+            return Ok(0);
+        }
         // this is a simple emulator, with RAM covering the entire 32 bit address space
         for (addr, val) in (start_addr..).zip(data.iter_mut()) {
             *val = self.mem.r8(addr)
@@ -216,6 +240,11 @@ impl SingleThreadBase for Emu {
     }
 
     fn write_addrs(&mut self, start_addr: u32, data: &[u8]) -> TargetResult<(), Self> {
+        if self.selected_frame.is_some() {
+            // we can't modify memory in a tracepoint frame
+            return Err(TargetError::NonFatal);
+        }
+
         // this is a simple emulator, with RAM covering the entire 32 bit address space
         for (addr, val) in (start_addr..).zip(data.iter().copied()) {
             self.mem.w8(addr, val)
