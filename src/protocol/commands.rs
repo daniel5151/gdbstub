@@ -341,7 +341,7 @@ commands! {
         "QTDPsrc" => _QTDPsrc::QTDPsrc<'a>,
         "QTDP" => _QTDP::QTDP<'a>,
         "QTinit" => _QTinit::QTinit,
-        "QTBuffer" => _QTBuffer::QTBuffer,
+        "QTBuffer" => _QTBuffer_upcase::QTBuffer,
         "QTStart" => _QTStart::QTStart,
         "QTStop" => _QTStop::QTStop,
         "QTFrame" => _QTFrame::QTFrame<'a>,
