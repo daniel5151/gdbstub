@@ -2,6 +2,13 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+# 0.7.4
+
+#### New Protocol Extensions
+
+- `Tracepoints` - Basic [tracepoint extension](https://sourceware.org/gdb/current/onlinedocs/gdb.html/Tracepoints.html) support. [\#160](https://github.com/daniel5151/gdbstub/pull/160) ([cczetier](https://github.com/cczetier))
+  - _Note:_ Most fundamental tracepoint operations are supported, but there quite a few packets / APIs that are not yet implemented. Please see the module documentation for additional details.
+
 # 0.7.3
 
 #### New Features

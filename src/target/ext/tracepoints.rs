@@ -1,4 +1,20 @@
-//! Provide tracepoints for the target.
+//! Support for
+//! [Tracepoint](https://sourceware.org/gdb/current/onlinedocs/gdb.html/Tracepoints.html)
+//! extensions.
+//!
+//! ## Implementation Status
+//!
+//! Most fundamental tracepoint operations are supported, but there quite a few
+//! packets / APIs that are not yet implemented, such as:
+//!
+//! - Fast Tracepoints
+//! - Tracepoint Conditions
+//! - Trace State Variables
+//!
+//! If you are interested in extending this API to support these additional
+//! features, please consider opening an Issue / PR on the `gdbstub` GitHub
+//! repo.
+
 use crate::target::Arch;
 use crate::target::Target;
 use crate::target::TargetResult;
