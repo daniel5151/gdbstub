@@ -119,6 +119,18 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     res.write_str(";QStartNoAckMode+")?;
                 }
 
+                if target.support_fork_events() {
+                    res.write_str(";fork-events+")?;
+                }
+
+                if target.support_vfork_events() {
+                    res.write_str(";vfork-events+")?;
+                }
+
+                if target.support_vforkdone_events() {
+                    res.write_str(";vforkdone-events+")?;
+                }
+
                 if let Some(resume_ops) = target.base_ops().resume_ops() {
                     let (reverse_cont, reverse_step) = match resume_ops {
                         ResumeOps::MultiThread(ops) => (

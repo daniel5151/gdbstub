@@ -337,6 +337,24 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             };
         }
 
+        macro_rules! guard_fork_events {
+            () => {
+                target.support_fork_events()
+            };
+        }
+
+        macro_rules! guard_vfork_events {
+            () => {
+                target.support_vfork_events()
+            };
+        }
+
+        macro_rules! guard_vforkdone_events {
+            () => {
+                target.support_vforkdone_events()
+            };
+        }
+
         let status = match stop_reason {
             MultiThreadStopReason::DoneStep => {
                 res.write_str("S")?;
@@ -425,13 +443,55 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                 FinishExecStatus::Handled
             }
+            MultiThreadStopReason::Library(tid) => {
+                self.write_stop_common(res, target, Some(tid), Signal::SIGTRAP)?;
+                res.write_str("library;")?;
+                FinishExecStatus::Handled
+            }
+            MultiThreadStopReason::Fork { cur_tid, new_tid } if guard_fork_events!() => {
+                crate::__dead_code_marker!("fork_events", "stop_reason");
+                self.write_stop_common(res, target, Some(cur_tid), Signal::SIGTRAP)?;
+                res.write_str("fork:")?;
+                res.write_specific_thread_id(SpecificThreadId {
+                    pid: self
+                        .features
+                        .multiprocess()
+                        .then_some(SpecificIdKind::WithId(self.get_current_pid(target)?)),
+                    tid: SpecificIdKind::WithId(new_tid),
+                })?;
+                res.write_str(";")?;
+                FinishExecStatus::Handled
+            }
+            MultiThreadStopReason::VFork { cur_tid, new_tid } if guard_vfork_events!() => {
+                crate::__dead_code_marker!("vfork_events", "stop_reason");
+                self.write_stop_common(res, target, Some(cur_tid), Signal::SIGTRAP)?;
+                res.write_str("vfork:")?;
+                res.write_specific_thread_id(SpecificThreadId {
+                    pid: self
+                        .features
+                        .multiprocess()
+                        .then_some(SpecificIdKind::WithId(self.get_current_pid(target)?)),
+                    tid: SpecificIdKind::WithId(new_tid),
+                })?;
+                res.write_str(";")?;
+                FinishExecStatus::Handled
+            }
+            MultiThreadStopReason::VForkDone(tid) if guard_vforkdone_events!() => {
+                crate::__dead_code_marker!("vforkdone_events", "stop_reason");
+                self.write_stop_common(res, target, Some(tid), Signal::SIGTRAP)?;
+                res.write_str("vforkdone;")?;
+                FinishExecStatus::Handled
+            }
             // Explicitly avoid using `_ =>` to handle the "unguarded" variants, as doing so would
             // squelch the useful compiler error that crops up whenever stop reasons are added.
             MultiThreadStopReason::SwBreak(_)
             | MultiThreadStopReason::HwBreak(_)
             | MultiThreadStopReason::Watch { .. }
             | MultiThreadStopReason::ReplayLog { .. }
-            | MultiThreadStopReason::CatchSyscall { .. } => {
+            | MultiThreadStopReason::CatchSyscall { .. }
+            | MultiThreadStopReason::Fork { .. }
+            | MultiThreadStopReason::VFork { .. }
+            | MultiThreadStopReason::VForkDone { .. } => {
                 return Err(Error::UnsupportedStopReason);
             }
         };
