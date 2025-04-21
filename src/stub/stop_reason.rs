@@ -103,14 +103,13 @@ pub enum BaseStopReason<Tid, U> {
     },
     /// A thread hit a specific library event.
     ///
-    /// This stop reason indicates that loaded libraries have changed. The debugger
-    /// should fetch a new list of loaded libraries.
+    /// This stop reason indicates that loaded libraries have changed. The
+    /// debugger should fetch a new list of loaded libraries.
     Library(Tid),
     /// A thread created a new process via fork.
     ///
-    /// Requires: [`support_fork_events`] is enabled.
-    ///
-    /// This indicates that a fork system call was executed, creating a new child process.
+    /// This indicates that a fork system call was executed, creating a new
+    /// child process.
     Fork {
         /// Tid of the thread that called fork
         cur_tid: Tid,
@@ -119,10 +118,9 @@ pub enum BaseStopReason<Tid, U> {
     },
     /// A thread created a new process via vfork.
     ///
-    /// Requires: [`support_vfork_events`] is enabled.
-    ///
-    /// Similar to Fork, but the parent process is suspended until the child calls
-    /// exec or exits, as the parent and child temporarily share the same address space.
+    /// Similar to Fork, but the parent process is suspended until the child
+    /// calls exec or exits, as the parent and child temporarily share the
+    /// same address space.
     VFork {
         /// Tid of the thread that called vfork
         cur_tid: Tid,
@@ -131,10 +129,9 @@ pub enum BaseStopReason<Tid, U> {
     },
     /// A vfork child process has completed its operation.
     ///
-    /// Requires: [`support_vforkdone_events`] is enabled.
-    ///
-    /// This indicates that a child process created by vfork has either called exec
-    /// or terminated, so the address spaces of parent and child are no longer shared.
+    /// This indicates that a child process created by vfork has either called
+    /// exec or terminated, so the address spaces of parent and child are no
+    /// longer shared.
     VForkDone(Tid),
 }
 
