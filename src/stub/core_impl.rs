@@ -30,6 +30,7 @@ mod breakpoints;
 mod catch_syscalls;
 mod exec_file;
 mod extended_mode;
+mod flash;
 mod host_io;
 mod libraries;
 mod lldb_register_info;
@@ -213,6 +214,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             Command::ReverseCont(cmd) => self.handle_reverse_cont(res, target, cmd),
             Command::ReverseStep(cmd) => self.handle_reverse_step(res, target, cmd),
             Command::MemoryMap(cmd) => self.handle_memory_map(res, target, cmd),
+            Command::FlashOperations(cmd) => self.handle_flash_operations(res, target, cmd),
             Command::HostIo(cmd) => self.handle_host_io(res, target, cmd),
             Command::ExecFile(cmd) => self.handle_exec_file(res, target, cmd),
             Command::Auxv(cmd) => self.handle_auxv(res, target, cmd),

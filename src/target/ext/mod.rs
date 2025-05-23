@@ -264,6 +264,7 @@ pub mod breakpoints;
 pub mod catch_syscalls;
 pub mod exec_file;
 pub mod extended_mode;
+pub mod flash;
 pub mod host_io;
 pub mod libraries;
 pub mod lldb_register_info_override;
