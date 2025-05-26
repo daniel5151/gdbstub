@@ -84,13 +84,10 @@ impl Registers for X86CoreRegs {
 
         // mxcsr
         write_bytes!(&self.mxcsr.to_le_bytes());
-
-        // padding
-        (0..4).for_each(|_| write_byte(None))
     }
 
     fn gdb_deserialize(&mut self, bytes: &[u8]) -> Result<(), ()> {
-        if bytes.len() < 0x138 {
+        if bytes.len() < 0x134 {
             return Err(());
         }
 
