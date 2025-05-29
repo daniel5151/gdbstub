@@ -10,14 +10,23 @@ impl target::ext::memory_map::MemoryMap for Emu {
         length: usize,
         buf: &mut [u8],
     ) -> TargetResult<usize, Self> {
-        // Sample memory map, with RAM coverying the whole
-        // memory space.
+        // Sample memory map, it's part of STM32F446 memory map.
+        // A real memory map is necessary to test the flash commands.
         let memory_map = r#"<?xml version="1.0"?>
 <!DOCTYPE memory-map
     PUBLIC "+//IDN gnu.org//DTD GDB Memory Map V1.0//EN"
             "http://sourceware.org/gdb/gdb-memory-map.dtd">
 <memory-map>
-    <memory type="ram" start="0x0" length="0x100000000"/>
+    <memory type="ram" start="0x20000000" length="0x20000"/>
+    <memory type="flash" start="0x08000000" length="0x10000">
+        <property name="blocksize">0x4000</property>
+    </memory>
+    <memory type="flash" start="0x08010000" length="0x10000">
+        <property name="blocksize">0x10000</property>
+    </memory>
+    <memory type="flash" start="0x08020000" length="0x60000">
+        <property name="blocksize">0x20000</property>
+    </memory>
 </memory-map>"#
             .trim()
             .as_bytes();
