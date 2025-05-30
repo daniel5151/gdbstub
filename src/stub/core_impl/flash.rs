@@ -28,7 +28,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 let addr = <T::Arch as Arch>::Usize::from_be_bytes(cmd.addr)
                     .ok_or(Error::TargetMismatch)?;
 
-                let _ret = ops.flash_write(addr, cmd.val).handle_error()?;
+                ops.flash_write(addr, cmd.val).handle_error()?;
                 HandlerStatus::NeedsOk
             }
             FlashOperations::vFlashDone(_) => {
