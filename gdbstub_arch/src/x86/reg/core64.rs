@@ -71,11 +71,6 @@ impl Registers for X86_64CoreRegs {
 
         // mxcsr
         write_bytes!(&self.mxcsr.to_le_bytes());
-
-        // padding?
-        // XXX: Couldn't figure out what these do and GDB doesn't actually display any
-        // registers that use these values.
-        (0..0x18).for_each(|_| write_byte(None))
     }
 
     fn gdb_deserialize(&mut self, bytes: &[u8]) -> Result<(), ()> {
@@ -115,5 +110,51 @@ impl Registers for X86_64CoreRegs {
         self.mxcsr = u32::from_le_bytes(bytes[0x214..0x218].try_into().unwrap());
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn x86_64_core_round_trip() {
+        let regs_before = X86_64CoreRegs {
+            regs: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+            eflags: 17,
+            rip: 18,
+            segments: X86SegmentRegs {
+                cs: 19,
+                ss: 20,
+                ds: 21,
+                es: 22,
+                fs: 23,
+                gs: 24,
+            },
+            st: Default::default(),
+            fpu: X87FpuInternalRegs {
+                fctrl: 25,
+                fstat: 26,
+                ftag: 27,
+                fiseg: 28,
+                fioff: 29,
+                foseg: 30,
+                fooff: 31,
+                fop: 32,
+            },
+            xmm: Default::default(),
+            mxcsr: 99,
+        };
+
+        let mut data = vec![];
+
+        regs_before.gdb_serialize(|x| {
+            data.push(x.unwrap_or(b'x'));
+        });
+
+        let mut regs_after = X86_64CoreRegs::default();
+        regs_after.gdb_deserialize(&data).unwrap();
+
+        assert_eq!(regs_before, regs_after);
     }
 }
