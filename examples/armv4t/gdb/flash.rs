@@ -6,16 +6,16 @@ use gdbstub::target::TargetResult;
 impl target::ext::flash::Flash for Emu {
     fn flash_erase(
         &mut self,
-        start_addr: <Self::Arch as Arch>::Usize,
-        length: <Self::Arch as Arch>::Usize,
+        _start_addr: <Self::Arch as Arch>::Usize,
+        _length: <Self::Arch as Arch>::Usize,
     ) -> TargetResult<(), Self> {
         Ok(())
     }
 
     fn flash_write(
         &mut self,
-        start_addr: <Self::Arch as Arch>::Usize,
-        data: &[u8],
+        _start_addr: <Self::Arch as Arch>::Usize,
+        _data: &[u8],
     ) -> TargetResult<(), Self> {
         Ok(())
     }
