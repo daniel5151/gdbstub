@@ -93,6 +93,7 @@ Of course, most use-cases will want to support additional debugging features as 
     - Configure tracepoints and actions to perform when hit
     - Select and interrogate collected trace frames
    - _Note:_ Feature support is not exhaustive, and many feature haven't been implemented yet.
+-   Flash operations (`load`)
 
 _Note:_ GDB features are implemented on an as-needed basis by `gdbstub`'s contributors. If there's a missing GDB feature that you'd like `gdbstub` to implement, please file an issue and/or open a PR!
 
