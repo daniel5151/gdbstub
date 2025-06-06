@@ -10,7 +10,7 @@ impl target::ext::memory_map::MemoryMap for Emu {
         length: usize,
         buf: &mut [u8],
     ) -> TargetResult<usize, Self> {
-        // Sample memory map, it's part of STM32F446 memory map.
+        // Sample memory map, modeled on part of STM32F446 memory map.
         // A real memory map is necessary to test the flash commands.
         let memory_map = r#"<?xml version="1.0"?>
 <!DOCTYPE memory-map
