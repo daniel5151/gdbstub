@@ -657,6 +657,12 @@ pub trait Target {
         None
     }
 
+    /// Support for flash memory operations.
+    #[inline(always)]
+    fn support_flash_operations(&mut self) -> Option<ext::flash::FlashOps<'_, Self>> {
+        None
+    }
+
     /// Support for setting / removing syscall catchpoints.
     #[inline(always)]
     fn support_catch_syscalls(

@@ -19,6 +19,7 @@ mod breakpoints;
 mod catch_syscalls;
 mod exec_file;
 mod extended_mode;
+mod flash;
 mod host_io;
 mod libraries;
 mod lldb_register_info_override;
@@ -167,6 +168,11 @@ impl Target for Emu {
     fn support_tracepoints(
         &mut self,
     ) -> Option<target::ext::tracepoints::TracepointsOps<'_, Self>> {
+        Some(self)
+    }
+
+    #[inline(always)]
+    fn support_flash_operations(&mut self) -> Option<target::ext::flash::FlashOps<'_, Self>> {
         Some(self)
     }
 }
