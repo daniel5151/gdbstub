@@ -2,6 +2,12 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+# 0.7.6
+
+#### New Protocol Extensions
+
+- `Flash` - Support for GDB [flash commands](https://sourceware.org/gdb/current/onlinedocs/gdb.html/Packets.html#Packets) (e.g: `load`). [\#172](https://github.com/daniel5151/gdbstub/pull/172) ([eulerdisk](https://github.com/eulerdisk))
+
 # 0.7.5
 
 #### New Protocol Extensions
