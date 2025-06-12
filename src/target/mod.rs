@@ -599,6 +599,24 @@ pub trait Target {
         true
     }
 
+    /// Support for reporting fork events.
+    #[inline(always)]
+    fn support_fork_events(&self) -> bool {
+        true
+    }
+
+    /// Support for reporting vfork events.
+    #[inline(always)]
+    fn support_vfork_events(&self) -> bool {
+        true
+    }
+
+    /// Support for reporting vforkdone events.
+    #[inline(always)]
+    fn support_vforkdone_events(&self) -> bool {
+        true
+    }
+
     /// Support for setting / removing breakpoints.
     #[inline(always)]
     fn support_breakpoints(&mut self) -> Option<ext::breakpoints::BreakpointsOps<'_, Self>> {
