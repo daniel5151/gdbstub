@@ -302,6 +302,12 @@ commands! {
         "qXfer:memory-map:read" => _qXfer_memory_map::qXferMemoryMapRead<'a>,
     }
 
+    flash_operations use 'a {
+        "vFlashErase" => _vFlashErase::vFlashErase<'a>,
+        "vFlashWrite" => _vFlashWrite::vFlashWrite<'a>,
+        "vFlashDone" => _vFlashDone::vFlashDone,
+    }
+
     auxv use 'a {
         "qXfer:auxv:read" => _qXfer_auxv_read::qXferAuxvRead<'a>,
     }
