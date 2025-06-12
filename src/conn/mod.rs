@@ -60,9 +60,6 @@ pub trait Connection {
 /// When the `std` feature is enabled, this trait is automatically implemented
 /// for [`TcpStream`](std::net::TcpStream) and
 /// [`UnixStream`](std::os::unix::net::UnixStream) (on unix systems).
-///
-/// [`gdbstub_run::Callbacks::read_byte`]:
-/// crate::gdbstub_run::Callbacks::read_byte
 pub trait ConnectionExt: Connection {
     /// Read a single byte.
     fn read(&mut self) -> Result<u8, Self::Error>;
