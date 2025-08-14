@@ -20,6 +20,9 @@ use crate::target::Target;
 use crate::target::TargetResult;
 use managed::ManagedSlice;
 
+#[cfg(feature = "alloc")]
+use crate::alloc::borrow::ToOwned;
+
 /// A tracepoint, identified by a unique number.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Tracepoint(pub usize);
