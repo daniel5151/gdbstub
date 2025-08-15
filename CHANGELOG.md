@@ -2,6 +2,12 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+# 0.7.7
+
+#### Bugfixes
+
+- Add missing `alloc::borrow::ToOwned` import when building `no_std` with `alloc`. [\#174](https://github.com/daniel5151/gdbstub/pull/174) ([AdamKMeller](https://github.com/AdamKMeller))
+
 # 0.7.6
 
 #### New Protocol Extensions
