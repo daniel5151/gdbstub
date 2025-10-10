@@ -136,6 +136,8 @@ pub enum HostIoErrno {
     ENOENT = 2,
     /// Interrupted function call (POSIX.1-2001); see signal(7).
     EINTR = 4,
+    /// Input/output error (POSIX.1-2001).
+    EIO = 5,
     /// Bad file descriptor (POSIX.1-2001).
     EBADF = 9,
     /// Permission denied (POSIX.1-2001).
@@ -168,6 +170,8 @@ pub enum HostIoErrno {
     ESPIPE = 29,
     /// Read-only filesystem (POSIX.1-2001).
     EROFS = 30,
+    /// Function not implemented (POSIX.1-2001).
+    ENOSYS = 88,
     /// Filename too long (POSIX.1-2001).
     ENAMETOOLONG = 91,
     /// Unknown errno - there may not be a GDB mapping for this value
