@@ -2,6 +2,12 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+# 0.7.8
+
+#### New Features
+
+- `HostIo` - Add HostIoErrno::{EIO,ENOSYS} variants. [\#175](https://github.com/daniel5151/gdbstub/pull/175) ([yodel](https://github.com/yodel))
+
 # 0.7.7
 
 #### Bugfixes
