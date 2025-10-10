@@ -53,7 +53,7 @@ where
         let ptrsize = core::mem::size_of::<U>();
 
         // ensure bytes.chunks_exact(ptrsize) won't panic
-        if bytes.len() % ptrsize != 0 {
+        if !bytes.len().is_multiple_of(ptrsize) {
             return Err(());
         }
 

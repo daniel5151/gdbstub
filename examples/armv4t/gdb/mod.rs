@@ -471,7 +471,7 @@ mod custom_arch {
 
         fn gdb_deserialize(&mut self, bytes: &[u8]) -> Result<(), ()> {
             // ensure bytes.chunks_exact(4) won't panic
-            if bytes.len() % 4 != 0 {
+            if !bytes.len().is_multiple_of(4) {
                 return Err(());
             }
 

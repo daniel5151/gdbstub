@@ -20,7 +20,6 @@ rustflags = [
     "-Wclippy::lossy_float_literal",
     "-Wclippy::macro_use_imports",
     "-Wclippy::map_flatten",
-    "-Wclippy::match_on_vec_items",
     "-Wclippy::needless_borrow",
     "-Wclippy::needless_continue",
     "-Wclippy::option_option",
