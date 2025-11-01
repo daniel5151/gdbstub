@@ -146,6 +146,7 @@ If you end up using `gdbstub` in your project, consider opening a PR and adding 
     -   [COCONUT-SVSM](https://github.com/coconut-svsm/svsm) - VM Service Module (SVSM), supporting Confidential VMs (CVMs)
     -   [`betrusted-io/xous-core`](https://github.com/betrusted-io/xous-core/blob/b471b604/kernel/src/debug/gdb.rs) - The Xous microkernel operating system
     -   [`vmware-labs/node-replicated-kernel`](https://github.com/vmware-labs/node-replicated-kernel/tree/57f953c2/kernel/src/arch/x86_64/gdb) - An (experimental) research OS kernel for x86-64 (amd64) machines
+    -   [`patina`](https://github.com/OpenDevicePartnership/patina/blob/main/core/patina_debugger/README.md) - A UEFI compliant pure rust DXE core
 -   Emulators
     -   [obliteration](https://github.com/obhq/obliteration) - Kernel + VMM for running PS4 software on PCs
     -   [solana_rbpf](https://github.com/solana-labs/rbpf) - VM and JIT compiler for eBPF programs
