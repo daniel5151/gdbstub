@@ -517,6 +517,23 @@ pub trait Target {
         true
     }
 
+    /// Enable/disable using the `x` packet to read to target
+    /// memory (as opposed to the basic `m` packet).
+    ///
+    /// By default, this method returns `false`.
+    ///
+    /// GDB and LLDB have different responses for the `x` packet, and until
+    /// `gdbstub` supports a disabmiguation mechanism to correctly handle
+    /// both GDB and LLDB, this is by default set to `false`.
+    ///
+    /// _Author's note:_ Unless you're _really_ trying to squeeze `gdbstub` onto
+    /// a particularly resource-constrained platform, you may as well leave this
+    /// optimization enabled.
+    #[inline(always)]
+    fn use_x_lowcase_packet(&self) -> bool {
+        false
+    }
+
     /// Enable/disable using the more efficient `X` packet to write to target
     /// memory (as opposed to the basic `M` packet).
     ///
@@ -802,6 +819,7 @@ macro_rules! impl_dyn_target {
             __delegate!(fn guard_rail_implicit_sw_breakpoints(&self) -> bool);
 
             __delegate!(fn use_no_ack_mode(&self) -> bool);
+            __delegate!(fn use_x_lowcase_packet(&self) -> bool);
             __delegate!(fn use_x_upcase_packet(&self) -> bool);
             __delegate!(fn use_resume_stub(&self) -> bool);
             __delegate!(fn use_rle(&self) -> bool);

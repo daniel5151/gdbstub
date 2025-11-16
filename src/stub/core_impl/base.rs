@@ -131,6 +131,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     res.write_str(";vforkdone-events+")?;
                 }
 
+                if target.use_x_lowcase_packet() {
+                    res.write_str(";binary-upload+")?;
+                }
+
                 if let Some(resume_ops) = target.base_ops().resume_ops() {
                     let (reverse_cont, reverse_step) = match resume_ops {
                         ResumeOps::MultiThread(ops) => (
