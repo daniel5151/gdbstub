@@ -94,6 +94,7 @@ macro_rules! commands {
                     fn support_reverse_step(&mut self) -> Option<()>;
                     fn support_reverse_cont(&mut self) -> Option<()>;
                     fn support_no_ack_mode(&mut self) -> Option<()>;
+                    fn support_x_lowcase_packet(&mut self) -> Option<()>;
                     fn support_x_upcase_packet(&mut self) -> Option<()>;
                     fn support_thread_extra_info(&mut self) -> Option<()>;
                 }
@@ -152,6 +153,14 @@ macro_rules! commands {
                         match self.base_ops().resume_ops()? {
                             ResumeOps::SingleThread(ops) => ops.support_reverse_cont().map(drop),
                             ResumeOps::MultiThread(ops) => ops.support_reverse_cont().map(drop),
+                        }
+                    }
+
+                    fn support_x_lowcase_packet(&mut self) -> Option<()> {
+                        if self.use_x_lowcase_packet() {
+                            Some(())
+                        } else {
+                            None
                         }
                     }
 
@@ -253,6 +262,10 @@ commands! {
         "c" => _c::c<'a>,
         "s" => _s::s<'a>,
         "vCont" => _vCont::vCont<'a>,
+    }
+
+    x_lowcase_packet use 'a {
+        "x" => _x_lowcase::x<'a>,
     }
 
     x_upcase_packet use 'a {
