@@ -324,6 +324,13 @@ pub enum TargetError<E> {
     /// debugging session, and return a
     /// [`GdbStubError`](crate::stub::GdbStubError)!
     Fatal(E),
+    /// A generic fatal error with a core Error implementation.
+    ///
+    /// **WARNING:** Returning this error will immediately terminate the GDB
+    /// debugging session, and return a
+    /// [`GdbStubError`](crate::stub::GdbStubError)!
+    #[cfg(feature = "std")]
+    FatalCore(Box<dyn core::error::Error + Send + Sync + 'static>),
 }
 
 /// Converts a `()` into a `TargetError::NonFatal`.
