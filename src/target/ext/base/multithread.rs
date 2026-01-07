@@ -134,9 +134,21 @@ pub trait MultiThreadResume: Target {
     /// GDB client had specified using any of the `set_resume_action_XXX`
     /// methods.
     ///
-    /// Any thread that wasn't explicitly resumed by a `set_resume_action_XXX`
-    /// method should be resumed as though it was resumed with
-    /// `set_resume_action_continue`.
+    /// # Default Resume Behavior
+    ///
+    /// By default, any thread that wasn't explicitly resumed by a
+    /// `set_resume_action_XXX` method should be resumed as though it was
+    /// resumed with `set_resume_action_continue`.
+    ///
+    /// **However**, if [`support_scheduler_locking`] is implemented and
+    /// [`set_resume_action_scheduler_lock`] has been called for the current
+    /// resume cycle, this default changes: **unmentioned threads must remain
+    /// stopped.**
+    ///
+    /// [`support_scheduler_locking`]: Self::support_scheduler_locking
+    /// [`set_resume_action_scheduler_lock`]: MultiThreadSchedulerLocking::set_resume_action_scheduler_lock
+    ///
+    /// # Protocol Extensions
     ///
     /// A basic target implementation only needs to implement support for
     /// `set_resume_action_continue`, with all other resume actions requiring
@@ -146,14 +158,17 @@ pub trait MultiThreadResume: Target {
     /// ----------------------------|------------------------------
     /// Optimized [Single Stepping] | See [`support_single_step()`]
     /// Optimized [Range Stepping]  | See [`support_range_step()`]
+    /// [Scheduler Locking]         | See [`support_scheduler_locking()`]
     /// "Stop"                      | Used in "Non-Stop" mode \*
     ///
     /// \* "Non-Stop" mode is currently unimplemented in `gdbstub`
     ///
     /// [Single stepping]: https://sourceware.org/gdb/current/onlinedocs/gdb/Continuing-and-Stepping.html#index-stepi
     /// [Range Stepping]: https://sourceware.org/gdb/current/onlinedocs/gdb/Continuing-and-Stepping.html#range-stepping
+    /// [Scheduler Locking]: https://sourceware.org/gdb/current/onlinedocs/gdb#index-scheduler-locking-mode
     /// [`support_single_step()`]: Self::support_single_step
     /// [`support_range_step()`]: Self::support_range_step
+    /// [`support_scheduler_locking()`]: Self::support_scheduler_locking
     ///
     /// # Additional Considerations
     ///
@@ -233,6 +248,14 @@ pub trait MultiThreadResume: Target {
     ) -> Option<super::reverse_exec::ReverseContOps<'_, Tid, Self>> {
         None
     }
+
+    /// Support for [scheduler locking].
+    ///
+    /// [scheduler locking]: https://sourceware.org/gdb/current/onlinedocs/gdb#index-scheduler-locking-mode
+    #[inline(always)]
+    fn support_scheduler_locking(&mut self) -> Option<MultiThreadSchedulerLockingOps<'_, Self>> {
+        None
+    }
 }
 
 define_ext!(MultiThreadResumeOps, MultiThreadResume);
@@ -290,3 +313,26 @@ pub trait MultiThreadRangeStepping: Target + MultiThreadResume {
 }
 
 define_ext!(MultiThreadRangeSteppingOps, MultiThreadRangeStepping);
+
+/// Target Extension - support for GDB's "Scheduler Locking" mode.
+/// See [`MultiThreadResume::support_scheduler_locking`].
+pub trait MultiThreadSchedulerLocking: Target + MultiThreadResume {
+    /// Configure the target to enable "Scheduler Locking" for the upcoming
+    /// resume.
+    ///
+    /// This method is invoked when the GDB client expects only a specific set
+    /// of threads to run, while all other threads remain frozen. This behavior
+    /// is typically toggled in GDB using the `set scheduler-locking on`
+    /// command.
+    ///
+    /// When this method is called, the implementation must ensure that any
+    /// threads not explicitly resumed via previous `set_resume_action_...`
+    /// calls **remain stopped**.
+    ///
+    /// This prevents any "implicit continue" behavior for unmentioned threads,
+    /// satisfying GDB's expectation that only the designated threads will
+    /// advance during the next resume.
+    fn set_resume_action_scheduler_lock(&mut self) -> Result<(), Self::Error>;
+}
+
+define_ext!(MultiThreadSchedulerLockingOps, MultiThreadSchedulerLocking);
