@@ -166,6 +166,13 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     ) -> Result<(), Error<T::Error, C::Error>> {
         ops.clear_resume_actions().map_err(Error::TargetError)?;
 
+        // Track whether the packet contains a wildcard/default continue action
+        // (e.g., `c` or `c:-1`).
+        //
+        // Presence of this action implies "Scheduler Locking" is OFF.
+        // Absence implies "Scheduler Locking" is ON.
+        let mut has_wildcard_continue = false;
+
         for action in actions.iter() {
             use crate::protocol::commands::_vCont::VContKind;
 
@@ -185,6 +192,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         None | Some(SpecificIdKind::All) => {
                             // Target API contract specifies that the default
                             // resume action for all threads is continue.
+                            has_wildcard_continue = true;
                         }
                         Some(SpecificIdKind::WithId(tid)) => ops
                             .set_resume_action_continue(tid, signal)
@@ -249,6 +257,15 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     return Err(Error::PacketUnexpected);
                 }
             }
+        }
+
+        if !has_wildcard_continue {
+            let Some(locking_ops) = ops.support_scheduler_locking() else {
+                return Err(Error::MissingMultiThreadSchedulerLocking);
+            };
+            locking_ops
+                .set_resume_action_scheduler_lock()
+                .map_err(Error::TargetError)?;
         }
 
         ops.resume().map_err(Error::TargetError)

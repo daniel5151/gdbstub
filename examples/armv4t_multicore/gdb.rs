@@ -185,6 +185,13 @@ impl MultiThreadResume for Emu {
 
         Ok(())
     }
+
+    #[inline(always)]
+    fn support_scheduler_locking(
+        &mut self,
+    ) -> Option<target::ext::base::multithread::MultiThreadSchedulerLockingOps<'_, Self>> {
+        Some(self)
+    }
 }
 
 impl target::ext::base::multithread::MultiThreadSingleStep for Emu {
@@ -291,6 +298,15 @@ impl target::ext::thread_extra_info::ThreadExtraInfo for Emu {
         let info = format!("CPU {:?}", cpu_id);
 
         Ok(copy_to_buf(info.as_bytes(), buf))
+    }
+}
+
+impl target::ext::base::multithread::MultiThreadSchedulerLocking for Emu {
+    fn set_resume_action_scheduler_lock(&mut self) -> Result<(), Self::Error> {
+        for id in [CpuId::Cpu, CpuId::Cop] {
+            self.exec_mode.entry(id).or_insert(ExecMode::Stop);
+        }
+        Ok(())
     }
 }
 

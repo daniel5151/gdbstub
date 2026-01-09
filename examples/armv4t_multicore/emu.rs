@@ -36,9 +36,11 @@ pub enum Event {
     WatchRead(u32),
 }
 
+#[derive(PartialEq)]
 pub enum ExecMode {
     Step,
     Continue,
+    Stop,
 }
 
 /// incredibly barebones armv4t-based emulator
@@ -187,6 +189,10 @@ impl Emu {
         let mut evt = None;
 
         for id in [CpuId::Cpu, CpuId::Cop].iter().copied() {
+            if matches!(self.exec_mode.get(&id), Some(ExecMode::Stop)) {
+                continue;
+            }
+
             if let Some(event) = self.step_core(id) {
                 if evt.is_none() {
                     evt = Some((event, id));
@@ -198,26 +204,25 @@ impl Emu {
     }
 
     pub fn run(&mut self, mut poll_incoming_data: impl FnMut() -> bool) -> RunEvent {
-        // the underlying armv4t_multicore emulator runs both cores in lock step, so
-        // when GDB requests a specific core to single-step, all we need to do is jot
-        // down that we want to single-step the system, as there is no way to
-        // single-step a single core while the other runs.
+        // The underlying armv4t_multicore emulator cycles all cores in lock-step.
         //
-        // In more complex emulators / implementations, this simplification is _not_
-        // valid, and you should track which specific TID the GDB client requested to be
-        // single-stepped, and run them appropriately.
+        // Inside `self.step()`, we iterate through all cores and only invoke
+        // `step_core` if that core's `ExecMode` is not `Stop`.
 
-        let should_single_step = matches!(
-            self.exec_mode
-                .get(&CpuId::Cpu)
-                .or_else(|| self.exec_mode.get(&CpuId::Cop)),
-            Some(&ExecMode::Step)
-        );
+        let should_single_step = self.exec_mode.values().any(|mode| mode == &ExecMode::Step);
 
         match should_single_step {
             true => match self.step() {
                 Some((event, id)) => RunEvent::Event(event, id),
-                None => RunEvent::Event(Event::DoneStep, CpuId::Cpu),
+                None => {
+                    let stepping_core = self
+                        .exec_mode
+                        .iter()
+                        .find(|&(_, mode)| mode == &ExecMode::Step)
+                        .map(|(id, _)| *id)
+                        .unwrap_or(CpuId::Cpu);
+                    RunEvent::Event(Event::DoneStep, stepping_core)
+                }
             },
             false => {
                 let mut cycles = 0;
