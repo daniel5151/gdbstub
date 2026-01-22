@@ -234,6 +234,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     res.write_str(";qXfer:libraries-svr4:read+")?;
                 }
 
+                if target.support_libraries().is_some() {
+                    res.write_str(";qXfer:libraries:read+")?;
+                }
+
                 HandlerStatus::Handled
             }
 
