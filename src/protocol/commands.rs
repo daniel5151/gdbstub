@@ -343,6 +343,10 @@ commands! {
         "qXfer:libraries-svr4:read" => _qXfer_libraries_svr4_read::qXferLibrariesSvr4Read<'a>,
     }
 
+    libraries use 'a {
+        "qXfer:libraries:read" => _qXfer_libraries_read::qXferLibrariesRead<'a>,
+    }
+
     tracepoints use 'a {
         "QTDPsrc" => _QTDPsrc::QTDPsrc<'a>,
         "QTDP" => _QTDP::QTDP<'a>,

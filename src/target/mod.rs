@@ -695,6 +695,15 @@ pub trait Target {
     fn support_libraries_svr4(&mut self) -> Option<ext::libraries::LibrariesSvr4Ops<'_, Self>> {
         None
     }
+
+    /// Support for reading a list of libraries (Windows/generic format).
+    ///
+    /// This is used for targets where library offsets are maintained externally
+    /// (e.g., Windows PE targets).
+    #[inline(always)]
+    fn support_libraries(&mut self) -> Option<ext::libraries::LibrariesOps<'_, Self>> {
+        None
+    }
 }
 
 macro_rules! __delegate {
