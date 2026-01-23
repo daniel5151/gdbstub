@@ -9,6 +9,15 @@ impl TcpConnection {
     pub fn new_localhost(port: u16) -> Result<TcpConnection, &'static str> {
         unsafe {
             let sockaddr = libc::sockaddr_in {
+                #[cfg(any(
+                    target_os = "macos",
+                    target_os = "ios",
+                    target_os = "freebsd",
+                    target_os = "netbsd",
+                    target_os = "openbsd",
+                    target_os = "dragonfly"
+                ))]
+                sin_len: core::mem::size_of::<libc::sockaddr_in>() as _,
                 sin_family: libc::AF_INET as _,
                 sin_port: port.to_be(),
                 // 127.0.0.1
