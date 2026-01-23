@@ -135,7 +135,8 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
                         }
                     }
                     // RLE would output an invalid char ('#' or '$')
-                    6 | 7 => {
+                    // repeat=7 gives 28+7=35='#', repeat=8 gives 28+8=36='$'
+                    7 | 8 => {
                         self.inner_write(self.rle_char)?;
                         self.rle_repeat -= 1;
                         continue;
@@ -285,5 +286,169 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
         }
         self.write_specific_id_kind(tid.tid)?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloc::vec::Vec;
+
+    /// A mock connection that captures all written bytes
+    struct MockConnection {
+        data: Vec<u8>,
+    }
+
+    impl MockConnection {
+        fn new() -> Self {
+            Self { data: Vec::new() }
+        }
+    }
+
+    impl Connection for MockConnection {
+        type Error = ();
+
+        fn write(&mut self, byte: u8) -> Result<(), Self::Error> {
+            self.data.push(byte);
+            Ok(())
+        }
+
+        fn write_all(&mut self, buf: &[u8]) -> Result<(), Self::Error> {
+            self.data.extend_from_slice(buf);
+            Ok(())
+        }
+
+        fn flush(&mut self) -> Result<(), Self::Error> {
+            Ok(())
+        }
+    }
+
+    /// Helper to decode RLE-encoded data for verification
+    ///
+    /// GDB RLE format: X*Y means output character X a total of (Y - 29 + 1) times
+    /// The +1 accounts for the base character X itself.
+    fn decode_rle(data: &[u8]) -> Vec<u8> {
+        let mut result = Vec::new();
+        let mut i = 0;
+        while i < data.len() {
+            if i + 2 < data.len() && data[i + 1] == b'*' {
+                // RLE sequence: char * count
+                // Output 1 (base) + (count_byte - 29) additional copies
+                let ch = data[i];
+                let additional = data[i + 2].wrapping_sub(29);
+                result.push(ch); // base character
+                for _ in 0..additional {
+                    result.push(ch); // additional copies
+                }
+                i += 3;
+            } else {
+                result.push(data[i]);
+                i += 1;
+            }
+        }
+        result
+    }
+
+    /// Regression test: RLE encoding must not produce '#' or '$' as repeat count.
+    ///
+    /// The RLE count byte formula is: 28 + repeat_count
+    /// - repeat=7 gives 35 = '#' (packet terminator)
+    /// - repeat=8 gives 36 = '$' (packet start)
+    ///
+    /// Both must be avoided by writing characters directly instead of using RLE.
+    #[test]
+    fn rle_avoids_hash_and_dollar() {
+        let mut conn = MockConnection::new();
+
+        {
+            let mut writer = ResponseWriter::new(&mut conn, true);
+            // Write exactly 8 identical characters - this would produce '$' as count
+            // if the bug exists (repeat=8 -> 28+8=36='$')
+            writer.write_str("00000000").unwrap();
+            writer.flush().unwrap();
+        }
+
+        // The encoded data should NOT contain '$' except at position 0 (packet start)
+        // and should NOT contain '#' except at the checksum delimiter
+        let data = &conn.data;
+
+        // Find the checksum delimiter position
+        let hash_pos = data.iter().rposition(|&b| b == b'#');
+        assert!(hash_pos.is_some(), "packet should have checksum delimiter");
+        let hash_pos = hash_pos.unwrap();
+
+        // Check that '$' only appears at position 0
+        for (i, &byte) in data.iter().enumerate() {
+            if byte == b'$' {
+                assert_eq!(i, 0, "found '$' at position {} in packet body (should only be at 0)", i);
+            }
+        }
+
+        // Check that '#' only appears at the checksum position
+        for (i, &byte) in data.iter().enumerate() {
+            if byte == b'#' {
+                assert_eq!(i, hash_pos, "found '#' at position {} (should only be at {})", i, hash_pos);
+            }
+        }
+
+        // Verify the decoded content is correct
+        let body = &data[1..hash_pos]; // skip '$' and stop before '#'
+        let decoded = decode_rle(body);
+        assert_eq!(decoded, b"00000000", "decoded content should be 8 zeros");
+    }
+
+    /// Test that 7 identical characters (which would produce '#') is also handled
+    #[test]
+    fn rle_avoids_hash_with_7_chars() {
+        let mut conn = MockConnection::new();
+
+        {
+            let mut writer = ResponseWriter::new(&mut conn, true);
+            // Write exactly 7 identical characters - this would produce '#' as count
+            // if the bug exists (repeat=7 -> 28+7=35='#')
+            writer.write_str("1111111").unwrap();
+            writer.flush().unwrap();
+        }
+
+        let data = &conn.data;
+        let hash_pos = data.iter().rposition(|&b| b == b'#').unwrap();
+
+        // Check that '#' only appears at the checksum position
+        for (i, &byte) in data.iter().enumerate() {
+            if byte == b'#' {
+                assert_eq!(i, hash_pos, "found '#' at position {} (should only be at {})", i, hash_pos);
+            }
+        }
+
+        let body = &data[1..hash_pos];
+        let decoded = decode_rle(body);
+        assert_eq!(decoded, b"1111111", "decoded content should be 7 ones");
+    }
+
+    /// Test that longer runs work correctly (more than 8)
+    #[test]
+    fn rle_handles_long_runs() {
+        let mut conn = MockConnection::new();
+
+        {
+            let mut writer = ResponseWriter::new(&mut conn, true);
+            // Write 20 identical characters
+            writer.write_str("aaaaaaaaaaaaaaaaaaaa").unwrap();
+            writer.flush().unwrap();
+        }
+
+        let data = &conn.data;
+        let hash_pos = data.iter().rposition(|&b| b == b'#').unwrap();
+
+        // Verify no invalid characters in packet body
+        for (i, &byte) in data[1..hash_pos].iter().enumerate() {
+            assert_ne!(byte, b'$', "found '$' at body position {}", i);
+            // '#' in body would break packet framing
+            assert_ne!(byte, b'#', "found '#' at body position {}", i);
+        }
+
+        let body = &data[1..hash_pos];
+        let decoded = decode_rle(body);
+        assert_eq!(decoded, b"aaaaaaaaaaaaaaaaaaaa", "decoded content should be 20 a's");
     }
 }
