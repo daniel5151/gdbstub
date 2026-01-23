@@ -445,7 +445,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             }
             MultiThreadStopReason::Library(tid) => {
                 self.write_stop_common(res, target, Some(tid), Signal::SIGTRAP)?;
-                res.write_str("library;")?;
+                res.write_str("library:;")?;
                 FinishExecStatus::Handled
             }
             MultiThreadStopReason::Fork { cur_tid, new_tid } if guard_fork_events!() => {
@@ -479,7 +479,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             MultiThreadStopReason::VForkDone(tid) if guard_vforkdone_events!() => {
                 crate::__dead_code_marker!("vforkdone_events", "stop_reason");
                 self.write_stop_common(res, target, Some(tid), Signal::SIGTRAP)?;
-                res.write_str("vforkdone;")?;
+                res.write_str("vforkdone:;")?;
                 FinishExecStatus::Handled
             }
             // Explicitly avoid using `_ =>` to handle the "unguarded" variants, as doing so would
