@@ -88,7 +88,7 @@ Of course, most use-cases will want to support additional debugging features as 
     -   Can be used to automatically read the remote executable on attach (using `ExecFile`)
 -   Read auxiliary vector (`info auxv`)
 -   Extra thread info (`info threads`)
--   Extra library information (`info sharedlibraries`)
+-   Extra library information (`info sharedlibraries` or `info shared`)
 -   Tracepoints
     - Configure tracepoints and actions to perform when hit
     - Select and interrogate collected trace frames
