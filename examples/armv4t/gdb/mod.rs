@@ -165,6 +165,11 @@ impl Target for Emu {
     }
 
     #[inline(always)]
+    fn support_libraries(&mut self) -> Option<target::ext::libraries::LibrariesOps<'_, Self>> {
+        Some(self)
+    }
+
+    #[inline(always)]
     fn support_tracepoints(
         &mut self,
     ) -> Option<target::ext::tracepoints::TracepointsOps<'_, Self>> {
