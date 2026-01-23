@@ -442,13 +442,24 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                 FinishExecStatus::Handled
             }
+            MultiThreadStopReason::Library(tid)
+                if target.support_libraries().is_some()
+                    || target.support_libraries_svr4().is_some() =>
+            {
+                crate::__dead_code_marker!("libraries", "stop_reason");
+
+                self.write_stop_common(res, target, Some(tid), Signal::SIGTRAP)?;
+                res.write_str("library:;")?;
+                FinishExecStatus::Handled
+            }
             // Explicitly avoid using `_ =>` to handle the "unguarded" variants, as doing so would
             // squelch the useful compiler error that crops up whenever stop reasons are added.
             MultiThreadStopReason::SwBreak(_)
             | MultiThreadStopReason::HwBreak(_)
             | MultiThreadStopReason::Watch { .. }
             | MultiThreadStopReason::ReplayLog { .. }
-            | MultiThreadStopReason::CatchSyscall { .. } => {
+            | MultiThreadStopReason::CatchSyscall { .. }
+            | MultiThreadStopReason::Library(_) => {
                 return Err(Error::UnsupportedStopReason);
             }
         };

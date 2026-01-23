@@ -101,6 +101,18 @@ pub enum BaseStopReason<Tid, U> {
         /// The location the event occurred at.
         position: CatchSyscallPosition,
     },
+    /// The target's library list has changed.
+    ///
+    /// This stop reason is used to notify the debugger that the list of loaded
+    /// libraries has changed (e.g., a new shared library was loaded). The
+    /// debugger can then request the updated library list via
+    /// `qXfer:libraries:read` or `qXfer:libraries-svr4:read`.
+    ///
+    /// Requires: [`Libraries`] or [`LibrariesSvr4`].
+    ///
+    /// [`Libraries`]: crate::target::ext::libraries::Libraries
+    /// [`LibrariesSvr4`]: crate::target::ext::libraries::LibrariesSvr4
+    Library(Tid),
 }
 
 /// A stop reason for a single threaded target.
@@ -140,6 +152,7 @@ impl<U> From<BaseStopReason<(), U>> for BaseStopReason<Tid, U> {
                 number,
                 position,
             },
+            BaseStopReason::Library(_) => BaseStopReason::Library(crate::SINGLE_THREAD_TID),
         }
     }
 }
