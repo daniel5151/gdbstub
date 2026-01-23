@@ -135,7 +135,7 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
                         }
                     }
                     // RLE would output an invalid char ('#' or '$')
-                    6 | 7 => {
+                    7 | 8 => {
                         self.inner_write(self.rle_char)?;
                         self.rle_repeat -= 1;
                         continue;
