@@ -36,6 +36,24 @@ impl Target for DummyTarget {
         false
     }
 
+    // disable fork events to save space
+    #[inline(always)]
+    fn use_fork_stop_reason(&self) -> bool {
+        false
+    }
+
+    // disable vfork events to save space
+    #[inline(always)]
+    fn use_vfork_stop_reason(&self) -> bool {
+        false
+    }
+
+    // disable vforkdone events to save space
+    #[inline(always)]
+    fn use_vforkdone_stop_reason(&self) -> bool {
+        false
+    }
+
     #[inline(always)]
     fn support_breakpoints(
         &mut self,

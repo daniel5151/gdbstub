@@ -101,6 +101,38 @@ pub enum BaseStopReason<Tid, U> {
         /// The location the event occurred at.
         position: CatchSyscallPosition,
     },
+    /// A thread hit a specific library event.
+    ///
+    /// This stop reason indicates that loaded libraries have changed. The
+    /// debugger should fetch a new list of loaded libraries.
+    Library(Tid),
+    /// A thread created a new process via fork.
+    ///
+    /// This indicates that a fork system call was executed, creating a new
+    /// child process.
+    Fork {
+        /// Tid of the thread that called fork
+        cur_tid: Tid,
+        /// Tid of the new child process
+        new_tid: core::num::NonZeroUsize,
+    },
+    /// A thread created a new process via vfork.
+    ///
+    /// Similar to Fork, but the parent process is suspended until the child
+    /// calls exec or exits, as the parent and child temporarily share the
+    /// same address space.
+    VFork {
+        /// Tid of the thread that called vfork
+        cur_tid: Tid,
+        /// Tid of the new child process
+        new_tid: core::num::NonZeroUsize,
+    },
+    /// A vfork child process has completed its operation.
+    ///
+    /// This indicates that a child process created by vfork has either called
+    /// exec or terminated, so the address spaces of parent and child are no
+    /// longer shared.
+    VForkDone(Tid),
 }
 
 /// A stop reason for a single threaded target.
@@ -140,6 +172,16 @@ impl<U> From<BaseStopReason<(), U>> for BaseStopReason<Tid, U> {
                 number,
                 position,
             },
+            BaseStopReason::Library(_) => BaseStopReason::Library(crate::SINGLE_THREAD_TID),
+            BaseStopReason::Fork { new_tid, .. } => BaseStopReason::Fork {
+                cur_tid: crate::SINGLE_THREAD_TID,
+                new_tid,
+            },
+            BaseStopReason::VFork { new_tid, .. } => BaseStopReason::VFork {
+                cur_tid: crate::SINGLE_THREAD_TID,
+                new_tid,
+            },
+            BaseStopReason::VForkDone(_) => BaseStopReason::VForkDone(crate::SINGLE_THREAD_TID),
         }
     }
 }
