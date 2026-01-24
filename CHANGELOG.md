@@ -2,6 +2,18 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+# 0.7.9
+
+#### New Protocol Extensions
+
+- `MultiThreadSchedulerLocking` - Support running in [Scheduler Locking](https://sourceware.org/gdb/current/onlinedocs/gdb#index-scheduler-locking-mode) mode. [\#179](https://github.com/daniel5151/gdbstub/pull/179) ([Satar07](https://github.com/Satar07))
+- `Libraries` - List a target's loaded libraries. [\#183](https://github.com/daniel5151/gdbstub/pull/183) ([mrexodia](https://github.com/mrexodia))
+  - _Note:_ This is a platform-agnostic version of the existing System-V/Unix-specific `LibrariesSvr4` feature, which landed in `0.7.1`
+
+#### Bugfixes
+
+- Fixed a bug in the RLE encoding where a `$` would be inserted in the packet when encoding runs of 8 chars (e.g: `00000000`). [\#182](https://github.com/daniel5151/gdbstub/pull/182) ([mrexodia](https://github.com/mrexodia))
+
 # 0.7.8
 
 #### New Features
