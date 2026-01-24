@@ -135,7 +135,7 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
                         }
                     }
                     // RLE would output an invalid char ('#' or '$')
-                    6 | 7 => {
+                    7 | 8 => {
                         self.inner_write(self.rle_char)?;
                         self.rle_repeat -= 1;
                         continue;
@@ -285,5 +285,72 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
         }
         self.write_specific_id_kind(tid.tid)?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloc::vec::Vec;
+
+    /// A mock connection that captures all written bytes
+    struct MockConnection {
+        data: Vec<u8>,
+    }
+
+    impl MockConnection {
+        fn new() -> Self {
+            Self { data: Vec::new() }
+        }
+    }
+
+    impl Connection for MockConnection {
+        type Error = ();
+
+        fn write(&mut self, byte: u8) -> Result<(), Self::Error> {
+            self.data.push(byte);
+            Ok(())
+        }
+
+        fn write_all(&mut self, buf: &[u8]) -> Result<(), Self::Error> {
+            self.data.extend_from_slice(buf);
+            Ok(())
+        }
+
+        fn flush(&mut self) -> Result<(), Self::Error> {
+            Ok(())
+        }
+    }
+
+    /// Check that packet body (between '$' and '#') contains no '$' or '#'.
+    fn assert_no_special_chars_in_body(data: &[u8]) {
+        let hash_pos = data.iter().rposition(|&b| b == b'#').unwrap();
+        for &byte in &data[1..hash_pos] {
+            assert!(
+                byte != b'$' && byte != b'#',
+                "found {:?} in packet body",
+                byte as char
+            );
+        }
+    }
+
+    /// RLE must not produce '#' in packet body.
+    #[test]
+    fn rle_avoids_hash() {
+        let mut conn = MockConnection::new();
+        let mut writer = ResponseWriter::new(&mut conn, true);
+        writer.write_str("0000000").unwrap();
+        writer.flush().unwrap();
+        assert_no_special_chars_in_body(&conn.data);
+    }
+
+    /// RLE must not produce '$' in packet body.
+    #[test]
+    fn rle_avoids_dollar() {
+        let mut conn = MockConnection::new();
+        let mut writer = ResponseWriter::new(&mut conn, true);
+        writer.write_str("00000000").unwrap();
+        writer.flush().unwrap();
+        assert_no_special_chars_in_body(&conn.data);
     }
 }
