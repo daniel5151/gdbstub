@@ -26,3 +26,26 @@ impl target::ext::libraries::LibrariesSvr4 for Emu {
         Ok(copy_range_to_buf(xml, offset, length, buf))
     }
 }
+
+impl target::ext::libraries::Libraries for Emu {
+    fn get_libraries(
+        &self,
+        offset: u64,
+        length: usize,
+        buf: &mut [u8],
+    ) -> TargetResult<usize, Self> {
+        // This is the Windows/generic library list format, which uses segment
+        // addresses instead of the SVR4 link_map structure.
+        //
+        // Note: on Windows, the `address` is not the image base, but the
+        // address of the first section (typically .text).
+        let xml = r#"
+<library-list>
+    <library name="/test.elf"><segment address="0x55550000"/></library>
+</library-list>
+"#
+        .trim()
+        .as_bytes();
+        Ok(copy_range_to_buf(xml, offset, length, buf))
+    }
+}
