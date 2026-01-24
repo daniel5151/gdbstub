@@ -599,21 +599,45 @@ pub trait Target {
         true
     }
 
-    /// Support for reporting fork events.
+    /// Enable support for [`BaseStopReason::Fork`].
+    ///
+    /// By default, this method returns `true`.
+    ///
+    /// _Author's note:_ Unless you're _really_ trying to squeeze `gdbstub` onto
+    /// a particularly resource-constrained platform (and looking to save ~100
+    /// bytes), you may as well leave this enabled.
+    ///
+    /// [`BaseStopReason::Fork`]: crate::stub::BaseStopReason::Fork
     #[inline(always)]
-    fn support_fork_events(&self) -> bool {
+    fn use_fork_stop_reason(&self) -> bool {
         true
     }
 
-    /// Support for reporting vfork events.
+    /// Enable support for [`BaseStopReason::VFork`].
+    ///
+    /// By default, this method returns `true`.
+    ///
+    /// _Author's note:_ Unless you're _really_ trying to squeeze `gdbstub` onto
+    /// a particularly resource-constrained platform (and looking to save ~100
+    /// bytes), you may as well leave this enabled.
+    ///
+    /// [`BaseStopReason::VFork`]: crate::stub::BaseStopReason::VFork
     #[inline(always)]
-    fn support_vfork_events(&self) -> bool {
+    fn use_vfork_stop_reason(&self) -> bool {
         true
     }
 
-    /// Support for reporting vforkdone events.
+    /// Enable support for [`BaseStopReason::VForkDone`].
+    ///
+    /// By default, this method returns `true`.
+    ///
+    /// _Author's note:_ Unless you're _really_ trying to squeeze `gdbstub` onto
+    /// a particularly resource-constrained platform (and looking to save ~100
+    /// bytes), you may as well leave this enabled.
+    ///
+    /// [`BaseStopReason::VForkDone`]: crate::stub::BaseStopReason::VForkDone
     #[inline(always)]
-    fn support_vforkdone_events(&self) -> bool {
+    fn use_vforkdone_stop_reason(&self) -> bool {
         true
     }
 

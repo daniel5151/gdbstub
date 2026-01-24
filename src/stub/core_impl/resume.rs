@@ -339,19 +339,19 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
         macro_rules! guard_fork_events {
             () => {
-                target.support_fork_events()
+                target.use_fork_stop_reason()
             };
         }
 
         macro_rules! guard_vfork_events {
             () => {
-                target.support_vfork_events()
+                target.use_vfork_stop_reason()
             };
         }
 
         macro_rules! guard_vforkdone_events {
             () => {
-                target.support_vforkdone_events()
+                target.use_vforkdone_stop_reason()
             };
         }
 

@@ -119,15 +119,15 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     res.write_str(";QStartNoAckMode+")?;
                 }
 
-                if target.support_fork_events() {
+                if target.use_fork_stop_reason() {
                     res.write_str(";fork-events+")?;
                 }
 
-                if target.support_vfork_events() {
+                if target.use_vfork_stop_reason() {
                     res.write_str(";vfork-events+")?;
                 }
 
-                if target.support_vforkdone_events() {
+                if target.use_vforkdone_stop_reason() {
                     res.write_str(";vforkdone-events+")?;
                 }
 
