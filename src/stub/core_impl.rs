@@ -72,6 +72,8 @@ pub(crate) mod target_result_ext {
                 Err(TargetError::Errno(code)) => code,
                 #[cfg(feature = "std")]
                 Err(TargetError::Io(e)) => e.raw_os_error().unwrap_or(121) as u8,
+                #[cfg(feature = "std")]
+                Err(TargetError::FatalCore(e)) => return Err(InternalError::TargetCoreError(e)),
             };
 
             Err(InternalError::NonFatalError(code))

@@ -28,6 +28,11 @@ pub(crate) enum InternalError<T, C> {
     /// Target encountered a fatal error.
     TargetError(T),
 
+    /// Target encountered a fatal error. More information may be available
+    /// in the source of the error.
+    #[cfg(feature = "std")]
+    TargetCoreError(Box<dyn core::error::Error + Send + Sync + 'static>),
+
     ClientSentNack,
     PacketBufferOverflow,
     PacketParse(PacketParseError),
@@ -141,6 +146,8 @@ where
             PacketUnexpected => write!(f, "Client sent an unexpected packet. This should never happen! Please re-run with `log` trace-level logging enabled and file an issue at https://github.com/daniel5151/gdbstub/issues"),
             TargetMismatch => write!(f, "Received a packet with too much data for the given target"),
             TargetError(e) => write!(f, "Target threw a fatal error: {}", e),
+            #[cfg(feature = "std")]
+            TargetCoreError(e) => write!(f, "Target threw a fatal error: {}", e),
             UnsupportedStopReason => write!(f, "{} {}", unsupported_stop_reason!(), CONTEXT),
             UnexpectedStepPacket => write!(f, "{} {}", unexpected_step_packet!(), CONTEXT),
 
@@ -161,6 +168,16 @@ where
     C: Debug + Display,
     T: Debug + Display,
 {
+    #[cfg(feature = "std")]
+    fn source(&self) -> Option<&(dyn CoreError + 'static)> {
+        let GdbStubError {
+            kind: InternalError::TargetCoreError(e),
+        } = self
+        else {
+            return None;
+        };
+        e.source()
+    }
 }
 
 impl<T, C> GdbStubError<T, C> {
@@ -173,6 +190,15 @@ impl<T, C> GdbStubError<T, C> {
     pub fn into_target_error(self) -> Option<T> {
         match self.kind {
             InternalError::TargetError(e) => Some(e),
+            _ => None,
+        }
+    }
+
+    /// If the error was due to a core error, return the core error trait.
+    #[cfg(feature = "std")]
+    pub fn into_core_error(self) -> Option<Box<dyn core::error::Error>> {
+        match self.kind {
+            InternalError::TargetCoreError(e) => Some(e),
             _ => None,
         }
     }
