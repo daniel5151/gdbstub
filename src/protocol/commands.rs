@@ -1,6 +1,6 @@
 use crate::protocol::packet::PacketBuf;
 use crate::target::Target;
-use paste::paste;
+use pastey::paste;
 
 /// Common imports used by >50% of all packet parsers.
 ///
