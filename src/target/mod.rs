@@ -764,7 +764,7 @@ macro_rules! __delegate {
 
 macro_rules! __delegate_support {
     ($ext:ident) => {
-        paste::paste! {
+        pastey::paste! {
             __delegate!(fn [<support_ $ext>](&mut self) -> Option<ext::$ext::[<$ext:camel Ops>]<'_, Self>>);
         }
     };
