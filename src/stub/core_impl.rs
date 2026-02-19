@@ -44,6 +44,7 @@ mod single_register_access;
 mod target_xml;
 mod thread_extra_info;
 mod tracepoints;
+mod x_lowcase_packet;
 mod x_upcase_packet;
 
 pub(crate) use resume::FinishExecStatus;
@@ -202,6 +203,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             Command::TargetXml(cmd) => self.handle_target_xml(res, target, cmd),
             Command::Resume(cmd) => self.handle_stop_resume(res, target, cmd),
             Command::NoAckMode(cmd) => self.handle_no_ack_mode(res, target, cmd),
+            Command::XLowcasePacket(cmd) => self.handle_x_lowcase_packet(res, target, cmd),
             Command::XUpcasePacket(cmd) => self.handle_x_upcase_packet(res, target, cmd),
             Command::SingleRegisterAccess(cmd) => {
                 self.handle_single_register_access(res, target, cmd)
