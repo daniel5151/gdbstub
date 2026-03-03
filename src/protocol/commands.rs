@@ -366,4 +366,11 @@ commands! {
         "qTfV" => _qTfV::qTfV,
         "qTsV" => _qTsV::qTsV,
     }
+
+    wasm {
+        "qWasmCallStack" => _qWasmCallStack::qWasmCallStack,
+        "qWasmLocal" => _qWasmLocal::qWasmLocal,
+        "qWasmGlobal" => _qWasmGlobal::qWasmGlobal,
+        "qWasmStackValue" => _qWasmStackValue::qWasmStackValue,
+    }
 }
