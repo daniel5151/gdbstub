@@ -44,6 +44,7 @@ use crate::protocol::ResponseWriter;
 use crate::stub::error::GdbStubError;
 use crate::stub::error::InternalError;
 use crate::stub::stop_reason::IntoStopReason;
+use crate::stub::BaseStopReason;
 use crate::target::Target;
 use managed::ManagedSlice;
 
@@ -257,6 +258,53 @@ impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::Running, 
     ) -> Result<GdbStubStateMachine<'a, T, C>, GdbStubError<T::Error, C::Error>> {
         let mut res = ResponseWriter::new(&mut self.i.conn, target.use_rle());
         let event = self.i.inner.finish_exec(&mut res, target, reason.into())?;
+        res.flush().map_err(InternalError::from)?;
+
+        Ok(match event {
+            FinishExecStatus::Handled => self
+                .transition(state::Idle {
+                    deferred_ctrlc_stop_reason: None,
+                })
+                .into(),
+            FinishExecStatus::Disconnect(reason) => {
+                self.transition(state::Disconnected { reason }).into()
+            }
+        })
+    }
+
+    /// Report a target stop reason back to GDB, including expedited
+    /// register values in the stop reply T-packet.
+    ///
+    /// The iterator yields `(register_number, value_bytes)` pairs that
+    /// are written as expedition registers in the T-packet. Values
+    /// should be in target byte order (typically little-endian).
+    pub fn report_stop_with_regs(
+        mut self,
+        target: &mut T,
+        reason: impl IntoStopReason<T>,
+        regs: &mut dyn Iterator<Item = (u32, &[u8])>,
+    ) -> Result<GdbStubStateMachine<'a, T, C>, GdbStubError<T::Error, C::Error>> {
+        let mt_reason: BaseStopReason<_, _> = reason.into();
+        let is_t_packet = !matches!(
+            mt_reason,
+            BaseStopReason::DoneStep
+                | BaseStopReason::Signal(_)
+                | BaseStopReason::Exited(_)
+                | BaseStopReason::Terminated(_)
+        );
+
+        let mut res = ResponseWriter::new(&mut self.i.conn, target.use_rle());
+        let event = self.i.inner.finish_exec(&mut res, target, mt_reason)?;
+
+        if is_t_packet {
+            for (reg_id, value) in regs {
+                res.write_num(reg_id).map_err(InternalError::from)?;
+                res.write_str(":").map_err(InternalError::from)?;
+                res.write_hex_buf(value).map_err(InternalError::from)?;
+                res.write_str(";").map_err(InternalError::from)?;
+            }
+        }
+
         res.flush().map_err(InternalError::from)?;
 
         Ok(match event {
