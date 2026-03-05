@@ -366,4 +366,9 @@ commands! {
         "qTfV" => _qTfV::qTfV,
         "qTsV" => _qTsV::qTsV,
     }
+
+    process_info {
+        "qHostInfo" => _qHostInfo::qHostInfo,
+        "qProcessInfo" => _qProcessInfo::qProcessInfo,
+    }
 }

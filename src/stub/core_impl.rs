@@ -37,6 +37,7 @@ mod lldb_register_info;
 mod memory_map;
 mod monitor_cmd;
 mod no_ack_mode;
+mod process_info;
 mod resume;
 mod reverse_exec;
 mod section_offsets;
@@ -223,6 +224,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             Command::LibrariesSvr4(cmd) => self.handle_libraries_svr4(res, target, cmd),
             Command::Libraries(cmd) => self.handle_libraries(res, target, cmd),
             Command::Tracepoints(cmd) => self.handle_tracepoints(res, target, cmd),
+            Command::ProcessInfo(cmd) => self.handle_process_info(res, target, cmd),
             // in the worst case, the command could not be parsed...
             Command::Unknown(cmd) => {
                 // HACK: if the user accidentally sends a resume command to a
