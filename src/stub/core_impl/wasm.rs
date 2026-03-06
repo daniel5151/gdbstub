@@ -1,5 +1,6 @@
 use super::prelude::*;
-use crate::protocol::{commands::ext::Wasm, IdKind};
+use crate::protocol::commands::ext::Wasm;
+use crate::protocol::IdKind;
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     pub(crate) fn handle_wasm(

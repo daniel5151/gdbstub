@@ -2,8 +2,8 @@ use super::prelude::*;
 
 #[derive(Debug)]
 pub struct qWasmStackValue {
-    pub frame: u32,
-    pub index: u32,
+    pub frame: usize,
+    pub index: usize,
 }
 
 impl<'a> ParseCommand<'a> for qWasmStackValue {
@@ -15,9 +15,9 @@ impl<'a> ParseCommand<'a> for qWasmStackValue {
         }
         let mut parts = body[1..].split(|b| *b == b';');
         let frame = parts.next()?;
-        let frame = str::from_utf8(frame).ok()?.parse::<u32>().ok()?;
+        let frame = str::from_utf8(frame).ok()?.parse::<usize>().ok()?;
         let index = parts.next()?;
-        let index = str::from_utf8(index).ok()?.parse::<u32>().ok()?;
+        let index = str::from_utf8(index).ok()?.parse::<usize>().ok()?;
         if parts.next().is_some() {
             // Too many parameters.
             return None;

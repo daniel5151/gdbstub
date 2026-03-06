@@ -2,8 +2,8 @@ use super::prelude::*;
 
 #[derive(Debug)]
 pub struct qWasmLocal {
-    pub frame: u32,
-    pub local: u32,
+    pub frame: usize,
+    pub local: usize,
 }
 
 impl<'a> ParseCommand<'a> for qWasmLocal {
@@ -15,9 +15,9 @@ impl<'a> ParseCommand<'a> for qWasmLocal {
         }
         let mut parts = body[1..].split(|b| *b == b';');
         let frame = parts.next()?;
-        let frame = str::from_utf8(frame).ok()?.parse::<u32>().ok()?;
+        let frame = str::from_utf8(frame).ok()?.parse::<usize>().ok()?;
         let local = parts.next()?;
-        let local = str::from_utf8(local).ok()?.parse::<u32>().ok()?;
+        let local = str::from_utf8(local).ok()?.parse::<usize>().ok()?;
         if parts.next().is_some() {
             // Too many parameters.
             return None;
