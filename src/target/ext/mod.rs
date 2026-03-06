@@ -274,3 +274,4 @@ pub mod section_offsets;
 pub mod target_description_xml_override;
 pub mod thread_extra_info;
 pub mod tracepoints;
+pub mod wasm;
