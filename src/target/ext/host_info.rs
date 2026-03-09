@@ -1,16 +1,15 @@
-//! Provide process information to the debugger.
+//! Provide host information to the debugger.
 //!
 //! This allows for reporting key-value metadata, for example the
-//! current PID, target triple, endianness, and pointer size.
+//! target triple, endianness, and pointer size.
 //!
 //! This corresponds to the `qHostInfo` command in the LLDB
 //! extensions.
 
 use crate::common::Endianness;
-use crate::common::Pid;
 use crate::target::Target;
 
-/// A response key-value pair to a qProcessInfo query.
+/// A response key-value pair to a qHostInfo query.
 ///
 /// A response consists of a list of key-value pairs, each of which is
 /// represented by one instance of this enum.
@@ -24,8 +23,6 @@ use crate::target::Target;
 #[derive(Clone, Copy)]
 #[non_exhaustive]
 pub enum InfoResponse<'a> {
-    /// The current process PID.
-    Pid(Pid),
     /// The target triple for the debuggee, as a string.
     Triple(&'a str),
     /// The target endianness.
@@ -34,15 +31,12 @@ pub enum InfoResponse<'a> {
     PointerSize(usize),
 }
 
-/// Target Extension - Provide process information.
-pub trait ProcessInfo: Target {
-    /// Write the response to process-info query (LLDB extension).
+/// Target Extension - Provide host information.
+pub trait HostInfo: Target {
+    /// Write a response to a host-info query (LLDB extension).
     ///
     /// Call `write_item` with each `InfoResponse` you wish to send.
-    fn process_info(
-        &self,
-        write_item: &mut dyn FnMut(&InfoResponse<'_>),
-    ) -> Result<(), Self::Error>;
+    fn host_info(&self, write_item: &mut dyn FnMut(&InfoResponse<'_>)) -> Result<(), Self::Error>;
 }
 
-define_ext!(ProcessInfoOps, ProcessInfo);
+define_ext!(HostInfoOps, HostInfo);

@@ -747,7 +747,13 @@ pub trait Target {
         None
     }
 
-    /// Support for host and process information (qHostInfo / qProcessInfo).
+    /// Support for host information (qHostInfo).
+    #[inline(always)]
+    fn support_host_info(&mut self) -> Option<ext::host_info::HostInfoOps<'_, Self>> {
+        None
+    }
+
+    /// Support for process information (qProcessInfo).
     #[inline(always)]
     fn support_process_info(&mut self) -> Option<ext::process_info::ProcessInfoOps<'_, Self>> {
         None

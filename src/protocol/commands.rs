@@ -367,8 +367,11 @@ commands! {
         "qTsV" => _qTsV::qTsV,
     }
 
-    process_info {
+    host_info {
         "qHostInfo" => _qHostInfo::qHostInfo,
+    }
+
+    process_info {
         "qProcessInfo" => _qProcessInfo::qProcessInfo,
     }
 }

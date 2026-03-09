@@ -31,7 +31,9 @@ mod catch_syscalls;
 mod exec_file;
 mod extended_mode;
 mod flash;
+mod host_info;
 mod host_io;
+mod info_response;
 mod libraries;
 mod lldb_register_info;
 mod memory_map;
@@ -224,6 +226,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             Command::LibrariesSvr4(cmd) => self.handle_libraries_svr4(res, target, cmd),
             Command::Libraries(cmd) => self.handle_libraries(res, target, cmd),
             Command::Tracepoints(cmd) => self.handle_tracepoints(res, target, cmd),
+            Command::HostInfo(cmd) => self.handle_host_info(res, target, cmd),
             Command::ProcessInfo(cmd) => self.handle_process_info(res, target, cmd),
             // in the worst case, the command could not be parsed...
             Command::Unknown(cmd) => {
