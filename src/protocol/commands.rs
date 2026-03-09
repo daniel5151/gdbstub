@@ -374,4 +374,11 @@ commands! {
     process_info {
         "qProcessInfo" => _qProcessInfo::qProcessInfo,
     }
+
+    wasm use 'a {
+        "qWasmCallStack" => _qWasmCallStack::qWasmCallStack,
+        "qWasmLocal" => _qWasmLocal::qWasmLocal<'a>,
+        "qWasmGlobal" => _qWasmGlobal::qWasmGlobal<'a>,
+        "qWasmStackValue" => _qWasmStackValue::qWasmStackValue<'a>,
+    }
 }
