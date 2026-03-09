@@ -2,7 +2,7 @@
 //!
 //! ### Address Encoding
 //!
-//! The gdbstub extension to the Wasm target architecture uses a
+//! The LLDB Wasm extension to the GDB RSP uses a
 //! specific encoding for addresses, both for commands in this
 //! extension trait and for commands in the base protocol (e.g., for
 //! reading and writing memory and setting breakpoints). The need for
