@@ -44,6 +44,7 @@ mod single_register_access;
 mod target_xml;
 mod thread_extra_info;
 mod tracepoints;
+mod wasm;
 mod x_upcase_packet;
 
 pub(crate) use resume::FinishExecStatus;
@@ -223,6 +224,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             Command::LibrariesSvr4(cmd) => self.handle_libraries_svr4(res, target, cmd),
             Command::Libraries(cmd) => self.handle_libraries(res, target, cmd),
             Command::Tracepoints(cmd) => self.handle_tracepoints(res, target, cmd),
+            Command::Wasm(cmd) => self.handle_wasm(res, target, cmd),
             // in the worst case, the command could not be parsed...
             Command::Unknown(cmd) => {
                 // HACK: if the user accidentally sends a resume command to a

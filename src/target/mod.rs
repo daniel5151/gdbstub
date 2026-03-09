@@ -746,6 +746,12 @@ pub trait Target {
     fn support_libraries(&mut self) -> Option<ext::libraries::LibrariesOps<'_, Self>> {
         None
     }
+
+    /// (LLDB extension) Support for WebAssembly (Wasm)-specific commands.
+    #[inline(always)]
+    fn support_wasm(&mut self) -> Option<ext::wasm::WasmOps<'_, Self>> {
+        None
+    }
 }
 
 macro_rules! __delegate {
