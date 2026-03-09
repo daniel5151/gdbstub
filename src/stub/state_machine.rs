@@ -37,6 +37,7 @@ use super::core_impl::State;
 use super::DisconnectReason;
 use super::GdbStub;
 use crate::arch::Arch;
+use crate::arch::RegId;
 use crate::conn::Connection;
 use crate::protocol::recv_packet::RecvPacketStateMachine;
 use crate::protocol::Packet;
@@ -274,7 +275,7 @@ impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::Running, 
         self,
         target: &mut T,
         reason: impl IntoStopReason<T>,
-        regs: &mut dyn Iterator<Item = (u32, &[u8])>,
+        regs: &mut dyn Iterator<Item = (<<T as Target>::Arch as Arch>::RegId, &[u8])>,
     ) -> Result<GdbStubStateMachine<'a, T, C>, GdbStubError<T::Error, C::Error>> {
         self.report_stop_impl(target, reason, Some(regs))
     }
@@ -287,7 +288,7 @@ impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::Running, 
         mut self,
         target: &mut T,
         reason: impl IntoStopReason<T>,
-        regs: Option<&mut dyn Iterator<Item = (u32, &[u8])>>,
+        regs: Option<&mut dyn Iterator<Item = (<<T as Target>::Arch as Arch>::RegId, &[u8])>>,
     ) -> Result<GdbStubStateMachine<'a, T, C>, GdbStubError<T::Error, C::Error>> {
         let reason: BaseStopReason<_, _> = reason.into();
         let is_t_packet = reason.is_t_packet();
@@ -298,10 +299,12 @@ impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::Running, 
         if let Some(regs) = regs {
             if is_t_packet {
                 for (reg_id, value) in regs {
-                    res.write_num(reg_id).map_err(InternalError::from)?;
-                    res.write_str(":").map_err(InternalError::from)?;
-                    res.write_hex_buf(value).map_err(InternalError::from)?;
-                    res.write_str(";").map_err(InternalError::from)?;
+                    if let Some(reg) = reg_id.to_raw_id() {
+                        res.write_num(reg).map_err(InternalError::from)?;
+                        res.write_str(":").map_err(InternalError::from)?;
+                        res.write_hex_buf(value).map_err(InternalError::from)?;
+                        res.write_str(";").map_err(InternalError::from)?;
+                    }
                 }
             }
         }
