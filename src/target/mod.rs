@@ -747,13 +747,13 @@ pub trait Target {
         None
     }
 
-    /// Support for host information (qHostInfo).
+    /// (LLDB extension) Support for reporting host information.
     #[inline(always)]
     fn support_host_info(&mut self) -> Option<ext::host_info::HostInfoOps<'_, Self>> {
         None
     }
 
-    /// Support for process information (qProcessInfo).
+    /// (LLDB extension) Support for reporting process information.
     #[inline(always)]
     fn support_process_info(&mut self) -> Option<ext::process_info::ProcessInfoOps<'_, Self>> {
         None

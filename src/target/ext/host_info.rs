@@ -22,7 +22,7 @@ use crate::target::Target;
 /// [LLDB extension documentation]: https://lldb.llvm.org/resources/lldbplatformpackets.html
 #[derive(Clone, Copy)]
 #[non_exhaustive]
-pub enum InfoResponse<'a> {
+pub enum HostInfoResponse<'a> {
     /// The target triple for the debuggee, as a string.
     Triple(&'a str),
     /// The target endianness.
@@ -31,12 +31,15 @@ pub enum InfoResponse<'a> {
     PointerSize(usize),
 }
 
-/// Target Extension - Provide host information.
+/// (LLDB extension) Target Extension - Provide host information.
 pub trait HostInfo: Target {
-    /// Write a response to a host-info query (LLDB extension).
+    /// Write a response to a host-info query.
     ///
-    /// Call `write_item` with each `InfoResponse` you wish to send.
-    fn host_info(&self, write_item: &mut dyn FnMut(&InfoResponse<'_>)) -> Result<(), Self::Error>;
+    /// Call `write_item` with each `HostInfoResponse` you wish to send.
+    fn host_info(
+        &self,
+        write_item: &mut dyn FnMut(&HostInfoResponse<'_>),
+    ) -> Result<(), Self::Error>;
 }
 
 define_ext!(HostInfoOps, HostInfo);

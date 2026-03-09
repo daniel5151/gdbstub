@@ -1,4 +1,4 @@
-//! Provide process information to the debugger.
+//! (LLDB extension) Provide process information to the debugger.
 //!
 //! This allows for reporting key-value metadata, for example the
 //! current PID, target triple, endianness, and pointer size.
@@ -10,7 +10,8 @@ use crate::common::Endianness;
 use crate::common::Pid;
 use crate::target::Target;
 
-/// A response key-value pair to a qProcessInfo query.
+/// A response key-value pair to a [ProcessInfo::process_info]
+/// query.
 ///
 /// A response consists of a list of key-value pairs, each of which is
 /// represented by one instance of this enum.
@@ -23,7 +24,7 @@ use crate::target::Target;
 /// [LLDB extension documentation]: https://lldb.llvm.org/resources/lldbplatformpackets.html
 #[derive(Clone, Copy)]
 #[non_exhaustive]
-pub enum InfoResponse<'a> {
+pub enum ProcessInfoResponse<'a> {
     /// The current process PID.
     Pid(Pid),
     /// The target triple for the debuggee, as a string.
@@ -34,14 +35,14 @@ pub enum InfoResponse<'a> {
     PointerSize(usize),
 }
 
-/// Target Extension - Provide process information.
+/// (LLDB extension) Target Extension - Provide process information.
 pub trait ProcessInfo: Target {
-    /// Write the response to process-info query (LLDB extension).
+    /// Write the response to process-info query.
     ///
     /// Call `write_item` with each `InfoResponse` you wish to send.
     fn process_info(
         &self,
-        write_item: &mut dyn FnMut(&InfoResponse<'_>),
+        write_item: &mut dyn FnMut(&ProcessInfoResponse<'_>),
     ) -> Result<(), Self::Error>;
 }
 
