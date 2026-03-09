@@ -1,4 +1,4 @@
-//! Provide host information to the debugger.
+//! (LLDB extension) Provide host information to the debugger.
 //!
 //! This allows for reporting key-value metadata, for example the
 //! target triple, endianness, and pointer size.
