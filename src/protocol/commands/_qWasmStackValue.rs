@@ -1,15 +1,18 @@
 use super::prelude::*;
 
 #[derive(Debug)]
-pub struct qWasmStackValue {
+pub struct qWasmStackValue<'a> {
     pub frame: usize,
     pub index: usize,
+    pub buf: &'a mut [u8],
 }
 
-impl<'a> ParseCommand<'a> for qWasmStackValue {
+impl<'a> ParseCommand<'a> for qWasmStackValue<'a> {
     #[inline(always)]
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
-        let body = buf.into_body();
+        let (buf, body_range) = buf.into_raw_buf();
+        let body = buf.get(body_range.start..body_range.end)?;
+
         if body.is_empty() || body[0] != b':' {
             return None;
         }
@@ -22,6 +25,11 @@ impl<'a> ParseCommand<'a> for qWasmStackValue {
             // Too many parameters.
             return None;
         }
-        Some(qWasmStackValue { frame, index })
+
+        Some(qWasmStackValue {
+            frame,
+            index,
+            buf,
+        })
     }
 }
