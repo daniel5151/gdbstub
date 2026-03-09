@@ -9,7 +9,7 @@
 use crate::common::Endianness;
 use crate::target::Target;
 
-/// A response key-value pair to a qHostInfo query.
+/// A response key-value pair to a [HostInfo::host_info] query.
 ///
 /// A response consists of a list of key-value pairs, each of which is
 /// represented by one instance of this enum.
