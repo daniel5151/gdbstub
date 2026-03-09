@@ -22,7 +22,7 @@
 use crate::common::Tid;
 use crate::target::Target;
 
-/// Target Extension - perform Wasm-specific actions.
+///  (LLDB extension) Target Extension - perform Wasm-specific actions.
 pub trait Wasm: Target {
     /// Get the Wasm call stack for a given thread.
     ///
