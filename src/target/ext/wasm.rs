@@ -1,4 +1,4 @@
-//! Provide Wasm-specific actions for the target.
+//! (LLDB extension) Provide Wasm-specific actions for the target.
 //!
 //! ### Address Encoding
 //!
