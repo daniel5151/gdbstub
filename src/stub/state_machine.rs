@@ -301,12 +301,11 @@ impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::Running, 
         if let Some(regs) = regs {
             if reason.is_t_packet() {
                 for (reg_id, value) in regs {
-                    if let Some(reg) = reg_id.to_raw_id() {
-                        res.write_num(reg).map_err(InternalError::from)?;
-                        res.write_str(":").map_err(InternalError::from)?;
-                        res.write_hex_buf(value).map_err(InternalError::from)?;
-                        res.write_str(";").map_err(InternalError::from)?;
-                    }
+                    let reg = reg_id.to_raw_id().ok_or(InternalError::MissingToRawId)?;
+                    res.write_num(reg).map_err(InternalError::from)?;
+                    res.write_str(":").map_err(InternalError::from)?;
+                    res.write_hex_buf(value).map_err(InternalError::from)?;
+                    res.write_str(";").map_err(InternalError::from)?;
                 }
             }
         }
