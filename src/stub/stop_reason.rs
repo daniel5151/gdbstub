@@ -139,20 +139,17 @@ impl<Tid, U> BaseStopReason<Tid, U> {
     /// Does this stop reason respond with a `T` packet?
     pub(crate) fn is_t_packet(&self) -> bool {
         match self {
-            Self::SignalWithThread { .. } => true,
-            Self::SwBreak(_) => true,
-            Self::HwBreak(_) => true,
-            Self::Watch { .. } => true,
-            Self::ReplayLog { .. } => true,
-            Self::CatchSyscall { .. } => true,
-            Self::Library(_) => true,
-            Self::Fork { .. } => true,
-            Self::VFork { .. } => true,
-            Self::VForkDone(_) => true,
-            Self::DoneStep => false,
-            Self::Signal(_) => false,
-            Self::Exited(_) => false,
-            Self::Terminated(_) => false,
+            Self::SignalWithThread { .. }
+            | Self::SwBreak(_)
+            | Self::HwBreak(_)
+            | Self::Watch { .. }
+            | Self::ReplayLog { .. }
+            | Self::CatchSyscall { .. }
+            | Self::Library(_)
+            | Self::Fork { .. }
+            | Self::VFork { .. }
+            | Self::VForkDone(_) => true,
+            Self::DoneStep | Self::Signal(_) | Self::Exited(_) | Self::Terminated(_) => false,
         }
     }
 }

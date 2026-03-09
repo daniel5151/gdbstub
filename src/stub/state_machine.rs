@@ -291,13 +291,11 @@ impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::Running, 
         regs: Option<&mut dyn Iterator<Item = (<<T as Target>::Arch as Arch>::RegId, &[u8])>>,
     ) -> Result<GdbStubStateMachine<'a, T, C>, GdbStubError<T::Error, C::Error>> {
         let reason: BaseStopReason<_, _> = reason.into();
-        let is_t_packet = reason.is_t_packet();
-
         let mut res = ResponseWriter::new(&mut self.i.conn, target.use_rle());
         let event = self.i.inner.finish_exec(&mut res, target, reason)?;
 
         if let Some(regs) = regs {
-            if is_t_packet {
+            if reason.is_t_packet() {
                 for (reg_id, value) in regs {
                     if let Some(reg) = reg_id.to_raw_id() {
                         res.write_num(reg).map_err(InternalError::from)?;
