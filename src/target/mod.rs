@@ -747,7 +747,7 @@ pub trait Target {
         None
     }
 
-    /// Support for WebAssembly (Wasm)-specific commands.
+    /// (LLDB extension) Support for WebAssembly (Wasm)-specific commands.
     #[inline(always)]
     fn support_wasm(&mut self) -> Option<ext::wasm::WasmOps<'_, Self>> {
         None
