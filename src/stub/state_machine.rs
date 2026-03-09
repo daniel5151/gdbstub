@@ -267,10 +267,14 @@ impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::Running, 
     /// are written as expedition registers in the T-packet. Values
     /// should be in target byte order (typically little-endian).
     ///
-    /// This may be useful to use, rather than [`report_stop`], when
+    /// This may be useful to use, rather than [`Self::report_stop`], when
     /// we want to provide register values immediately to, for
     /// example, avoid a round-trip, or work around a quirk/bug in a
     /// debugger that does not otherwise request new register values.
+    ///
+    /// Note that if you use this method, you'll need to provide
+    /// [`crate::arch::RegId::to_raw_id`] so that the raw register IDs
+    /// can be sent.
     pub fn report_stop_with_regs(
         self,
         target: &mut T,
