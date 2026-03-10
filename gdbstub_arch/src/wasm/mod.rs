@@ -42,8 +42,10 @@
 //! 5. Start up LLDB and attach it to an endpoint served by `gdbstub` with this
 //!    target:
 //!
-//!        $ .../bin/lldb
-//!        (lldb) process connect --plugin wasm connect://localhost:1234
+//!    ```text
+//!    $ .../bin/lldb
+//!    (lldb) process connect --plugin wasm connect://localhost:1234
+//!    ```
 //!
 //!    then ordinary debugging with breakpoints, step/continue, and state
 //!    examination should work.
