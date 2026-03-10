@@ -318,6 +318,23 @@ pub enum TargetError<E> {
     Io(std::io::Error),
     /// An operation-specific non-fatal error code.
     Errno(u8),
+    /// A non-fatal error with an associated error message.
+    ///
+    /// The error message will be reported back to the GDB client as-is.
+    ///
+    /// _Note:_ GDB native text-based errors do not support the `$` and `#`
+    /// characters. If these characters are present in the error message,
+    /// `gdbstub` will skip sending the message and fall back to sending a
+    /// standard `EXX` packet instead.
+    NonFatalMsg(u8, &'static str),
+    /// A non-fatal error with an associated dynamically allocated error
+    /// message.
+    ///
+    /// Available when the `alloc` feature is enabled.
+    ///
+    /// See [`TargetError::NonFatalMsg`] for more details.
+    #[cfg(feature = "alloc")]
+    NonFatalMsgAlloc(u8, alloc::borrow::Cow<'static, str>),
     /// A target-specific fatal error.
     ///
     /// **WARNING:** Returning this error will immediately terminate the GDB
@@ -514,6 +531,29 @@ pub trait Target {
     /// > the 'QStartNoAckMode' packet
     #[inline(always)]
     fn use_no_ack_mode(&self) -> bool {
+        true
+    }
+
+    /// Enable/disable using error messages (GDB `E,errtext` and LLDB
+    /// `EXX;errtext`).
+    ///
+    /// By default, this method returns `true`.
+    ///
+    /// Setting this to `false` will disable all code related to text-based
+    /// error messages, which can help save some space on extremely
+    /// resource-constrained platforms.
+    ///
+    /// # GDB-specific Sanitization
+    ///
+    /// The GDB remote serial protocol prohibits the use of `$`, `#`, and `*`
+    /// characters within the raw ASCII error text of an `E,errtext` packet.
+    ///
+    /// If an error message contains any of these characters, `gdbstub` will
+    /// automatically sanitize the message by replacing them with descriptive
+    /// text (e.g: replacing `$` with `(reserved char $)`), and appending a
+    /// helpful hint pointing back to this documentation.
+    #[inline(always)]
+    fn use_error_messages(&self) -> bool {
         true
     }
 

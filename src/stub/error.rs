@@ -52,6 +52,11 @@ pub(crate) enum InternalError<T, C> {
     // propagated up to the end user.
     #[doc(hidden)]
     NonFatalError(u8),
+    #[doc(hidden)]
+    NonFatalErrorMsg(u8, &'static str),
+    #[cfg(feature = "alloc")]
+    #[doc(hidden)]
+    NonFatalErrorMsgAlloc(u8, alloc::borrow::Cow<'static, str>),
 }
 
 impl<T, C> InternalError<T, C> {
@@ -151,6 +156,9 @@ where
             MissingMultiThreadSchedulerLocking => write!(f, "GDB requested Scheduler Locking, but the Target does not implement the `MultiThreadSchedulerLocking` IDET"),
 
             NonFatalError(_) => write!(f, "Internal non-fatal error. You should never see this! Please file an issue if you do!"),
+            NonFatalErrorMsg(code, _) => write!(f, "Internal non-fatal error {}: You should never see this!", code),
+            #[cfg(feature = "alloc")]
+            NonFatalErrorMsgAlloc(code, _) => write!(f, "Internal non-fatal error {}: You should never see this!", code),
         }
     }
 }
@@ -203,3 +211,4 @@ impl<A, T, C> From<CapacityError<A>> for GdbStubError<T, C> {
         InternalError::PacketBufferOverflow.into()
     }
 }
+

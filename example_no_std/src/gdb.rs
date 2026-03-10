@@ -54,6 +54,12 @@ impl Target for DummyTarget {
         false
     }
 
+    // disable error messages to save space
+    #[inline(always)]
+    fn use_error_messages(&self) -> bool {
+        false
+    }
+
     #[inline(always)]
     fn support_breakpoints(
         &mut self,

@@ -96,6 +96,7 @@ macro_rules! commands {
                     fn support_no_ack_mode(&mut self) -> Option<()>;
                     fn support_x_upcase_packet(&mut self) -> Option<()>;
                     fn support_thread_extra_info(&mut self) -> Option<()>;
+                    fn support_lldb_error_strings(&mut self) -> Option<()>;
                 }
 
                 impl<T: Target> Hack for T {
@@ -176,6 +177,14 @@ macro_rules! commands {
                         match self.base_ops() {
                             BaseOps::SingleThread(_) => None,
                             BaseOps::MultiThread(ops) => ops.support_thread_extra_info().map(drop),
+                        }
+                    }
+
+                    fn support_lldb_error_strings(&mut self) -> Option<()> {
+                        if self.use_error_messages() {
+                            Some(())
+                        } else {
+                            None
                         }
                     }
                 }
@@ -345,6 +354,10 @@ commands! {
 
     libraries use 'a {
         "qXfer:libraries:read" => _qXfer_libraries_read::qXferLibrariesRead<'a>,
+    }
+
+    lldb_error_strings {
+        "QEnableErrorStrings" => _QEnableErrorStrings::QEnableErrorStrings,
     }
 
     tracepoints use 'a {

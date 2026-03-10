@@ -25,13 +25,17 @@ impl<'a> ParseCommand<'a> for qSupported<'a> {
 pub struct Features<'a>(&'a [u8]);
 
 impl<'a> Features<'a> {
-    pub fn into_iter(self) -> impl Iterator<Item = Result<Option<(Feature, bool)>, ()>> + 'a {
-        self.0.split(|b| *b == b';').map(|s| match s.last() {
+    pub fn into_iter(
+        self,
+        use_error_messages: bool,
+    ) -> impl Iterator<Item = Result<Option<(Feature, bool)>, ()>> + 'a {
+        self.0.split(|b| *b == b';').map(move |s| match s.last() {
             None => Err(()),
             Some(&c) => match c {
                 b'+' | b'-' => {
                     let feature = match &s[..s.len() - 1] {
                         b"multiprocess" => Feature::Multiprocess,
+                        b"error-message" if use_error_messages => Feature::ErrorMessage,
                         // TODO: implementing other features will require IDET plumbing
                         _ => return Ok(None),
                     };
@@ -51,4 +55,5 @@ impl<'a> Features<'a> {
 #[derive(Debug)]
 pub enum Feature {
     Multiprocess,
+    ErrorMessage,
 }

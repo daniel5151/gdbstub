@@ -33,6 +33,7 @@ mod extended_mode;
 mod flash;
 mod host_io;
 mod libraries;
+mod lldb_error_strings;
 mod lldb_register_info;
 mod memory_map;
 mod monitor_cmd;
@@ -63,18 +64,25 @@ pub(crate) mod target_result_ext {
 
     impl<V, T, C> TargetResultExt<V, T, C> for Result<V, TargetError<T>> {
         fn handle_error(self) -> Result<V, InternalError<T, C>> {
-            let code = match self {
+            let err = match self {
                 Ok(v) => return Ok(v),
                 Err(TargetError::Fatal(e)) => return Err(InternalError::TargetError(e)),
                 // Recoverable errors:
                 // Error code 121 corresponds to `EREMOTEIO` lol
-                Err(TargetError::NonFatal) => 121,
-                Err(TargetError::Errno(code)) => code,
+                Err(TargetError::NonFatal) => InternalError::NonFatalError(121),
+                Err(TargetError::Errno(code)) => InternalError::NonFatalError(code),
+                Err(TargetError::NonFatalMsg(code, msg)) => InternalError::NonFatalErrorMsg(code, msg),
+                #[cfg(feature = "alloc")]
+                Err(TargetError::NonFatalMsgAlloc(code, msg)) => {
+                    InternalError::NonFatalErrorMsgAlloc(code, msg)
+                }
                 #[cfg(feature = "std")]
-                Err(TargetError::Io(e)) => e.raw_os_error().unwrap_or(121) as u8,
+                Err(TargetError::Io(e)) => {
+                    InternalError::NonFatalError(e.raw_os_error().unwrap_or(121) as u8)
+                }
             };
 
-            Err(InternalError::NonFatalError(code))
+            Err(err)
         }
     }
 }
@@ -170,6 +178,13 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         res.write_num(code)?;
                         None
                     }
+                    Err(err @ InternalError::NonFatalErrorMsg(_, _)) => {
+                        self.handle_non_fatal_error_msg(&mut res, target, err)?
+                    }
+                    #[cfg(feature = "alloc")]
+                    Err(err @ InternalError::NonFatalErrorMsgAlloc(_, _)) => {
+                        self.handle_non_fatal_error_msg(&mut res, target, err)?
+                    }
                     Err(e) => return Err(e),
                 };
 
@@ -219,6 +234,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             Command::ExecFile(cmd) => self.handle_exec_file(res, target, cmd),
             Command::Auxv(cmd) => self.handle_auxv(res, target, cmd),
             Command::ThreadExtraInfo(cmd) => self.handle_thread_extra_info(res, target, cmd),
+            Command::LldbErrorStrings(cmd) => self.handle_lldb_error_strings(res, target, cmd),
             Command::LldbRegisterInfo(cmd) => self.handle_lldb_register_info(res, target, cmd),
             Command::LibrariesSvr4(cmd) => self.handle_libraries_svr4(res, target, cmd),
             Command::Libraries(cmd) => self.handle_libraries(res, target, cmd),
@@ -254,6 +270,80 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             }
         }
     }
+
+    fn handle_non_fatal_error_msg(
+        &mut self,
+        res: &mut ResponseWriter<'_, C>,
+        target: &mut T,
+        err: InternalError<T::Error, C::Error>,
+    ) -> Result<Option<DisconnectReason>, InternalError<T::Error, C::Error>> {
+        use InternalError::*;
+
+        let (code, msg) = match err {
+            NonFatalErrorMsg(code, msg) => (code, msg),
+            #[cfg(feature = "alloc")]
+            NonFatalErrorMsgAlloc(code, ref msg) => (code, msg.as_ref()),
+            _ => unreachable!(),
+        };
+
+        if target.use_error_messages() {
+            return self.handle_non_fatal_error_msg_impl(res, code, msg);
+        }
+
+        // Fallback: EXX
+        res.write_str("E")?;
+        res.write_num(code)?;
+        Ok(None)
+    }
+
+    #[inline(never)]
+    fn handle_non_fatal_error_msg_impl(
+        &mut self,
+        res: &mut ResponseWriter<'_, C>,
+        code: u8,
+        msg: &str,
+    ) -> Result<Option<DisconnectReason>, InternalError<T::Error, C::Error>> {
+        if self.features.gdb_error_message() {
+            // GDB native: E,errtext
+            //
+            // The GDB spec (as of June 2024) forbids '$' and '#' in the
+            // error message, as they are used as packet delimiters.
+            res.write_str("E,")?;
+            let mut has_reserved = false;
+            for c in msg.chars() {
+                match c {
+                    '$' => {
+                        res.write_str("(reserved char $)")?;
+                        has_reserved = true;
+                    }
+                    '#' => {
+                        res.write_str("(reserved char #)")?;
+                        has_reserved = true;
+                    }
+                    c => {
+                        let mut b = [0; 4];
+                        res.write_str(c.encode_utf8(&mut b))?;
+                    }
+                }
+            }
+            if has_reserved {
+                res.write_str("\n[gdbstub]: error messages cannot contain '$' or '#'")?;
+            }
+            return Ok(None);
+        } else if self.features.lldb_error_strings() {
+            // LLDB: EXX;errtext (hex)
+            res.write_str("E")?;
+            res.write_num(code)?;
+            res.write_str(";")?;
+            res.write_hex_buf(msg.as_bytes())?;
+            return Ok(None);
+        }
+
+        // Fallback: EXX
+        res.write_str("E")?;
+        res.write_num(code)?;
+        Ok(None)
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -267,6 +357,8 @@ bitflags::bitflags! {
     impl ProtocolFeatures: u8 {
         const NO_ACK_MODE = 1 << 0;
         const MULTIPROCESS = 1 << 1;
+        const GDB_ERROR_MESSAGE = 1 << 2;
+        const LLDB_ERROR_STRINGS = 1 << 3;
     }
 }
 
@@ -289,5 +381,260 @@ impl ProtocolFeatures {
     #[inline(always)]
     fn set_multiprocess(&mut self, val: bool) {
         self.set(ProtocolFeatures::MULTIPROCESS, val)
+    }
+
+    #[inline(always)]
+    fn gdb_error_message(&self) -> bool {
+        self.contains(ProtocolFeatures::GDB_ERROR_MESSAGE)
+    }
+
+    #[inline(always)]
+    fn set_gdb_error_message(&mut self, val: bool) {
+        self.set(ProtocolFeatures::GDB_ERROR_MESSAGE, val)
+    }
+
+    #[inline(always)]
+    fn lldb_error_strings(&self) -> bool {
+        self.contains(ProtocolFeatures::LLDB_ERROR_STRINGS)
+    }
+
+    #[inline(always)]
+    fn set_lldb_error_strings(&mut self, val: bool) {
+        self.set(ProtocolFeatures::LLDB_ERROR_STRINGS, val)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::conn::Connection;
+    use crate::protocol::ResponseWriter;
+    use crate::target::Target;
+    use alloc::vec::Vec;
+
+    struct MockConnection(Vec<u8>);
+
+    impl Connection for MockConnection {
+        type Error = ();
+
+        fn write(&mut self, byte: u8) -> Result<(), Self::Error> {
+            self.0.push(byte);
+            Ok(())
+        }
+
+        fn flush(&mut self) -> Result<(), Self::Error> {
+            Ok(())
+        }
+    }
+
+    #[derive(Debug, Default, Clone, PartialEq)]
+    struct MockRegisters;
+
+    impl crate::arch::Registers for MockRegisters {
+        type ProgramCounter = u32;
+        fn pc(&self) -> u32 {
+            0
+        }
+        fn gdb_serialize(&self, _: impl FnMut(Option<u8>)) {}
+        fn gdb_deserialize(&mut self, _: &[u8]) -> Result<(), ()> {
+            Ok(())
+        }
+    }
+
+    struct MockArch;
+
+    impl crate::arch::Arch for MockArch {
+        type Usize = u32;
+        type Registers = MockRegisters;
+        type BreakpointKind = ();
+        type RegId = ();
+    }
+
+    struct MockTarget;
+
+    impl Target for MockTarget {
+        type Arch = MockArch;
+        type Error = ();
+
+        fn base_ops(&mut self) -> crate::target::ext::base::BaseOps<'_, Self::Arch, Self::Error> {
+            unimplemented!()
+        }
+    }
+
+    fn assert_packet(data: &[u8], body: &[u8]) {
+        assert_eq!(data[0], b'$');
+        let hash_pos = data.iter().rposition(|&b| b == b'#').unwrap();
+        assert_eq!(
+            core::str::from_utf8(&data[1..hash_pos]).unwrap(),
+            core::str::from_utf8(body).unwrap()
+        );
+        // checksum verification
+        let sum: u8 = body.iter().fold(0, |a, &b| a.wrapping_add(b));
+        let hex_sum = &data[hash_pos + 1..];
+        let mut expected_hex = [0u8; 2];
+        let hi = sum >> 4;
+        let lo = sum & 0xf;
+        expected_hex[0] = if hi < 10 { b'0' + hi } else { b'a' + hi - 10 };
+        expected_hex[1] = if lo < 10 { b'0' + lo } else { b'a' + lo - 10 };
+        assert_eq!(hex_sum, &expected_hex);
+    }
+
+    #[test]
+    fn test_error_packet_generation() {
+        let mut target = MockTarget;
+        let mut conn = MockConnection(Vec::new());
+        let mut stub = GdbStubImpl::<MockTarget, MockConnection>::new();
+
+        // Case 1: Standard GDB (no error-message)
+        {
+            conn.0.clear();
+            let mut res = ResponseWriter::new(&mut conn, false);
+            stub.handle_non_fatal_error_msg(
+                &mut res,
+                &mut target,
+                InternalError::NonFatalErrorMsg(0x10, "test error"),
+            )
+            .unwrap();
+            res.flush().unwrap();
+            assert_packet(&conn.0, b"E10");
+        }
+
+        // Case 2: GDB with error-message
+        {
+            stub.features.set_gdb_error_message(true);
+            conn.0.clear();
+            let mut res = ResponseWriter::new(&mut conn, false);
+            stub.handle_non_fatal_error_msg(
+                &mut res,
+                &mut target,
+                InternalError::NonFatalErrorMsg(0x10, "test error"),
+            )
+            .unwrap();
+            res.flush().unwrap();
+            assert_packet(&conn.0, b"E,test error");
+        }
+
+        // Case 3: LLDB with error-strings
+        {
+            stub.features.set_gdb_error_message(false);
+            stub.features.set_lldb_error_strings(true);
+            conn.0.clear();
+            let mut res = ResponseWriter::new(&mut conn, false);
+            stub.handle_non_fatal_error_msg(
+                &mut res,
+                &mut target,
+                InternalError::NonFatalErrorMsg(0x10, "test error"),
+            )
+            .unwrap();
+            res.flush().unwrap();
+            assert_packet(&conn.0, b"E10;74657374206572726f72");
+        }
+
+        // Case 4: GDB with error-message, but message contains forbidden characters
+        {
+            stub.features.set_gdb_error_message(true);
+            conn.0.clear();
+            let mut res = ResponseWriter::new(&mut conn, false);
+            stub.handle_non_fatal_error_msg(
+                &mut res,
+                &mut target,
+                InternalError::NonFatalErrorMsg(0x10, "error with $ and #"),
+            )
+            .unwrap();
+            res.flush().unwrap();
+            assert_packet(
+                &conn.0,
+                b"E,error with (reserved char $) and (reserved char #)\n[gdbstub]: error messages cannot contain '$' or '#'",
+            );
+        }
+
+        // Case 5: Target disables error messages
+        {
+            struct NoMsgTarget;
+            impl Target for NoMsgTarget {
+                type Arch = MockArch;
+                type Error = ();
+                fn base_ops(
+                    &mut self,
+                ) -> crate::target::ext::base::BaseOps<'_, Self::Arch, Self::Error> {
+                    unimplemented!()
+                }
+                fn use_error_messages(&self) -> bool {
+                    false
+                }
+            }
+
+            let mut target = NoMsgTarget;
+            let mut stub = GdbStubImpl::<NoMsgTarget, MockConnection>::new();
+            stub.features.set_gdb_error_message(true);
+            conn.0.clear();
+            let mut res = ResponseWriter::new(&mut conn, false);
+            stub.handle_non_fatal_error_msg(
+                &mut res,
+                &mut target,
+                InternalError::NonFatalErrorMsg(0x10, "test error"),
+            )
+            .unwrap();
+            res.flush().unwrap();
+            // Should fall back to EXX
+            assert_packet(&conn.0, b"E10");
+        }
+    }
+    #[test]
+    fn test_qsupported_gating() {
+        use crate::protocol::commands::ParseCommand;
+        use crate::protocol::commands::prelude::PacketBuf;
+
+        let mut _target = MockTarget;
+        let _stub = GdbStubImpl::<MockTarget, MockConnection>::new();
+
+        // Case 1: use_error_messages = true
+        {
+            let mut buf = [0u8; 128];
+            let msg = b":error-message+;multiprocess+";
+            buf[..msg.len()].copy_from_slice(msg);
+            let packet_buf = PacketBuf::new_with_raw_body(&mut buf[..msg.len()]).unwrap();
+            let cmd = crate::protocol::commands::_qSupported::qSupported::from_packet(packet_buf).unwrap();
+
+            let mut features = ProtocolFeatures(0);
+            for feature in cmd.features.into_iter(true) {
+                let (feature, supported) = feature.unwrap().unwrap();
+                match feature {
+                    crate::protocol::commands::_qSupported::Feature::ErrorMessage => {
+                        features.set_gdb_error_message(supported)
+                    }
+                    crate::protocol::commands::_qSupported::Feature::Multiprocess => {
+                        features.set_multiprocess(supported)
+                    }
+                }
+            }
+            assert!(features.gdb_error_message());
+            assert!(features.multiprocess());
+        }
+
+        // Case 2: use_error_messages = false
+        {
+            let mut buf = [0u8; 128];
+            let msg = b":error-message+;multiprocess+";
+            buf[..msg.len()].copy_from_slice(msg);
+            let packet_buf = PacketBuf::new_with_raw_body(&mut buf[..msg.len()]).unwrap();
+            let cmd = crate::protocol::commands::_qSupported::qSupported::from_packet(packet_buf).unwrap();
+
+            let mut features = ProtocolFeatures(0);
+            for feature in cmd.features.into_iter(false) {
+                if let Ok(Some((feature, supported))) = feature {
+                    match feature {
+                        crate::protocol::commands::_qSupported::Feature::ErrorMessage => {
+                            features.set_gdb_error_message(supported)
+                        }
+                        crate::protocol::commands::_qSupported::Feature::Multiprocess => {
+                            features.set_multiprocess(supported)
+                        }
+                    }
+                }
+            }
+            assert!(!features.gdb_error_message());
+            assert!(features.multiprocess());
+        }
     }
 }

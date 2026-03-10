@@ -93,7 +93,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 use crate::protocol::commands::_qSupported::Feature;
 
                 // perform incoming feature negotiation
-                for feature in cmd.features.into_iter() {
+                for feature in cmd.features.into_iter(target.use_error_messages()) {
                     let (feature, supported) = match feature {
                         Ok(Some(v)) => v,
                         Ok(None) => continue,
@@ -106,6 +106,11 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                     match feature {
                         Feature::Multiprocess => self.features.set_multiprocess(supported),
+                        Feature::ErrorMessage => {
+                            if target.use_error_messages() {
+                                self.features.set_gdb_error_message(supported)
+                            }
+                        }
                     }
                 }
 
@@ -114,6 +119,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                 // these are the few features that gdbstub unconditionally supports
                 res.write_str(concat!(";vContSupported+", ";multiprocess+",))?;
+
+                if target.use_error_messages() {
+                    res.write_str(";error-message+")?;
+                }
 
                 if target.use_no_ack_mode() {
                     res.write_str(";QStartNoAckMode+")?;
