@@ -7,6 +7,8 @@ use crate::protocol::ResponseWriterError;
 use crate::target::ext::host_info::HostInfoResponse;
 use crate::target::ext::process_info::ProcessInfoResponse;
 
+// Convert the two distinct public enums to a single unified enum internally, so
+// that we can reuse serialization code when convenient.
 pub(crate) enum InfoResponse<'a> {
     Pid(Pid),
     Triple(&'a str),

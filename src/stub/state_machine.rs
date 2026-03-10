@@ -260,34 +260,38 @@ impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::Running, 
         self.report_stop_impl(target, reason, None)
     }
 
-    /// Report a target stop reason back to GDB, including expedited
-    /// register values in the stop reply T-packet.
+    /// Report a target stop reason back to GDB, including expedited register
+    /// values in the stop reply T-packet.
     ///
-    /// The iterator yields `(register_number, value_bytes)` pairs that
-    /// are written as expedition registers in the T-packet. Values
-    /// should be in target byte order (typically little-endian).
+    /// **Note:** In order to use this method, the Target's [`Arch`]
+    /// implementation MUST implement a valid [`RegId::to_raw_id`]
+    /// implementation. If the method is unimplemented, `gdbstub` will report an
+    /// error.
     ///
-    /// This may be useful to use, rather than [`Self::report_stop`], when
-    /// we want to provide register values immediately to, for
-    /// example, avoid a round-trip, or work around a quirk/bug in a
-    /// debugger that does not otherwise request new register values.
+    /// The iterator yields `(register_number, value_bytes)` pairs that are
+    /// written as expedited registers in the T-packet. Values should be in
+    /// target byte order (typically little-endian).
     ///
-    /// Note that if you use this method, you'll need to provide
-    /// [`crate::arch::RegId::to_raw_id`] so that the raw register IDs
-    /// can be sent.
+    /// This may be useful to use, rather than [`Self::report_stop`], when we
+    /// want to provide register values immediately to, for example, avoid a
+    /// round-trip, or work around a quirk/bug in a debugger that does not
+    /// otherwise request new register values.
+    ///
+    /// [`RegId::to_raw_id`]: crate::arch::RegId::to_raw_id
     pub fn report_stop_with_regs(
         self,
         target: &mut T,
         reason: impl IntoStopReason<T>,
+        // FUTURE: (breaking) explore adding a `RegIdWithVal` construct, in
+        // order to tighten up this typing even further?
         regs: &mut dyn Iterator<Item = (<<T as Target>::Arch as Arch>::RegId, &[u8])>,
     ) -> Result<GdbStubStateMachine<'a, T, C>, GdbStubError<T::Error, C::Error>> {
         self.report_stop_impl(target, reason, Some(regs))
     }
 
-    /// Shared implementation for the
-    /// `report_stop`/`report_stop_with_regs` API. Takes an `Option`
-    /// around the `&mut dyn Iterator` to avoid making a dynamic
-    /// vtable dispatch in the common `report_stop` case.
+    /// Shared implementation for the `report_stop`/`report_stop_with_regs` API.
+    /// Takes an `Option` around the `&mut dyn Iterator` to avoid making a
+    /// dynamic vtable dispatch in the common `report_stop` case.
     fn report_stop_impl(
         mut self,
         target: &mut T,
