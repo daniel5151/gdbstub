@@ -9,16 +9,20 @@
 //! The need for this scheme arises from the fact that Wasm is natively
 //! "multimemory": there can be many code modules, and many linear memories, and
 //! each is a native entity (rather than mapped into a larger single address
-//! space) in the VM definition. The LLDB GDB RSP protocol extensions map these
-//! native entities into an address space where the upper 32 bits encode the
-//! index of a particular Wasm code module or linear (data) memory and the lower
-//! 32 bits encode an offset.
+//! space) in the VM definition. The LLDB GDB RSP extensions map these native
+//! entities into an address space where the upper 32 bits encode the index of a
+//! particular Wasm code module or linear (data) memory and the lower 32 bits
+//! encode an offset.
 //!
 //! See the [LLDB source code] (particularly `WasmAddressType` and
 //! `wasm_addr_t`) for a description of the encoding of the PC values.
 //!
 //! [LLDB source code]:
 //!     https://github.com/llvm/llvm-project/blob/main/lldb/source/Plugins/Process/wasm/ProcessWasm.h
+//!
+//! An implementation of this address encoding/decoding can be found in the
+//! `gdbstub_arch` crate in `gdbstub_arch::wasm::addr`.
+
 use crate::common::Tid;
 use crate::target::Target;
 
