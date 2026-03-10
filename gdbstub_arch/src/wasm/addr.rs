@@ -1,5 +1,4 @@
-//! Synthetic 64-bit Wasm address space expected by the LLDB Wasm
-//! extensions.
+//! Synthetic 64-bit Wasm address space expected by the LLDB Wasm extensions.
 //!
 //! WebAssembly is natively *multi-memory* and *multi-address-space*:
 //!
@@ -12,37 +11,26 @@
 //!   modules only occur via explicit strongly-typed function imports and
 //!   exports.
 //!
-//! Wasm implementations typically represent these concepts directly
-//! rather than attempt to map to a more conventional ISA model of a
-//! single flat address space with machine code and data. However, the
-//! gdbstub protocol assumes the latter: all of its commands, such as
-//! memory reads/writes, breakpoint updates, and the like, use
-//! integers as pointers in a single address space.
+//! Wasm implementations typically represent these concepts directly rather than
+//! attempt to map to a more conventional ISA model of a single flat address
+//! space with machine code and data. However, the GDB RSP assumes the latter:
+//! all of its commands, such as memory reads/writes, breakpoint updates, and
+//! the like, use integers as pointers in a single address space.
 //!
-//! The LLDB Wasm extensions thus define a canonical mapping between
-//! the multi-address-space world and a flat 64-bit address space for
-//! the purposes of the protocol only. Note that this is 64-bit even
-//! when Wasm natively has 32-bit memory offsets (the "wasm32"
-//! architecture), because the definition adds additional information
-//! above the 32-bit offset.
+//! The LLDB Wasm extensions to the GDB RSP thus define a canonical mapping
+//! between the multi-address-space world and a flat 64-bit address space for
+//! the purposes of the protocol only. Note that this is 64-bit even when Wasm
+//! natively has 32-bit memory offsets (the "wasm32" architecture), because the
+//! definition adds additional information above the 32-bit offset.
 //!
-//! The [ProcessWasm.h] header file in the LLDB source contains
-//! definitions that are as close to documentation as we can find: see
-//! the `WasmAddressType` and `wasm_addr_t` definitions.
+//! The [ProcessWasm.h] header file in the LLDB source contains definitions that
+//! are as close to documentation as we can find: see the `WasmAddressType` and
+//! `wasm_addr_t` definitions.
 //!
 //! An address consists of three parts:
 //!
 //! - The type: code or data. Wasm has separate "address spaces" for these, so
-//!   they are mapped to different regions of the 64-bit synthetic space.
-//!
-//!   Note that this implies that the original bytecode (the full
-//!   image of the Wasm module, starting with its magic number) is
-//!   present in this synthetic address space. An engine that
-//!   implements debugging for Wasm should keep around the original
-//!   bytecode, even if it does ahead-of-time compilation or other
-//!   processing, so that the debugger can use it: LLDB will read the
-//!   module bytecode from the synthetic address space, including its
-//!   debug sections, rather than find the image elsewhere.
+//!   they are mapped to different regions of the 64-bit synthetic space.\*
 //!
 //! - The module/memory index. The engine decides an arbitrary index ordering
 //!   for all of the Wasm modules and Wasm linear memories present in a given
@@ -50,7 +38,16 @@
 //!
 //! - The offset within that Wasm module bytecode or linear memory.
 //!
-//! [ProcessWasm.h]: https://github.com/llvm/llvm-project/blob/main/lldb/source/Plugins/Process/wasm/ProcessWasm.h
+//! \*Note that this implies that the original bytecode (the full image of the
+//! Wasm module, starting with its magic number) is present in this synthetic
+//! address space. An engine that implements debugging for Wasm should keep
+//! around the original bytecode, even if it does ahead-of-time compilation or
+//! other processing, so that the debugger can use it: LLDB will read the
+//! module bytecode from the synthetic address space, including its debug
+//! sections, rather than find the image elsewhere.
+//!
+//! [ProcessWasm.h]:
+//!     https://github.com/llvm/llvm-project/blob/074653a/lldb/source/Plugins/Process/wasm/ProcessWasm.h
 
 /// The type of an address in the synthetic address space used by the
 /// Wasm target.
