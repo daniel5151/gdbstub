@@ -23,7 +23,7 @@
 //! extensions. See the [`self::addr`] submodule for utilities to encode and
 //! decode these synthesized addresses.
 //!
-//! To use GDB RSP with these extensions implemented by LLDB:
+//! To use `gdbstub` with the LLDB Wasm GDB RSP extensions:
 //!
 //! 1. Implement the `Target` trait and the [`Wasm`], [`HostInfo`] and
 //!    [`ProcessInfo`] traits on the target implementation for your Wasm
@@ -31,6 +31,9 @@
 //! 2. Make use of this `Arch` implementation in your target.
 //! 3. Make use of the [`report_stop_with_regs`] API to report the Wasm PC with
 //!    every stop packet.
+//!    - _Note_: It seems likely that this requirement stems from a LLDB bug, as
+//!      "expedited registers" are not typically mandated by the GDB RSP, and
+//!      generally serve as an optional optimization to reduce roundtrips.
 //! 4. Ensure that you have a build of LLDB with the Wasm target enabled. (A
 //!    binary distribution of LLDB with your operating system may not have this,
 //!    but a build from LLVM source will, by default. Once a release of
@@ -43,7 +46,7 @@
 //!        (lldb) process connect --plugin wasm connect://localhost:1234
 //!
 //!    then ordinary debugging with breakpoints, step/continue, and state
-//! examination should work.
+//!    examination should work.
 //!
 //! See [Wasmtime] for an example of the use of this crate.
 //!
@@ -67,10 +70,9 @@ pub mod reg;
 pub enum Wasm {}
 
 impl Arch for Wasm {
-    /// Even though Wasm is nominally a 32-bit platform, the gdbstub
-    /// protocol for Wasm uses a 64-bit address word to multiplex module
-    /// bytecode regions and linear memory regions into a single address
-    /// space.
+    /// Even though Wasm is nominally a 32-bit platform, LLDB's GDB RSP
+    /// extensions for Wasm uses a 64-bit address word to multiplex module
+    /// bytecode regions and linear memory regions into a single address space.
     type Usize = u64;
     type Registers = reg::WasmRegisters;
     type RegId = reg::id::WasmRegId;
