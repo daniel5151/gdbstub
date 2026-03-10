@@ -2,6 +2,21 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+# 0.7.10
+
+#### New Features
+
+- `GdbStubStateMachineInner::report_stop_with_regs` - new API to pass expedited register values in the stop reply T-packet. [\#189](https://github.com/daniel5151/gdbstub/pull/189) ([cfallin](https://github.com/cfallin))
+
+#### New Protocol Extensions
+
+- `Wasm` - (LLDB extension) Wasm-specific actions (i.e: reading Wasm call stack, and global/local/stack vars). [\#188](https://github.com/daniel5151/gdbstub/pull/188) ([cfallin](https://github.com/cfallin))
+- `ProcessInfo` + `HostInfo` - (LLDB extension) Report key/value metadata about the host / process being debugged. [\#190](https://github.com/daniel5151/gdbstub/pull/190) ([cfallin](https://github.com/cfallin))
+
+#### Internal Improvements
+
+- Dependencies: Switch from `paste` to `pastey`. [\#187](https://github.com/daniel5151/gdbstub/pull/187) ([Maiux92](https://github.com/Maiux92))
+
 # 0.7.9
 
 #### New Protocol Extensions
