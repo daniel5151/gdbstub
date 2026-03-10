@@ -19,6 +19,9 @@
 //!
 //! [LLDB source code]:
 //!     https://github.com/llvm/llvm-project/blob/main/lldb/source/Plugins/Process/wasm/ProcessWasm.h
+//!
+//! An implementation of this address encoding/decoding can be found
+//! in the `gdbstub_arch` crate in `gdbstub_arch::wasm::addr`.
 use crate::common::Tid;
 use crate::target::Target;
 

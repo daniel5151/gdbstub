@@ -59,6 +59,7 @@ pub mod mips;
 pub mod msp430;
 pub mod ppc;
 pub mod riscv;
+pub mod wasm;
 pub mod x86;
 
 // used as part of intra-doc link
