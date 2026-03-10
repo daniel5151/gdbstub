@@ -95,23 +95,24 @@ impl WasmAddr {
     }
 
     /// Construct a `WasmAddr` from its constituent parts.
-    pub fn new(addr_type: WasmAddrType, module_index: u32, offset: u32) -> Self {
+    ///
+    /// Returns `None` if the `module_index` is out-of-range: it only supports
+    /// up to 2^30 modules.
+    pub fn new(addr_type: WasmAddrType, module_index: u32, offset: u32) -> Option<Self> {
         // There are fewer than 32 bits in the encoding for the module
         // index.
-        assert_eq!(
-            module_index >> Self::MODULE_BITS,
-            0,
-            "Out-of-bounds module index"
-        );
+        if module_index >> Self::MODULE_BITS != 0 {
+            return None;
+        }
         let type_bits: u64 = match addr_type {
             WasmAddrType::Memory => 0,
             WasmAddrType::Object => 1,
         };
-        WasmAddr(
+        Some(WasmAddr(
             (type_bits << Self::TYPE_SHIFT)
                 | ((u64::from(module_index)) << Self::MODULE_SHIFT)
                 | (u64::from(offset)),
-        )
+        ))
     }
 
     /// Get the type of this address.
@@ -121,9 +122,10 @@ impl WasmAddr {
             1 => WasmAddrType::Object,
             // We never set other type-bits and the raw bits are fully
             // encapsulated and checked in `from_raw`, so this is
-            // unreachable. `gdbstub_arch` forbids panics, so we
-            // return a bogus type here.
-            _ => WasmAddrType::Memory,
+            // unreachable in practice and should never panic.
+            // We silence clippy's warning about this.
+            #[allow(clippy::unreachable)]
+            _ => unreachable!(),
         }
     }
 
