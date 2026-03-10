@@ -367,6 +367,14 @@ commands! {
         "qTsV" => _qTsV::qTsV,
     }
 
+    host_info {
+        "qHostInfo" => _qHostInfo::qHostInfo,
+    }
+
+    process_info {
+        "qProcessInfo" => _qProcessInfo::qProcessInfo,
+    }
+
     wasm use 'a {
         "qWasmCallStack" => _qWasmCallStack::qWasmCallStack,
         "qWasmLocal" => _qWasmLocal::qWasmLocal<'a>,
