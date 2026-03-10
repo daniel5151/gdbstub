@@ -37,6 +37,7 @@ use super::core_impl::State;
 use super::DisconnectReason;
 use super::GdbStub;
 use crate::arch::Arch;
+use crate::arch::RegId;
 use crate::conn::Connection;
 use crate::protocol::recv_packet::RecvPacketStateMachine;
 use crate::protocol::Packet;
@@ -44,6 +45,7 @@ use crate::protocol::ResponseWriter;
 use crate::stub::error::GdbStubError;
 use crate::stub::error::InternalError;
 use crate::stub::stop_reason::IntoStopReason;
+use crate::stub::BaseStopReason;
 use crate::target::Target;
 use managed::ManagedSlice;
 
@@ -251,12 +253,63 @@ impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::Idle<T>, 
 impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::Running, T, C> {
     /// Report a target stop reason back to GDB.
     pub fn report_stop(
-        mut self,
+        self,
         target: &mut T,
         reason: impl IntoStopReason<T>,
     ) -> Result<GdbStubStateMachine<'a, T, C>, GdbStubError<T::Error, C::Error>> {
+        self.report_stop_impl(target, reason, None)
+    }
+
+    /// Report a target stop reason back to GDB, including expedited
+    /// register values in the stop reply T-packet.
+    ///
+    /// The iterator yields `(register_number, value_bytes)` pairs that
+    /// are written as expedition registers in the T-packet. Values
+    /// should be in target byte order (typically little-endian).
+    ///
+    /// This may be useful to use, rather than [`Self::report_stop`], when
+    /// we want to provide register values immediately to, for
+    /// example, avoid a round-trip, or work around a quirk/bug in a
+    /// debugger that does not otherwise request new register values.
+    ///
+    /// Note that if you use this method, you'll need to provide
+    /// [`crate::arch::RegId::to_raw_id`] so that the raw register IDs
+    /// can be sent.
+    pub fn report_stop_with_regs(
+        self,
+        target: &mut T,
+        reason: impl IntoStopReason<T>,
+        regs: &mut dyn Iterator<Item = (<<T as Target>::Arch as Arch>::RegId, &[u8])>,
+    ) -> Result<GdbStubStateMachine<'a, T, C>, GdbStubError<T::Error, C::Error>> {
+        self.report_stop_impl(target, reason, Some(regs))
+    }
+
+    /// Shared implementation for the
+    /// `report_stop`/`report_stop_with_regs` API. Takes an `Option`
+    /// around the `&mut dyn Iterator` to avoid making a dynamic
+    /// vtable dispatch in the common `report_stop` case.
+    fn report_stop_impl(
+        mut self,
+        target: &mut T,
+        reason: impl IntoStopReason<T>,
+        regs: Option<&mut dyn Iterator<Item = (<<T as Target>::Arch as Arch>::RegId, &[u8])>>,
+    ) -> Result<GdbStubStateMachine<'a, T, C>, GdbStubError<T::Error, C::Error>> {
+        let reason: BaseStopReason<_, _> = reason.into();
         let mut res = ResponseWriter::new(&mut self.i.conn, target.use_rle());
-        let event = self.i.inner.finish_exec(&mut res, target, reason.into())?;
+        let event = self.i.inner.finish_exec(&mut res, target, reason)?;
+
+        if let Some(regs) = regs {
+            if reason.is_t_packet() {
+                for (reg_id, value) in regs {
+                    let reg = reg_id.to_raw_id().ok_or(InternalError::MissingToRawId)?;
+                    res.write_num(reg).map_err(InternalError::from)?;
+                    res.write_str(":").map_err(InternalError::from)?;
+                    res.write_hex_buf(value).map_err(InternalError::from)?;
+                    res.write_str(";").map_err(InternalError::from)?;
+                }
+            }
+        }
+
         res.flush().map_err(InternalError::from)?;
 
         Ok(match event {

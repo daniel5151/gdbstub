@@ -135,6 +135,25 @@ pub enum BaseStopReason<Tid, U> {
     VForkDone(Tid),
 }
 
+impl<Tid, U> BaseStopReason<Tid, U> {
+    /// Does this stop reason respond with a `T` packet?
+    pub(crate) fn is_t_packet(&self) -> bool {
+        match self {
+            Self::SignalWithThread { .. }
+            | Self::SwBreak(_)
+            | Self::HwBreak(_)
+            | Self::Watch { .. }
+            | Self::ReplayLog { .. }
+            | Self::CatchSyscall { .. }
+            | Self::Library(_)
+            | Self::Fork { .. }
+            | Self::VFork { .. }
+            | Self::VForkDone(_) => true,
+            Self::DoneStep | Self::Signal(_) | Self::Exited(_) | Self::Terminated(_) => false,
+        }
+    }
+}
+
 /// A stop reason for a single threaded target.
 ///
 /// Threads are identified using the unit type `()` (as there is only a single
