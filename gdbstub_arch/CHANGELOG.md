@@ -2,6 +2,10 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+# 0.3.3
+
+- Add support for Wasm [\#192](https://github.com/daniel5151/gdbstub/pull/192) ([cfallin](https://github.com/cfallin))
+
 # 0.3.2
 
 - x86: Remove "padding" bytes from x86 register packet [\#171](https://github.com/daniel5151/gdbstub/pull/171) ([cadmic](https://github.com/cadmic))
