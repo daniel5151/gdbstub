@@ -530,6 +530,31 @@ pub trait Target {
         true
     }
 
+    /// Enable/disable using the more efficient `x` packet to read to target
+    /// memory (as opposed to the basic `m` packet).
+    ///
+    /// **By default, this method returns `false`.**
+    ///
+    /// This packet is disabled by default in order to maximize out-of-the-box
+    /// compatibility between `gdbstub` and all released GDB and LLDB versions.
+    /// For more context, see the discussion at
+    /// [daniel5151/gdbstub#163](https://github.com/daniel5151/gdbstub/issues/163#issuecomment-4049691552).
+    ///
+    /// `gdbstub` implements the `x` packet according to the GDB RSP spec, and
+    /// as such, enabling this packet will break compatibility with older LLDB
+    /// version.
+    ///
+    /// _Author's note:_ If you are _certain_ that your target will only even be
+    /// debugged used alongside a sufficiently recent GDB / LLDB version (i.e:
+    /// those released sometime after ~early 2026), you can set this to `true`
+    /// for improved performance. That said, unless you're planning to fetch
+    /// a _lot_ of memory data from your `Target`, you may as well leave
+    /// this optimization disabled, and guarantee client compatibility.
+    #[inline(always)]
+    fn use_x_lowcase_packet(&self) -> bool {
+        false
+    }
+
     /// Whether `gdbstub` should provide a "stub" `resume` implementation on
     /// targets without support for resumption.
     ///
@@ -802,6 +827,7 @@ macro_rules! impl_dyn_target {
             __delegate!(fn guard_rail_implicit_sw_breakpoints(&self) -> bool);
 
             __delegate!(fn use_no_ack_mode(&self) -> bool);
+            __delegate!(fn use_x_lowcase_packet(&self) -> bool);
             __delegate!(fn use_x_upcase_packet(&self) -> bool);
             __delegate!(fn use_resume_stub(&self) -> bool);
             __delegate!(fn use_rle(&self) -> bool);
