@@ -806,10 +806,14 @@ macro_rules! __delegate {
 }
 
 macro_rules! __delegate_support {
-    ($ext:ident) => {
+    ($ext:ident, $extpath:ident) => {
         pastey::paste! {
-            __delegate!(fn [<support_ $ext>](&mut self) -> Option<ext::$ext::[<$ext:camel Ops>]<'_, Self>>);
+            __delegate!(fn [<support_ $ext>](&mut self) -> Option<ext::$extpath::[<$ext:camel Ops>]<'_, Self>>);
         }
+    };
+
+    ($ext:ident) => {
+        __delegate_support!($ext, $ext);
     };
 }
 
@@ -826,26 +830,36 @@ macro_rules! impl_dyn_target {
 
             __delegate!(fn guard_rail_implicit_sw_breakpoints(&self) -> bool);
 
+            __delegate!(fn use_fork_stop_reason(&self) -> bool);
+            __delegate!(fn use_lldb_register_info(&self) -> bool);
             __delegate!(fn use_no_ack_mode(&self) -> bool);
-            __delegate!(fn use_x_lowcase_packet(&self) -> bool);
-            __delegate!(fn use_x_upcase_packet(&self) -> bool);
             __delegate!(fn use_resume_stub(&self) -> bool);
             __delegate!(fn use_rle(&self) -> bool);
             __delegate!(fn use_target_description_xml(&self) -> bool);
-            __delegate!(fn use_lldb_register_info(&self) -> bool);
+            __delegate!(fn use_vfork_stop_reason(&self) -> bool);
+            __delegate!(fn use_vforkdone_stop_reason(&self) -> bool);
+            __delegate!(fn use_x_lowcase_packet(&self) -> bool);
+            __delegate!(fn use_x_upcase_packet(&self) -> bool);
 
+            // TODO: (breaking) fix inconsistencies in `support_` naming
+            __delegate_support!(auxv);
             __delegate_support!(breakpoints);
-            __delegate_support!(monitor_cmd);
+            __delegate_support!(catch_syscalls);
+            __delegate_support!(exec_file);
             __delegate_support!(extended_mode);
-            __delegate_support!(section_offsets);
-            __delegate_support!(target_description_xml_override);
+            __delegate!(fn support_flash_operations(&mut self) -> Option<ext::flash::FlashOps<'_, Self>>);
+            __delegate_support!(host_info);
+            __delegate_support!(host_io);
+            __delegate_support!(libraries);
+            __delegate!(fn support_libraries_svr4(&mut self) -> Option<ext::libraries::LibrariesSvr4Ops<'_, Self>>);
             __delegate_support!(lldb_register_info_override);
             __delegate_support!(memory_map);
-            __delegate_support!(catch_syscalls);
-            __delegate_support!(host_io);
-            __delegate_support!(exec_file);
-            __delegate_support!(auxv);
+            __delegate_support!(monitor_cmd);
+            __delegate_support!(process_info);
+            __delegate_support!(section_offsets);
+            __delegate_support!(target_description_xml_override);
             __delegate_support!(tracepoints);
+            __delegate_support!(wasm);
         }
     };
 }
