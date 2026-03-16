@@ -388,6 +388,11 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         }
                     },
                 }
+                if let Some(ops) = target.support_extended_mode() {
+                    if cmd.attach_process == true {
+                        ops.attach(cmd.process);
+                    }
+                }
                 HandlerStatus::NeedsOk
             }
             Base::qfThreadInfo(_) => {
