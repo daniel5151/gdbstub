@@ -1,7 +1,6 @@
 use super::prelude::*;
-use crate::arch::Arch;
 use crate::protocol::commands::ext::XLowcasePacket;
-use crate::target::ext::base::BaseOps;
+use crate::stub::core_impl::base::read_addr_handler;
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     pub(crate) fn handle_x_lowcase_packet(
@@ -18,40 +17,20 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
         let handler_status = match command {
             XLowcasePacket::x(cmd) => {
-                let buf = cmd.buf;
-                let addr = <T::Arch as Arch>::Usize::from_be_bytes(cmd.addr)
-                    .ok_or(Error::TargetMismatch)?;
-
-                let mut i = 0;
-                let mut n = cmd.len;
-                while n != 0 {
-                    let chunk_size = n.min(buf.len());
-
-                    use num_traits::NumCast;
-
-                    let addr = addr + NumCast::from(i).ok_or(Error::TargetMismatch)?;
-                    let data = &mut buf[..chunk_size];
-                    let data_len = match target.base_ops() {
-                        BaseOps::SingleThread(ops) => ops.read_addrs(addr, data),
-                        BaseOps::MultiThread(ops) => {
-                            ops.read_addrs(addr, data, self.current_mem_tid)
+                read_addr_handler::<C, T>(
+                    |i, data| {
+                        // Start data with 'b' to indicate binary data
+                        if i == 0 {
+                            res.write_str("b")?;
                         }
-                    }
-                    .handle_error()?;
-
-                    // TODO: add more specific error variant?
-                    let data = data.get(..data_len).ok_or(Error::PacketBufferOverflow)?;
-
-                    // Start data with 'b' to indicate binary data
-                    if i == 0 {
-                        res.write_str("b")?;
-                    }
-
-                    n -= chunk_size;
-                    i += chunk_size;
-
-                    res.write_binary(data)?;
-                }
+                        res.write_binary(data)
+                    },
+                    self.current_mem_tid,
+                    target,
+                    cmd.buf,
+                    cmd.len,
+                    cmd.addr,
+                )?;
 
                 HandlerStatus::Handled
             }

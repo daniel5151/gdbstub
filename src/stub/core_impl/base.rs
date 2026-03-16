@@ -304,34 +304,14 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 HandlerStatus::NeedsOk
             }
             Base::m(cmd) => {
-                let buf = cmd.buf;
-                let addr = <T::Arch as Arch>::Usize::from_be_bytes(cmd.addr)
-                    .ok_or(Error::TargetMismatch)?;
-
-                let mut i = 0;
-                let mut n = cmd.len;
-                while n != 0 {
-                    let chunk_size = n.min(buf.len());
-
-                    use num_traits::NumCast;
-
-                    let addr = addr + NumCast::from(i).ok_or(Error::TargetMismatch)?;
-                    let data = &mut buf[..chunk_size];
-                    let data_len = match target.base_ops() {
-                        BaseOps::SingleThread(ops) => ops.read_addrs(addr, data),
-                        BaseOps::MultiThread(ops) => {
-                            ops.read_addrs(addr, data, self.current_mem_tid)
-                        }
-                    }
-                    .handle_error()?;
-
-                    n -= chunk_size;
-                    i += chunk_size;
-
-                    // TODO: add more specific error variant?
-                    let data = data.get(..data_len).ok_or(Error::PacketBufferOverflow)?;
-                    res.write_hex_buf(data)?;
-                }
+                read_addr_handler::<C, T>(
+                    |_, data| res.write_hex_buf(data),
+                    self.current_mem_tid,
+                    target,
+                    cmd.buf,
+                    cmd.len,
+                    cmd.addr,
+                )?;
                 HandlerStatus::Handled
             }
             Base::M(cmd) => {
@@ -477,4 +457,40 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         };
         Ok(handler_status)
     }
+}
+
+// shared by both the 'm' and 'x' packet handlers
+pub(crate) fn read_addr_handler<C: Connection, T: Target>(
+    mut write_res: impl FnMut(
+        usize,
+        &[u8],
+    ) -> Result<(), crate::protocol::ResponseWriterError<C::Error>>,
+    current_mem_tid: Tid,
+    target: &mut T,
+    buf: &mut [u8],
+    len: usize,
+    addr: &[u8],
+) -> Result<(), Error<T::Error, C::Error>> {
+    let addr = <T::Arch as Arch>::Usize::from_be_bytes(addr).ok_or(Error::TargetMismatch)?;
+    let mut i = 0;
+    let mut n = len;
+    while n != 0 {
+        let chunk_size = n.min(buf.len());
+
+        let addr = addr + num_traits::NumCast::from(i).ok_or(Error::TargetMismatch)?;
+        let data = &mut buf[..chunk_size];
+        let data_len = match target.base_ops() {
+            BaseOps::SingleThread(ops) => ops.read_addrs(addr, data),
+            BaseOps::MultiThread(ops) => ops.read_addrs(addr, data, current_mem_tid),
+        }
+        .handle_error()?;
+
+        // TODO: add more specific error variant?
+        let data = data.get(..data_len).ok_or(Error::PacketBufferOverflow)?;
+        write_res(i, data)?;
+
+        n -= chunk_size;
+        i += chunk_size;
+    }
+    Ok(())
 }
