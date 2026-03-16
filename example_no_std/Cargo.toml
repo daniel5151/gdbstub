@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["Daniel Prilik <danielprilik@gmail.com>"]
 edition = "2018"
 
+[features]
+__dead_code_marker = ["gdbstub/__dead_code_marker"]
+
 [dependencies]
 gdbstub = { path = "../", default-features = false }
 gdbstub_arch = { path = "../gdbstub_arch", default-features = false }

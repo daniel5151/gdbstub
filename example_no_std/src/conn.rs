@@ -33,6 +33,18 @@ impl TcpConnection {
                 return Err("could not create listen socket");
             }
 
+            let reuseaddr: i32 = 1;
+            if libc::setsockopt(
+                sock,
+                libc::SOL_SOCKET,
+                libc::SO_REUSEADDR,
+                &reuseaddr as *const _ as *const libc::c_void,
+                core::mem::size_of::<i32>() as u32,
+            ) < 0
+            {
+                return Err("could not set SO_REUSEADDR");
+            }
+
             if libc::bind(sock, &sockaddr as *const _ as _, socklen as u32) < 0 {
                 return Err("could not bind socket");
             }
