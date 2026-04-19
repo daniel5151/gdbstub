@@ -1,0 +1,11 @@
+[package]
+name = "gdbstub_tests"
+version = "0.1.0"
+edition = "2018"
+publish = false
+
+[dev-dependencies]
+anyhow = "1.0"
+gdbstub_test = { path = "../gdbstub_test" }
+# Ensure we have the same features as gdbstub
+gdbstub = { path = "..", features = ["std"] }

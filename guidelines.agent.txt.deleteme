@@ -1,0 +1,40 @@
+✦ Based on my exploration of the codebase and the specific instructions provided, here are the detailed design constraints and technical requirements for achieving 80% line coverage for the gdbstub package.
+
+  1. Immutability Constraints (Hard)
+   * Zero Core Modifications: I MUST NOT modify any code within the gdbstub/ or gdbstub_arch/ directories.
+   * Zero Example Modifications: I MUST NOT modify any code within the examples/ directory (e.g., armv4t, armv4t_multicore).
+   * Restricted Workspace: Modifications are strictly limited to the gdbstub_test (framework) and gdbstub_tests (integration suite) crates.
+
+  2. Testing Methodology (Semantic Realism)
+   * GDB/MI Only: All interactions with the target MUST be driven through the GDB Machine Interface (MI) or high-level GDB console commands via -interpreter-exec console.
+   * No Raw Packet Injection: I MUST NOT use GDB maintenance packet commands to manually inject RSP packets. Coverage must be a side effect of legitimate GDB client behavior.
+   * No Manual Pumping: I MUST NOT manually feed bytes into the GdbStub state machine or use mock target implementations like MegaMockTarget.
+   * User Simulation: Tests must simulate actual workflows an end-user would perform (e.g., setting breakpoints, inspecting memory, remote file operations, tracepoint experiments).
+
+  3. Coverage Collection & Orchestration
+   * Child Process Instrumentation: Since the gdbstub logic executes within the spawned emulator process, I must ensure that the armv4t example binaries are built with -Cinstrument-coverage and that LLVM_PROFILE_FILE
+     environment variables are correctly propagated and managed to allow for merging .profraw data from multiple runs.
+   * Aggregation: I must use cargo llvm-cov in a way that aggregates coverage from both the integration test harness and the target emulator binaries.
+   * Feature Completeness: To reach 80% coverage, I must exhaustively exercise all IDETs (Internal Data Entry Trails) implemented by the armv4t targets, including:
+       * Base Debugging: (G/g, M/m, P/p, Z0/z0, etc.)
+       * Host I/O: Using remote put, remote get, and remote delete.
+       * qXfer: Triggering auxv, features, libraries, and memory-map transfers.
+       * Tracepoints: Setting tracepoints and running tstart, tstop, and tfind.
+       * Extended Mode: Using target extended-remote to trigger vRun, vAttach, and vKill.
+
+  4. Operational & Performance Constraints
+   * Strict Timeouts: All GDB/MI command responses MUST be received within 10 seconds.
+   * Sequential Execution: Integration tests must be run with --test-threads=1 because the armv4t examples bind to a hardcoded Unix Domain Socket path (/tmp/armv4t_gdb), making parallel execution impossible without
+     modifying the examples.
+   * Instrumentation Overhead: I must account for the fact that LLVM coverage instrumentation significantly slows down execution, making the 10s timeout a tight constraint for complex operations (like large memory
+     transfers or tracepoint experiments).
+
+  5. Identified Challenges & Risks
+   * The "Error Path" Gap: Standard GDB clients are designed to send well-formed packets. Achieving 80% coverage is exceptionally difficult without manual packet injection, as many lines in gdbstub are dedicated to
+     handling malformed packets or protocol edge cases that a standard GDB client will never trigger.
+   * Target Support Limits: I am constrained by what the armv4t and armv4t_multicore examples actually implement. If an IDET isn't implemented in the example, I cannot hit that code in gdbstub core via integration
+     testing.
+   * UDS Path Conflicts: Since I cannot modify the examples to accept dynamic UDS paths, stale socket files in /tmp from crashed tests can cause subsequent runs to fail with AddrInUse. I must implement robust cleanup
+     in the gdbstub_test framework.
+
+  Does this accurately reflect the constraints you want me to work under? If so, I will proceed with expanding the GDB/MI integration suite.

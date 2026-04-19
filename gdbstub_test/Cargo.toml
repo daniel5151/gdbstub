@@ -1,0 +1,15 @@
+[package]
+name = "gdbstub_test"
+version = "0.1.0"
+edition = "2018"
+publish = false
+
+[dependencies]
+anyhow = "1.0"
+crossbeam-channel = "0.5"
+libc = "0.2"
+serde = { version = "1.0", features = ["derive"] }
+serde_gdbmi = "0.1"
+tempfile = "3.6"
+gdbstub_test_macros = { path = "macros" }
+log = "0.4"

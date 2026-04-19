@@ -25,7 +25,6 @@ rustflags = [
     "-Wclippy::option_option",
     "-Wclippy::ref_option_ref",
     "-Wclippy::rest_pat_in_fully_bound_structs",
-    "-Wclippy::string_to_string",
     "-Wclippy::suboptimal_flops",
     "-Wclippy::verbose_file_reads",
 #   "-Wclippy::unused_self", # might be interesting to explore this...
