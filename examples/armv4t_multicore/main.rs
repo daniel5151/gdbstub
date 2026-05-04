@@ -9,7 +9,6 @@ use gdbstub::conn::ConnectionExt;
 use gdbstub::stub::run_blocking;
 use gdbstub::stub::DisconnectReason;
 use gdbstub::stub::GdbStub;
-use gdbstub::stub::MultiThreadStopReason;
 use gdbstub::target::Target;
 use std::net::TcpListener;
 use std::net::TcpStream;
@@ -61,19 +60,31 @@ enum EmuGdbEventLoop {}
 impl run_blocking::BlockingEventLoop for EmuGdbEventLoop {
     type Target = emu::Emu;
     type Connection = Box<dyn ConnectionExt<Error = std::io::Error>>;
-    type StopReason = MultiThreadStopReason<u32>;
+    type Tid = gdbstub::common::Tid;
 
     #[allow(clippy::type_complexity)]
-    fn wait_for_stop_reason(
+    fn wait_for_stop_reason<'a>(
         target: &mut emu::Emu,
-        conn: &mut Self::Connection,
+        mut simple_stub: run_blocking::SimpleStub<
+            'a,
+            Self::Target,
+            Self::Connection,
+            gdbstub::common::Tid,
+        >,
     ) -> Result<
-        run_blocking::Event<Self::StopReason>,
+        run_blocking::Event<'a, Self::Target, Self::Connection>,
         run_blocking::WaitForStopReasonError<
             <Self::Target as Target>::Error,
             <Self::Connection as Connection>::Error,
         >,
     > {
+        if target.ctrl_c_interrupt {
+            target.ctrl_c_interrupt = false;
+            return Ok(
+                simple_stub.report_stop(target, |report_stop| report_stop.signal(Signal::SIGINT))
+            );
+        }
+
         // The `armv4t_multicore` example runs the emulator in the same thread as the
         // GDB state machine loop. As such, it uses a simple poll-based model to
         // check for interrupt events, whereby the emulator will check if there
@@ -100,50 +111,53 @@ impl run_blocking::BlockingEventLoop for EmuGdbEventLoop {
             // gdbstub takes ownership of the underlying connection, so the `borrow_conn`
             // method is used to borrow the underlying connection back from the stub to
             // check for incoming data.
-            conn.peek().map(|b| b.is_some()).unwrap_or(true)
+            simple_stub
+                .borrow_conn()
+                .peek()
+                .map(|b| b.is_some())
+                .unwrap_or(true)
         };
 
         match target.run(poll_incoming_data) {
             emu::RunEvent::IncomingData => {
-                let byte = conn
+                let byte = simple_stub
+                    .borrow_conn()
                     .read()
                     .map_err(run_blocking::WaitForStopReasonError::Connection)?;
-                Ok(run_blocking::Event::IncomingData(byte))
+                Ok(simple_stub.incoming_data(target, byte))
             }
             emu::RunEvent::Event(event, cpuid) => {
-                use gdbstub::target::ext::breakpoints::WatchKind;
-
                 // translate emulator stop reason into GDB stop reason
-                let tid = gdb::cpuid_to_tid(cpuid);
-                let stop_reason = match event {
-                    emu::Event::DoneStep => MultiThreadStopReason::DoneStep,
-                    emu::Event::Halted => MultiThreadStopReason::Terminated(Signal::SIGSTOP),
-                    emu::Event::Break => MultiThreadStopReason::SwBreak(tid),
-                    emu::Event::WatchWrite(addr) => MultiThreadStopReason::Watch {
-                        tid,
-                        kind: WatchKind::Write,
-                        addr,
-                    },
-                    emu::Event::WatchRead(addr) => MultiThreadStopReason::Watch {
-                        tid,
-                        kind: WatchKind::Read,
-                        addr,
-                    },
-                };
+                Ok(simple_stub.report_stop(target, |report_stop| {
+                    use gdbstub::target::ext::breakpoints::WatchKind;
 
-                Ok(run_blocking::Event::TargetStopped(stop_reason))
+                    let tid = gdb::cpuid_to_tid(cpuid);
+                    match event {
+                        emu::Event::DoneStep => report_stop.done_step(),
+                        emu::Event::Halted => report_stop.terminated(Signal::SIGSTOP),
+                        emu::Event::Break => report_stop.swbreak(tid),
+                        emu::Event::WatchWrite(addr) => {
+                            report_stop.watch(tid, WatchKind::Write, addr)
+                        }
+                        emu::Event::WatchRead(addr) => {
+                            report_stop.watch(tid, WatchKind::Read, addr)
+                        }
+                    }
+                }))
             }
         }
     }
 
-    fn on_interrupt(
-        _target: &mut emu::Emu,
-    ) -> Result<Option<MultiThreadStopReason<u32>>, <emu::Emu as Target>::Error> {
-        // Because this emulator runs as part of the GDB stub loop, there isn't any
-        // special action that needs to be taken to interrupt the underlying target. It
-        // is implicitly paused whenever the stub isn't within the
-        // `wait_for_stop_reason` callback.
-        Ok(Some(MultiThreadStopReason::Signal(Signal::SIGINT)))
+    fn on_interrupt(target: &mut emu::Emu) -> Result<(), <emu::Emu as Target>::Error> {
+        // Because this emulator runs as part of the GDB stub loop, there isn't
+        // any special action that needs to be taken to interrupt the
+        // underlying target. It is implicitly paused whenever the stub
+        // isn't within the `wait_for_stop_reason` callback.
+        //
+        // as such, we can just set a "flag" bool and use that to immediately
+        // report a stop reason the next time we try to resume
+        target.ctrl_c_interrupt = true;
+        Ok(())
     }
 }
 

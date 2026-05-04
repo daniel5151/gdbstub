@@ -5,7 +5,7 @@ use crate::target::Target;
 /// Target Extension - Reverse continue for targets.
 pub trait ReverseCont<Tid>: Target
 where
-    Tid: crate::is_valid_tid::IsValidTid,
+    Tid: crate::IsValidTid,
 {
     /// [Reverse continue] the target.
     ///
@@ -23,7 +23,7 @@ pub type ReverseContOps<'a, Tid, T> =
 /// Target Extension - Reverse stepping for targets.
 pub trait ReverseStep<Tid>: Target
 where
-    Tid: crate::is_valid_tid::IsValidTid,
+    Tid: crate::IsValidTid,
 {
     /// [Reverse step] the specified `Tid`.
     ///

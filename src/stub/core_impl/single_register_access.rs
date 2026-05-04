@@ -12,7 +12,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         id: Tid,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>>
     where
-        Tid: crate::is_valid_tid::IsValidTid,
+        Tid: crate::IsValidTid,
     {
         let handler_status = match command {
             SingleRegisterAccess::p(p) => {

@@ -357,9 +357,27 @@ const SINGLE_THREAD_TID: common::Tid = unwrap!(common::Tid::new(1));
 /// reporting a custom Pid itself.
 const FAKE_PID: common::Pid = unwrap!(common::Pid::new(1));
 
-pub(crate) mod is_valid_tid {
-    pub trait IsValidTid {}
+/// Data types that can be used as Thread IDs in the GBD protocol.
+pub trait IsValidTid: private::Sealed {
+    #[doc(hidden)]
+    fn into_fully_qualified_tid(self) -> common::Tid;
+}
 
-    impl IsValidTid for () {}
-    impl IsValidTid for crate::common::Tid {}
+impl IsValidTid for () {
+    fn into_fully_qualified_tid(self) -> common::Tid {
+        SINGLE_THREAD_TID
+    }
+}
+
+impl IsValidTid for crate::common::Tid {
+    fn into_fully_qualified_tid(self) -> common::Tid {
+        self
+    }
+}
+
+mod private {
+    pub trait Sealed {}
+
+    impl Sealed for () {}
+    impl Sealed for crate::common::Tid {}
 }

@@ -97,7 +97,7 @@ pub enum DisconnectReason {
 
 pub enum State {
     Pump,
-    DeferredStopReason,
+    DoResume,
     CtrlCInterrupt,
     Disconnect(DisconnectReason),
 }
@@ -114,7 +114,7 @@ pub(crate) struct GdbStubImpl<T: Target, C: Connection> {
 pub enum HandlerStatus {
     Handled,
     NeedsOk,
-    DeferredStopReason,
+    DoResume,
     Disconnect(DisconnectReason),
 }
 
@@ -164,7 +164,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         res.write_str("OK")?;
                         None
                     }
-                    Ok(HandlerStatus::DeferredStopReason) => return Ok(State::DeferredStopReason),
+                    Ok(HandlerStatus::DoResume) => return Ok(State::DoResume),
                     Ok(HandlerStatus::Disconnect(reason)) => Some(reason),
                     // HACK: handling this "dummy" error is required as part of the
                     // `TargetResultExt::handle_error()` machinery.

@@ -51,6 +51,7 @@ pub struct Emu {
 
     pub(crate) watchpoints: Vec<u32>,
     pub(crate) breakpoints: Vec<u32>,
+    pub(crate) ctrl_c_interrupt: bool,
     pub(crate) files: Vec<Option<std::fs::File>>,
 
     pub(crate) tracepoints: BTreeMap<
@@ -116,6 +117,7 @@ impl Emu {
 
             watchpoints: Vec::new(),
             breakpoints: Vec::new(),
+            ctrl_c_interrupt: false,
             files: Vec::new(),
 
             tracepoints: BTreeMap::new(),
