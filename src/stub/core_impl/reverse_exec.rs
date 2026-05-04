@@ -62,7 +62,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     }
                 }
 
-                HandlerStatus::DeferredStopReason
+                HandlerStatus::DoResume
             }
         };
 
@@ -100,7 +100,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     }
                 }
 
-                HandlerStatus::DeferredStopReason
+                HandlerStatus::DoResume
             }
         };
 

@@ -20,7 +20,7 @@ use crate::target::TargetResult;
 /// Control and Status registers).
 pub trait SingleRegisterAccess<Tid>: Target
 where
-    Tid: crate::is_valid_tid::IsValidTid,
+    Tid: crate::IsValidTid,
 {
     /// Read to a single register on the target.
     ///

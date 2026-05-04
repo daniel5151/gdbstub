@@ -1,21 +1,15 @@
 //! Stop reasons reported back to the GDB client.
 
-use crate::arch::Arch;
 use crate::common::Signal;
 use crate::common::Tid;
 use crate::target::ext::base::reverse_exec::ReplayLogPosition;
 use crate::target::ext::breakpoints::WatchKind;
 use crate::target::ext::catch_syscalls::CatchSyscallPosition;
-use crate::target::Target;
 
 /// Describes why a thread stopped.
 ///
 /// Single threaded targets should set `Tid` to `()`, whereas multi threaded
-/// targets should set `Tid` to [`Tid`]. To make things easier, it is
-/// recommended to use the [`SingleThreadStopReason`] and
-/// [`MultiThreadStopReason`] when possible.
-///
-///
+/// targets should set `Tid` to [`Tid`].
 ///
 /// Targets MUST only respond with stop reasons that correspond to IDETs that
 /// target has implemented. Not doing so will result in a runtime error.
@@ -27,7 +21,7 @@ use crate::target::Target;
 /// [`HwBreakpoint`]: crate::target::ext::breakpoints::HwBreakpoint
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum BaseStopReason<Tid, U> {
+pub(crate) enum BaseStopReason<Tid, U> {
     /// Completed the single-step request.
     DoneStep,
     /// The process exited with the specified exit status.
@@ -154,17 +148,6 @@ impl<Tid, U> BaseStopReason<Tid, U> {
     }
 }
 
-/// A stop reason for a single threaded target.
-///
-/// Threads are identified using the unit type `()` (as there is only a single
-/// possible thread-id).
-pub type SingleThreadStopReason<U> = BaseStopReason<(), U>;
-
-/// A stop reason for a multi threaded target.
-///
-/// Threads are identified using a [`Tid`].
-pub type MultiThreadStopReason<U> = BaseStopReason<Tid, U>;
-
 impl<U> From<BaseStopReason<(), U>> for BaseStopReason<Tid, U> {
     fn from(st_stop_reason: BaseStopReason<(), U>) -> BaseStopReason<Tid, U> {
         match st_stop_reason {
@@ -204,20 +187,3 @@ impl<U> From<BaseStopReason<(), U>> for BaseStopReason<Tid, U> {
         }
     }
 }
-
-mod private {
-    pub trait Sealed {}
-
-    impl<U> Sealed for super::SingleThreadStopReason<U> {}
-    impl<U> Sealed for super::MultiThreadStopReason<U> {}
-}
-
-/// A marker trait implemented by [`SingleThreadStopReason`] and
-/// [`MultiThreadStopReason`].
-pub trait IntoStopReason<T: Target>:
-    private::Sealed + Into<MultiThreadStopReason<<<T as Target>::Arch as Arch>::Usize>>
-{
-}
-
-impl<T: Target> IntoStopReason<T> for SingleThreadStopReason<<<T as Target>::Arch as Arch>::Usize> {}
-impl<T: Target> IntoStopReason<T> for MultiThreadStopReason<<<T as Target>::Arch as Arch>::Usize> {}

@@ -7,10 +7,11 @@ use crate::protocol::commands::_vCont::Actions;
 use crate::protocol::commands::ext::Resume;
 use crate::protocol::SpecificIdKind;
 use crate::protocol::SpecificThreadId;
-use crate::stub::MultiThreadStopReason;
 use crate::target::ext::base::reverse_exec::ReplayLogPosition;
 use crate::target::ext::base::ResumeOps;
 use crate::target::ext::catch_syscalls::CatchSyscallPosition;
+
+type MultiThreadStopReason<U> = crate::stub::stop_reason::BaseStopReason<Tid, U>;
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     pub(crate) fn handle_stop_resume(
@@ -281,7 +282,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             ResumeOps::MultiThread(ops) => Self::do_vcont_multi_thread(ops, &actions)?,
         };
 
-        Ok(HandlerStatus::DeferredStopReason)
+        Ok(HandlerStatus::DoResume)
     }
 
     fn write_stop_common(

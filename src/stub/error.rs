@@ -179,6 +179,13 @@ impl<T, C> GdbStubError<T, C> {
         }
     }
 
+    /// Create a new error wrapping a target error.
+    pub fn from_target_error(err: T) -> Self {
+        Self {
+            kind: InternalError::TargetError(err),
+        }
+    }
+
     /// Check if the error was due to a connection error.
     pub fn is_connection_error(&self) -> bool {
         matches!(self.kind, InternalError::Connection(..))
