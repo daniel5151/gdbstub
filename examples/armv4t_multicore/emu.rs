@@ -36,11 +36,10 @@ pub enum Event {
     WatchRead(u32),
 }
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum ExecMode {
     Step,
     Continue,
-    Stop,
 }
 
 /// incredibly barebones armv4t-based emulator
@@ -49,6 +48,7 @@ pub struct Emu {
     pub(crate) cop: Cpu,
     pub(crate) mem: ExampleMem,
 
+    // If a CpuId is not in this, it is presumed "stopped".
     pub(crate) exec_mode: HashMap<CpuId, ExecMode>,
 
     pub(crate) watchpoints: Vec<u32>,
@@ -189,7 +189,7 @@ impl Emu {
         let mut evt = None;
 
         for id in [CpuId::Cpu, CpuId::Cop].iter().copied() {
-            if matches!(self.exec_mode.get(&id), Some(ExecMode::Stop)) {
+            if !self.exec_mode.contains_key(&id) {
                 continue;
             }
 
@@ -207,8 +207,7 @@ impl Emu {
         // The underlying armv4t_multicore emulator cycles all cores in lock-step.
         //
         // Inside `self.step()`, we iterate through all cores and only invoke
-        // `step_core` if that core's `ExecMode` is not `Stop`.
-
+        // `step_core` if that core has an `ExecMode`.
         let should_single_step = self.exec_mode.values().any(|mode| mode == &ExecMode::Step);
 
         match should_single_step {

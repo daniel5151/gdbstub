@@ -89,6 +89,12 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     ) -> Result<(), Error<T::Error, C::Error>> {
         use crate::protocol::commands::_vCont::VContKind;
 
+        // In the single-threaded scenario, we don't reverse the actions like we
+        // do in the multi-threaded: there are only two scenarios we concern
+        // ourselves with: 1 action, or 2 actions where the second is a
+        // continue action (sometimes GDB sends a packet of the form
+        // `vCont;s:foo;c`, even in single-threaded scenarios). We ignore the
+        // continue action, since there aren't any other threads to continue.
         let mut actions = actions.iter();
         let first_action = actions
             .next()
@@ -166,14 +172,16 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     ) -> Result<(), Error<T::Error, C::Error>> {
         ops.clear_resume_actions().map_err(Error::TargetError)?;
 
-        // Track whether the packet contains a wildcard/default continue action
-        // (e.g., `c` or `c:-1`).
+        // NOTE: We iterate through these actions in reverse order, which corresponds to
+        // a right-to-left ordering of the actions specified in the vCont packet. This
+        // is intentionally the opposite of the left-to-right order specified by
+        // the vCont packet documentation.
         //
-        // Presence of this action implies "Scheduler Locking" is OFF.
-        // Absence implies "Scheduler Locking" is ON.
-        let mut has_wildcard_continue = false;
-
-        for action in actions.iter() {
+        // This is to simplify target implementations: each `set_resume_action_XXX`
+        // callback can overwrite the current state, instead of having to keep track of
+        // each thread specified by previous actions and making sure they don't get
+        // overwritten.
+        for action in actions.iter().rev() {
             use crate::protocol::commands::_vCont::VContKind;
 
             let action = action.ok_or(Error::PacketParse(
@@ -187,17 +195,15 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         _ => None,
                     };
 
-                    match action.thread.map(|thread| thread.tid) {
-                        // An action with no thread-id matches all threads
-                        None | Some(SpecificIdKind::All) => {
-                            // Target API contract specifies that the default
-                            // resume action for all threads is continue.
-                            has_wildcard_continue = true;
-                        }
-                        Some(SpecificIdKind::WithId(tid)) => ops
-                            .set_resume_action_continue(tid, signal)
-                            .map_err(Error::TargetError)?,
-                    }
+                    let tid = match action.thread.map(|thread| thread.tid) {
+                        // An action with no thread-id matches all threads, which is passed to
+                        // `set_resume_action_continue` as `None`.
+                        None | Some(SpecificIdKind::All) => None,
+                        Some(SpecificIdKind::WithId(tid)) => Some(tid),
+                    };
+
+                    ops.set_resume_action_continue(tid, signal)
+                        .map_err(Error::TargetError)?;
                 }
                 VContKind::Step | VContKind::StepWithSig(_)
                     if ops.support_single_step().is_some() =>
@@ -257,15 +263,6 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     return Err(Error::PacketUnexpected);
                 }
             }
-        }
-
-        if !has_wildcard_continue {
-            let Some(locking_ops) = ops.support_scheduler_locking() else {
-                return Err(Error::MissingMultiThreadSchedulerLocking);
-            };
-            locking_ops
-                .set_resume_action_scheduler_lock()
-                .map_err(Error::TargetError)?;
         }
 
         ops.resume().map_err(Error::TargetError)
