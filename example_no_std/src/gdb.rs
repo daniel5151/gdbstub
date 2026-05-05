@@ -149,7 +149,7 @@ impl MultiThreadResume for DummyTarget {
     #[inline(never)]
     fn set_resume_action_continue(
         &mut self,
-        _tid: Tid,
+        _tid: Option<Tid>,
         _signal: Option<Signal>,
     ) -> Result<(), Self::Error> {
         print_str("> set_resume_action_continue");

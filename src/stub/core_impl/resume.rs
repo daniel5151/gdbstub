@@ -166,13 +166,6 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     ) -> Result<(), Error<T::Error, C::Error>> {
         ops.clear_resume_actions().map_err(Error::TargetError)?;
 
-        // Track whether the packet contains a wildcard/default continue action
-        // (e.g., `c` or `c:-1`).
-        //
-        // Presence of this action implies "Scheduler Locking" is OFF.
-        // Absence implies "Scheduler Locking" is ON.
-        let mut has_wildcard_continue = false;
-
         for action in actions.iter() {
             use crate::protocol::commands::_vCont::VContKind;
 
@@ -187,17 +180,15 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         _ => None,
                     };
 
-                    match action.thread.map(|thread| thread.tid) {
-                        // An action with no thread-id matches all threads
-                        None | Some(SpecificIdKind::All) => {
-                            // Target API contract specifies that the default
-                            // resume action for all threads is continue.
-                            has_wildcard_continue = true;
-                        }
-                        Some(SpecificIdKind::WithId(tid)) => ops
-                            .set_resume_action_continue(tid, signal)
-                            .map_err(Error::TargetError)?,
-                    }
+                    let tid = match action.thread.map(|thread| thread.tid) {
+                        // An action with no thread-id matches all threads, which is passed to
+                        // `set_resume_actin_continue` as `None
+                        None | Some(SpecificIdKind::All) => None,
+                        Some(SpecificIdKind::WithId(tid)) => Some(tid),
+                    };
+
+                    ops.set_resume_action_continue(tid, signal)
+                        .map_err(Error::TargetError)?;
                 }
                 VContKind::Step | VContKind::StepWithSig(_)
                     if ops.support_single_step().is_some() =>
@@ -257,15 +248,6 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     return Err(Error::PacketUnexpected);
                 }
             }
-        }
-
-        if !has_wildcard_continue {
-            let Some(locking_ops) = ops.support_scheduler_locking() else {
-                return Err(Error::MissingMultiThreadSchedulerLocking);
-            };
-            locking_ops
-                .set_resume_action_scheduler_lock()
-                .map_err(Error::TargetError)?;
         }
 
         ops.resume().map_err(Error::TargetError)
