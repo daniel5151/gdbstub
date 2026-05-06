@@ -6,6 +6,14 @@ This document does _not_ discuss any new features that might have been added bet
 
 > _Note:_ after reading through this doc, you may also find it helpful to refer to the in-tree `armv4t` and `armv4t_multicore` examples when transitioning between versions.
 
+## `0.7` -> `0.8`
+
+#### Changes to multi-threaded resume behavior
+
+Previously, if a thread had no `resume_set_action_XXX` methods called on it, the default was to act as if `resume_set_action_continue` was called on it.  Now, if a thread has no `resume_set_action_XXX` methods called on it, it should remain stopped.
+
+This new behavior obsoletes the `MultiThreadSchedulerLocking` trait, which has been removed.  If a stub is unable to handle executing a single thread and keeping all others locked, it should return an error in the `resume` method.
+
 ## `0.6` -> `0.7`
 
 `0.7` is a fairly minimal "cleanup" release, landing a collection of small breaking changes that collectively improve various ergonomic issues in `gdbstub`'s API.

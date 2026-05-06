@@ -51,9 +51,9 @@ pub trait MultiThreadBase: Target {
     /// to indicate that memory starting at `start_addr + n` cannot be
     /// accessed.
     ///
-    /// Implemenations may also return an appropriate non-fatal error if the
+    /// Implementations may also return an appropriate non-fatal error if the
     /// requested address range could not be accessed (e.g: due to MMU
-    /// protection, unhanded page fault, etc...).
+    /// protection, unhandled page fault, etc...).
     ///
     /// Implementations must guarantee that the returned number is less than or
     /// equal `data.len()`.
@@ -67,7 +67,7 @@ pub trait MultiThreadBase: Target {
     /// Write bytes to the specified address range.
     ///
     /// If the requested address range could not be accessed (e.g: due to
-    /// MMU protection, unhanded page fault, etc...), an appropriate non-fatal
+    /// MMU protection, unhandled page fault, etc...), an appropriate non-fatal
     /// error should be returned.
     fn write_addrs(
         &mut self,
@@ -132,21 +132,11 @@ pub trait MultiThreadResume: Target {
     /// Upon returning from the `resume` method, the target being debugged
     /// should be configured to run according to whatever resume actions the
     /// GDB client had specified using any of the `set_resume_action_XXX`
-    /// methods.
-    ///
-    /// # Default Resume Behavior
-    ///
-    /// By default, any thread that wasn't explicitly resumed by a
-    /// `set_resume_action_XXX` method should be resumed as though it was
-    /// resumed with `set_resume_action_continue`.
-    ///
-    /// **However**, if [`support_scheduler_locking`] is implemented and
-    /// [`set_resume_action_scheduler_lock`] has been called for the current
-    /// resume cycle, this default changes: **unmentioned threads must remain
-    /// stopped.**
-    ///
-    /// [`support_scheduler_locking`]: Self::support_scheduler_locking
-    /// [`set_resume_action_scheduler_lock`]: MultiThreadSchedulerLocking::set_resume_action_scheduler_lock
+    /// methods. Any thread that wasn't explicitly specified in a
+    /// `set_resume_action_XXX` method should remain in the same state.
+    /// Currently, because `gdbstub` only supports all-stop mode, the only state
+    /// threads will be in while processing `resume` is stopped, so any threads
+    /// not specified in `set_resume_action_XXX` should remain stopped.
     ///
     /// # Protocol Extensions
     ///
@@ -158,19 +148,25 @@ pub trait MultiThreadResume: Target {
     /// ----------------------------|------------------------------
     /// Optimized [Single Stepping] | See [`support_single_step()`]
     /// Optimized [Range Stepping]  | See [`support_range_step()`]
-    /// [Scheduler Locking]         | See [`support_scheduler_locking()`]
     /// "Stop"                      | Used in "Non-Stop" mode \*
     ///
     /// \* "Non-Stop" mode is currently unimplemented in `gdbstub`
     ///
     /// [Single stepping]: https://sourceware.org/gdb/current/onlinedocs/gdb/Continuing-and-Stepping.html#index-stepi
     /// [Range Stepping]: https://sourceware.org/gdb/current/onlinedocs/gdb/Continuing-and-Stepping.html#range-stepping
-    /// [Scheduler Locking]: https://sourceware.org/gdb/current/onlinedocs/gdb#index-scheduler-locking-mode
     /// [`support_single_step()`]: Self::support_single_step
     /// [`support_range_step()`]: Self::support_range_step
-    /// [`support_scheduler_locking()`]: Self::support_scheduler_locking
     ///
     /// # Additional Considerations
+    ///
+    /// ### Scheduler locking
+    ///
+    /// The GDB client may send a resume message that only continues one thread
+    /// and keeps all other threads in a halted state. Not all OS schedulers are
+    /// able to handle this, so `resume` should return an error if it's ever
+    /// asked to do something that the stub is unable to support. More details
+    /// can be found in the `set scheduler-locking mode` section of the
+    /// [GDB documentation](https://sourceware.org/gdb/current/onlinedocs/gdb#index-scheduler-locking-mode)
     ///
     /// ### Adjusting PC after a breakpoint is hit
     ///
@@ -202,6 +198,8 @@ pub trait MultiThreadResume: Target {
 
     /// Continue the specified thread.
     ///
+    /// If no thread is specified, continue all threads.
+    ///
     /// See the [`resume`](Self::resume) docs for information on when this is
     /// called.
     ///
@@ -209,7 +207,7 @@ pub trait MultiThreadResume: Target {
     /// target.
     fn set_resume_action_continue(
         &mut self,
-        tid: Tid,
+        tid: Option<Tid>,
         signal: Option<Signal>,
     ) -> Result<(), Self::Error>;
 
@@ -246,14 +244,6 @@ pub trait MultiThreadResume: Target {
     fn support_reverse_cont(
         &mut self,
     ) -> Option<super::reverse_exec::ReverseContOps<'_, Tid, Self>> {
-        None
-    }
-
-    /// Support for [scheduler locking].
-    ///
-    /// [scheduler locking]: https://sourceware.org/gdb/current/onlinedocs/gdb#index-scheduler-locking-mode
-    #[inline(always)]
-    fn support_scheduler_locking(&mut self) -> Option<MultiThreadSchedulerLockingOps<'_, Self>> {
         None
     }
 }
@@ -313,26 +303,3 @@ pub trait MultiThreadRangeStepping: Target + MultiThreadResume {
 }
 
 define_ext!(MultiThreadRangeSteppingOps, MultiThreadRangeStepping);
-
-/// Target Extension - support for GDB's "Scheduler Locking" mode.
-/// See [`MultiThreadResume::support_scheduler_locking`].
-pub trait MultiThreadSchedulerLocking: Target + MultiThreadResume {
-    /// Configure the target to enable "Scheduler Locking" for the upcoming
-    /// resume.
-    ///
-    /// This method is invoked when the GDB client expects only a specific set
-    /// of threads to run, while all other threads remain frozen. This behavior
-    /// is typically toggled in GDB using the `set scheduler-locking on`
-    /// command.
-    ///
-    /// When this method is called, the implementation must ensure that any
-    /// threads not explicitly resumed via previous `set_resume_action_...`
-    /// calls **remain stopped**.
-    ///
-    /// This prevents any "implicit continue" behavior for unmentioned threads,
-    /// satisfying GDB's expectation that only the designated threads will
-    /// advance during the next resume.
-    fn set_resume_action_scheduler_lock(&mut self) -> Result<(), Self::Error>;
-}
-
-define_ext!(MultiThreadSchedulerLockingOps, MultiThreadSchedulerLocking);

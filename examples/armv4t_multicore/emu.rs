@@ -36,11 +36,10 @@ pub enum Event {
     WatchRead(u32),
 }
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum ExecMode {
     Step,
     Continue,
-    Stop,
 }
 
 /// incredibly barebones armv4t-based emulator
@@ -49,6 +48,7 @@ pub struct Emu {
     pub(crate) cop: Cpu,
     pub(crate) mem: ExampleMem,
 
+    // If a CpuId is not in this, it is presumed "stopped".
     pub(crate) exec_mode: HashMap<CpuId, ExecMode>,
 
     pub(crate) watchpoints: Vec<u32>,
@@ -189,7 +189,7 @@ impl Emu {
         let mut evt = None;
 
         for id in [CpuId::Cpu, CpuId::Cop].iter().copied() {
-            if matches!(self.exec_mode.get(&id), Some(ExecMode::Stop)) {
+            if !self.exec_mode.contains_key(&id) {
                 continue;
             }
 
@@ -204,11 +204,18 @@ impl Emu {
     }
 
     pub fn run(&mut self, mut poll_incoming_data: impl FnMut() -> bool) -> RunEvent {
+        if self.exec_mode.is_empty() {
+            // This should never happen (`resume` returns an error if this
+            // situation arises), but in case it does, we explicitly log it and
+            // return the closest event that represents this.
+            eprintln!("Running while all threads are stopped; this should never happen!  Treating as 0 steps");
+            return RunEvent::Event(Event::DoneStep, CpuId::Cpu);
+        }
+
         // The underlying armv4t_multicore emulator cycles all cores in lock-step.
         //
         // Inside `self.step()`, we iterate through all cores and only invoke
-        // `step_core` if that core's `ExecMode` is not `Stop`.
-
+        // `step_core` if that core has an `ExecMode`.
         let should_single_step = self.exec_mode.values().any(|mode| mode == &ExecMode::Step);
 
         match should_single_step {
@@ -221,6 +228,7 @@ impl Emu {
                         .find(|&(_, mode)| mode == &ExecMode::Step)
                         .map(|(id, _)| *id)
                         .unwrap_or(CpuId::Cpu);
+
                     RunEvent::Event(Event::DoneStep, stepping_core)
                 }
             },
