@@ -37,7 +37,7 @@ pub mod run_blocking {
     ///
     /// [`GdbStubStateMachine`]: state_machine::GdbStubStateMachine
     pub struct SimpleStub<'a, T: Target, C: Connection, Tid: IsValidTid> {
-        pub(crate) inner:
+        pub(crate) gdb:
             state_machine::GdbStubStateMachineInner<'a, state_machine::state::Running, T, C, Tid>,
     }
 
@@ -45,17 +45,17 @@ pub mod run_blocking {
     /// [`BlockingEventLoop::wait_for_stop_reason`].
     ///
     /// Created via [`SimpleStub`].
-    pub struct Event<'a, T: Target, C: Connection, Tid: IsValidTid>(
-        pub(crate)  Result<
+    pub struct Event<'a, T: Target, C: Connection, Tid: IsValidTid> {
+        pub(crate) gdb: Result<
             state_machine::GdbStubStateMachine<'a, T, C, Tid>,
             GdbStubError<<T as Target>::Error, <C as Connection>::Error>,
         >,
-    );
+    }
 
     impl<'a, T: Target, C: Connection, Tid: IsValidTid> SimpleStub<'a, T, C, Tid> {
         /// Return a mutable reference to the underlying connection.
         pub fn borrow_conn(&mut self) -> &mut C {
-            self.inner.borrow_conn()
+            self.gdb.borrow_conn()
         }
 
         /// Report a target stop reason back to GDB.
@@ -69,12 +69,16 @@ pub mod run_blocking {
                 GdbStubError<<T as Target>::Error, <C as Connection>::Error>,
             >,
         ) -> Event<'a, T, C, Tid> {
-            Event(report(self.inner.report_stop(target)))
+            Event {
+                gdb: report(self.gdb.report_stop(target)),
+            }
         }
 
         /// Pass a byte to the GDB stub.
         pub fn incoming_data(self, target: &mut T, byte: u8) -> Event<'a, T, C, Tid> {
-            Event(self.inner.incoming_data(target, byte))
+            Event {
+                gdb: self.gdb.incoming_data(target, byte),
+            }
         }
     }
 
@@ -83,9 +87,7 @@ pub mod run_blocking {
     ///
     /// Reminder: to use `gdbstub` in a non-blocking manner (e.g: via
     /// async/await, unix polling, from an interrupt handler, etc...) you will
-    /// need to interface with the
-    /// [`GdbStubStateMachine`](state_machine::GdbStubStateMachine) API
-    /// directly.
+    /// need to interface with the [`GdbStubStateMachine`] API directly.
     pub trait BlockingEventLoop {
         /// The Target being driven.
         type Target: Target;
@@ -145,12 +147,10 @@ pub mod run_blocking {
         ///    `Event::StopReason` in `wait_for_stop_reason()` as usual.
         ///
         /// _Suggestion_: If you're unsure which stop reason to report in
-        /// response to a ctrl-c interrupt,
-        /// [`BaseStopReason::Signal(Signal::SIGINT)`] may be a sensible
+        /// response to a ctrl-c interrupt, [`Signal::SIGINT`] may be a sensible
         /// default.
         ///
-        /// [`BaseStopReason::Signal(Signal::SIGINT)`]:
-        /// crate::stub::BaseStopReason::Signal
+        /// [`Signal::SIGINT`]: crate::common::Signal::SIGINT
         fn on_interrupt(target: &mut Self::Target) -> Result<(), <Self::Target as Target>::Error> {
             let _ = target;
             Ok(())
@@ -248,10 +248,9 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
                     use run_blocking::WaitForStopReasonError;
 
                     // block waiting for the target to return a stop reason
-                    let res =
-                        E::wait_for_stop_reason(target, run_blocking::SimpleStub { inner: gdb });
+                    let res = E::wait_for_stop_reason(target, run_blocking::SimpleStub { gdb });
                     match res {
-                        Ok(run_blocking::Event(gdb)) => gdb?,
+                        Ok(run_blocking::Event { gdb }) => gdb?,
                         Err(WaitForStopReasonError::Target(e)) => {
                             break Err(InternalError::TargetError(e).into());
                         }

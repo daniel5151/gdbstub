@@ -947,11 +947,7 @@ where
     ///   resuming the target (and of course - retuning an appropriate stop
     ///   reason).
     /// - If you're unsure which stop reason to report in response to a ctrl-c
-    ///   interrupt, [`BaseStopReason::Signal(Signal::SIGINT)`] may be a
-    ///   sensible default.
-    ///
-    /// [`BaseStopReason::Signal(Signal::SIGINT)`]:
-    /// crate::stub::BaseStopReason::Signal
+    ///   interrupt, reporting a [`Signal::SIGINT`] may be a sensible default.
     pub fn interrupt_handled(self) -> GdbStubStateMachine<'a, T, C, Tid> {
         if self.state.from_idle {
             self.transition(state::Idle {}).into()

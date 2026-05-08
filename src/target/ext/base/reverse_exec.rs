@@ -40,8 +40,11 @@ where
 pub type ReverseStepOps<'a, Tid, T> =
     &'a mut dyn ReverseStep<Tid, Arch = <T as Target>::Arch, Error = <T as Target>::Error>;
 
-/// Describes the point reached in a replay log (used alongside
-/// [`BaseStopReason::ReplayLog`](crate::stub::BaseStopReason::ReplayLog))
+/// Describes the point reached in a replay log (used in
+/// [`StopReasonReporter::replay_log`])
+///
+/// [`StopReasonReporter::replay_log`]:
+///     crate::stub::state_machine::StopReasonReporter::replay_log
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ReplayLogPosition {
     /// Reached the beginning of the replay log.
