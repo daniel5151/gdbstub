@@ -8,7 +8,6 @@ use crate::print_str::print_str;
 use gdbstub::stub::state_machine::GdbStubStateMachine;
 use gdbstub::stub::DisconnectReason;
 use gdbstub::stub::GdbStubBuilder;
-use gdbstub::stub::MultiThreadStopReason;
 
 mod conn;
 mod gdb;
@@ -41,7 +40,9 @@ fn rust_main() -> Result<(), i32> {
 
     print_str("Starting GDB session...");
 
-    let mut gdb = gdb.run_state_machine(&mut target).map_err(|_| 1)?;
+    let mut gdb = gdb
+        .run_state_machine::<gdbstub::common::Tid>(&mut target)
+        .map_err(|_| 1)?;
 
     let res = loop {
         gdb = match gdb {
@@ -52,18 +53,11 @@ fn rust_main() -> Result<(), i32> {
                     Err(e) => break Err(e),
                 }
             }
-            GdbStubStateMachine::Running(gdb) => {
-                match gdb.report_stop(&mut target, MultiThreadStopReason::DoneStep) {
-                    Ok(gdb) => gdb,
-                    Err(e) => break Err(e),
-                }
-            }
-            GdbStubStateMachine::CtrlCInterrupt(gdb) => {
-                match gdb.interrupt_handled(&mut target, None::<MultiThreadStopReason<u32>>) {
-                    Ok(gdb) => gdb,
-                    Err(e) => break Err(e),
-                }
-            }
+            GdbStubStateMachine::Running(gdb) => match gdb.report_stop(&mut target).done_step() {
+                Ok(gdb) => gdb,
+                Err(e) => break Err(e),
+            },
+            GdbStubStateMachine::CtrlCInterrupt(gdb) => gdb.interrupt_handled(),
             GdbStubStateMachine::Disconnected(gdb) => break Ok(gdb.get_reason()),
         }
     };

@@ -852,6 +852,7 @@ macro_rules! impl_dyn_target {
             __delegate!(fn use_target_description_xml(&self) -> bool);
             __delegate!(fn use_vfork_stop_reason(&self) -> bool);
             __delegate!(fn use_vforkdone_stop_reason(&self) -> bool);
+            __delegate!(fn use_exec_stop_reason(&self) -> bool);
             __delegate!(fn use_x_lowcase_packet(&self) -> bool);
             __delegate!(fn use_x_upcase_packet(&self) -> bool);
 

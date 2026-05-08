@@ -165,7 +165,7 @@ where
         GdbStubStateMachineInner {
             i: self.i,
             state,
-            _tid: std::marker::PhantomData,
+            _tid: core::marker::PhantomData,
         }
     }
 }
@@ -186,7 +186,7 @@ struct GdbStubStateMachineReallyInner<'a, T: Target, C: Connection> {
 pub struct GdbStubStateMachineInner<'a, S, T: Target, C: Connection, Tid: IsValidTid> {
     i: GdbStubStateMachineReallyInner<'a, T, C>,
     state: S,
-    _tid: std::marker::PhantomData<Tid>,
+    _tid: core::marker::PhantomData<Tid>,
 }
 
 /// Methods which can be called regardless of the current state.
@@ -222,7 +222,7 @@ where
                 inner: stub.inner,
             },
             state: state::Idle {},
-            _tid: std::marker::PhantomData,
+            _tid: core::marker::PhantomData,
         }
     }
 
