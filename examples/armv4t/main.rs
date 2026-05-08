@@ -120,6 +120,7 @@ impl run_blocking::BlockingEventLoop for EmuGdbEventLoop {
 
                     match event {
                         emu::Event::DoneStep => report_stop.done_step(),
+                        emu::Event::Interrupted => report_stop.signal(Signal::SIGINT),
                         emu::Event::Halted => report_stop.terminated(Signal::SIGSTOP),
                         emu::Event::Break => report_stop.swbreak(())?.done(),
                         emu::Event::WatchWrite(addr) => {
@@ -128,6 +129,7 @@ impl run_blocking::BlockingEventLoop for EmuGdbEventLoop {
                         emu::Event::WatchRead(addr) => {
                             report_stop.watch((), WatchKind::Read, addr)?.done()
                         }
+                        emu::Event::Exec(path) => report_stop.exec(path)?.done(),
                     }
                 }))
             }

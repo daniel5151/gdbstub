@@ -78,13 +78,6 @@ impl run_blocking::BlockingEventLoop for EmuGdbEventLoop {
             <Self::Connection as Connection>::Error,
         >,
     > {
-        if target.ctrl_c_interrupt {
-            target.ctrl_c_interrupt = false;
-            return Ok(
-                simple_stub.report_stop(target, |report_stop| report_stop.signal(Signal::SIGINT))
-            );
-        }
-
         // The `armv4t_multicore` example runs the emulator in the same thread as the
         // GDB state machine loop. As such, it uses a simple poll-based model to
         // check for interrupt events, whereby the emulator will check if there
@@ -134,6 +127,7 @@ impl run_blocking::BlockingEventLoop for EmuGdbEventLoop {
                     let tid = gdb::cpuid_to_tid(cpuid);
                     match event {
                         emu::Event::DoneStep => report_stop.done_step(),
+                        emu::Event::Interrupted => report_stop.signal(Signal::SIGINT),
                         emu::Event::Halted => report_stop.terminated(Signal::SIGSTOP),
                         emu::Event::Break => report_stop.swbreak(tid)?.done(),
                         emu::Event::WatchWrite(addr) => {

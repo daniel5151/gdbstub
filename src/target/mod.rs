@@ -666,6 +666,20 @@ pub trait Target {
         true
     }
 
+    /// Enable the use of [`StopReasonReporter::exec`].
+    ///
+    /// By default, this method returns `true`.
+    ///
+    /// _Author's note:_ Unless you're _really_ trying to squeeze `gdbstub` onto
+    /// a particularly resource-constrained platform, you may as well leave this
+    /// enabled.
+    ///
+    /// [`StopReasonReporter::exec`]: crate::stub::state_machine::StopReasonReporter::exec
+    #[inline(always)]
+    fn use_exec_stop_reason(&self) -> bool {
+        true
+    }
+
     /// Support for setting / removing breakpoints.
     #[inline(always)]
     fn support_breakpoints(&mut self) -> Option<ext::breakpoints::BreakpointsOps<'_, Self>> {

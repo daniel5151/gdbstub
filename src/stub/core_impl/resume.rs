@@ -586,4 +586,23 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         res.write_str("vforkdone:;")?;
         Ok(())
     }
+
+    #[inline(always)]
+    pub(crate) fn finish_exec(
+        &mut self,
+        res: &mut ResponseWriter<'_, C>,
+        target: &mut T,
+        path: &[u8],
+    ) -> Result<(), Error<T::Error, C::Error>> {
+        if !target.use_exec_stop_reason() {
+            return Err(Error::UnsupportedStopReason);
+        }
+
+        crate::__dead_code_marker!("vforkdone_events", "stop_reason");
+        self.write_stop_common(res, target, None, Signal::SIGTRAP)?;
+        res.write_str("exec:")?;
+        res.write_hex_buf(path)?;
+        res.write_str(";")?;
+        Ok(())
+    }
 }

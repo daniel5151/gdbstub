@@ -34,6 +34,7 @@ pub enum Event {
     Break,
     WatchWrite(u32),
     WatchRead(u32),
+    Interrupted,
 }
 
 #[derive(Debug, PartialEq)]
@@ -206,6 +207,11 @@ impl Emu {
     }
 
     pub fn run(&mut self, mut poll_incoming_data: impl FnMut() -> bool) -> RunEvent {
+        if self.ctrl_c_interrupt {
+            self.ctrl_c_interrupt = false;
+            return RunEvent::Event(Event::Interrupted, CpuId::Cpu);
+        }
+
         // The underlying armv4t_multicore emulator cycles all cores in lock-step.
         //
         // Inside `self.step()`, we iterate through all cores and only invoke

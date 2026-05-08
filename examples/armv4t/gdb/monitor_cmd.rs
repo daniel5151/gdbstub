@@ -17,9 +17,27 @@ impl target::ext::monitor_cmd::MonitorCmd for Emu {
             }
         };
 
-        match cmd {
-            "" => outputln!(out, "Sorry, didn't catch that. Try `monitor ping`!"),
-            "ping" => outputln!(out, "pong!"),
+        let mut args = cmd.split(' ');
+
+        match args.next() {
+            None => outputln!(out, "Sorry, didn't catch that. Try `monitor ping`!"),
+            Some("ping") => outputln!(out, "pong!"),
+            Some("fake-exec") => {
+                let Some(path) = args.next() else {
+                    outputln!(
+                        out,
+                        "expected fake arg (likely /test.elf, to match `exec_file`)"
+                    );
+                    return Ok(());
+                };
+
+                self.fake_exec = Some(path.into());
+
+                outputln!(
+                    out,
+                    "ok, will report `exec` stop reason (with {path} as the path) when resumed!"
+                )
+            }
             _ => outputln!(out, "I don't know how to handle '{}'", cmd),
         };
 

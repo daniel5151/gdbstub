@@ -131,6 +131,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     res.write_str(";vforkdone-events+")?;
                 }
 
+                if target.use_exec_stop_reason() {
+                    res.write_str(";exec-events+")?;
+                }
+
                 if target.use_x_lowcase_packet() {
                     res.write_str(";binary-upload+")?;
                 }

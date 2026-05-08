@@ -837,6 +837,32 @@ where
             gdb,
         })
     }
+
+    /// Report that `execve` was called, where `path` is the absolute pathname
+    /// of the file that was executed.
+    ///
+    /// Requires: [`Target::use_exec_stop_reason`].
+    pub fn exec(
+        self,
+        path: impl AsRef<[u8]>,
+    ) -> Result<StopReasonReporter<'a, 't, T, C, Tid, true, true>, GdbStubError<T::Error, C::Error>>
+    {
+        let Self {
+            target,
+            res,
+            mut gdb,
+        } = self;
+
+        let mut res = ResponseWriter::from_state(&mut gdb.i.conn, res);
+
+        gdb.i.inner.finish_exec(&mut res, target, path.as_ref())?;
+
+        Ok(StopReasonReporter {
+            target,
+            res: res.into_state(),
+            gdb,
+        })
+    }
 }
 
 /// Methods which can only be called from the
