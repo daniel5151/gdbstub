@@ -72,7 +72,7 @@ impl run_blocking::BlockingEventLoop for EmuGdbEventLoop {
             gdbstub::common::Tid,
         >,
     ) -> Result<
-        run_blocking::Event<'a, Self::Target, Self::Connection>,
+        run_blocking::Event<'a, Self::Target, Self::Connection, Self::Tid>,
         run_blocking::WaitForStopReasonError<
             <Self::Target as Target>::Error,
             <Self::Connection as Connection>::Error,
@@ -135,12 +135,12 @@ impl run_blocking::BlockingEventLoop for EmuGdbEventLoop {
                     match event {
                         emu::Event::DoneStep => report_stop.done_step(),
                         emu::Event::Halted => report_stop.terminated(Signal::SIGSTOP),
-                        emu::Event::Break => report_stop.swbreak(tid),
+                        emu::Event::Break => report_stop.swbreak(tid)?.done(),
                         emu::Event::WatchWrite(addr) => {
-                            report_stop.watch(tid, WatchKind::Write, addr)
+                            report_stop.watch(tid, WatchKind::Write, addr)?.done()
                         }
                         emu::Event::WatchRead(addr) => {
-                            report_stop.watch(tid, WatchKind::Read, addr)
+                            report_stop.watch(tid, WatchKind::Read, addr)?.done()
                         }
                     }
                 }))

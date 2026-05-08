@@ -78,7 +78,7 @@ impl<T, C> From<ResponseWriterError<C>> for InternalError<T, C> {
 
 macro_rules! unsupported_stop_reason {
     () => {
-        "User error: cannot report stop reason without also implementing its corresponding IDET"
+        "User error: cannot report stop reason without also activating its corresponding IDET"
     };
 }
 

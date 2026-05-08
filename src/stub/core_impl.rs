@@ -49,8 +49,6 @@ mod wasm;
 mod x_lowcase_packet;
 mod x_upcase_packet;
 
-pub(crate) use resume::FinishExecStatus;
-
 pub(crate) mod target_result_ext {
     use crate::stub::error::InternalError;
     use crate::target::TargetError;

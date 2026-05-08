@@ -31,7 +31,6 @@
 //! [`BlockingEventLoop`]: super::run_blocking::BlockingEventLoop
 //! [`GdbStub::run_blocking`]: super::GdbStub::run_blocking
 
-use super::core_impl::FinishExecStatus;
 use super::core_impl::GdbStubImpl;
 use super::core_impl::State;
 use super::DisconnectReason;
@@ -43,10 +42,12 @@ use crate::conn::Connection;
 use crate::protocol::recv_packet::RecvPacketStateMachine;
 use crate::protocol::Packet;
 use crate::protocol::ResponseWriter;
+use crate::protocol::ResponseWriterState;
 use crate::stub::error::GdbStubError;
 use crate::stub::error::InternalError;
-use crate::stub::BaseStopReason;
+use crate::target::ext::base::reverse_exec::ReplayLogPosition;
 use crate::target::ext::breakpoints::WatchKind;
+use crate::target::ext::catch_syscalls::CatchSyscallPosition;
 use crate::target::Target;
 use crate::IsValidTid;
 use managed::ManagedSlice;
@@ -54,24 +55,25 @@ use managed::ManagedSlice;
 /// State-machine interface to `GdbStub`.
 ///
 /// See the [module level documentation](self) for more details.
-pub enum GdbStubStateMachine<'a, T, C>
+pub enum GdbStubStateMachine<'a, T, C, Tid>
 where
     T: Target,
     C: Connection,
+    Tid: IsValidTid,
 {
     /// The target is completely stopped, and the GDB stub is waiting for
     /// additional input.
-    Idle(GdbStubStateMachineInner<'a, state::Idle, T, C>),
+    Idle(GdbStubStateMachineInner<'a, state::Idle, T, C, Tid>),
     /// The target is currently running, and the GDB client is waiting for
     /// the target to report a stop reason.
     ///
     /// Note that the client may still send packets to the target
     /// (e.g: to trigger a Ctrl-C interrupt).
-    Running(GdbStubStateMachineInner<'a, state::Running, T, C>),
+    Running(GdbStubStateMachineInner<'a, state::Running, T, C, Tid>),
     /// The GDB client has sent a Ctrl-C interrupt to the target.
-    CtrlCInterrupt(GdbStubStateMachineInner<'a, state::CtrlCInterrupt, T, C>),
+    CtrlCInterrupt(GdbStubStateMachineInner<'a, state::CtrlCInterrupt, T, C, Tid>),
     /// The GDB client has disconnected.
-    Disconnected(GdbStubStateMachineInner<'a, state::Disconnected, T, C>),
+    Disconnected(GdbStubStateMachineInner<'a, state::Disconnected, T, C, Tid>),
 }
 
 /// State machine typestates.
@@ -112,13 +114,14 @@ pub mod state {
 /// its corresponding `GdbStubStateMachine` variant.
 macro_rules! impl_from_inner {
         ($state:ident $($tt:tt)*) => {
-            impl<'a, T, C> From<GdbStubStateMachineInner<'a, state::$state $($tt)*, T, C>>
-                for GdbStubStateMachine<'a, T, C>
+            impl<'a, T, C, Tid> From<GdbStubStateMachineInner<'a, state::$state $($tt)*, T, C, Tid>>
+                for GdbStubStateMachine<'a, T, C, Tid>
             where
                 T: Target,
                 C: Connection,
+                Tid: IsValidTid
             {
-                fn from(inner: GdbStubStateMachineInner<'a, state::$state $($tt)*, T, C>) -> Self {
+                fn from(inner: GdbStubStateMachineInner<'a, state::$state $($tt)*, T, C, Tid>) -> Self {
                     GdbStubStateMachine::$state(inner)
                 }
             }
@@ -132,22 +135,24 @@ impl_from_inner!(Disconnected);
 
 /// Internal helper trait to cut down on boilerplate required to transition
 /// between states.
-trait Transition<'a, T, C>
+trait Transition<'a, T, C, Tid>
 where
     T: Target,
     C: Connection,
+    Tid: IsValidTid,
 {
     /// Transition between different state machine states
-    fn transition<S2>(self, state: S2) -> GdbStubStateMachineInner<'a, S2, T, C>;
+    fn transition<S2>(self, state: S2) -> GdbStubStateMachineInner<'a, S2, T, C, Tid>;
 }
 
-impl<'a, S1, T, C> Transition<'a, T, C> for GdbStubStateMachineInner<'a, S1, T, C>
+impl<'a, S1, T, C, Tid> Transition<'a, T, C, Tid> for GdbStubStateMachineInner<'a, S1, T, C, Tid>
 where
     T: Target,
     C: Connection,
+    Tid: IsValidTid,
 {
     #[inline(always)]
-    fn transition<S2>(self, state: S2) -> GdbStubStateMachineInner<'a, S2, T, C> {
+    fn transition<S2>(self, state: S2) -> GdbStubStateMachineInner<'a, S2, T, C, Tid> {
         if log::log_enabled!(log::Level::Trace) {
             let s1 = core::any::type_name::<S1>();
             let s2 = core::any::type_name::<S2>();
@@ -157,7 +162,11 @@ where
                 s2.strip_prefix(state::MODULE_PATH).unwrap_or(s2)
             );
         }
-        GdbStubStateMachineInner { i: self.i, state }
+        GdbStubStateMachineInner {
+            i: self.i,
+            state,
+            _tid: std::marker::PhantomData,
+        }
     }
 }
 
@@ -174,13 +183,19 @@ struct GdbStubStateMachineReallyInner<'a, T: Target, C: Connection> {
 /// Core state machine implementation that is parameterized by various
 /// [states](state). Can be converted back into the appropriate
 /// [`GdbStubStateMachine`] variant via [`Into::into`].
-pub struct GdbStubStateMachineInner<'a, S, T: Target, C: Connection> {
+pub struct GdbStubStateMachineInner<'a, S, T: Target, C: Connection, Tid: IsValidTid> {
     i: GdbStubStateMachineReallyInner<'a, T, C>,
     state: S,
+    _tid: std::marker::PhantomData<Tid>,
 }
 
 /// Methods which can be called regardless of the current state.
-impl<S, T: Target, C: Connection> GdbStubStateMachineInner<'_, S, T, C> {
+impl<'a, S, T, C, Tid> GdbStubStateMachineInner<'a, S, T, C, Tid>
+where
+    T: Target,
+    C: Connection,
+    Tid: IsValidTid,
+{
     /// Return a mutable reference to the underlying connection.
     pub fn borrow_conn(&mut self) -> &mut C {
         &mut self.i.conn
@@ -189,11 +204,16 @@ impl<S, T: Target, C: Connection> GdbStubStateMachineInner<'_, S, T, C> {
 
 /// Methods which can only be called from the [`GdbStubStateMachine::Idle`]
 /// state.
-impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::Idle, T, C> {
+impl<'a, T, C, Tid> GdbStubStateMachineInner<'a, state::Idle, T, C, Tid>
+where
+    T: Target,
+    C: Connection,
+    Tid: IsValidTid,
+{
     /// Internal entrypoint into the state machine.
     pub(crate) fn from_plain_gdbstub(
         stub: GdbStub<'a, T, C>,
-    ) -> GdbStubStateMachineInner<'a, state::Idle, T, C> {
+    ) -> GdbStubStateMachineInner<'a, state::Idle, T, C, Tid> {
         GdbStubStateMachineInner {
             i: GdbStubStateMachineReallyInner {
                 conn: stub.conn,
@@ -202,6 +222,7 @@ impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::Idle, T, 
                 inner: stub.inner,
             },
             state: state::Idle {},
+            _tid: std::marker::PhantomData,
         }
     }
 
@@ -210,7 +231,7 @@ impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::Idle, T, 
         mut self,
         target: &mut T,
         byte: u8,
-    ) -> Result<GdbStubStateMachine<'a, T, C>, GdbStubError<T::Error, C::Error>> {
+    ) -> Result<GdbStubStateMachine<'a, T, C, Tid>, GdbStubError<T::Error, C::Error>> {
         let packet_buffer = match self.i.recv_packet.pump(&mut self.i.packet_buffer, byte)? {
             Some(buf) => buf,
             None => return Ok(self.into()),
@@ -232,56 +253,280 @@ impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::Idle, T, 
     }
 }
 
-/// Handle to report stop reasons.
-pub struct ReportStop<T: Target, Tid> {
-    _target: std::marker::PhantomData<T>,
-    _tid: std::marker::PhantomData<Tid>,
+/// A helper that enforces protocol-level constraints related to reporting
+/// stop-reasons.
+pub struct StopReasonReporter<
+    'a,
+    't,
+    T,
+    C,
+    Tid,
+    const USING_T_PACKET: bool,
+    const CAN_ADD_CORE: bool,
+> where
+    T: Target,
+    C: Connection,
+    Tid: IsValidTid,
+{
+    target: &'t mut T,
+    res: ResponseWriterState,
+    gdb: GdbStubStateMachineInner<'a, state::Running, T, C, Tid>,
 }
 
-/// Stop reason that can be reported back to GDB.
-///
-/// Constructed via [`ReportStop`].
-pub struct StopReason<T: Target> {
-    reason: BaseStopReason<crate::common::Tid, <T::Arch as Arch>::Usize>,
+impl<'a, 't, T, C, Tid, const USING_T_PACKET: bool, const CAN_ADD_CORE: bool>
+    StopReasonReporter<'a, 't, T, C, Tid, USING_T_PACKET, CAN_ADD_CORE>
+where
+    T: Target,
+    C: Connection,
+    Tid: IsValidTid,
+{
+    /// Obtain a mutable handle to the `target`
+    pub fn borrow_target<'b: 't>(&'b mut self) -> &'t T {
+        self.target
+    }
 }
 
-impl<T: Target, Tid: IsValidTid> ReportStop<T, Tid> {
+impl<'a, 't, T, C, Tid, const CAN_ADD_CORE: bool>
+    StopReasonReporter<'a, 't, T, C, Tid, true, CAN_ADD_CORE>
+where
+    T: Target,
+    C: Connection,
+    Tid: IsValidTid,
+{
+    /// Finalize the stop reply packet, and transition the state machine into
+    /// the Idle state.
+    pub fn done(
+        mut self,
+    ) -> Result<GdbStubStateMachine<'a, T, C, Tid>, GdbStubError<T::Error, C::Error>> {
+        ResponseWriter::from_state(&mut self.gdb.i.conn, self.res)
+            .flush()
+            .map_err(InternalError::from)?;
+        Ok(self.gdb.transition(state::Idle {}).into())
+    }
+
+    /// Include an expedited register value in the stop reply packet.
+    ///
+    /// Including these registers is entirely optional*, but can be a useful way
+    /// to reduce round trip latency.
+    ///
+    /// **Note:** In order to use this method, the Target's [`Arch`]
+    /// implementation MUST implement a valid [`RegId::to_raw_id`]
+    /// implementation. If the method is unimplemented, `gdbstub` will report an
+    /// error.
+    ///
+    /// The iterator yields `(register_number, value_bytes)` pairs that are
+    /// written as expedited registers in the T-packet. Values should be in
+    /// target byte order (typically little-endian).
+    ///
+    /// \* Though there are known instances where a particular client + arch
+    /// combo may _require_ including one or more registers inline with the stop
+    /// reply packet. e.g: WASM on LLDB requires reporting the PC.
+    ///
+    /// [`RegId::to_raw_id`]: crate::arch::RegId::to_raw_id
+    pub fn add_reg(
+        self,
+        reg_id: <<T as Target>::Arch as Arch>::RegId,
+        value: &[u8],
+    ) -> Result<Self, GdbStubError<T::Error, C::Error>> {
+        let Self {
+            target,
+            res,
+            mut gdb,
+        } = self;
+
+        let mut res = ResponseWriter::from_state(&mut gdb.i.conn, res);
+
+        let reg = reg_id.to_raw_id().ok_or(InternalError::MissingToRawId)?;
+        res.write_num(reg).map_err(InternalError::from)?;
+        res.write_str(":").map_err(InternalError::from)?;
+        res.write_hex_buf(value).map_err(InternalError::from)?;
+        res.write_str(";").map_err(InternalError::from)?;
+
+        Ok(Self {
+            target,
+            res: res.into_state(),
+            gdb,
+        })
+    }
+}
+
+impl<'a, 't, T, C, Tid> StopReasonReporter<'a, 't, T, C, Tid, true, true>
+where
+    T: Target,
+    C: Connection,
+    Tid: IsValidTid,
+{
+    /// Include metadata about what "core" the stop event was detected on.
+    ///
+    /// This can only be called once.
+    pub fn add_core(
+        self,
+        core: usize,
+    ) -> Result<StopReasonReporter<'a, 't, T, C, Tid, true, false>, GdbStubError<T::Error, C::Error>>
+    {
+        let Self {
+            target,
+            res,
+            mut gdb,
+        } = self;
+
+        let mut res = ResponseWriter::from_state(&mut gdb.i.conn, res);
+
+        res.write_str("core:").map_err(InternalError::from)?;
+        res.write_num(core).map_err(InternalError::from)?;
+        res.write_str(";").map_err(InternalError::from)?;
+
+        Ok(StopReasonReporter {
+            target,
+            res: res.into_state(),
+            gdb,
+        })
+    }
+}
+
+// DEVNOTE: for certain stop reasons, it's possible to add a `Target` bound that
+// restricts calling the stop reason method entirely if the corresponding IDET
+// hasn't been implemented.
+//
+// This is a nice UX trick, but it is _not_ a bulletproof way to enforce
+// protocol invariants.
+
+// i.e: a `Target` is well within it's right to _dynamically_ toggle an IDET on
+// or off (via `supports_*`), which means downstream runtime checks (in the
+// `finish_*` methods) are still required.
+impl<'a, 't, T, C, Tid, const CAN_ADD_CORE: bool>
+    StopReasonReporter<'a, 't, T, C, Tid, false, CAN_ADD_CORE>
+where
+    T: Target,
+    C: Connection,
+    Tid: IsValidTid,
+{
+    // ---- Stop Reasons that DO NOT use the T packet ---- //
+
     /// Completed the single-step request.
-    pub fn done_step(self) -> StopReason<T> {
-        StopReason {
-            reason: BaseStopReason::DoneStep,
-        }
+    ///
+    /// This stop reason immediately resolves, bypassing [`StopReasonReporter`]
+    /// and transitioning the state machine into the Idle state.
+    pub fn done_step(
+        self,
+    ) -> Result<GdbStubStateMachine<'a, T, C, Tid>, GdbStubError<T::Error, C::Error>> {
+        let Self {
+            target: _,
+            res,
+            mut gdb,
+        } = self;
+
+        let mut res = ResponseWriter::from_state(&mut gdb.i.conn, res);
+
+        gdb.i.inner.finish_done_step(&mut res)?;
+        res.flush().map_err(InternalError::from)?;
+
+        Ok(gdb.transition(state::Idle {}).into())
     }
 
     /// The process terminated with the specified signal number.
-    pub fn terminated(self, signal: Signal) -> StopReason<T> {
-        StopReason {
-            reason: BaseStopReason::Terminated(signal),
-        }
+    ///
+    /// This stop reason immediately resolves, bypassing [`StopReasonReporter`]
+    /// and transitioning the state machine into the Disconnected state.
+    pub fn terminated(
+        self,
+        signal: Signal,
+    ) -> Result<GdbStubStateMachine<'a, T, C, Tid>, GdbStubError<T::Error, C::Error>> {
+        let Self {
+            target: _,
+            res,
+            mut gdb,
+        } = self;
+
+        let mut res = ResponseWriter::from_state(&mut gdb.i.conn, res);
+
+        gdb.i.inner.finish_terminated(&mut res, signal)?;
+        res.flush().map_err(InternalError::from)?;
+
+        Ok(gdb
+            .transition(state::Disconnected {
+                reason: DisconnectReason::TargetTerminated(signal),
+            })
+            .into())
     }
 
-    /// The process exited with the specified exit status.
-    pub fn exited(self, status: u8) -> StopReason<T> {
-        StopReason {
-            reason: BaseStopReason::Exited(status),
-        }
+    /// The process exited with the specified exit status code.
+    ///
+    /// This stop reason immediately resolves, bypassing [`StopReasonReporter`]
+    /// and transitioning the state machine into the Disconnected state.
+    pub fn exited(
+        self,
+        code: u8,
+    ) -> Result<GdbStubStateMachine<'a, T, C, Tid>, GdbStubError<T::Error, C::Error>> {
+        let Self {
+            target: _,
+            res,
+            mut gdb,
+        } = self;
+
+        let mut res = ResponseWriter::from_state(&mut gdb.i.conn, res);
+
+        gdb.i.inner.finish_exited(&mut res, code)?;
+        res.flush().map_err(InternalError::from)?;
+
+        Ok(gdb
+            .transition(state::Disconnected {
+                reason: DisconnectReason::TargetExited(code),
+            })
+            .into())
     }
 
     /// The program received a signal.
-    pub fn signal(self, signal: Signal) -> StopReason<T> {
-        StopReason {
-            reason: BaseStopReason::Signal(signal),
-        }
+    ///
+    /// This stop reason immediately resolves, bypassing [`StopReasonReporter`]
+    /// and transitioning the state machine into the Idle state.
+    pub fn signal(
+        self,
+        signal: Signal,
+    ) -> Result<GdbStubStateMachine<'a, T, C, Tid>, GdbStubError<T::Error, C::Error>> {
+        let Self {
+            target: _,
+            res,
+            mut gdb,
+        } = self;
+
+        let mut res = ResponseWriter::from_state(&mut gdb.i.conn, res);
+
+        gdb.i.inner.finish_signal(&mut res, signal)?;
+        res.flush().map_err(InternalError::from)?;
+
+        Ok(gdb.transition(state::Idle {}).into())
     }
 
+    // ---- Stop Reasons that DO use the T packet ---- //
+
     /// A specific thread received a signal.
-    pub fn signal_with_thread(self, signal: Signal, tid: Tid) -> StopReason<T> {
-        StopReason {
-            reason: BaseStopReason::SignalWithThread {
-                tid: tid.into_fully_qualified_tid(),
-                signal,
-            },
-        }
+    pub fn signal_with_thread(
+        self,
+        signal: Signal,
+        tid: Tid,
+    ) -> Result<StopReasonReporter<'a, 't, T, C, Tid, true, true>, GdbStubError<T::Error, C::Error>>
+    {
+        let Self {
+            target,
+            res,
+            mut gdb,
+        } = self;
+
+        let mut res = ResponseWriter::from_state(&mut gdb.i.conn, res);
+
+        gdb.i.inner.finish_signal_with_thread(
+            &mut res,
+            target,
+            tid.into_fully_qualified_tid(),
+            signal,
+        )?;
+
+        Ok(StopReasonReporter {
+            target,
+            res: res.into_state(),
+            gdb,
+        })
     }
 
     /// A thread hit a software breakpoint (e.g. due to a trap instruction).
@@ -292,13 +537,31 @@ impl<T: Target, Tid: IsValidTid> ReportStop<T, Tid> {
     /// the client/user of the current GDB session.
     ///
     /// [`SwBreakpoint`]: crate::target::ext::breakpoints::SwBreakpoint
-    pub fn swbreak(self, tid: Tid) -> StopReason<T>
+    pub fn swbreak(
+        self,
+        tid: Tid,
+    ) -> Result<StopReasonReporter<'a, 't, T, C, Tid, true, true>, GdbStubError<T::Error, C::Error>>
     where
+        // DEVNOTE: see DEVNOTE above (on the `impl` block itself) for info on this type bound
         T: crate::target::ext::breakpoints::SwBreakpoint,
     {
-        StopReason {
-            reason: BaseStopReason::SwBreak(tid.into_fully_qualified_tid()),
-        }
+        let Self {
+            target,
+            res,
+            mut gdb,
+        } = self;
+
+        let mut res = ResponseWriter::from_state(&mut gdb.i.conn, res);
+
+        gdb.i
+            .inner
+            .finish_swbreak(&mut res, target, tid.into_fully_qualified_tid())?;
+
+        Ok(StopReasonReporter {
+            target,
+            res: res.into_state(),
+            gdb,
+        })
     }
 
     /// A thread hit a hardware breakpoint.
@@ -306,13 +569,31 @@ impl<T: Target, Tid: IsValidTid> ReportStop<T, Tid> {
     /// Requires: [`HwBreakpoint`].
     ///
     /// [`HwBreakpoint`]: crate::target::ext::breakpoints::HwBreakpoint
-    pub fn hwbreak(self, tid: Tid) -> StopReason<T>
+    pub fn hwbreak(
+        self,
+        tid: Tid,
+    ) -> Result<StopReasonReporter<'a, 't, T, C, Tid, true, true>, GdbStubError<T::Error, C::Error>>
     where
+        // DEVNOTE: see DEVNOTE above (on the `impl` block itself) for info on this type bound
         T: crate::target::ext::breakpoints::HwBreakpoint,
     {
-        StopReason {
-            reason: BaseStopReason::HwBreak(tid.into_fully_qualified_tid()),
-        }
+        let Self {
+            target,
+            res,
+            mut gdb,
+        } = self;
+
+        let mut res = ResponseWriter::from_state(&mut gdb.i.conn, res);
+
+        gdb.i
+            .inner
+            .finish_hwbreak(&mut res, target, tid.into_fully_qualified_tid())?;
+
+        Ok(StopReasonReporter {
+            target,
+            res: res.into_state(),
+            gdb,
+        })
     }
 
     /// A thread hit a watchpoint.
@@ -325,98 +606,257 @@ impl<T: Target, Tid: IsValidTid> ReportStop<T, Tid> {
         tid: Tid,
         kind: WatchKind,
         addr: <<T as Target>::Arch as Arch>::Usize,
-    ) -> StopReason<T>
+    ) -> Result<StopReasonReporter<'a, 't, T, C, Tid, true, true>, GdbStubError<T::Error, C::Error>>
     where
+        // DEVNOTE: see DEVNOTE above (on the `impl` block itself) for info on this type bound
         T: crate::target::ext::breakpoints::HwWatchpoint,
     {
-        StopReason {
-            reason: BaseStopReason::Watch {
-                tid: tid.into_fully_qualified_tid(),
-                kind,
-                addr,
-            },
-        }
+        let Self {
+            target,
+            res,
+            mut gdb,
+        } = self;
+
+        let mut res = ResponseWriter::from_state(&mut gdb.i.conn, res);
+
+        gdb.i
+            .inner
+            .finish_watch(&mut res, target, tid.into_fully_qualified_tid(), kind, addr)?;
+
+        Ok(StopReasonReporter {
+            target,
+            res: res.into_state(),
+            gdb,
+        })
+    }
+
+    /// The program has reached the end of the logged replay events.
+    ///
+    /// Requires: [`ReverseCont`] or [`ReverseStep`].
+    ///
+    /// This is used for GDB's reverse execution. When playing back a recording,
+    /// you may hit the end of the buffer of recorded events, and as such no
+    /// further execution can be done. This stop reason tells GDB that this has
+    /// occurred.
+    ///
+    /// [`ReverseCont`]: crate::target::ext::base::reverse_exec::ReverseCont
+    /// [`ReverseStep`]: crate::target::ext::base::reverse_exec::ReverseStep
+    pub fn replay_log(
+        self,
+        tid: Option<Tid>,
+        pos: ReplayLogPosition,
+    ) -> Result<StopReasonReporter<'a, 't, T, C, Tid, true, true>, GdbStubError<T::Error, C::Error>>
+    {
+        let Self {
+            target,
+            res,
+            mut gdb,
+        } = self;
+
+        let mut res = ResponseWriter::from_state(&mut gdb.i.conn, res);
+
+        gdb.i.inner.finish_replay_log(
+            &mut res,
+            target,
+            tid.map(|tid| tid.into_fully_qualified_tid()),
+            pos,
+        )?;
+
+        Ok(StopReasonReporter {
+            target,
+            res: res.into_state(),
+            gdb,
+        })
+    }
+
+    /// The program has reached a syscall entry or return location.
+    ///
+    /// Requires: [`CatchSyscalls`].
+    ///
+    /// [`CatchSyscalls`]: crate::target::ext::catch_syscalls::CatchSyscalls
+    pub fn catch_syscall(
+        self,
+        tid: Option<Tid>,
+        number: <<T as Target>::Arch as Arch>::Usize,
+        position: CatchSyscallPosition,
+    ) -> Result<StopReasonReporter<'a, 't, T, C, Tid, true, true>, GdbStubError<T::Error, C::Error>>
+    where
+        // DEVNOTE: see DEVNOTE above (on the `impl` block itself) for info on this type bound
+        T: crate::target::ext::catch_syscalls::CatchSyscalls,
+    {
+        let Self {
+            target,
+            res,
+            mut gdb,
+        } = self;
+
+        let mut res = ResponseWriter::from_state(&mut gdb.i.conn, res);
+
+        gdb.i.inner.finish_catch_syscall(
+            &mut res,
+            target,
+            tid.map(|tid| tid.into_fully_qualified_tid()),
+            number,
+            position,
+        )?;
+
+        Ok(StopReasonReporter {
+            target,
+            res: res.into_state(),
+            gdb,
+        })
+    }
+
+    /// A thread hit a specific library event.
+    ///
+    /// This stop reason indicates that loaded libraries have changed. The
+    /// debugger should fetch a new list of loaded libraries.
+    pub fn library(
+        self,
+        tid: Tid,
+    ) -> Result<StopReasonReporter<'a, 't, T, C, Tid, true, true>, GdbStubError<T::Error, C::Error>>
+    {
+        let Self {
+            target,
+            res,
+            mut gdb,
+        } = self;
+
+        let mut res = ResponseWriter::from_state(&mut gdb.i.conn, res);
+
+        gdb.i
+            .inner
+            .finish_library(&mut res, target, tid.into_fully_qualified_tid())?;
+
+        Ok(StopReasonReporter {
+            target,
+            res: res.into_state(),
+            gdb,
+        })
+    }
+
+    /// A thread created a new process via fork.
+    ///
+    /// This indicates that a fork system call was executed, creating a new
+    /// child process.
+    ///
+    /// Requires: [`Target::use_fork_stop_reason`].
+    pub fn fork(
+        self,
+        cur_tid: Tid,
+        new_tid: Tid,
+    ) -> Result<StopReasonReporter<'a, 't, T, C, Tid, true, true>, GdbStubError<T::Error, C::Error>>
+    {
+        let Self {
+            target,
+            res,
+            mut gdb,
+        } = self;
+
+        let mut res = ResponseWriter::from_state(&mut gdb.i.conn, res);
+
+        gdb.i.inner.finish_fork(
+            &mut res,
+            target,
+            cur_tid.into_fully_qualified_tid(),
+            new_tid.into_fully_qualified_tid(),
+        )?;
+
+        Ok(StopReasonReporter {
+            target,
+            res: res.into_state(),
+            gdb,
+        })
+    }
+
+    /// A thread created a new process via vfork.
+    ///
+    /// This indicates that a vfork system call was executed, creating a new
+    /// child process.
+    ///
+    /// Similar to Fork, but the parent process is suspended until the child
+    /// calls exec or exits, as the parent and child temporarily share the
+    /// same address space.
+    ///
+    /// Requires: [`Target::use_vfork_stop_reason`].
+    pub fn vfork(
+        self,
+        cur_tid: Tid,
+        new_tid: Tid,
+    ) -> Result<StopReasonReporter<'a, 't, T, C, Tid, true, true>, GdbStubError<T::Error, C::Error>>
+    {
+        let Self {
+            target,
+            res,
+            mut gdb,
+        } = self;
+
+        let mut res = ResponseWriter::from_state(&mut gdb.i.conn, res);
+
+        gdb.i.inner.finish_vfork(
+            &mut res,
+            target,
+            cur_tid.into_fully_qualified_tid(),
+            new_tid.into_fully_qualified_tid(),
+        )?;
+
+        Ok(StopReasonReporter {
+            target,
+            res: res.into_state(),
+            gdb,
+        })
+    }
+
+    /// A vfork child process has completed its operation.
+    ///
+    /// This indicates that a child process created by vfork has either called
+    /// exec or terminated, so the address spaces of parent and child are no
+    /// longer shared.
+    ///
+    /// Requires: [`Target::use_vforkdone_stop_reason`].
+    pub fn vfork_done(
+        self,
+        tid: Tid,
+    ) -> Result<StopReasonReporter<'a, 't, T, C, Tid, true, true>, GdbStubError<T::Error, C::Error>>
+    {
+        let Self {
+            target,
+            res,
+            mut gdb,
+        } = self;
+
+        let mut res = ResponseWriter::from_state(&mut gdb.i.conn, res);
+
+        gdb.i
+            .inner
+            .finish_vforkdone(&mut res, target, tid.into_fully_qualified_tid())?;
+
+        Ok(StopReasonReporter {
+            target,
+            res: res.into_state(),
+            gdb,
+        })
     }
 }
 
 /// Methods which can only be called from the
 /// [`GdbStubStateMachine::Running`] state.
-impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::Running, T, C> {
+impl<'a, T, C, Tid> GdbStubStateMachineInner<'a, state::Running, T, C, Tid>
+where
+    T: Target,
+    C: Connection,
+    Tid: IsValidTid,
+{
     /// Report a target stop reason back to GDB.
-    pub fn report_stop<Tid: IsValidTid>(
-        self,
-        target: &mut T,
-        report: impl FnOnce(ReportStop<T, Tid>) -> StopReason<T>,
-    ) -> Result<GdbStubStateMachine<'a, T, C>, GdbStubError<T::Error, C::Error>> {
-        self.report_stop_impl(target, report, None)
-    }
-
-    /// Report a target stop reason back to GDB, including expedited register
-    /// values in the stop reply T-packet.
-    ///
-    /// **Note:** In order to use this method, the Target's [`Arch`]
-    /// implementation MUST implement a valid [`RegId::to_raw_id`]
-    /// implementation. If the method is unimplemented, `gdbstub` will report an
-    /// error.
-    ///
-    /// The iterator yields `(register_number, value_bytes)` pairs that are
-    /// written as expedited registers in the T-packet. Values should be in
-    /// target byte order (typically little-endian).
-    ///
-    /// This may be useful to use, rather than [`Self::report_stop`], when we
-    /// want to provide register values immediately to, for example, avoid a
-    /// round-trip, or work around a quirk/bug in a debugger that does not
-    /// otherwise request new register values.
-    ///
-    /// [`RegId::to_raw_id`]: crate::arch::RegId::to_raw_id
-    pub fn report_stop_with_regs<Tid: IsValidTid>(
-        self,
-        target: &mut T,
-        report: impl FnOnce(ReportStop<T, Tid>) -> StopReason<T>,
-        // FUTURE: (breaking) explore adding a `RegIdWithVal` construct, in
-        // order to tighten up this typing even further?
-        regs: &mut dyn Iterator<Item = (<<T as Target>::Arch as Arch>::RegId, &[u8])>,
-    ) -> Result<GdbStubStateMachine<'a, T, C>, GdbStubError<T::Error, C::Error>> {
-        self.report_stop_impl(target, report, Some(regs))
-    }
-
-    /// Shared implementation for the `report_stop`/`report_stop_with_regs` API.
-    /// Takes an `Option` around the `&mut dyn Iterator` to avoid making a
-    /// dynamic vtable dispatch in the common `report_stop` case.
-    fn report_stop_impl<Tid: IsValidTid>(
+    pub fn report_stop<'t>(
         mut self,
-        target: &mut T,
-        report: impl FnOnce(ReportStop<T, Tid>) -> StopReason<T>,
-        regs: Option<&mut dyn Iterator<Item = (<<T as Target>::Arch as Arch>::RegId, &[u8])>>,
-    ) -> Result<GdbStubStateMachine<'a, T, C>, GdbStubError<T::Error, C::Error>> {
-        let reason = report(ReportStop {
-            _target: std::marker::PhantomData,
-            _tid: std::marker::PhantomData,
-        })
-        .reason;
-        let mut res = ResponseWriter::new(&mut self.i.conn, target.use_rle());
-        let event = self.i.inner.finish_exec(&mut res, target, reason)?;
-
-        if let Some(regs) = regs {
-            if reason.is_t_packet() {
-                for (reg_id, value) in regs {
-                    let reg = reg_id.to_raw_id().ok_or(InternalError::MissingToRawId)?;
-                    res.write_num(reg).map_err(InternalError::from)?;
-                    res.write_str(":").map_err(InternalError::from)?;
-                    res.write_hex_buf(value).map_err(InternalError::from)?;
-                    res.write_str(";").map_err(InternalError::from)?;
-                }
-            }
+        target: &'t mut T,
+    ) -> StopReasonReporter<'a, 't, T, C, Tid, false, false> {
+        StopReasonReporter {
+            res: ResponseWriter::new(self.borrow_conn(), target.use_rle()).into_state(),
+            target,
+            gdb: self,
         }
-
-        res.flush().map_err(InternalError::from)?;
-
-        Ok(match event {
-            FinishExecStatus::Handled => self.transition(state::Idle {}).into(),
-            FinishExecStatus::Disconnect(reason) => {
-                self.transition(state::Disconnected { reason }).into()
-            }
-        })
     }
 
     /// Pass a byte to the GDB stub.
@@ -424,7 +864,7 @@ impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::Running, 
         mut self,
         target: &mut T,
         byte: u8,
-    ) -> Result<GdbStubStateMachine<'a, T, C>, GdbStubError<T::Error, C::Error>> {
+    ) -> Result<GdbStubStateMachine<'a, T, C, Tid>, GdbStubError<T::Error, C::Error>> {
         let packet_buffer = match self.i.recv_packet.pump(&mut self.i.packet_buffer, byte)? {
             Some(buf) => buf,
             None => return Ok(self.into()),
@@ -448,11 +888,16 @@ impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::Running, 
 
 /// Methods which can only be called from the
 /// [`GdbStubStateMachine::CtrlCInterrupt`] state.
-impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::CtrlCInterrupt, T, C> {
+impl<'a, T, C, Tid> GdbStubStateMachineInner<'a, state::CtrlCInterrupt, T, C, Tid>
+where
+    T: Target,
+    C: Connection,
+    Tid: IsValidTid,
+{
     /// Acknowledge the Ctrl-C interrupt.
     ///
-    /// Stubs are not required to recognize this interrupt mechanism, and
-    /// the precise meaning associated with receipt of the interrupt is
+    /// Stubs are not required to recognize this interrupt mechanism, and the
+    /// precise meaning associated with receipt of the interrupt is
     /// implementation defined. It is perfectly valid to invoke
     /// `interrupt_handled` without actually doing anything (though, given the
     /// utility of supporting Ctrl-C interrupts - this is not advised).
@@ -481,7 +926,7 @@ impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::CtrlCInte
     ///
     /// [`BaseStopReason::Signal(Signal::SIGINT)`]:
     /// crate::stub::BaseStopReason::Signal
-    pub fn interrupt_handled(self) -> GdbStubStateMachine<'a, T, C> {
+    pub fn interrupt_handled(self) -> GdbStubStateMachine<'a, T, C, Tid> {
         if self.state.from_idle {
             self.transition(state::Idle {}).into()
         } else {
@@ -492,14 +937,19 @@ impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::CtrlCInte
 
 /// Methods which can only be called from the
 /// [`GdbStubStateMachine::Disconnected`] state.
-impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::Disconnected, T, C> {
+impl<'a, T, C, Tid> GdbStubStateMachineInner<'a, state::Disconnected, T, C, Tid>
+where
+    T: Target,
+    C: Connection,
+    Tid: IsValidTid,
+{
     /// Inspect why the GDB client disconnected.
     pub fn get_reason(&self) -> DisconnectReason {
         self.state.reason
     }
 
     /// Reuse the existing state machine instance, reentering the idle loop.
-    pub fn return_to_idle(self) -> GdbStubStateMachine<'a, T, C> {
+    pub fn return_to_idle(self) -> GdbStubStateMachine<'a, T, C, Tid> {
         self.transition(state::Idle {}).into()
     }
 }

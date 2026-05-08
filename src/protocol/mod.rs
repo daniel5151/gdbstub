@@ -20,3 +20,4 @@ pub(crate) use common::thread_id::SpecificThreadId;
 pub(crate) use packet::Packet;
 pub(crate) use response_writer::Error as ResponseWriterError;
 pub(crate) use response_writer::ResponseWriter;
+pub(crate) use response_writer::ResponseWriterState;

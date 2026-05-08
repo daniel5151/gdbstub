@@ -624,43 +624,43 @@ pub trait Target {
         true
     }
 
-    /// Enable support for [`BaseStopReason::Fork`].
+    /// Enable the use of [`StopReasonReporter::fork`].
     ///
     /// By default, this method returns `true`.
     ///
     /// _Author's note:_ Unless you're _really_ trying to squeeze `gdbstub` onto
-    /// a particularly resource-constrained platform (and looking to save ~100
-    /// bytes), you may as well leave this enabled.
+    /// a particularly resource-constrained platform, you may as well leave this
+    /// enabled.
     ///
-    /// [`BaseStopReason::Fork`]: crate::stub::BaseStopReason::Fork
+    /// [`StopReasonReporter::fork`]: crate::stub::state_machine::StopReasonReporter::fork
     #[inline(always)]
     fn use_fork_stop_reason(&self) -> bool {
         true
     }
 
-    /// Enable support for [`BaseStopReason::VFork`].
+    /// Enable the use of [`StopReasonReporter::vfork`].
     ///
     /// By default, this method returns `true`.
     ///
     /// _Author's note:_ Unless you're _really_ trying to squeeze `gdbstub` onto
-    /// a particularly resource-constrained platform (and looking to save ~100
-    /// bytes), you may as well leave this enabled.
+    /// a particularly resource-constrained platform, you may as well leave this
+    /// enabled.
     ///
-    /// [`BaseStopReason::VFork`]: crate::stub::BaseStopReason::VFork
+    /// [`StopReasonReporter::vfork`]: crate::stub::state_machine::StopReasonReporter::vfork
     #[inline(always)]
     fn use_vfork_stop_reason(&self) -> bool {
         true
     }
 
-    /// Enable support for [`BaseStopReason::VForkDone`].
+    /// Enable the use of [`StopReasonReporter::vfork_done`].
     ///
     /// By default, this method returns `true`.
     ///
     /// _Author's note:_ Unless you're _really_ trying to squeeze `gdbstub` onto
-    /// a particularly resource-constrained platform (and looking to save ~100
-    /// bytes), you may as well leave this enabled.
+    /// a particularly resource-constrained platform, you may as well leave this
+    /// enabled.
     ///
-    /// [`BaseStopReason::VForkDone`]: crate::stub::BaseStopReason::VForkDone
+    /// [`StopReasonReporter::vfork_done`]: crate::stub::state_machine::StopReasonReporter::vfork_done
     #[inline(always)]
     fn use_vforkdone_stop_reason(&self) -> bool {
         true
