@@ -43,7 +43,6 @@ pub(crate) enum InternalError<T, C> {
     MissingCurrentActivePidImpl,
     TracepointFeatureUnimplemented(u8),
     TracepointUnsupportedSourceEnumeration,
-    MissingMultiThreadSchedulerLocking,
     MissingToRawId,
 
     // Internal - A non-fatal error occurred (with errno-style error code)
@@ -149,7 +148,6 @@ where
             MissingCurrentActivePidImpl => write!(f, "GDB client attempted to attach to a new process, but the target has not implemented support for `ExtendedMode::support_current_active_pid`"),
             TracepointFeatureUnimplemented(feat) => write!(f, "GDB client sent us a tracepoint packet using feature {}, but `gdbstub` doesn't implement it. If this is something you require, please file an issue at https://github.com/daniel5151/gdbstub/issues", *feat as char),
             TracepointUnsupportedSourceEnumeration => write!(f, "The target doesn't support the gdbstub TracepointSource extension, but attempted to transition to enumerating tracepoint sources"),
-            MissingMultiThreadSchedulerLocking => write!(f, "GDB requested Scheduler Locking, but the Target does not implement the `MultiThreadSchedulerLocking` IDET"),
             MissingToRawId => write!(f, "A RegId was used with an API that requires raw register IDs to be available (e.g. `report_stop_with_regs`) but returned `None` from `to_raw_id()`"),
 
             NonFatalError(_) => write!(f, "Internal non-fatal error. You should never see this! Please file an issue if you do!"),

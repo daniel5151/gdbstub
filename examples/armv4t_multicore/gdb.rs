@@ -160,6 +160,10 @@ impl MultiThreadResume for Emu {
     }
 
     fn clear_resume_actions(&mut self) -> Result<(), Self::Error> {
+        // We're in all-stop mode (since `gdbstub` doesn't support non-stop yet), so
+        // the fact that we're processing commands from the GDB client means that all
+        // threads have already stopped, which is represented by the thread being
+        // absent from the `exec_mode` map.
         self.exec_mode.clear();
         Ok(())
     }
@@ -173,24 +177,26 @@ impl MultiThreadResume for Emu {
 
     fn set_resume_action_continue(
         &mut self,
-        tid: Tid,
+        tid: Option<Tid>,
         signal: Option<Signal>,
     ) -> Result<(), Self::Error> {
         if signal.is_some() {
             return Err("no support for continuing with signal");
         }
 
-        self.exec_mode
-            .insert(tid_to_cpuid(tid)?, ExecMode::Continue);
+        match tid {
+            None => {
+                for id in [CpuId::Cpu, CpuId::Cop] {
+                    self.exec_mode.entry(id).or_insert(ExecMode::Continue);
+                }
+            }
+            Some(tid) => {
+                self.exec_mode
+                    .insert(tid_to_cpuid(tid)?, ExecMode::Continue);
+            }
+        }
 
         Ok(())
-    }
-
-    #[inline(always)]
-    fn support_scheduler_locking(
-        &mut self,
-    ) -> Option<target::ext::base::multithread::MultiThreadSchedulerLockingOps<'_, Self>> {
-        Some(self)
     }
 }
 
@@ -298,15 +304,6 @@ impl target::ext::thread_extra_info::ThreadExtraInfo for Emu {
         let info = format!("CPU {:?}", cpu_id);
 
         Ok(copy_to_buf(info.as_bytes(), buf))
-    }
-}
-
-impl target::ext::base::multithread::MultiThreadSchedulerLocking for Emu {
-    fn set_resume_action_scheduler_lock(&mut self) -> Result<(), Self::Error> {
-        for id in [CpuId::Cpu, CpuId::Cop] {
-            self.exec_mode.entry(id).or_insert(ExecMode::Stop);
-        }
-        Ok(())
     }
 }
 

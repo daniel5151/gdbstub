@@ -25,7 +25,8 @@ impl<'a> ParseCommand<'a> for vCont<'a> {
         let body = buf.into_body();
         match body as &[u8] {
             b"?" => Some(vCont::Query),
-            _ => Some(vCont::Actions(Actions::new_from_buf(body))),
+            [b';', rest @ ..] => Some(vCont::Actions(Actions::new_from_buf(rest))),
+            _ => None
         }
     }
 }
@@ -52,7 +53,7 @@ impl<'a> Actions<'a> {
         Actions::FixedCont(tid)
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = Option<VContAction<'a>>> + '_ {
+    pub fn iter(&self) -> impl DoubleEndedIterator<Item = Option<VContAction<'a>>> + '_ {
         match self {
             Actions::Buf(x) => EitherIter::A(x.iter()),
             Actions::FixedStep(x) => EitherIter::B(core::iter::once(Some(VContAction {
@@ -67,12 +68,16 @@ impl<'a> Actions<'a> {
     }
 }
 
+// This does not include the leading semicolon of the first action.
 #[derive(Debug)]
 pub struct ActionsBuf<'a>(&'a [u8]);
 
 impl<'a> ActionsBuf<'a> {
-    fn iter(&self) -> impl Iterator<Item = Option<VContAction<'a>>> + '_ {
-        self.0.split(|b| *b == b';').skip(1).map(|act| {
+    fn iter(&self) -> impl DoubleEndedIterator<Item = Option<VContAction<'a>>> + '_ {
+        // `ActionsBuf` doesn't include the leading semicolon in the first
+        // action, so we don't need to worry about the first element of the
+        // split being empty.
+        self.0.split(|b| *b == b';').map(|act| {
             let mut s = act.split(|b| *b == b':');
             let kind = s.next()?;
             let thread = match s.next() {
@@ -109,7 +114,7 @@ impl<'a> ActionsBuf<'a> {
                     //
                     // As a workaround for these weird GDB clients, `gdbstub`
                     // takes the pragmatic approach of treating this request as
-                    // though it the client requested _all_ threads to be
+                    // though the client requested _all_ threads to be
                     // resumed.
                     //
                     // If this turns out to be wrong... `gdbstub` can explore a
@@ -191,6 +196,20 @@ where
         match self {
             EitherIter::A(a) => a.next(),
             EitherIter::B(b) => b.next(),
+        }
+    }
+}
+
+impl<A, B, T> DoubleEndedIterator for EitherIter<A, B>
+where
+    A: DoubleEndedIterator<Item = T>,
+    B: DoubleEndedIterator<Item = T>,
+{
+    #[inline(always)]
+    fn next_back(&mut self) -> Option<T> {
+        match self {
+            EitherIter::A(a) => a.next_back(),
+            EitherIter::B(b) => b.next_back(),
         }
     }
 }
