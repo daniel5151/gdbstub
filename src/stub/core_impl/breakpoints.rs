@@ -16,14 +16,14 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         cmd: crate::protocol::commands::breakpoint::BasicBreakpoint<'_>,
         cmd_kind: CmdKind,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
-        let addr =
-            <T::Arch as Arch>::Usize::from_be_bytes(cmd.addr).ok_or(Error::TargetMismatch)?;
+        let addr = <T::Arch as Arch>::Usize::from_be_bytes(cmd.addr)
+            .ok_or(Error::UnexpectedIntegerSize)?;
 
         macro_rules! bp_kind {
             () => {
                 BeBytes::from_be_bytes(cmd.kind)
                     .and_then(<T::Arch as Arch>::BreakpointKind::from_usize)
-                    .ok_or(Error::TargetMismatch)?
+                    .ok_or(Error::UnexpectedIntegerSize)?
             };
         }
 
@@ -54,7 +54,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     _ => unreachable!(),
                 };
                 let len = <T::Arch as Arch>::Usize::from_be_bytes(cmd.kind)
-                    .ok_or(Error::TargetMismatch)?;
+                    .ok_or(Error::UnexpectedIntegerSize)?;
                 let ops = ops.support_hw_watchpoint().unwrap();
                 match cmd_kind {
                     CmdKind::Add => ops.add_hw_watchpoint(addr, len, kind),

@@ -45,20 +45,37 @@ pub enum Endianness {
 }
 
 /// Data types that can be used as Thread IDs in the GDB RSP.
+///
+/// FUTURE: when multi-process support is added, this will need to be updated to
+/// include process IDs as well.
 pub trait IsValidTid: private::Sealed + PartialEq + Copy {
     #[doc(hidden)]
     fn into_fully_qualified_tid(self) -> Tid;
+    #[doc(hidden)]
+    fn from_fully_qualified_tid(tid: Tid) -> Option<Self>;
 }
 
 impl IsValidTid for () {
     fn into_fully_qualified_tid(self) -> Tid {
         crate::SINGLE_THREAD_TID
     }
+
+    fn from_fully_qualified_tid(tid: Tid) -> Option<Self> {
+        if tid == crate::SINGLE_THREAD_TID {
+            Some(())
+        } else {
+            None
+        }
+    }
 }
 
 impl IsValidTid for Tid {
     fn into_fully_qualified_tid(self) -> Tid {
         self
+    }
+
+    fn from_fully_qualified_tid(tid: Tid) -> Option<Self> {
+        Some(tid)
     }
 }
 

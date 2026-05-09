@@ -1,7 +1,6 @@
 use super::prelude::*;
 use crate::arch::Arch;
 use crate::arch::RegId;
-use crate::common::IsValidTid;
 use crate::protocol::commands::ext::SingleRegisterAccess;
 use crate::target::ext::base::BaseOps;
 
@@ -9,7 +8,6 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     fn inner<Tid: IsValidTid>(
         res: &mut ResponseWriter<'_, C>,
         ops: &mut dyn crate::target::ext::base::single_register_access::SingleRegisterAccess<
-            Tid,
             Arch = T::Arch,
             Error = T::Error,
             Tid = Tid,
@@ -42,12 +40,12 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                             res.write_str("xx")?;
                         }
                     } else {
-                        return Err(Error::TargetMismatch);
+                        return Err(Error::UnexpectedReg);
                     }
                 } else {
                     if let Some(size) = reg_size {
                         if size.get() != len {
-                            return Err(Error::TargetMismatch);
+                            return Err(Error::UnexpectedReg);
                         }
                     } else {
                         buf = buf.get_mut(..len).ok_or(Error::PacketBufferOverflow)?;

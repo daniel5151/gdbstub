@@ -297,7 +297,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             Base::G(cmd) => {
                 let mut regs: <T::Arch as Arch>::Registers = Default::default();
                 regs.gdb_deserialize(cmd.vals)
-                    .map_err(|_| Error::TargetMismatch)?;
+                    .map_err(|_| Error::UnexpectedReg)?;
 
                 match target.base_ops() {
                     BaseOps::SingleThread(ops) => ops.write_registers(&regs),
@@ -320,7 +320,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             }
             Base::M(cmd) => {
                 let addr = <T::Arch as Arch>::Usize::from_be_bytes(cmd.addr)
-                    .ok_or(Error::TargetMismatch)?;
+                    .ok_or(Error::UnexpectedIntegerSize)?;
 
                 match target.base_ops() {
                     BaseOps::SingleThread(ops) => ops.write_addrs(addr, cmd.val),
@@ -475,13 +475,13 @@ pub(crate) fn read_addr_handler<C: Connection, T: Target>(
     len: usize,
     addr: &[u8],
 ) -> Result<(), Error<T::Error, C::Error>> {
-    let addr = <T::Arch as Arch>::Usize::from_be_bytes(addr).ok_or(Error::TargetMismatch)?;
+    let addr = <T::Arch as Arch>::Usize::from_be_bytes(addr).ok_or(Error::UnexpectedIntegerSize)?;
     let mut i = 0;
     let mut n = len;
     while n != 0 {
         let chunk_size = n.min(buf.len());
 
-        let addr = addr + num_traits::NumCast::from(i).ok_or(Error::TargetMismatch)?;
+        let addr = addr + num_traits::NumCast::from(i).ok_or(Error::UnexpectedIntegerSize)?;
         let data = &mut buf[..chunk_size];
         let data_len = match target.base_ops() {
             BaseOps::SingleThread(ops) => ops.read_addrs(addr, data),

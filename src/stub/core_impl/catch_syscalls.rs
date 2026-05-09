@@ -35,7 +35,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         ops.enable_catch_syscalls(Some(SyscallNumbers { inner: &mut filter }))
                             .handle_error()?;
                         if error {
-                            return Err(Error::TargetMismatch);
+                            return Err(Error::UnexpectedIntegerSize);
                         }
                     }
                     QCatchSyscalls::EnableAll => ops.enable_catch_syscalls(None).handle_error()?,

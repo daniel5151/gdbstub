@@ -16,17 +16,17 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         let handler_status = match command {
             FlashOperations::vFlashErase(cmd) => {
                 let addr = <T::Arch as Arch>::Usize::from_be_bytes(cmd.addr)
-                    .ok_or(Error::TargetMismatch)?;
+                    .ok_or(Error::UnexpectedIntegerSize)?;
 
                 let length = <T::Arch as Arch>::Usize::from_be_bytes(cmd.length)
-                    .ok_or(Error::TargetMismatch)?;
+                    .ok_or(Error::UnexpectedIntegerSize)?;
 
                 ops.flash_erase(addr, length).handle_error()?;
                 HandlerStatus::NeedsOk
             }
             FlashOperations::vFlashWrite(cmd) => {
                 let addr = <T::Arch as Arch>::Usize::from_be_bytes(cmd.addr)
-                    .ok_or(Error::TargetMismatch)?;
+                    .ok_or(Error::UnexpectedIntegerSize)?;
 
                 ops.flash_write(addr, cmd.val).handle_error()?;
                 HandlerStatus::NeedsOk

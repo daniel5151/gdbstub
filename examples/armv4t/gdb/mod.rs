@@ -337,7 +337,7 @@ impl target::ext::base::singlethread::SingleThreadSingleStep for Emu {
     }
 }
 
-impl target::ext::base::single_register_access::SingleRegisterAccess<()> for Emu {
+impl target::ext::base::single_register_access::SingleRegisterAccess for Emu {
     fn read_register(
         &mut self,
         _tid: (),
@@ -402,7 +402,7 @@ impl target::ext::base::single_register_access::SingleRegisterAccess<()> for Emu
     }
 }
 
-impl target::ext::base::reverse_exec::ReverseCont<()> for Emu {
+impl target::ext::base::reverse_exec::ReverseCont for Emu {
     fn reverse_cont(&mut self) -> Result<(), Self::Error> {
         // FIXME: actually implement reverse step
         eprintln!(
@@ -413,7 +413,7 @@ impl target::ext::base::reverse_exec::ReverseCont<()> for Emu {
     }
 }
 
-impl target::ext::base::reverse_exec::ReverseStep<()> for Emu {
+impl target::ext::base::reverse_exec::ReverseStep for Emu {
     fn reverse_step(&mut self, _tid: ()) -> Result<(), Self::Error> {
         // FIXME: actually implement reverse step
         eprintln!(

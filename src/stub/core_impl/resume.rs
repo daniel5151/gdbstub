@@ -145,8 +145,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             VContKind::RangeStep(start, end) if ops.support_range_step().is_some() => {
                 let ops = ops.support_range_step().unwrap();
 
-                let start = start.decode().map_err(|_| Error::TargetMismatch)?;
-                let end = end.decode().map_err(|_| Error::TargetMismatch)?;
+                let start = start.decode().map_err(|_| Error::UnexpectedIntegerSize)?;
+                let end = end.decode().map_err(|_| Error::UnexpectedIntegerSize)?;
 
                 ops.resume_range_step(start, end)
                     .map_err(Error::TargetError)?;
@@ -239,8 +239,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                             return Err(Error::PacketUnexpected);
                         }
                         Some(SpecificIdKind::WithId(tid)) => {
-                            let start = start.decode().map_err(|_| Error::TargetMismatch)?;
-                            let end = end.decode().map_err(|_| Error::TargetMismatch)?;
+                            let start = start.decode().map_err(|_| Error::UnexpectedIntegerSize)?;
+                            let end = end.decode().map_err(|_| Error::UnexpectedIntegerSize)?;
 
                             ops.set_resume_action_range_step(tid, start, end)
                                 .map_err(Error::TargetError)?;

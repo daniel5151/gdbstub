@@ -1,7 +1,6 @@
 //! Support for single-register read/write access.
 
 use crate::arch::Arch;
-use crate::common::IsValidTid;
 use crate::target::Target;
 use crate::target::TargetResult;
 
@@ -19,10 +18,7 @@ use crate::target::TargetResult;
 /// part of the default default register file used by the `read/write_registers`
 /// methods, and can only be accessed via this extension (e.g: the RISC-V
 /// Control and Status registers).
-pub trait SingleRegisterAccess<Tid>: Target
-where
-    Tid: IsValidTid,
-{
+pub trait SingleRegisterAccess: Target {
     /// Read to a single register on the target.
     ///
     /// The `tid` field identifies which thread the value should be read from.
@@ -38,7 +34,7 @@ where
     /// non-fatal error should be returned.
     fn read_register(
         &mut self,
-        tid: Tid,
+        tid: Self::Tid,
         reg_id: <Self::Arch as Arch>::RegId,
         buf: &mut [u8],
     ) -> TargetResult<usize, Self>;
@@ -56,7 +52,7 @@ where
     /// non-fatal error should be returned.
     fn write_register(
         &mut self,
-        tid: Tid,
+        tid: Self::Tid,
         reg_id: <Self::Arch as Arch>::RegId,
         val: &[u8],
     ) -> TargetResult<(), Self>;
@@ -64,7 +60,6 @@ where
 
 /// See [`SingleRegisterAccess`]
 pub type SingleRegisterAccessOps<'a, Tid, T> = &'a mut dyn SingleRegisterAccess<
-    Tid,
     Arch = <T as Target>::Arch,
     Error = <T as Target>::Error,
     Tid = Tid,

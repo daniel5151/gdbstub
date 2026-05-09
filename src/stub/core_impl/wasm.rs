@@ -17,8 +17,14 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
         match command {
             Wasm::qWasmCallStack(cmd) => {
+                // TODO: plumb through PID when true multi-process support is added
+                let _pid = cmd.tid.pid;
+                let Some(thread_id) = T::Tid::from_fully_qualified_tid(cmd.tid.tid) else {
+                    return Err(Error::UnexpectedThreadId);
+                };
+
                 let mut error: Result<(), Error<T::Error, C::Error>> = Ok(());
-                ops.wasm_call_stack(cmd.tid.tid, &mut |pc| {
+                ops.wasm_call_stack(thread_id, &mut |pc| {
                     if let Err(e) = res.write_hex_buf(&pc.to_le_bytes()) {
                         error = Err(e.into());
                     }
@@ -27,20 +33,35 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 error?;
             }
             Wasm::qWasmLocal(cmd) => {
+                // TODO: plumb through PID when true multi-process support is added
+                let Some(thread_id) = T::Tid::from_fully_qualified_tid(self.current_mem_tid) else {
+                    return Err(Error::UnexpectedThreadId);
+                };
+
                 let len = ops
-                    .read_wasm_local(self.current_mem_tid, cmd.frame, cmd.local, cmd.buf)
+                    .read_wasm_local(thread_id, cmd.frame, cmd.local, cmd.buf)
                     .map_err(Error::TargetError)?;
                 res.write_hex_buf(&cmd.buf[0..len])?;
             }
             Wasm::qWasmGlobal(cmd) => {
+                // TODO: plumb through PID when true multi-process support is added
+                let Some(thread_id) = T::Tid::from_fully_qualified_tid(self.current_mem_tid) else {
+                    return Err(Error::UnexpectedThreadId);
+                };
+
                 let len = ops
-                    .read_wasm_global(self.current_mem_tid, cmd.frame, cmd.global, cmd.buf)
+                    .read_wasm_global(thread_id, cmd.frame, cmd.global, cmd.buf)
                     .map_err(Error::TargetError)?;
                 res.write_hex_buf(&cmd.buf[0..len])?;
             }
             Wasm::qWasmStackValue(cmd) => {
+                // TODO: plumb through PID when true multi-process support is added
+                let Some(thread_id) = T::Tid::from_fully_qualified_tid(self.current_mem_tid) else {
+                    return Err(Error::UnexpectedThreadId);
+                };
+
                 let len = ops
-                    .read_wasm_stack(self.current_mem_tid, cmd.frame, cmd.index, cmd.buf)
+                    .read_wasm_stack(thread_id, cmd.frame, cmd.index, cmd.buf)
                     .map_err(Error::TargetError)?;
                 res.write_hex_buf(&cmd.buf[0..len])?;
             }

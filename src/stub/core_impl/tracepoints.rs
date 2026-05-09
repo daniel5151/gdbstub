@@ -427,7 +427,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             }
             Tracepoints::qTP(qtp) => {
                 let addr = <T::Arch as Arch>::Usize::from_be_bytes(qtp.addr)
-                    .ok_or(Error::TargetMismatch)?;
+                    .ok_or(Error::UnexpectedIntegerSize)?;
                 let TracepointStatus {
                     hit_count,
                     bytes_used,
@@ -447,7 +447,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                         let (new_tracepoint, more) =
                             NewTracepoint::<<T::Arch as Arch>::Usize>::from_tdp(ctdp)
-                                .ok_or(Error::TargetMismatch)?;
+                                .ok_or(Error::UnexpectedIntegerSize)?;
                         let tp = new_tracepoint.number;
                         ops.tracepoint_create_begin(new_tracepoint).handle_error()?;
                         if !more {
@@ -457,7 +457,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     QTDP::Extend(dtdp) => {
                         let extend_tracepoint =
                             ExtendTracepoint::<<T::Arch as Arch>::Usize>::from_tdp(dtdp)
-                                .ok_or(Error::TargetMismatch)?;
+                                .ok_or(Error::UnexpectedIntegerSize)?;
                         let tp = extend_tracepoint.number;
                         let mut err: Option<Error<T::Error, C::Error>> = None;
                         let more = extend_tracepoint.actions(|action| {
@@ -490,7 +490,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             Tracepoints::QTDPsrc(src) => {
                 if let Some(supports_sources) = ops.support_tracepoint_source() {
                     let source = SourceTracepoint::<<T::Arch as Arch>::Usize>::from_src(src)
-                        .ok_or(Error::TargetMismatch)?;
+                        .ok_or(Error::UnexpectedIntegerSize)?;
                     supports_sources
                         .tracepoint_attach_source(source)
                         .handle_error()?;
@@ -531,7 +531,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             }
             Tracepoints::QTFrame(req) => {
                 let parsed_qtframe: Option<FrameRequest<<T::Arch as Arch>::Usize>> = req.0.into();
-                let parsed_req = parsed_qtframe.ok_or(Error::TargetMismatch)?;
+                let parsed_req = parsed_qtframe.ok_or(Error::UnexpectedIntegerSize)?;
                 let mut err: Result<_, Error<T::Error, C::Error>> = Ok(());
                 let mut any_results = false;
                 ops.select_frame(parsed_req, &mut |desc| {

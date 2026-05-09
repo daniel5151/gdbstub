@@ -23,27 +23,30 @@ pub enum ConnectionErrorKind {
 
 #[derive(Debug)]
 pub(crate) enum InternalError<T, C> {
-    /// Connection Error
     Connection(C, ConnectionErrorKind),
-    /// Target encountered a fatal error.
     TargetError(T),
 
+    // Errors indicating a GDB client issue, out of `gdbstub`'s control
     ClientSentNack,
     PacketBufferOverflow,
     PacketParse(PacketParseError),
     PacketUnexpected,
-    TargetMismatch,
-    UnsupportedStopReason,
+    TracepointFeatureUnimplemented(u8),
+    UnexpectedIntegerSize,
+    UnexpectedReg,
     UnexpectedStepPacket,
+    UnexpectedThreadId,
+
+    // Errors indicative of a error in the user's `Target` implementation / `gdbstub` integration.
     ImplicitSwBreakpoints,
     // DEVNOTE: this is a temporary workaround for something that can and should
     // be caught at compile time via IDETs. That said, since i'm not sure when
     // I'll find the time to cut a breaking release of gdbstub, I'd prefer to
     // push out this feature as a non-breaking change now.
     MissingCurrentActivePidImpl,
-    TracepointFeatureUnimplemented(u8),
-    TracepointUnsupportedSourceEnumeration,
     MissingToRawId,
+    TracepointUnsupportedSourceEnumeration,
+    UnsupportedStopReason,
 
     // Internal - A non-fatal error occurred (with errno-style error code)
     //
@@ -66,6 +69,56 @@ impl<T, C> InternalError<T, C> {
     pub fn conn_init(e: C) -> Self {
         InternalError::Connection(e, ConnectionErrorKind::Init)
     }
+
+    fn prefix(&self) -> &'static str {
+        use self::InternalError::*;
+
+        match self {
+            Connection(_, _) => "Connection",
+
+            ClientSentNack
+            | PacketBufferOverflow
+            | PacketParse(_)
+            | PacketUnexpected
+            | TracepointFeatureUnimplemented(_)
+            | UnexpectedIntegerSize
+            | UnexpectedReg
+            | UnexpectedStepPacket
+            | UnexpectedThreadId => "Client",
+
+            TargetError(_)
+            | ImplicitSwBreakpoints
+            | MissingCurrentActivePidImpl
+            | MissingToRawId
+            | TracepointUnsupportedSourceEnumeration
+            | UnsupportedStopReason => "Target",
+
+            NonFatalError(_) => "Unreachable",
+        }
+    }
+
+    fn should_file_bug_report(&self) -> bool {
+        use self::InternalError::*;
+
+        match self {
+            ClientSentNack
+            | Connection(_, _)
+            | ImplicitSwBreakpoints
+            | MissingCurrentActivePidImpl
+            | MissingToRawId
+            | PacketBufferOverflow
+            | PacketParse(_)
+            | TargetError(_)
+            | TracepointFeatureUnimplemented(_)
+            | TracepointUnsupportedSourceEnumeration
+            | UnexpectedStepPacket
+            | UnsupportedStopReason => false,
+
+            UnexpectedIntegerSize | PacketUnexpected | UnexpectedReg | UnexpectedThreadId => true,
+
+            NonFatalError(_) => true,
+        }
+    }
 }
 
 impl<T, C> From<ResponseWriterError<C>> for InternalError<T, C> {
@@ -84,7 +137,7 @@ macro_rules! unsupported_stop_reason {
 
 macro_rules! unexpected_step_packet {
     () => {
-        "Received an unexpected `step` request. This is most-likely due to this GDB client bug: <https://sourceware.org/bugzilla/show_bug.cgi?id=28440>"
+        "Sent us an unexpected `step` request. This is most-likely due to this GDB client bug: <https://sourceware.org/bugzilla/show_bug.cgi?id=28440>"
     };
 }
 
@@ -105,11 +158,12 @@ macro_rules! unexpected_step_packet {
 /// your `gdbstub` integration.
 ///
 /// Certain stop reasons can only be used when their associated protocol feature
-/// has been implemented. e.g: a Target cannot return a `StopReason::HwBreak` if
-/// the hardware breakpoints IDET hasn't been implemented.
+/// has been enabled. For example:
 ///
-/// Please double-check that you've implemented all the necessary `supports_`
-/// methods related to the stop reason you're trying to report.
+/// - e.g: To use `StopReasonReporter::hwbreak`, `supports_hw_breakpoints` must
+///   return `Some`
+/// - e.g: To use `StopReasonReporter::vfork`, `use_vfork_stop_reason` must
+///   return `true`.
 ///
 /// * * *
 #[doc = concat!("_", unexpected_step_packet!(), "_")]
@@ -130,28 +184,43 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use self::InternalError::*;
-        const CONTEXT: &str = "See the `GdbStubError` docs for more details";
+
+        const SEE_DOCS_FOR_CONTEXT: &str = "See the `GdbStubError` docs for more details";
+
+        write!(f, "{} error: ", self.kind.prefix())?;
+
         match &self.kind {
-            Connection(e, ConnectionErrorKind::Init) => write!(f, "Connection Error while initializing the session: {}", e),
-            Connection(e, ConnectionErrorKind::Read) => write!(f, "Connection Error while reading request: {}", e),
-            Connection(e, ConnectionErrorKind::Write) => write!(f, "Connection Error while writing response: {}", e),
-            ClientSentNack => write!(f, "Client nack'd the last packet, but `gdbstub` doesn't implement re-transmission."),
-            PacketBufferOverflow => write!(f, "Received an oversized packet (did not fit in provided packet buffer)"),
-            PacketParse(e) => write!(f, "Failed to parse packet into a valid command: {:?}", e),
-            PacketUnexpected => write!(f, "Client sent an unexpected packet. This should never happen! Please re-run with `log` trace-level logging enabled and file an issue at https://github.com/daniel5151/gdbstub/issues"),
-            TargetMismatch => write!(f, "Received a packet with too much data for the given target"),
-            TargetError(e) => write!(f, "Target threw a fatal error: {}", e),
-            UnsupportedStopReason => write!(f, "{} {}", unsupported_stop_reason!(), CONTEXT),
-            UnexpectedStepPacket => write!(f, "{} {}", unexpected_step_packet!(), CONTEXT),
+            Connection(e, ConnectionErrorKind::Init) => write!(f, "error initializing the session: {e}"),
+            Connection(e, ConnectionErrorKind::Read) => write!(f, "error while reading: {e}"),
+            Connection(e, ConnectionErrorKind::Write) => write!(f, "error while writing: {e}"),
+            TargetError(e) => write!(f, "Target threw a fatal error: {e}"),
 
-            ImplicitSwBreakpoints => write!(f, "Warning: The target has not opted into using implicit software breakpoints. See `Target::guard_rail_implicit_sw_breakpoints` for more information"),
+            // Errors indicating a GDB client issue, out of `gdbstub`'s control
+            ClientSentNack => write!(f, "Sent us a nack packet, but `gdbstub` doesn't implement re-transmission. See https://github.com/daniel5151/gdbstub/issues/137"),
+            PacketBufferOverflow => write!(f, "Sent us an oversized packet (doesn't fit in the configured packet buffer)"),
+            PacketParse(e) => write!(f, "Sent us packet that couldn't be parsed: {e:?}"),
+            PacketUnexpected => write!(f, "Sent us a packet `gdbstub` wasn't expecting"),
+            TracepointFeatureUnimplemented(feat) => write!(f, "Sent us a tracepoint packet using feature {}, but `gdbstub` doesn't implement it. If this is something you require, please file an issue at https://github.com/daniel5151/gdbstub/issues", *feat as char),
+            UnexpectedIntegerSize => write!(f, "Sent us packet exceeding the integer bounds for the given target"),
+            UnexpectedReg => write!(f, "Sent us a packet with register data that isn't compatible with the current Target"),
+            UnexpectedStepPacket => write!(f, "{} {}", unexpected_step_packet!(), SEE_DOCS_FOR_CONTEXT),
+            UnexpectedThreadId => write!(f, "Sent us a packet with an unexpected thread ID for the given target"),
+
+            // Errors indicating an error in the user's `Target` implementation / `gdbstub` integration.
+            ImplicitSwBreakpoints => write!(f, "The target has not opted into using implicit software breakpoints. See `Target::guard_rail_implicit_sw_breakpoints` for more information"),
             MissingCurrentActivePidImpl => write!(f, "GDB client attempted to attach to a new process, but the target has not implemented support for `ExtendedMode::support_current_active_pid`"),
-            TracepointFeatureUnimplemented(feat) => write!(f, "GDB client sent us a tracepoint packet using feature {}, but `gdbstub` doesn't implement it. If this is something you require, please file an issue at https://github.com/daniel5151/gdbstub/issues", *feat as char),
+            MissingToRawId => write!(f, "A RegId was used with an API that requires raw register IDs to be available (e.g. `StopReasonReporter::add_reg`) but returned `None` from `to_raw_id()`"),
             TracepointUnsupportedSourceEnumeration => write!(f, "The target doesn't support the gdbstub TracepointSource extension, but attempted to transition to enumerating tracepoint sources"),
-            MissingToRawId => write!(f, "A RegId was used with an API that requires raw register IDs to be available (e.g. `report_stop_with_regs`) but returned `None` from `to_raw_id()`"),
+            UnsupportedStopReason => write!(f, "{} {}", unsupported_stop_reason!(), SEE_DOCS_FOR_CONTEXT),
 
-            NonFatalError(_) => write!(f, "Internal non-fatal error. You should never see this! Please file an issue if you do!"),
+            NonFatalError(_) => write!(f, "Internal non-fatal error. You should never see this!"),
+        }?;
+
+        if self.kind.should_file_bug_report() {
+            write!(f, ". This should never happen! Please re-run with `log` trace-level logging enabled and file an issue at https://github.com/daniel5151/gdbstub/issues")?;
         }
+
+        Ok(())
     }
 }
 

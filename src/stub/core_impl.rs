@@ -14,6 +14,7 @@ use core::marker::PhantomData;
 ///
 /// Do not clutter this prelude with types only used by a few extensions.
 mod prelude {
+    pub(super) use crate::common::IsValidTid;
     pub(super) use crate::conn::Connection;
     pub(super) use crate::internal::BeBytes;
     pub(super) use crate::protocol::ResponseWriter;

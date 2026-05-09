@@ -10,15 +10,8 @@ use crate::target::ext::base::ResumeOps;
 macro_rules! defn_ops {
     ($name:ident, $reverse_trait:ident, $f:ident) => {
         enum $name<'a, A: Arch, E> {
-            SingleThread(&'a mut dyn $reverse_trait<(), Arch = A, Error = E, Tid = ()>),
-            MultiThread(
-                &'a mut dyn $reverse_trait<
-                    crate::common::Tid,
-                    Arch = A,
-                    Error = E,
-                    Tid = crate::common::Tid,
-                >,
-            ),
+            SingleThread(&'a mut dyn $reverse_trait<Arch = A, Error = E, Tid = ()>),
+            MultiThread(&'a mut dyn $reverse_trait<Arch = A, Error = E, Tid = crate::common::Tid>),
         }
 
         impl<'a, A, E> $name<'a, A, E>
