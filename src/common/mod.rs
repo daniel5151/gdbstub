@@ -44,7 +44,7 @@ pub enum Endianness {
     Little,
 }
 
-/// Data types that can be used as Thread IDs in the GBD protocol.
+/// Data types that can be used as Thread IDs in the GDB RSP.
 pub trait IsValidTid: private::Sealed + PartialEq + Copy {
     #[doc(hidden)]
     fn into_fully_qualified_tid(self) -> Tid;
