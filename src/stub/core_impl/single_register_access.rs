@@ -6,21 +6,17 @@ use crate::protocol::commands::ext::SingleRegisterAccess;
 use crate::target::ext::base::BaseOps;
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
-    fn inner<Tid, TargetTid>(
+    fn inner<Tid: IsValidTid>(
         res: &mut ResponseWriter<'_, C>,
         ops: &mut dyn crate::target::ext::base::single_register_access::SingleRegisterAccess<
             Tid,
             Arch = T::Arch,
             Error = T::Error,
-            Tid = TargetTid,
+            Tid = Tid,
         >,
         command: SingleRegisterAccess<'_>,
         id: Tid,
-    ) -> Result<HandlerStatus, Error<T::Error, C::Error>>
-    where
-        Tid: IsValidTid,
-        TargetTid: IsValidTid,
-    {
+    ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
         let handler_status = match command {
             SingleRegisterAccess::p(p) => {
                 let reg = <T::Arch as Arch>::RegId::from_raw_id(p.reg_id);
