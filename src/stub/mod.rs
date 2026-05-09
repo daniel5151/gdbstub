@@ -5,15 +5,10 @@ pub use builder::GdbStubBuilder;
 pub use builder::GdbStubBuilderError;
 pub use core_impl::DisconnectReason;
 pub use error::GdbStubError;
-pub use stop_reason::BaseStopReason;
-pub use stop_reason::IntoStopReason;
-pub use stop_reason::MultiThreadStopReason;
-pub use stop_reason::SingleThreadStopReason;
 
 mod builder;
 mod core_impl;
 mod error;
-mod stop_reason;
 
 pub mod state_machine;
 
@@ -24,44 +19,96 @@ use crate::target::Target;
 use managed::ManagedSlice;
 
 /// Types and traits related to the [`GdbStub::run_blocking`] interface.
+// DEVNOTE: There is nothing in this module that makes it _required_ to exist in
+// `gdbstub` core. Indeed, it could just as well be hoisted into an entirely
+// separate crate (a-la `gdbstub_arch`) and distributed separately. Not that we
+// should do that, of course. Having a "blessed" quick-start path is great for
+// lowering the barrier to entry!
 pub mod run_blocking {
     use super::*;
     use crate::conn::ConnectionExt;
+    use crate::stub::state_machine::GdbStubStateMachine;
+    use crate::stub::state_machine::StopReasonReporter;
+
+    /// Simple interface to a running [`GdbStubStateMachine`], used in
+    /// [`BlockingEventLoop::wait_for_stop_reason`].
+    ///
+    /// [`GdbStubStateMachine`]: state_machine::GdbStubStateMachine
+    pub struct SimpleStub<'a, T: Target, C: Connection> {
+        pub(crate) gdb:
+            state_machine::GdbStubStateMachineInner<'a, state_machine::state::Running, T, C>,
+    }
+
+    /// Opaque type representing an event that was occurred in
+    /// [`BlockingEventLoop::wait_for_stop_reason`].
+    ///
+    /// Created via [`SimpleStub`].
+    pub struct Event<'a, T: Target, C: Connection> {
+        pub(crate) gdb: Result<
+            state_machine::GdbStubStateMachine<'a, T, C>,
+            GdbStubError<<T as Target>::Error, <C as Connection>::Error>,
+        >,
+    }
+
+    impl<'a, T: Target, C: Connection> SimpleStub<'a, T, C> {
+        /// Return a mutable reference to the underlying connection.
+        pub fn borrow_conn(&mut self) -> &mut C {
+            self.gdb.borrow_conn()
+        }
+
+        /// Report a target stop reason back to GDB.
+        pub fn report_stop<'t>(
+            self,
+            target: &'t mut T,
+            report: impl FnOnce(
+                StopReasonReporter<'a, 't, T, C, false, false>,
+            ) -> Result<
+                GdbStubStateMachine<'a, T, C>,
+                GdbStubError<<T as Target>::Error, <C as Connection>::Error>,
+            >,
+        ) -> Event<'a, T, C> {
+            Event {
+                gdb: report(self.gdb.report_stop(target)),
+            }
+        }
+
+        /// Pass a byte to the GDB stub.
+        pub fn incoming_data(self, target: &mut T, byte: u8) -> Event<'a, T, C> {
+            Event {
+                gdb: self.gdb.incoming_data(target, byte),
+            }
+        }
+    }
 
     /// A set of user-provided methods required to run a GDB debugging session
     /// using the [`GdbStub::run_blocking`] method.
     ///
     /// Reminder: to use `gdbstub` in a non-blocking manner (e.g: via
     /// async/await, unix polling, from an interrupt handler, etc...) you will
-    /// need to interface with the
-    /// [`GdbStubStateMachine`](state_machine::GdbStubStateMachine) API
-    /// directly.
+    /// need to interface with the [`GdbStubStateMachine`] API directly.
     pub trait BlockingEventLoop {
         /// The Target being driven.
         type Target: Target;
         /// Connection being used to drive the target.
         type Connection: ConnectionExt;
 
-        /// Which variant of the `StopReason` type should be used. Single
-        /// threaded targets should use [`SingleThreadStopReason`], whereas
-        /// multi threaded targets should use [`MultiThreadStopReason`].
+        /// Invoked after the target's `resume` method has been called.
         ///
-        /// [`SingleThreadStopReason`]: crate::stub::SingleThreadStopReason
-        /// [`MultiThreadStopReason`]: crate::stub::MultiThreadStopReason
-        type StopReason: IntoStopReason<Self::Target>;
-
-        /// Invoked immediately after the target's `resume` method has been
-        /// called. The implementation should block until either the target
-        /// reports a stop reason, or if new data was sent over the connection.
+        /// Implementations resume the target, and run until either:
+        /// - the target has stopped
+        /// - new data has arrived over the connection
         ///
-        /// The specific mechanism to "select" between these two events is
-        /// implementation specific. Some examples might include: `epoll`,
-        /// `select!` across multiple event channels, periodic polling, etc...
-        fn wait_for_stop_reason(
+        /// The specific mechanism to concurrently "select" between these two
+        /// events is implementation specific. Some examples might
+        /// include: `epoll`, `select!` across multiple event channels,
+        /// periodic polling, etc...
+        ///
+        /// Events are reported via methods on the provided [`SimpleStub`].
+        fn wait_for_stop_reason<'a>(
             target: &mut Self::Target,
-            conn: &mut Self::Connection,
+            simple_stub: SimpleStub<'a, Self::Target, Self::Connection>,
         ) -> Result<
-            Event<Self::StopReason>,
+            Event<'a, Self::Target, Self::Connection>,
             WaitForStopReasonError<
                 <Self::Target as Target>::Error,
                 <Self::Connection as Connection>::Error,
@@ -70,30 +117,40 @@ pub mod run_blocking {
 
         /// Invoked when the GDB client sends a Ctrl-C interrupt.
         ///
-        /// Depending on how the target is implemented, it may or may not make
-        /// sense to immediately return a stop reason as part of handling the
-        /// Ctrl-C interrupt. e.g: in some cases, it may be better to send the
-        /// target a signal upon receiving a Ctrl-C interrupt _without_
-        /// immediately sending a stop reason, and instead deferring the stop
-        /// reason to some later point in the target's execution.
+        /// Stubs are not required to recognize this interrupt mechanism, and
+        /// the precise meaning associated with receipt of the interrupt is
+        /// implementation defined, so leaving this method as the default no-op
+        /// is reasonable (though, given the utility of supporting Ctrl-C
+        /// interrupts - this is not advised).
         ///
-        /// _Suggestion_: If you're unsure which stop reason to report,
-        /// [`BaseStopReason::Signal(Signal::SIGINT)`] is a sensible default.
+        /// To support interrupts, override this method with logic to notify
+        /// the `target` of the interrupt request, and arrange for it to be
+        /// stopped (at it's earliest convenience).
         ///
-        /// [`BaseStopReason::Signal(Signal::SIGINT)`]:
-        /// crate::stub::BaseStopReason::Signal
-        fn on_interrupt(
-            target: &mut Self::Target,
-        ) -> Result<Option<Self::StopReason>, <Self::Target as Target>::Error>;
-    }
-
-    /// Returned by the `wait_for_stop_reason` closure in
-    /// [`GdbStub::run_blocking`]
-    pub enum Event<StopReason> {
-        /// GDB Client sent data while the target was running.
-        IncomingData(u8),
-        /// The target has stopped.
-        TargetStopped(StopReason),
+        /// The specifics of "arranging for it to be stopped" will vary between
+        /// targets. For example:
+        ///
+        /// 1. In targets that runs "inline" with the `BlockingEventLoop`, it
+        ///    may be sufficient to set a simple boolean flag on the `target`
+        ///    that can be queried in `wait_for_stop_reason()` prior to resuming
+        ///    execution (i.e: if set, immediately report a stop reason).
+        /// 2. In targets that run asynchronously from the `BlockingEventLoop`
+        ///    (such as those running on separate threads), `on_interrupt()`
+        ///    might send a "message" to the target to "inject" the interrupt
+        ///    (e.g: over a chanel, via a shared atomic, etc...), and return
+        ///    from the method. At this point, the target can then process the
+        ///    interrupt at its leisure, reporting the event via an
+        ///    `Event::StopReason` in `wait_for_stop_reason()` as usual.
+        ///
+        /// _Suggestion_: If you're unsure which stop reason to report in
+        /// response to a ctrl-c interrupt, [`Signal::SIGINT`] may be a sensible
+        /// default.
+        ///
+        /// [`Signal::SIGINT`]: crate::common::Signal::SIGINT
+        fn on_interrupt(target: &mut Self::Target) -> Result<(), <Self::Target as Target>::Error> {
+            let _ = target;
+            Ok(())
+        }
     }
 
     /// Error value returned by the `wait_for_stop_reason` closure in
@@ -141,17 +198,18 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
     /// lower-level [state-machine](state_machine::GdbStubStateMachine)
     /// based interface.
     ///
-    /// Instead, an implementation simply needs to provide a implementation of
-    /// [`run_blocking::BlockingEventLoop`], which is a simplified set
-    /// of methods describing how to drive the target.
+    /// Implementations need only to provide a custom
+    /// [`run_blocking::BlockingEventLoop`], which is then used by
+    /// `run_blocking` in order to drive Target execution.
     ///
-    /// `GdbStub::run_blocking` returns once the GDB client closes the debugging
-    /// session, or if the target triggers a disconnect.
+    /// `GdbStub::run_blocking` only returns once the GDB client closes the
+    /// debugging session, or if the Target triggers a disconnect.
     ///
-    /// Note that this implementation is **blocking**, which many not be
-    /// preferred (or suitable) in all cases. To use `gdbstub` in a non-blocking
-    /// manner (e.g: via async/await, unix polling, from an interrupt handler,
-    /// etc...) you will need to interface with the underlying
+    /// As the name implies - this helper method is **blocking**, which many not
+    /// be preferable (or suitable) in all use-cases. To use `gdbstub` in a
+    /// fully non-blocking manner (e.g: via async/await, unix polling, embedded
+    /// system interrupt handlers, etc...) you will need to interface with the
+    /// underlying
     /// [`GdbStubStateMachine`](state_machine::GdbStubStateMachine) API
     /// directly.
     pub fn run_blocking<E>(
@@ -178,27 +236,17 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
                 }
 
                 state_machine::GdbStubStateMachine::CtrlCInterrupt(gdb) => {
-                    // defer to the implementation on how it wants to handle the interrupt
-                    let stop_reason =
-                        E::on_interrupt(target).map_err(InternalError::TargetError)?;
-                    gdb.interrupt_handled(target, stop_reason)?
+                    E::on_interrupt(target).map_err(GdbStubError::from_target_error)?;
+                    gdb.interrupt_handled()
                 }
 
-                state_machine::GdbStubStateMachine::Running(mut gdb) => {
-                    use run_blocking::Event as BlockingEventLoopEvent;
+                state_machine::GdbStubStateMachine::Running(gdb) => {
                     use run_blocking::WaitForStopReasonError;
 
                     // block waiting for the target to return a stop reason
-                    let event = E::wait_for_stop_reason(target, gdb.borrow_conn());
-                    match event {
-                        Ok(BlockingEventLoopEvent::TargetStopped(stop_reason)) => {
-                            gdb.report_stop(target, stop_reason)?
-                        }
-
-                        Ok(BlockingEventLoopEvent::IncomingData(byte)) => {
-                            gdb.incoming_data(target, byte)?
-                        }
-
+                    let res = E::wait_for_stop_reason(target, run_blocking::SimpleStub { gdb });
+                    match res {
+                        Ok(run_blocking::Event { gdb }) => gdb?,
                         Err(WaitForStopReasonError::Target(e)) => {
                             break Err(InternalError::TargetError(e).into());
                         }

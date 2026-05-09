@@ -46,12 +46,10 @@ pub trait RegId: Sized + Debug {
     ///
     /// Returns `None` if this mapping direction is not implemented.
     ///
-    /// This method currently only needs to return `Some` for a register if that
-    /// register is sent with
-    /// [`GdbStubStateMachineInner::report_stop_with_regs`].
+    /// This method currently only needs to return `Some` for registers sent
+    /// with [`StopReasonReporter::add_reg`].
     ///
-    /// [`GdbStubStateMachineInner::report_stop_with_regs`]:
-    ///     crate::stub::state_machine::GdbStubStateMachineInner::report_stop_with_regs
+    /// [`StopReasonReporter::add_reg`]: crate::stub::state_machine::StopReasonReporter::add_reg
     fn to_raw_id(&self) -> Option<usize> {
         None
     }

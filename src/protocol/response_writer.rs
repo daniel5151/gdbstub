@@ -16,14 +16,40 @@ use num_traits::PrimInt;
 #[derive(Debug, Clone)]
 pub struct Error<C>(pub C);
 
-/// A wrapper around [`Connection`] that computes the single-byte checksum of
-/// incoming / outgoing data.
-pub struct ResponseWriter<'a, C: Connection> {
-    inner: &'a mut C,
-    started: bool,
+#[derive(Copy, Clone, Default)]
+#[repr(transparent)]
+struct ResponseWriterStatus(u8);
+
+bitflags::bitflags! {
+    impl ResponseWriterStatus: u8 {
+        const STARTED = 1 << 0;
+        const USE_RLE = 1 << 1;
+    }
+}
+
+impl ResponseWriterState {
+    fn enable_rle(&mut self) {
+        self.status.insert(ResponseWriterStatus::USE_RLE);
+    }
+
+    fn start(&mut self) {
+        self.status.insert(ResponseWriterStatus::STARTED);
+    }
+
+    fn rle_enabled(&self) -> bool {
+        self.status.contains(ResponseWriterStatus::USE_RLE)
+    }
+
+    fn started(&self) -> bool {
+        self.status.contains(ResponseWriterStatus::STARTED)
+    }
+}
+
+#[derive(Default)]
+pub struct ResponseWriterState {
+    status: ResponseWriterStatus,
     checksum: u8,
 
-    rle_enabled: bool,
     rle_char: u8,
     rle_repeat: u8,
 
@@ -32,33 +58,41 @@ pub struct ResponseWriter<'a, C: Connection> {
     msg: Vec<u8>,
 }
 
+/// A wrapper around [`Connection`] that computes the single-byte checksum of
+/// incoming / outgoing data.
+pub struct ResponseWriter<'a, C: Connection> {
+    state: ResponseWriterState,
+    inner: &'a mut C,
+}
+
 impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
     /// Creates a new ResponseWriter
     pub fn new(inner: &'a mut C, rle_enabled: bool) -> Self {
-        Self {
-            inner,
-            started: false,
-            checksum: 0,
-
-            rle_enabled,
-            rle_char: 0,
-            rle_repeat: 0,
-
-            #[cfg(feature = "trace-pkt")]
-            msg: Vec::new(),
+        let mut state = ResponseWriterState::default();
+        if rle_enabled {
+            state.enable_rle();
         }
+        Self { inner, state }
+    }
+
+    pub fn into_state(self) -> ResponseWriterState {
+        self.state
+    }
+
+    pub fn from_state(inner: &'a mut C, state: ResponseWriterState) -> Self {
+        Self { inner, state }
     }
 
     /// Consumes self, writing out the final '#' and checksum
     pub fn flush(mut self) -> Result<(), Error<C::Error>> {
         // don't include the '#' in checksum calculation
-        let checksum = if self.rle_enabled {
+        let checksum = if self.state.rle_enabled() {
             self.write(b'#')?;
             // (note: even though `self.write` was called, the the '#' char hasn't been
             // added to the checksum, and is just sitting in the RLE buffer)
-            self.checksum
+            self.state.checksum
         } else {
-            let checksum = self.checksum;
+            let checksum = self.state.checksum;
             self.write(b'#')?;
             checksum
         };
@@ -66,12 +100,12 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
         self.write_hex(checksum)?;
 
         // HACK: "write" a dummy char to force an RLE flush
-        if self.rle_enabled {
+        if self.state.rle_enabled() {
             self.write(0)?;
         }
 
         #[cfg(feature = "trace-pkt")]
-        trace!("--> ${}", String::from_utf8_lossy(&self.msg));
+        trace!("--> ${}", String::from_utf8_lossy(&self.state.msg));
 
         self.inner.flush().map_err(Error)?;
 
@@ -86,33 +120,33 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
     fn inner_write(&mut self, byte: u8) -> Result<(), Error<C::Error>> {
         #[cfg(feature = "trace-pkt")]
         if log_enabled!(log::Level::Trace) {
-            if self.rle_enabled {
-                match self.msg.as_slice() {
+            if self.state.rle_enabled() {
+                match self.state.msg.as_slice() {
                     [.., c, b'*'] => {
                         let c = *c;
-                        self.msg.pop();
+                        self.state.msg.pop();
                         for _ in 0..(byte - 29) {
-                            self.msg.push(c);
+                            self.state.msg.push(c);
                         }
                     }
-                    _ => self.msg.push(byte),
+                    _ => self.state.msg.push(byte),
                 }
             } else {
-                self.msg.push(byte)
+                self.state.msg.push(byte)
             }
         }
 
-        if !self.started {
-            self.started = true;
+        if !self.state.started() {
+            self.state.start();
             self.inner.write(b'$').map_err(Error)?;
         }
 
-        self.checksum = self.checksum.wrapping_add(byte);
+        self.state.checksum = self.state.checksum.wrapping_add(byte);
         self.inner.write(byte).map_err(Error)
     }
 
     fn write(&mut self, byte: u8) -> Result<(), Error<C::Error>> {
-        if !self.rle_enabled {
+        if !self.state.rle_enabled() {
             return self.inner_write(byte);
         }
 
@@ -120,36 +154,37 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
         const ASCII_LAST_PRINT: u8 = b'~';
 
         // handle RLE
-        let rle_printable = (ASCII_FIRST_PRINT - 4 + (self.rle_repeat + 1)) <= ASCII_LAST_PRINT;
-        if byte == self.rle_char && rle_printable {
-            self.rle_repeat += 1;
+        let rle_printable =
+            (ASCII_FIRST_PRINT - 4 + (self.state.rle_repeat + 1)) <= ASCII_LAST_PRINT;
+        if byte == self.state.rle_char && rle_printable {
+            self.state.rle_repeat += 1;
             Ok(())
         } else {
             loop {
-                match self.rle_repeat {
+                match self.state.rle_repeat {
                     0 => {} // happens once, after the first char is written
                     // RLE doesn't win, just output the byte
                     1 | 2 | 3 => {
-                        for _ in 0..self.rle_repeat {
-                            self.inner_write(self.rle_char)?
+                        for _ in 0..self.state.rle_repeat {
+                            self.inner_write(self.state.rle_char)?
                         }
                     }
                     // RLE would output an invalid char ('#' or '$')
                     7 | 8 => {
-                        self.inner_write(self.rle_char)?;
-                        self.rle_repeat -= 1;
+                        self.inner_write(self.state.rle_char)?;
+                        self.state.rle_repeat -= 1;
                         continue;
                     }
                     // RLE wins for repetitions >4
                     _ => {
-                        self.inner_write(self.rle_char)?;
+                        self.inner_write(self.state.rle_char)?;
                         self.inner_write(b'*')?;
-                        self.inner_write(ASCII_FIRST_PRINT - 4 + self.rle_repeat)?;
+                        self.inner_write(ASCII_FIRST_PRINT - 4 + self.state.rle_repeat)?;
                     }
                 }
 
-                self.rle_char = byte;
-                self.rle_repeat = 1;
+                self.state.rle_char = byte;
+                self.state.rle_repeat = 1;
 
                 break Ok(());
             }

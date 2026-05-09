@@ -32,7 +32,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 // It is possible for this to be `None` in the case where the target has
                 // not yet called `register_thread()`. This can happen, for example, if
                 // there are no active threads in the current target process.
-                first_tid
+                first_tid.map(|tid| tid.into_fully_qualified_tid())
             }
         };
         Ok(tid)
@@ -129,6 +129,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                 if target.use_vforkdone_stop_reason() {
                     res.write_str(";vforkdone-events+")?;
+                }
+
+                if target.use_exec_stop_reason() {
+                    res.write_str(";exec-events+")?;
                 }
 
                 if target.use_x_lowcase_packet() {
@@ -293,7 +297,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             Base::G(cmd) => {
                 let mut regs: <T::Arch as Arch>::Registers = Default::default();
                 regs.gdb_deserialize(cmd.vals)
-                    .map_err(|_| Error::TargetMismatch)?;
+                    .map_err(|_| Error::UnexpectedReg)?;
 
                 match target.base_ops() {
                     BaseOps::SingleThread(ops) => ops.write_registers(&regs),
@@ -316,7 +320,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             }
             Base::M(cmd) => {
                 let addr = <T::Arch as Arch>::Usize::from_be_bytes(cmd.addr)
-                    .ok_or(Error::TargetMismatch)?;
+                    .ok_or(Error::UnexpectedIntegerSize)?;
 
                 match target.base_ops() {
                     BaseOps::SingleThread(ops) => ops.write_addrs(addr, cmd.val),
@@ -365,14 +369,20 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 match cmd.kind {
                     Op::Other => match cmd.thread.tid {
                         IdKind::Any => match self.get_sane_any_tid(target)? {
-                            Some(tid) => self.current_mem_tid = tid,
+                            Some(tid) => {
+                                self.current_mem_tid = T::Tid::from_fully_qualified_tid(tid)
+                                    .ok_or(Error::UnexpectedThreadId)?
+                            }
                             None => {
                                 return Err(Error::NonFatalError(1));
                             }
                         },
                         // "All" threads doesn't make sense for memory accesses
                         IdKind::All => return Err(Error::PacketUnexpected),
-                        IdKind::WithId(tid) => self.current_mem_tid = tid,
+                        IdKind::WithId(tid) => {
+                            self.current_mem_tid = T::Tid::from_fully_qualified_tid(tid)
+                                .ok_or(Error::UnexpectedThreadId)?
+                        }
                     },
                     // technically, this variant is deprecated in favor of vCont...
                     Op::StepContinue => match cmd.thread.tid {
@@ -417,7 +427,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                                         .features
                                         .multiprocess()
                                         .then_some(SpecificIdKind::WithId(pid)),
-                                    tid: SpecificIdKind::WithId(tid),
+                                    tid: SpecificIdKind::WithId(tid.into_fully_qualified_tid()),
                                 })?;
                                 Ok(())
                             })();
@@ -439,12 +449,19 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             }
             Base::T(cmd) => {
                 let alive = match cmd.thread.tid {
-                    IdKind::WithId(tid) => match target.base_ops() {
-                        BaseOps::SingleThread(_) => tid == SINGLE_THREAD_TID,
-                        BaseOps::MultiThread(ops) => {
-                            ops.is_thread_alive(tid).map_err(Error::TargetError)?
+                    IdKind::WithId(tid) => {
+                        let thread_id = T::Tid::from_fully_qualified_tid(tid)
+                            .ok_or(Error::UnexpectedThreadId)?;
+
+                        match target.base_ops() {
+                            // always true in SingleThread, (if they didn't match - the
+                            // UnexpectedThreadId check would've failed)
+                            BaseOps::SingleThread(_) => true,
+                            BaseOps::MultiThread(ops) => {
+                                ops.is_thread_alive(thread_id).map_err(Error::TargetError)?
+                            }
                         }
-                    },
+                    }
                     _ => return Err(Error::PacketUnexpected),
                 };
                 if alive {
@@ -465,19 +482,19 @@ pub(crate) fn read_addr_handler<C: Connection, T: Target>(
         usize,
         &[u8],
     ) -> Result<(), crate::protocol::ResponseWriterError<C::Error>>,
-    current_mem_tid: Tid,
+    current_mem_tid: T::Tid,
     target: &mut T,
     buf: &mut [u8],
     len: usize,
     addr: &[u8],
 ) -> Result<(), Error<T::Error, C::Error>> {
-    let addr = <T::Arch as Arch>::Usize::from_be_bytes(addr).ok_or(Error::TargetMismatch)?;
+    let addr = <T::Arch as Arch>::Usize::from_be_bytes(addr).ok_or(Error::UnexpectedIntegerSize)?;
     let mut i = 0;
     let mut n = len;
     while n != 0 {
         let chunk_size = n.min(buf.len());
 
-        let addr = addr + num_traits::NumCast::from(i).ok_or(Error::TargetMismatch)?;
+        let addr = addr + num_traits::NumCast::from(i).ok_or(Error::UnexpectedIntegerSize)?;
         let data = &mut buf[..chunk_size];
         let data_len = match target.base_ops() {
             BaseOps::SingleThread(ops) => ops.read_addrs(addr, data),

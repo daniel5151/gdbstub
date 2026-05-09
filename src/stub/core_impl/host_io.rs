@@ -66,7 +66,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             }
             HostIo::vFilePwrite(cmd) if ops.support_pwrite().is_some() => {
                 let offset = <T::Arch as Arch>::Usize::from_be_bytes(cmd.offset)
-                    .ok_or(Error::TargetMismatch)?;
+                    .ok_or(Error::UnexpectedIntegerSize)?;
                 let ops = ops.support_pwrite().unwrap();
                 handle_hostio_result! {
                     if let Ok(ret) = ops.pwrite(cmd.fd, offset, cmd.data) => {

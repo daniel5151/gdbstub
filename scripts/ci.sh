@@ -152,6 +152,23 @@ log_info "  gdbstub CI"
 log_info "==========================================\n"
 
 # ============================================
+# RUSTFMT JOB
+# ============================================
+if [ "$RUN_RUSTFMT" = true ]; then
+    start_group "RUSTFMT JOB - nightly format check"
+    log_info ""
+
+    run_step "cargo fmt check (all)" \
+        cargo +nightly fmt --all -- --check
+
+    run_step "cargo fmt check (example_no_std)" \
+        cargo +nightly fmt --manifest-path example_no_std/Cargo.toml -- --check
+
+    end_group
+    log_info ""
+fi
+
+# ============================================
 # TEST JOB
 # ============================================
 if [ "$RUN_TEST" = true ]; then
@@ -176,23 +193,6 @@ if [ "$RUN_TEST" = true ]; then
 
     run_step "cargo doc" \
         bash -c 'RUSTDOCFLAGS="-Dwarnings" cargo +stable doc --workspace --features=std'
-
-    end_group
-    log_info ""
-fi
-
-# ============================================
-# RUSTFMT JOB
-# ============================================
-if [ "$RUN_RUSTFMT" = true ]; then
-    start_group "RUSTFMT JOB - nightly format check"
-    log_info ""
-
-    run_step "cargo fmt check (all)" \
-        cargo +nightly fmt --all -- --check
-
-    run_step "cargo fmt check (example_no_std)" \
-        cargo +nightly fmt --manifest-path example_no_std/Cargo.toml -- --check
 
     end_group
     log_info ""

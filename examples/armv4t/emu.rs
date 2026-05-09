@@ -16,13 +16,15 @@ use std::collections::BTreeMap;
 
 const HLE_RETURN_ADDR: u32 = 0x12345678;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Event {
     DoneStep,
     Halted,
     Break,
     WatchWrite(u32),
     WatchRead(u32),
+    Interrupted,
+    Exec(String),
 }
 
 pub enum ExecMode {
@@ -51,6 +53,9 @@ pub struct Emu {
 
     pub(crate) watchpoints: Vec<u32>,
     pub(crate) breakpoints: Vec<u32>,
+    pub(crate) ctrl_c_interrupt: bool,
+    pub(crate) fake_exec: Option<String>,
+
     pub(crate) files: Vec<Option<std::fs::File>>,
 
     pub(crate) tracepoints: BTreeMap<
@@ -116,6 +121,8 @@ impl Emu {
 
             watchpoints: Vec::new(),
             breakpoints: Vec::new(),
+            ctrl_c_interrupt: false,
+            fake_exec: None,
             files: Vec::new(),
 
             tracepoints: BTreeMap::new(),
@@ -193,6 +200,15 @@ impl Emu {
     /// will use the provided callback to poll the connection for incoming data
     /// every 1024 steps.
     pub fn run(&mut self, mut poll_incoming_data: impl FnMut() -> bool) -> RunEvent {
+        if self.ctrl_c_interrupt {
+            self.ctrl_c_interrupt = false;
+            return RunEvent::Event(Event::Interrupted);
+        }
+
+        if let Some(path) = self.fake_exec.take() {
+            return RunEvent::Event(Event::Exec(path));
+        }
+
         match self.exec_mode {
             ExecMode::Step => RunEvent::Event(self.step().unwrap_or(Event::DoneStep)),
             ExecMode::Continue => {

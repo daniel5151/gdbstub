@@ -19,7 +19,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         let handler_status = match command {
             XUpcasePacket::X(cmd) => {
                 let addr = <T::Arch as Arch>::Usize::from_be_bytes(cmd.addr)
-                    .ok_or(Error::TargetMismatch)?;
+                    .ok_or(Error::UnexpectedIntegerSize)?;
 
                 match target.base_ops() {
                     BaseOps::SingleThread(ops) => ops.write_addrs(addr, cmd.val),

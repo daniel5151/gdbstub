@@ -1,15 +1,13 @@
 use super::prelude::*;
-use super::DisconnectReason;
 use crate::arch::Arch;
 use crate::common::Signal;
-use crate::common::Tid;
 use crate::protocol::commands::_vCont::Actions;
 use crate::protocol::commands::ext::Resume;
 use crate::protocol::SpecificIdKind;
 use crate::protocol::SpecificThreadId;
-use crate::stub::MultiThreadStopReason;
 use crate::target::ext::base::reverse_exec::ReplayLogPosition;
 use crate::target::ext::base::ResumeOps;
+use crate::target::ext::breakpoints::WatchKind;
 use crate::target::ext::catch_syscalls::CatchSyscallPosition;
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
@@ -84,6 +82,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         ops: &mut dyn crate::target::ext::base::singlethread::SingleThreadResume<
             Arch = T::Arch,
             Error = T::Error,
+            Tid = T::Tid,
         >,
         actions: &Actions<'_>,
     ) -> Result<(), Error<T::Error, C::Error>> {
@@ -145,8 +144,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             VContKind::RangeStep(start, end) if ops.support_range_step().is_some() => {
                 let ops = ops.support_range_step().unwrap();
 
-                let start = start.decode().map_err(|_| Error::TargetMismatch)?;
-                let end = end.decode().map_err(|_| Error::TargetMismatch)?;
+                let start = start.decode().map_err(|_| Error::UnexpectedIntegerSize)?;
+                let end = end.decode().map_err(|_| Error::UnexpectedIntegerSize)?;
 
                 ops.resume_range_step(start, end)
                     .map_err(Error::TargetError)?;
@@ -167,6 +166,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         ops: &mut dyn crate::target::ext::base::multithread::MultiThreadResume<
             Arch = T::Arch,
             Error = T::Error,
+            Tid = T::Tid,
         >,
         actions: &Actions<'_>,
     ) -> Result<(), Error<T::Error, C::Error>> {
@@ -199,7 +199,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         // An action with no thread-id matches all threads, which is passed to
                         // `set_resume_action_continue` as `None`.
                         None | Some(SpecificIdKind::All) => None,
-                        Some(SpecificIdKind::WithId(tid)) => Some(tid),
+                        Some(SpecificIdKind::WithId(tid)) => Some(
+                            T::Tid::from_fully_qualified_tid(tid)
+                                .ok_or(Error::UnexpectedThreadId)?,
+                        ),
                     };
 
                     ops.set_resume_action_continue(tid, signal)
@@ -222,7 +225,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                             return Err(Error::PacketUnexpected);
                         }
                         Some(SpecificIdKind::WithId(tid)) => {
-                            ops.set_resume_action_step(tid, signal)
+                            let thread_id = T::Tid::from_fully_qualified_tid(tid)
+                                .ok_or(Error::UnexpectedThreadId)?;
+
+                            ops.set_resume_action_step(thread_id, signal)
                                 .map_err(Error::TargetError)?;
                         }
                     };
@@ -238,10 +244,13 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                             return Err(Error::PacketUnexpected);
                         }
                         Some(SpecificIdKind::WithId(tid)) => {
-                            let start = start.decode().map_err(|_| Error::TargetMismatch)?;
-                            let end = end.decode().map_err(|_| Error::TargetMismatch)?;
+                            let start = start.decode().map_err(|_| Error::UnexpectedIntegerSize)?;
+                            let end = end.decode().map_err(|_| Error::UnexpectedIntegerSize)?;
 
-                            ops.set_resume_action_range_step(tid, start, end)
+                            let thread_id = T::Tid::from_fully_qualified_tid(tid)
+                                .ok_or(Error::UnexpectedThreadId)?;
+
+                            ops.set_resume_action_range_step(thread_id, start, end)
                                 .map_err(Error::TargetError)?;
                         }
                     };
@@ -270,7 +279,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
     fn do_vcont(
         &mut self,
-        ops: ResumeOps<'_, T::Arch, T::Error>,
+        ops: ResumeOps<'_, T::Arch, T::Error, T::Tid>,
         actions: Actions<'_>,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
         match ops {
@@ -278,14 +287,14 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             ResumeOps::MultiThread(ops) => Self::do_vcont_multi_thread(ops, &actions)?,
         };
 
-        Ok(HandlerStatus::DeferredStopReason)
+        Ok(HandlerStatus::DoResume)
     }
 
     fn write_stop_common(
         &mut self,
         res: &mut ResponseWriter<'_, C>,
         target: &mut T,
-        tid: Option<Tid>,
+        tid: Option<T::Tid>,
         signal: Signal,
     ) -> Result<(), Error<T::Error, C::Error>> {
         res.write_str("T")?;
@@ -293,7 +302,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
         if let Some(tid) = tid {
             self.current_mem_tid = tid;
-            self.current_resume_tid = SpecificIdKind::WithId(tid);
+            self.current_resume_tid = SpecificIdKind::WithId(tid.into_fully_qualified_tid());
 
             res.write_str("thread:")?;
             res.write_specific_thread_id(SpecificThreadId {
@@ -301,7 +310,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     .features
                     .multiprocess()
                     .then_some(SpecificIdKind::WithId(self.get_current_pid(target)?)),
-                tid: SpecificIdKind::WithId(tid),
+                tid: SpecificIdKind::WithId(tid.into_fully_qualified_tid()),
             })?;
             res.write_str(";")?;
         }
@@ -309,204 +318,301 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         Ok(())
     }
 
+    #[inline(always)]
+    pub(crate) fn finish_done_step(
+        &mut self,
+        res: &mut ResponseWriter<'_, C>,
+    ) -> Result<(), Error<T::Error, C::Error>> {
+        res.write_str("S")?;
+        res.write_num(Signal::SIGTRAP.0)?;
+        Ok(())
+    }
+
+    #[inline(always)]
+    pub(crate) fn finish_signal(
+        &mut self,
+        res: &mut ResponseWriter<'_, C>,
+        sig: Signal,
+    ) -> Result<(), Error<T::Error, C::Error>> {
+        res.write_str("S")?;
+        res.write_num(sig.0)?;
+        Ok(())
+    }
+
+    #[inline(always)]
+    pub(crate) fn finish_exited(
+        &mut self,
+        res: &mut ResponseWriter<'_, C>,
+        code: u8,
+    ) -> Result<(), Error<T::Error, C::Error>> {
+        res.write_str("W")?;
+        res.write_num(code)?;
+        Ok(())
+    }
+
+    #[inline(always)]
+    pub(crate) fn finish_terminated(
+        &mut self,
+        res: &mut ResponseWriter<'_, C>,
+        sig: Signal,
+    ) -> Result<(), Error<T::Error, C::Error>> {
+        res.write_str("X")?;
+        res.write_num(sig.0)?;
+        Ok(())
+    }
+
+    #[inline(always)]
+    pub(crate) fn finish_signal_with_thread(
+        &mut self,
+        res: &mut ResponseWriter<'_, C>,
+        target: &mut T,
+        tid: T::Tid,
+        sig: Signal,
+    ) -> Result<(), Error<T::Error, C::Error>> {
+        self.write_stop_common(res, target, Some(tid), sig)?;
+        Ok(())
+    }
+
+    #[inline(always)]
+    pub(crate) fn finish_swbreak(
+        &mut self,
+        res: &mut ResponseWriter<'_, C>,
+        target: &mut T,
+        tid: T::Tid,
+    ) -> Result<(), Error<T::Error, C::Error>> {
+        if target
+            .support_breakpoints()
+            .and_then(|x| x.support_sw_breakpoint())
+            .is_none()
+        {
+            return Err(Error::UnsupportedStopReason);
+        }
+
+        crate::__dead_code_marker!("sw_breakpoint", "stop_reason");
+
+        self.write_stop_common(res, target, Some(tid), Signal::SIGTRAP)?;
+        res.write_str("swbreak:;")?;
+        Ok(())
+    }
+
+    #[inline(always)]
+    pub(crate) fn finish_hwbreak(
+        &mut self,
+        res: &mut ResponseWriter<'_, C>,
+        target: &mut T,
+        tid: T::Tid,
+    ) -> Result<(), Error<T::Error, C::Error>> {
+        if target
+            .support_breakpoints()
+            .and_then(|x| x.support_hw_breakpoint())
+            .is_none()
+        {
+            return Err(Error::UnsupportedStopReason);
+        }
+
+        crate::__dead_code_marker!("hw_breakpoint", "stop_reason");
+
+        self.write_stop_common(res, target, Some(tid), Signal::SIGTRAP)?;
+        res.write_str("hwbreak:;")?;
+        Ok(())
+    }
+
+    #[inline(always)]
+    pub(crate) fn finish_watch(
+        &mut self,
+        res: &mut ResponseWriter<'_, C>,
+        target: &mut T,
+        tid: T::Tid,
+        kind: WatchKind,
+        addr: <<T as Target>::Arch as Arch>::Usize,
+    ) -> Result<(), Error<T::Error, C::Error>> {
+        if target
+            .support_breakpoints()
+            .and_then(|x| x.support_hw_watchpoint())
+            .is_none()
+        {
+            return Err(Error::UnsupportedStopReason);
+        }
+
+        crate::__dead_code_marker!("hw_watchpoint", "stop_reason");
+
+        self.write_stop_common(res, target, Some(tid), Signal::SIGTRAP)?;
+
+        res.write_str(match kind {
+            WatchKind::Write => "watch:",
+            WatchKind::Read => "rwatch:",
+            WatchKind::ReadWrite => "awatch:",
+        })?;
+        res.write_num(addr)?;
+        res.write_str(";")?;
+        Ok(())
+    }
+
+    #[inline(always)]
+    pub(crate) fn finish_replay_log(
+        &mut self,
+        res: &mut ResponseWriter<'_, C>,
+        target: &mut T,
+        tid: Option<T::Tid>,
+        pos: ReplayLogPosition,
+    ) -> Result<(), Error<T::Error, C::Error>> {
+        let supported = if let Some(resume_ops) = target.base_ops().resume_ops() {
+            let (reverse_cont, reverse_step) = match resume_ops {
+                ResumeOps::MultiThread(ops) => (
+                    ops.support_reverse_cont().is_some(),
+                    ops.support_reverse_step().is_some(),
+                ),
+                ResumeOps::SingleThread(ops) => (
+                    ops.support_reverse_cont().is_some(),
+                    ops.support_reverse_step().is_some(),
+                ),
+            };
+
+            reverse_cont || reverse_step
+        } else {
+            false
+        };
+
+        if !supported {
+            return Err(Error::UnsupportedStopReason);
+        }
+
+        crate::__dead_code_marker!("reverse_exec", "stop_reason");
+
+        self.write_stop_common(res, target, tid, Signal::SIGTRAP)?;
+
+        res.write_str("replaylog:")?;
+        res.write_str(match pos {
+            ReplayLogPosition::Begin => "begin",
+            ReplayLogPosition::End => "end",
+        })?;
+        res.write_str(";")?;
+        Ok(())
+    }
+
+    #[inline(always)]
+    pub(crate) fn finish_catch_syscall(
+        &mut self,
+        res: &mut ResponseWriter<'_, C>,
+        target: &mut T,
+        tid: Option<T::Tid>,
+        number: <<T as Target>::Arch as Arch>::Usize,
+        position: CatchSyscallPosition,
+    ) -> Result<(), Error<T::Error, C::Error>> {
+        if target.support_catch_syscalls().is_none() {
+            return Err(Error::UnsupportedStopReason);
+        }
+
+        crate::__dead_code_marker!("catch_syscall", "stop_reason");
+
+        self.write_stop_common(res, target, tid, Signal::SIGTRAP)?;
+
+        res.write_str(match position {
+            CatchSyscallPosition::Entry => "syscall_entry:",
+            CatchSyscallPosition::Return => "syscall_return:",
+        })?;
+        res.write_num(number)?;
+        res.write_str(";")?;
+        Ok(())
+    }
+
+    #[inline(always)]
+    pub(crate) fn finish_library(
+        &mut self,
+        res: &mut ResponseWriter<'_, C>,
+        target: &mut T,
+        tid: T::Tid,
+    ) -> Result<(), Error<T::Error, C::Error>> {
+        self.write_stop_common(res, target, Some(tid), Signal::SIGTRAP)?;
+        res.write_str("library:;")?;
+        Ok(())
+    }
+
+    #[inline(always)]
+    pub(crate) fn finish_fork(
+        &mut self,
+        res: &mut ResponseWriter<'_, C>,
+        target: &mut T,
+        cur_tid: T::Tid,
+        new_tid: T::Tid,
+    ) -> Result<(), Error<T::Error, C::Error>> {
+        if !target.use_fork_stop_reason() {
+            return Err(Error::UnsupportedStopReason);
+        }
+
+        crate::__dead_code_marker!("fork_events", "stop_reason");
+        self.write_stop_common(res, target, Some(cur_tid), Signal::SIGTRAP)?;
+        res.write_str("fork:")?;
+        res.write_specific_thread_id(SpecificThreadId {
+            pid: self
+                .features
+                .multiprocess()
+                .then_some(SpecificIdKind::WithId(self.get_current_pid(target)?)),
+            tid: SpecificIdKind::WithId(new_tid.into_fully_qualified_tid()),
+        })?;
+        res.write_str(";")?;
+        Ok(())
+    }
+
+    #[inline(always)]
+    pub(crate) fn finish_vfork(
+        &mut self,
+        res: &mut ResponseWriter<'_, C>,
+        target: &mut T,
+        cur_tid: T::Tid,
+        new_tid: T::Tid,
+    ) -> Result<(), Error<T::Error, C::Error>> {
+        if !target.use_vfork_stop_reason() {
+            return Err(Error::UnsupportedStopReason);
+        }
+
+        crate::__dead_code_marker!("vfork_events", "stop_reason");
+        self.write_stop_common(res, target, Some(cur_tid), Signal::SIGTRAP)?;
+        res.write_str("vfork:")?;
+        res.write_specific_thread_id(SpecificThreadId {
+            pid: self
+                .features
+                .multiprocess()
+                .then_some(SpecificIdKind::WithId(self.get_current_pid(target)?)),
+            tid: SpecificIdKind::WithId(new_tid.into_fully_qualified_tid()),
+        })?;
+        res.write_str(";")?;
+        Ok(())
+    }
+
+    #[inline(always)]
+    pub(crate) fn finish_vforkdone(
+        &mut self,
+        res: &mut ResponseWriter<'_, C>,
+        target: &mut T,
+        tid: T::Tid,
+    ) -> Result<(), Error<T::Error, C::Error>> {
+        if !target.use_vforkdone_stop_reason() {
+            return Err(Error::UnsupportedStopReason);
+        }
+
+        crate::__dead_code_marker!("vforkdone_events", "stop_reason");
+        self.write_stop_common(res, target, Some(tid), Signal::SIGTRAP)?;
+        res.write_str("vforkdone:;")?;
+        Ok(())
+    }
+
+    #[inline(always)]
     pub(crate) fn finish_exec(
         &mut self,
         res: &mut ResponseWriter<'_, C>,
         target: &mut T,
-        stop_reason: MultiThreadStopReason<<T::Arch as Arch>::Usize>,
-    ) -> Result<FinishExecStatus, Error<T::Error, C::Error>> {
-        /// Helper macro to gate certain stop reasons on whether the target
-        /// supports it.
-        macro_rules! guard {
-            (reverse_exec) => {{
-                if let Some(resume_ops) = target.base_ops().resume_ops() {
-                    let (reverse_cont, reverse_step) = match resume_ops {
-                        ResumeOps::MultiThread(ops) => (
-                            ops.support_reverse_cont().is_some(),
-                            ops.support_reverse_step().is_some(),
-                        ),
-                        ResumeOps::SingleThread(ops) => (
-                            ops.support_reverse_cont().is_some(),
-                            ops.support_reverse_step().is_some(),
-                        ),
-                    };
-
-                    reverse_cont || reverse_step
-                } else {
-                    false
-                }
-            }};
-
-            (break $op:ident) => {
-                target
-                    .support_breakpoints()
-                    .and_then(|ops| ops.$op())
-                    .is_some()
-            };
-
-            (catch_syscall) => {
-                target.support_catch_syscalls().is_some()
-            };
-
-            (fork) => {
-                target.use_fork_stop_reason()
-            };
-
-            (vfork) => {
-                target.use_vfork_stop_reason()
-            };
-
-            (vforkdone) => {
-                target.use_vforkdone_stop_reason()
-            };
+        path: &[u8],
+    ) -> Result<(), Error<T::Error, C::Error>> {
+        if !target.use_exec_stop_reason() {
+            return Err(Error::UnsupportedStopReason);
         }
 
-        let status = match stop_reason {
-            MultiThreadStopReason::DoneStep => {
-                res.write_str("S")?;
-                res.write_num(Signal::SIGTRAP.0)?;
-                FinishExecStatus::Handled
-            }
-            MultiThreadStopReason::Signal(sig) => {
-                res.write_str("S")?;
-                res.write_num(sig.0)?;
-                FinishExecStatus::Handled
-            }
-            MultiThreadStopReason::Exited(code) => {
-                res.write_str("W")?;
-                res.write_num(code)?;
-                FinishExecStatus::Disconnect(DisconnectReason::TargetExited(code))
-            }
-            MultiThreadStopReason::Terminated(sig) => {
-                res.write_str("X")?;
-                res.write_num(sig.0)?;
-                FinishExecStatus::Disconnect(DisconnectReason::TargetTerminated(sig))
-            }
-            MultiThreadStopReason::SignalWithThread { tid, signal } => {
-                self.write_stop_common(res, target, Some(tid), signal)?;
-                FinishExecStatus::Handled
-            }
-            MultiThreadStopReason::SwBreak(tid) if guard!(break support_sw_breakpoint) => {
-                crate::__dead_code_marker!("sw_breakpoint", "stop_reason");
-
-                self.write_stop_common(res, target, Some(tid), Signal::SIGTRAP)?;
-                res.write_str("swbreak:;")?;
-                FinishExecStatus::Handled
-            }
-            MultiThreadStopReason::HwBreak(tid) if guard!(break support_hw_breakpoint) => {
-                crate::__dead_code_marker!("hw_breakpoint", "stop_reason");
-
-                self.write_stop_common(res, target, Some(tid), Signal::SIGTRAP)?;
-                res.write_str("hwbreak:;")?;
-                FinishExecStatus::Handled
-            }
-            MultiThreadStopReason::Watch { tid, kind, addr }
-                if guard!(break support_hw_watchpoint) =>
-            {
-                crate::__dead_code_marker!("hw_watchpoint", "stop_reason");
-
-                self.write_stop_common(res, target, Some(tid), Signal::SIGTRAP)?;
-
-                use crate::target::ext::breakpoints::WatchKind;
-                match kind {
-                    WatchKind::Write => res.write_str("watch:")?,
-                    WatchKind::Read => res.write_str("rwatch:")?,
-                    WatchKind::ReadWrite => res.write_str("awatch:")?,
-                }
-                res.write_num(addr)?;
-                res.write_str(";")?;
-                FinishExecStatus::Handled
-            }
-            MultiThreadStopReason::ReplayLog { tid, pos } if guard!(reverse_exec) => {
-                crate::__dead_code_marker!("reverse_exec", "stop_reason");
-
-                self.write_stop_common(res, target, tid, Signal::SIGTRAP)?;
-
-                res.write_str("replaylog:")?;
-                res.write_str(match pos {
-                    ReplayLogPosition::Begin => "begin",
-                    ReplayLogPosition::End => "end",
-                })?;
-                res.write_str(";")?;
-
-                FinishExecStatus::Handled
-            }
-            MultiThreadStopReason::CatchSyscall {
-                tid,
-                number,
-                position,
-            } if guard!(catch_syscall) => {
-                crate::__dead_code_marker!("catch_syscall", "stop_reason");
-
-                self.write_stop_common(res, target, tid, Signal::SIGTRAP)?;
-
-                res.write_str(match position {
-                    CatchSyscallPosition::Entry => "syscall_entry:",
-                    CatchSyscallPosition::Return => "syscall_return:",
-                })?;
-                res.write_num(number)?;
-                res.write_str(";")?;
-
-                FinishExecStatus::Handled
-            }
-            MultiThreadStopReason::Library(tid) => {
-                self.write_stop_common(res, target, Some(tid), Signal::SIGTRAP)?;
-                res.write_str("library:;")?;
-                FinishExecStatus::Handled
-            }
-            MultiThreadStopReason::Fork { cur_tid, new_tid } if guard!(fork) => {
-                crate::__dead_code_marker!("fork_events", "stop_reason");
-                self.write_stop_common(res, target, Some(cur_tid), Signal::SIGTRAP)?;
-                res.write_str("fork:")?;
-                res.write_specific_thread_id(SpecificThreadId {
-                    pid: self
-                        .features
-                        .multiprocess()
-                        .then_some(SpecificIdKind::WithId(self.get_current_pid(target)?)),
-                    tid: SpecificIdKind::WithId(new_tid),
-                })?;
-                res.write_str(";")?;
-                FinishExecStatus::Handled
-            }
-            MultiThreadStopReason::VFork { cur_tid, new_tid } if guard!(vfork) => {
-                crate::__dead_code_marker!("vfork_events", "stop_reason");
-                self.write_stop_common(res, target, Some(cur_tid), Signal::SIGTRAP)?;
-                res.write_str("vfork:")?;
-                res.write_specific_thread_id(SpecificThreadId {
-                    pid: self
-                        .features
-                        .multiprocess()
-                        .then_some(SpecificIdKind::WithId(self.get_current_pid(target)?)),
-                    tid: SpecificIdKind::WithId(new_tid),
-                })?;
-                res.write_str(";")?;
-                FinishExecStatus::Handled
-            }
-            MultiThreadStopReason::VForkDone(tid) if guard!(vforkdone) => {
-                crate::__dead_code_marker!("vforkdone_events", "stop_reason");
-                self.write_stop_common(res, target, Some(tid), Signal::SIGTRAP)?;
-                res.write_str("vforkdone:;")?;
-                FinishExecStatus::Handled
-            }
-            // Explicitly avoid using `_ =>` to handle the "unguarded" variants, as doing so would
-            // squelch the useful compiler error that crops up whenever stop reasons are added.
-            MultiThreadStopReason::SwBreak(_)
-            | MultiThreadStopReason::HwBreak(_)
-            | MultiThreadStopReason::Watch { .. }
-            | MultiThreadStopReason::ReplayLog { .. }
-            | MultiThreadStopReason::CatchSyscall { .. }
-            | MultiThreadStopReason::Fork { .. }
-            | MultiThreadStopReason::VFork { .. }
-            | MultiThreadStopReason::VForkDone { .. } => {
-                return Err(Error::UnsupportedStopReason);
-            }
-        };
-
-        Ok(status)
+        crate::__dead_code_marker!("vforkdone_events", "stop_reason");
+        self.write_stop_common(res, target, None, Signal::SIGTRAP)?;
+        res.write_str("exec:")?;
+        res.write_hex_buf(path)?;
+        res.write_str(";")?;
+        Ok(())
     }
-}
-
-pub(crate) enum FinishExecStatus {
-    Handled,
-    Disconnect(DisconnectReason),
 }

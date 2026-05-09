@@ -17,8 +17,13 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
         match command {
             Wasm::qWasmCallStack(cmd) => {
+                // TODO: plumb through PID when true multi-process support is added
+                let _pid = cmd.tid.pid;
+                let tid = T::Tid::from_fully_qualified_tid(cmd.tid.tid)
+                    .ok_or(Error::UnexpectedThreadId)?;
+
                 let mut error: Result<(), Error<T::Error, C::Error>> = Ok(());
-                ops.wasm_call_stack(cmd.tid.tid, &mut |pc| {
+                ops.wasm_call_stack(tid, &mut |pc| {
                     if let Err(e) = res.write_hex_buf(&pc.to_le_bytes()) {
                         error = Err(e.into());
                     }

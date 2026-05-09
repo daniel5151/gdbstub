@@ -34,6 +34,7 @@ pub enum Event {
     Break,
     WatchWrite(u32),
     WatchRead(u32),
+    Interrupted,
 }
 
 #[derive(Debug, PartialEq)]
@@ -55,6 +56,7 @@ pub struct Emu {
     /// (read, write)
     pub(crate) watchpoint_kind: HashMap<u32, (bool, bool)>,
     pub(crate) breakpoints: Vec<u32>,
+    pub(crate) ctrl_c_interrupt: bool,
 
     // GDB seems to get gets very confused if two threads are executing the exact same code at the
     // exact same time. Maybe this is a bug with `gdbstub`?
@@ -107,6 +109,7 @@ impl Emu {
             watchpoints: Vec::new(),
             watchpoint_kind: HashMap::new(),
             breakpoints: Vec::new(),
+            ctrl_c_interrupt: false,
 
             stall_cop_cycles: 24,
         })
@@ -204,6 +207,11 @@ impl Emu {
     }
 
     pub fn run(&mut self, mut poll_incoming_data: impl FnMut() -> bool) -> RunEvent {
+        if self.ctrl_c_interrupt {
+            self.ctrl_c_interrupt = false;
+            return RunEvent::Event(Event::Interrupted, CpuId::Cpu);
+        }
+
         // The underlying armv4t_multicore emulator cycles all cores in lock-step.
         //
         // Inside `self.step()`, we iterate through all cores and only invoke

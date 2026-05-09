@@ -76,6 +76,7 @@ impl Target for Emu {
     // listing out all the registers out manually).
     type Arch = custom_arch::Armv4tCustom;
     type Error = &'static str;
+    type Tid = ();
 
     // --------------- IMPORTANT NOTE ---------------
     // Always remember to annotate IDET enable methods with `inline(always)`!
@@ -83,7 +84,7 @@ impl Target for Emu {
     // implementations, resulting in unnecessary binary bloat.
 
     #[inline(always)]
-    fn base_ops(&mut self) -> target::ext::base::BaseOps<'_, Self::Arch, Self::Error> {
+    fn base_ops(&mut self) -> target::ext::base::BaseOps<'_, Self::Arch, Self::Error, Self::Tid> {
         target::ext::base::BaseOps::SingleThread(self)
     }
 
@@ -231,8 +232,7 @@ impl SingleThreadBase for Emu {
     #[inline(always)]
     fn support_single_register_access(
         &mut self,
-    ) -> Option<target::ext::base::single_register_access::SingleRegisterAccessOps<'_, (), Self>>
-    {
+    ) -> Option<target::ext::base::single_register_access::SingleRegisterAccessOps<'_, Self>> {
         Some(self)
     }
 
@@ -298,14 +298,14 @@ impl SingleThreadResume for Emu {
     #[inline(always)]
     fn support_reverse_cont(
         &mut self,
-    ) -> Option<target::ext::base::reverse_exec::ReverseContOps<'_, (), Self>> {
+    ) -> Option<target::ext::base::reverse_exec::ReverseContOps<'_, Self>> {
         Some(self)
     }
 
     #[inline(always)]
     fn support_reverse_step(
         &mut self,
-    ) -> Option<target::ext::base::reverse_exec::ReverseStepOps<'_, (), Self>> {
+    ) -> Option<target::ext::base::reverse_exec::ReverseStepOps<'_, Self>> {
         Some(self)
     }
 
@@ -336,7 +336,7 @@ impl target::ext::base::singlethread::SingleThreadSingleStep for Emu {
     }
 }
 
-impl target::ext::base::single_register_access::SingleRegisterAccess<()> for Emu {
+impl target::ext::base::single_register_access::SingleRegisterAccess for Emu {
     fn read_register(
         &mut self,
         _tid: (),
@@ -401,7 +401,7 @@ impl target::ext::base::single_register_access::SingleRegisterAccess<()> for Emu
     }
 }
 
-impl target::ext::base::reverse_exec::ReverseCont<()> for Emu {
+impl target::ext::base::reverse_exec::ReverseCont for Emu {
     fn reverse_cont(&mut self) -> Result<(), Self::Error> {
         // FIXME: actually implement reverse step
         eprintln!(
@@ -412,7 +412,7 @@ impl target::ext::base::reverse_exec::ReverseCont<()> for Emu {
     }
 }
 
-impl target::ext::base::reverse_exec::ReverseStep<()> for Emu {
+impl target::ext::base::reverse_exec::ReverseStep for Emu {
     fn reverse_step(&mut self, _tid: ()) -> Result<(), Self::Error> {
         // FIXME: actually implement reverse step
         eprintln!(

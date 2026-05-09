@@ -2,7 +2,6 @@
 
 use crate::arch::Arch;
 use crate::common::Signal;
-use crate::common::Tid;
 use crate::target::Target;
 use crate::target::TargetResult;
 
@@ -15,7 +14,7 @@ pub trait MultiThreadBase: Target {
     fn read_registers(
         &mut self,
         regs: &mut <Self::Arch as Arch>::Registers,
-        tid: Tid,
+        tid: Self::Tid,
     ) -> TargetResult<(), Self>;
 
     /// Write the target's registers.
@@ -25,7 +24,7 @@ pub trait MultiThreadBase: Target {
     fn write_registers(
         &mut self,
         regs: &<Self::Arch as Arch>::Registers,
-        tid: Tid,
+        tid: Self::Tid,
     ) -> TargetResult<(), Self>;
 
     /// Support for single-register access.
@@ -40,7 +39,7 @@ pub trait MultiThreadBase: Target {
     #[inline(always)]
     fn support_single_register_access(
         &mut self,
-    ) -> Option<super::single_register_access::SingleRegisterAccessOps<'_, Tid, Self>> {
+    ) -> Option<super::single_register_access::SingleRegisterAccessOps<'_, Self>> {
         None
     }
 
@@ -61,7 +60,7 @@ pub trait MultiThreadBase: Target {
         &mut self,
         start_addr: <Self::Arch as Arch>::Usize,
         data: &mut [u8],
-        tid: Tid,
+        tid: Self::Tid,
     ) -> TargetResult<usize, Self>;
 
     /// Write bytes to the specified address range.
@@ -73,7 +72,7 @@ pub trait MultiThreadBase: Target {
         &mut self,
         start_addr: <Self::Arch as Arch>::Usize,
         data: &[u8],
-        tid: Tid,
+        tid: Self::Tid,
     ) -> TargetResult<(), Self>;
 
     /// List all currently active threads.
@@ -82,11 +81,11 @@ pub trait MultiThreadBase: Target {
     /// thread-related methods on bare-metal (threadless) targets.
     ///
     /// _Note_: Implementors should mark this method as `#[inline(always)]`, as
-    /// this will result in better codegen (namely, by sidestepping any of the
-    /// `dyn FnMut` closure machinery).
+    /// this will result in better codegen (makes it easier to compile-out all
+    /// the `dyn FnMut` closure machinery).
     fn list_active_threads(
         &mut self,
-        thread_is_active: &mut dyn FnMut(Tid),
+        thread_is_active: &mut dyn FnMut(Self::Tid),
     ) -> Result<(), Self::Error>;
 
     /// Check if the specified thread is alive.
@@ -96,7 +95,7 @@ pub trait MultiThreadBase: Target {
     /// threads. On thread-heavy systems, it may be more efficient
     /// to override this method with a more direct query.
     #[allow(clippy::wrong_self_convention)] // requires breaking change to fix
-    fn is_thread_alive(&mut self, tid: Tid) -> Result<bool, Self::Error> {
+    fn is_thread_alive(&mut self, tid: Self::Tid) -> Result<bool, Self::Error> {
         let mut found = false;
         self.list_active_threads(&mut |active_tid| {
             if tid == active_tid {
@@ -217,7 +216,7 @@ pub trait MultiThreadResume: Target {
     /// target.
     fn set_resume_action_continue(
         &mut self,
-        tid: Option<Tid>,
+        tid: Option<Self::Tid>,
         signal: Option<Signal>,
     ) -> Result<(), Self::Error>;
 
@@ -241,9 +240,7 @@ pub trait MultiThreadResume: Target {
     ///
     /// [reverse stepping]: https://sourceware.org/gdb/current/onlinedocs/gdb/Reverse-Execution.html
     #[inline(always)]
-    fn support_reverse_step(
-        &mut self,
-    ) -> Option<super::reverse_exec::ReverseStepOps<'_, Tid, Self>> {
+    fn support_reverse_step(&mut self) -> Option<super::reverse_exec::ReverseStepOps<'_, Self>> {
         None
     }
 
@@ -251,9 +248,7 @@ pub trait MultiThreadResume: Target {
     ///
     /// [reverse continuing]: https://sourceware.org/gdb/current/onlinedocs/gdb/Reverse-Execution.html
     #[inline(always)]
-    fn support_reverse_cont(
-        &mut self,
-    ) -> Option<super::reverse_exec::ReverseContOps<'_, Tid, Self>> {
+    fn support_reverse_cont(&mut self) -> Option<super::reverse_exec::ReverseContOps<'_, Self>> {
         None
     }
 }
@@ -278,7 +273,7 @@ pub trait MultiThreadSingleStep: Target + MultiThreadResume {
     /// [Single step]: https://sourceware.org/gdb/current/onlinedocs/gdb/Continuing-and-Stepping.html#index-stepi
     fn set_resume_action_step(
         &mut self,
-        tid: Tid,
+        tid: Self::Tid,
         signal: Option<Signal>,
     ) -> Result<(), Self::Error>;
 }
@@ -306,7 +301,7 @@ pub trait MultiThreadRangeStepping: Target + MultiThreadResume {
     /// [Range step]: https://sourceware.org/gdb/current/onlinedocs/gdb/Continuing-and-Stepping.html#range-stepping
     fn set_resume_action_range_step(
         &mut self,
-        tid: Tid,
+        tid: Self::Tid,
         start: <Self::Arch as Arch>::Usize,
         end: <Self::Arch as Arch>::Usize,
     ) -> Result<(), Self::Error>;

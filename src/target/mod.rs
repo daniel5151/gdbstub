@@ -123,9 +123,10 @@
 //! impl Target for MyTarget {
 //!     type Error = ();
 //!     type Arch = gdbstub_arch::arm::Armv4t; // as an example
+//!     type Tid = ();
 //!
 //!     #[inline(always)]
-//!     fn base_ops(&mut self) -> BaseOps<Self::Arch, Self::Error> {
+//!     fn base_ops(&mut self) -> BaseOps<Self::Arch, Self::Error, Self::Tid> {
 //!         BaseOps::SingleThread(self)
 //!     }
 //!
@@ -252,6 +253,7 @@
 //! method implementation with a parameter passed as `(addr: <Self::Arch as
 //! Arch>::Usize)`, just write `(addr: u32)` directly.
 use crate::arch::Arch;
+use crate::common::IsValidTid;
 
 pub mod ext;
 
@@ -371,6 +373,14 @@ pub trait Target {
     /// A target-specific **fatal** error.
     type Error;
 
+    /// The type of `thread-id` the Target supports.
+    ///
+    /// - For single threaded targets, this should be `()`.
+    /// - For multi threaded targets, this should be [`Tid`](crate::common::Tid)
+    // DEVNOTE: and in the future, multi-threaded targets will use something along
+    // the lines of (Tid, Pid)
+    type Tid: IsValidTid;
+
     /// Base operations such as reading/writing from memory/registers,
     /// stopping/resuming the target, etc....
     ///
@@ -387,8 +397,9 @@ pub trait Target {
     ///     // ...
     ///     # type Arch = gdbstub_arch::arm::Armv4t;
     ///     # type Error = ();
+    ///     # type Tid = ();
     ///
-    ///     fn base_ops(&mut self) -> BaseOps<Self::Arch, Self::Error> {
+    ///     fn base_ops(&mut self) -> BaseOps<Self::Arch, Self::Error, Self::Tid> {
     ///         BaseOps::SingleThread(self)
     ///     }
     /// }
@@ -419,7 +430,7 @@ pub trait Target {
     /// #   ) -> TargetResult<(), Self> { todo!() }
     /// }
     /// ```
-    fn base_ops(&mut self) -> ext::base::BaseOps<'_, Self::Arch, Self::Error>;
+    fn base_ops(&mut self) -> ext::base::BaseOps<'_, Self::Arch, Self::Error, Self::Tid>;
 
     /// If the target supports resumption, but hasn't implemented explicit
     /// support for software breakpoints (via
@@ -624,45 +635,59 @@ pub trait Target {
         true
     }
 
-    /// Enable support for [`BaseStopReason::Fork`].
+    /// Enable the use of [`StopReasonReporter::fork`].
     ///
     /// By default, this method returns `true`.
     ///
     /// _Author's note:_ Unless you're _really_ trying to squeeze `gdbstub` onto
-    /// a particularly resource-constrained platform (and looking to save ~100
-    /// bytes), you may as well leave this enabled.
+    /// a particularly resource-constrained platform, you may as well leave this
+    /// enabled.
     ///
-    /// [`BaseStopReason::Fork`]: crate::stub::BaseStopReason::Fork
+    /// [`StopReasonReporter::fork`]: crate::stub::state_machine::StopReasonReporter::fork
     #[inline(always)]
     fn use_fork_stop_reason(&self) -> bool {
         true
     }
 
-    /// Enable support for [`BaseStopReason::VFork`].
+    /// Enable the use of [`StopReasonReporter::vfork`].
     ///
     /// By default, this method returns `true`.
     ///
     /// _Author's note:_ Unless you're _really_ trying to squeeze `gdbstub` onto
-    /// a particularly resource-constrained platform (and looking to save ~100
-    /// bytes), you may as well leave this enabled.
+    /// a particularly resource-constrained platform, you may as well leave this
+    /// enabled.
     ///
-    /// [`BaseStopReason::VFork`]: crate::stub::BaseStopReason::VFork
+    /// [`StopReasonReporter::vfork`]: crate::stub::state_machine::StopReasonReporter::vfork
     #[inline(always)]
     fn use_vfork_stop_reason(&self) -> bool {
         true
     }
 
-    /// Enable support for [`BaseStopReason::VForkDone`].
+    /// Enable the use of [`StopReasonReporter::vfork_done`].
     ///
     /// By default, this method returns `true`.
     ///
     /// _Author's note:_ Unless you're _really_ trying to squeeze `gdbstub` onto
-    /// a particularly resource-constrained platform (and looking to save ~100
-    /// bytes), you may as well leave this enabled.
+    /// a particularly resource-constrained platform, you may as well leave this
+    /// enabled.
     ///
-    /// [`BaseStopReason::VForkDone`]: crate::stub::BaseStopReason::VForkDone
+    /// [`StopReasonReporter::vfork_done`]: crate::stub::state_machine::StopReasonReporter::vfork_done
     #[inline(always)]
     fn use_vforkdone_stop_reason(&self) -> bool {
+        true
+    }
+
+    /// Enable the use of [`StopReasonReporter::exec`].
+    ///
+    /// By default, this method returns `true`.
+    ///
+    /// _Author's note:_ Unless you're _really_ trying to squeeze `gdbstub` onto
+    /// a particularly resource-constrained platform, you may as well leave this
+    /// enabled.
+    ///
+    /// [`StopReasonReporter::exec`]: crate::stub::state_machine::StopReasonReporter::exec
+    #[inline(always)]
+    fn use_exec_stop_reason(&self) -> bool {
         true
     }
 
@@ -819,14 +844,16 @@ macro_rules! __delegate_support {
 
 macro_rules! impl_dyn_target {
     ($type:ty) => {
-        impl<A, E> Target for $type
+        impl<A, E, Tid> Target for $type
         where
             A: Arch,
+            Tid: crate::common::IsValidTid,
         {
             type Arch = A;
             type Error = E;
+            type Tid = Tid;
 
-            __delegate!(fn base_ops(&mut self) -> ext::base::BaseOps<'_, Self::Arch, Self::Error>);
+            __delegate!(fn base_ops(&mut self) -> ext::base::BaseOps<'_, Self::Arch, Self::Error, Self::Tid>);
 
             __delegate!(fn guard_rail_implicit_sw_breakpoints(&self) -> bool);
 
@@ -838,6 +865,7 @@ macro_rules! impl_dyn_target {
             __delegate!(fn use_target_description_xml(&self) -> bool);
             __delegate!(fn use_vfork_stop_reason(&self) -> bool);
             __delegate!(fn use_vforkdone_stop_reason(&self) -> bool);
+            __delegate!(fn use_exec_stop_reason(&self) -> bool);
             __delegate!(fn use_x_lowcase_packet(&self) -> bool);
             __delegate!(fn use_x_upcase_packet(&self) -> bool);
 
@@ -864,6 +892,6 @@ macro_rules! impl_dyn_target {
     };
 }
 
-impl_dyn_target!(&mut dyn Target<Arch = A, Error = E>);
+impl_dyn_target!(&mut dyn Target<Arch = A, Error = E, Tid = Tid>);
 #[cfg(feature = "alloc")]
-impl_dyn_target!(alloc::boxed::Box<dyn Target<Arch = A, Error = E>>);
+impl_dyn_target!(alloc::boxed::Box<dyn Target<Arch = A, Error = E, Tid = Tid>>);

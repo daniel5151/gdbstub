@@ -151,7 +151,8 @@
 //! # impl Target for MyTarget {
 //! #     type Error = &'static str;
 //! #     type Arch = gdbstub_arch::arm::Armv4t; // as an example
-//! #     fn base_ops(&mut self) -> BaseOps<Self::Arch, Self::Error> { todo!() }
+//! #     type Tid = ();
+//! #     fn base_ops(&mut self) -> BaseOps<Self::Arch, Self::Error, Self::Tid> { todo!() }
 //! # }
 //! #
 //! # impl MyTarget {
@@ -167,13 +168,12 @@
 //! #
 //! # enum MyTargetEvent {
 //! #     IncomingData,
-//! #     StopReason(SingleThreadStopReason<u32>),
+//! #     Stopped,
 //! # }
 //! #
 //! use gdbstub::common::Signal;
 //! use gdbstub::conn::{Connection, ConnectionExt}; // note the use of `ConnectionExt`
 //! use gdbstub::stub::{run_blocking, DisconnectReason, GdbStub};
-//! use gdbstub::stub::SingleThreadStopReason;
 //! use gdbstub::target::Target;
 //!
 //! enum MyGdbBlockingEventLoop {}
@@ -184,40 +184,43 @@
 //!     type Target = MyTarget;
 //!     type Connection = Box<dyn ConnectionExt<Error = std::io::Error>>;
 //!
-//!     // or MultiThreadStopReason on multi threaded targets
-//!     type StopReason = SingleThreadStopReason<u32>;
-//!
 //!     // Invoked immediately after the target's `resume` method has been
 //!     // called. The implementation should block until either the target
 //!     // reports a stop reason, or if new data was sent over the connection.
-//!     fn wait_for_stop_reason(
+//!     fn wait_for_stop_reason<'a>(
 //!         target: &mut MyTarget,
-//!         conn: &mut Self::Connection,
+//!         mut simple_stub: run_blocking::SimpleStub<'a, Self::Target, Self::Connection>,
 //!     ) -> Result<
-//!         run_blocking::Event<SingleThreadStopReason<u32>>,
+//!         run_blocking::Event<'a, Self::Target, Self::Connection>,
 //!         run_blocking::WaitForStopReasonError<
 //!             <Self::Target as Target>::Error,
 //!             <Self::Connection as Connection>::Error,
 //!         >,
 //!     > {
-//!         // the specific mechanism to "select" between incoming data and target
+//!         // The specific mechanism to "select" between incoming data and target
 //!         // events will depend on your project's architecture.
 //!         //
-//!         // some examples of how you might implement this method include: `epoll`,
+//!         // Some examples of how you might implement this method include: `epoll`,
 //!         // `select!` across multiple event channels, periodic polling, etc...
 //!         //
-//!         // in this example, lets assume the target has a magic method that handles
+//!         // In this example, lets assume the target has a magic method that handles
 //!         // this for us.
-//!         let event = match target.run_and_check_for_incoming_data(conn) {
+//!         let event = match target.run_and_check_for_incoming_data(simple_stub.borrow_conn()) {
 //!             MyTargetEvent::IncomingData => {
-//!                 let byte = conn
-//!                     .read() // method provided by the `ConnectionExt` trait
+//!                 let byte = simple_stub
+//!                     .borrow_conn()
+//!                     .read()
 //!                     .map_err(run_blocking::WaitForStopReasonError::Connection)?;
 //!
-//!                 run_blocking::Event::IncomingData(byte)
+//!                 simple_stub.incoming_data(target, byte)
 //!             }
-//!             MyTargetEvent::StopReason(reason) => {
-//!                 run_blocking::Event::TargetStopped(reason)
+//!             MyTargetEvent::Stopped => {
+//!                 // Report a target stop reason back to GDB. In this example,
+//!                 // we choose to report a SIGINT stop reason, but your target
+//!                 // can use any stop reason appropriate for the event.
+//!                 simple_stub.report_stop(target, |report_stop| {
+//!                     report_stop.signal(Signal::SIGINT)
+//!                 })
 //!             }
 //!         };
 //!
@@ -225,15 +228,9 @@
 //!     }
 //!
 //!     // Invoked when the GDB client sends a Ctrl-C interrupt.
-//!     fn on_interrupt(
-//!         target: &mut MyTarget,
-//!     ) -> Result<Option<SingleThreadStopReason<u32>>, <MyTarget as Target>::Error> {
-//!         // notify the target that a ctrl-c interrupt has occurred.
+//!     fn on_interrupt(target: &mut MyTarget) -> Result<(), <MyTarget as Target>::Error> {
 //!         target.stop_in_response_to_ctrl_c_interrupt()?;
-//!
-//!         // a pretty typical stop reason in response to a Ctrl-C interrupt is to
-//!         // report a "Signal::SIGINT".
-//!         Ok(Some(SingleThreadStopReason::Signal(Signal::SIGINT).into()))
+//!         Ok(())
 //!     }
 //! }
 //!
@@ -356,10 +353,3 @@ const SINGLE_THREAD_TID: common::Tid = unwrap!(common::Tid::new(1));
 /// (Internal) The fake Pid reported to GDB when the target hasn't opted into
 /// reporting a custom Pid itself.
 const FAKE_PID: common::Pid = unwrap!(common::Pid::new(1));
-
-pub(crate) mod is_valid_tid {
-    pub trait IsValidTid {}
-
-    impl IsValidTid for () {}
-    impl IsValidTid for crate::common::Tid {}
-}

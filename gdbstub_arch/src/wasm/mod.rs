@@ -29,8 +29,8 @@
 //!    [`ProcessInfo`] traits on the target implementation for your Wasm
 //!    execution engine/target.
 //! 2. Make use of this `Arch` implementation in your target.
-//! 3. Make use of the [`report_stop_with_regs`] API to report the Wasm PC with
-//!    every stop packet.
+//! 3. Make use of the [`StopReasonReporter::add_reg`] API to report the Wasm PC
+//!    with every stop packet.
 //!    - _Note_: It seems likely that this requirement stems from a LLDB bug, as
 //!      "expedited registers" are not typically mandated by the GDB RSP, and
 //!      generally serve as an optional optimization to reduce roundtrips.
@@ -57,8 +57,8 @@
 //! [`Wasm`]: gdbstub::target::ext::wasm::Wasm
 //! [`HostInfo`]: gdbstub::target::ext::host_info::HostInfo
 //! [`ProcessInfo`]: gdbstub::target::ext::process_info::ProcessInfo
-//! [`report_stop_with_regs`]:
-//!     gdbstub::stub::state_machine::GdbStubStateMachineInner::report_stop_with_regs
+//! [`StopReasonReporter::add_reg`]:
+//!     gdbstub::stub::state_machine::StopReasonReporter::add_reg
 //! [`wasi-sdk`]: https://github.com/WebAssembly/wasi-sdk
 //! [this PR]: https://github.com/WebAssembly/wasi-sdk/pull/596
 //! [Wasmtime]: https://github.com/bytecodealliance/wasmtime

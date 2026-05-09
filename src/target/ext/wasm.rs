@@ -23,7 +23,6 @@
 //! An implementation of this address encoding/decoding can be found in the
 //! `gdbstub_arch` crate in `gdbstub_arch::wasm::addr`.
 
-use crate::common::Tid;
 use crate::target::Target;
 
 /// (LLDB extension) Target Extension - perform Wasm-specific actions.
@@ -38,7 +37,11 @@ pub trait Wasm: Target {
     /// called) frame to outermost.
     ///
     /// [Wasm address encoding]: `self#Address_Encoding`
-    fn wasm_call_stack(&self, tid: Tid, next_pc: &mut dyn FnMut(u64)) -> Result<(), Self::Error>;
+    fn wasm_call_stack(
+        &self,
+        thread_id: Self::Tid,
+        next_pc: &mut dyn FnMut(u64),
+    ) -> Result<(), Self::Error>;
 
     /// Get the Wasm local for a given thread, frame index, and local index.
     ///
@@ -53,7 +56,7 @@ pub trait Wasm: Target {
     /// type).
     fn read_wasm_local(
         &self,
-        tid: Tid,
+        thread_id: Self::Tid,
         frame: usize,
         local: usize,
         buf: &mut [u8],
@@ -74,7 +77,7 @@ pub trait Wasm: Target {
     /// type).
     fn read_wasm_stack(
         &self,
-        tid: Tid,
+        thread_id: Self::Tid,
         frame: usize,
         index: usize,
         buf: &mut [u8],
@@ -95,7 +98,7 @@ pub trait Wasm: Target {
     /// type).
     fn read_wasm_global(
         &self,
-        tid: Tid,
+        thread_id: Self::Tid,
         frame: usize,
         global: usize,
         buf: &mut [u8],

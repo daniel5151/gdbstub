@@ -1,5 +1,5 @@
+use crate::common::IsValidTid;
 use crate::common::Signal;
-use crate::common::Tid;
 use crate::conn::Connection;
 use crate::protocol::commands::Command;
 use crate::protocol::Packet;
@@ -14,6 +14,7 @@ use core::marker::PhantomData;
 ///
 /// Do not clutter this prelude with types only used by a few extensions.
 mod prelude {
+    pub(super) use crate::common::IsValidTid;
     pub(super) use crate::conn::Connection;
     pub(super) use crate::internal::BeBytes;
     pub(super) use crate::protocol::ResponseWriter;
@@ -48,8 +49,6 @@ mod tracepoints;
 mod wasm;
 mod x_lowcase_packet;
 mod x_upcase_packet;
-
-pub(crate) use resume::FinishExecStatus;
 
 pub(crate) mod target_result_ext {
     use crate::stub::error::InternalError;
@@ -97,7 +96,7 @@ pub enum DisconnectReason {
 
 pub enum State {
     Pump,
-    DeferredStopReason,
+    DoResume,
     CtrlCInterrupt,
     Disconnect(DisconnectReason),
 }
@@ -106,7 +105,7 @@ pub(crate) struct GdbStubImpl<T: Target, C: Connection> {
     _target: PhantomData<T>,
     _connection: PhantomData<C>,
 
-    current_mem_tid: Tid,
+    current_mem_tid: T::Tid,
     current_resume_tid: SpecificIdKind,
     features: ProtocolFeatures,
 }
@@ -114,7 +113,7 @@ pub(crate) struct GdbStubImpl<T: Target, C: Connection> {
 pub enum HandlerStatus {
     Handled,
     NeedsOk,
-    DeferredStopReason,
+    DoResume,
     Disconnect(DisconnectReason),
 }
 
@@ -132,7 +131,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             //
             // Plus, even if the GDB client is acting strangely and doesn't overwrite these values,
             // the target will simply return a non-fatal error, which is totally fine.
-            current_mem_tid: SINGLE_THREAD_TID,
+            current_mem_tid: T::Tid::sentinel(),
+            // FUTURE: this should get switched over to T::Tid as well
             current_resume_tid: SpecificIdKind::WithId(SINGLE_THREAD_TID),
             features: ProtocolFeatures::empty(),
         }
@@ -164,7 +164,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         res.write_str("OK")?;
                         None
                     }
-                    Ok(HandlerStatus::DeferredStopReason) => return Ok(State::DeferredStopReason),
+                    Ok(HandlerStatus::DoResume) => return Ok(State::DoResume),
                     Ok(HandlerStatus::Disconnect(reason)) => Some(reason),
                     // HACK: handling this "dummy" error is required as part of the
                     // `TargetResultExt::handle_error()` machinery.
