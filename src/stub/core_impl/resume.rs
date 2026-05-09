@@ -293,7 +293,6 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     fn write_stop_common(
         &mut self,
         res: &mut ResponseWriter<'_, C>,
-        target: &mut T,
         tid: Option<T::Tid>,
         signal: Signal,
     ) -> Result<(), Error<T::Error, C::Error>> {
@@ -309,7 +308,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 pid: self
                     .features
                     .multiprocess()
-                    .then_some(SpecificIdKind::WithId(self.get_current_pid(target)?)),
+                    .then_some(SpecificIdKind::WithId(self.current_active_pid)),
                 tid: SpecificIdKind::WithId(tid.into_fully_qualified_tid()),
             })?;
             res.write_str(";")?;
@@ -365,11 +364,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     pub(crate) fn finish_signal_with_thread(
         &mut self,
         res: &mut ResponseWriter<'_, C>,
-        target: &mut T,
         tid: T::Tid,
         sig: Signal,
     ) -> Result<(), Error<T::Error, C::Error>> {
-        self.write_stop_common(res, target, Some(tid), sig)?;
+        self.write_stop_common(res, Some(tid), sig)?;
         Ok(())
     }
 
@@ -390,7 +388,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
         crate::__dead_code_marker!("sw_breakpoint", "stop_reason");
 
-        self.write_stop_common(res, target, Some(tid), Signal::SIGTRAP)?;
+        self.write_stop_common(res, Some(tid), Signal::SIGTRAP)?;
         res.write_str("swbreak:;")?;
         Ok(())
     }
@@ -412,7 +410,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
         crate::__dead_code_marker!("hw_breakpoint", "stop_reason");
 
-        self.write_stop_common(res, target, Some(tid), Signal::SIGTRAP)?;
+        self.write_stop_common(res, Some(tid), Signal::SIGTRAP)?;
         res.write_str("hwbreak:;")?;
         Ok(())
     }
@@ -436,7 +434,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
         crate::__dead_code_marker!("hw_watchpoint", "stop_reason");
 
-        self.write_stop_common(res, target, Some(tid), Signal::SIGTRAP)?;
+        self.write_stop_common(res, Some(tid), Signal::SIGTRAP)?;
 
         res.write_str(match kind {
             WatchKind::Write => "watch:",
@@ -479,7 +477,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
         crate::__dead_code_marker!("reverse_exec", "stop_reason");
 
-        self.write_stop_common(res, target, tid, Signal::SIGTRAP)?;
+        self.write_stop_common(res, tid, Signal::SIGTRAP)?;
 
         res.write_str("replaylog:")?;
         res.write_str(match pos {
@@ -505,7 +503,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
         crate::__dead_code_marker!("catch_syscall", "stop_reason");
 
-        self.write_stop_common(res, target, tid, Signal::SIGTRAP)?;
+        self.write_stop_common(res, tid, Signal::SIGTRAP)?;
 
         res.write_str(match position {
             CatchSyscallPosition::Entry => "syscall_entry:",
@@ -520,10 +518,9 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     pub(crate) fn finish_library(
         &mut self,
         res: &mut ResponseWriter<'_, C>,
-        target: &mut T,
         tid: T::Tid,
     ) -> Result<(), Error<T::Error, C::Error>> {
-        self.write_stop_common(res, target, Some(tid), Signal::SIGTRAP)?;
+        self.write_stop_common(res, Some(tid), Signal::SIGTRAP)?;
         res.write_str("library:;")?;
         Ok(())
     }
@@ -541,13 +538,13 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         }
 
         crate::__dead_code_marker!("fork_events", "stop_reason");
-        self.write_stop_common(res, target, Some(cur_tid), Signal::SIGTRAP)?;
+        self.write_stop_common(res, Some(cur_tid), Signal::SIGTRAP)?;
         res.write_str("fork:")?;
         res.write_specific_thread_id(SpecificThreadId {
             pid: self
                 .features
                 .multiprocess()
-                .then_some(SpecificIdKind::WithId(self.get_current_pid(target)?)),
+                .then_some(SpecificIdKind::WithId(self.current_active_pid)),
             tid: SpecificIdKind::WithId(new_tid.into_fully_qualified_tid()),
         })?;
         res.write_str(";")?;
@@ -567,13 +564,13 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         }
 
         crate::__dead_code_marker!("vfork_events", "stop_reason");
-        self.write_stop_common(res, target, Some(cur_tid), Signal::SIGTRAP)?;
+        self.write_stop_common(res, Some(cur_tid), Signal::SIGTRAP)?;
         res.write_str("vfork:")?;
         res.write_specific_thread_id(SpecificThreadId {
             pid: self
                 .features
                 .multiprocess()
-                .then_some(SpecificIdKind::WithId(self.get_current_pid(target)?)),
+                .then_some(SpecificIdKind::WithId(self.current_active_pid)),
             tid: SpecificIdKind::WithId(new_tid.into_fully_qualified_tid()),
         })?;
         res.write_str(";")?;
@@ -592,7 +589,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         }
 
         crate::__dead_code_marker!("vforkdone_events", "stop_reason");
-        self.write_stop_common(res, target, Some(tid), Signal::SIGTRAP)?;
+        self.write_stop_common(res, Some(tid), Signal::SIGTRAP)?;
         res.write_str("vforkdone:;")?;
         Ok(())
     }
@@ -609,7 +606,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         }
 
         crate::__dead_code_marker!("vforkdone_events", "stop_reason");
-        self.write_stop_common(res, target, None, Signal::SIGTRAP)?;
+        self.write_stop_common(res, None, Signal::SIGTRAP)?;
         res.write_str("exec:")?;
         res.write_hex_buf(path)?;
         res.write_str(";")?;

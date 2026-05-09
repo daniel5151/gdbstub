@@ -100,13 +100,6 @@ impl target::ext::extended_mode::ExtendedMode for Emu {
     ) -> Option<target::ext::extended_mode::ConfigureWorkingDirOps<'_, Self>> {
         Some(self)
     }
-
-    #[inline(always)]
-    fn support_current_active_pid(
-        &mut self,
-    ) -> Option<target::ext::extended_mode::CurrentActivePidOps<'_, Self>> {
-        Some(self)
-    }
 }
 
 impl target::ext::extended_mode::ConfigureAslr for Emu {
@@ -167,11 +160,5 @@ impl target::ext::extended_mode::ConfigureWorkingDir for Emu {
         }
 
         Ok(())
-    }
-}
-
-impl target::ext::extended_mode::CurrentActivePid for Emu {
-    fn current_active_pid(&mut self) -> Result<Pid, Self::Error> {
-        Ok(self.reported_pid)
     }
 }

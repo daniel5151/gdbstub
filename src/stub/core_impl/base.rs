@@ -2,7 +2,6 @@ use super::prelude::*;
 use super::DisconnectReason;
 use crate::arch::Arch;
 use crate::arch::Registers;
-use crate::common::Pid;
 use crate::common::Tid;
 use crate::protocol::commands::ext::Base;
 use crate::protocol::IdKind;
@@ -10,7 +9,6 @@ use crate::protocol::SpecificIdKind;
 use crate::protocol::SpecificThreadId;
 use crate::target::ext::base::BaseOps;
 use crate::target::ext::base::ResumeOps;
-use crate::FAKE_PID;
 use crate::SINGLE_THREAD_TID;
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
@@ -38,20 +36,6 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         Ok(tid)
     }
 
-    pub(crate) fn get_current_pid(
-        &mut self,
-        target: &mut T,
-    ) -> Result<Pid, Error<T::Error, C::Error>> {
-        if let Some(ops) = target
-            .support_extended_mode()
-            .and_then(|ops| ops.support_current_active_pid())
-        {
-            ops.current_active_pid().map_err(Error::TargetError)
-        } else {
-            Ok(FAKE_PID)
-        }
-    }
-
     // Used by `?` and `vAttach` to return a "reasonable" stop reason.
     //
     // This is a bit of an implementation wart, since this is really something
@@ -71,7 +55,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 pid: self
                     .features
                     .multiprocess()
-                    .then_some(SpecificIdKind::WithId(self.get_current_pid(target)?)),
+                    .then_some(SpecificIdKind::WithId(self.current_active_pid)),
                 tid: SpecificIdKind::WithId(tid),
             })?;
         } else {
@@ -402,7 +386,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             }
             Base::qfThreadInfo(_) => {
                 res.write_str("m")?;
-                let pid = self.get_current_pid(target)?;
+                let pid = self.current_active_pid;
 
                 match target.base_ops() {
                     BaseOps::SingleThread(_) => res.write_specific_thread_id(SpecificThreadId {

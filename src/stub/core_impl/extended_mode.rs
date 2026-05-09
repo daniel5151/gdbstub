@@ -3,6 +3,7 @@ use crate::protocol::commands::ext::ExtendedMode;
 use crate::protocol::SpecificIdKind;
 use crate::protocol::SpecificThreadId;
 use crate::target::ext::base::BaseOps;
+use crate::FAKE_PID;
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     pub(crate) fn handle_extended_mode(
@@ -28,18 +29,16 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 HandlerStatus::Handled
             }
             ExtendedMode::vAttach(cmd) => {
-                if ops.support_current_active_pid().is_none() {
-                    return Err(Error::MissingCurrentActivePidImpl);
+                if let Err(e) = ops.attach(cmd.pid).handle_error() {
+                    self.current_active_pid = FAKE_PID;
+                    return Err(e);
                 }
-
-                ops.attach(cmd.pid).handle_error()?;
+                self.current_active_pid = cmd.pid;
                 self.report_reasonable_stop_reason(res, target)?
             }
-            ExtendedMode::qC(_cmd) if ops.support_current_active_pid().is_some() => {
-                let ops = ops.support_current_active_pid().unwrap();
-
+            ExtendedMode::qC(_cmd) => {
                 res.write_str("QC")?;
-                let pid = ops.current_active_pid().map_err(Error::TargetError)?;
+                let pid = self.current_active_pid;
                 let tid = match target.base_ops() {
                     BaseOps::SingleThread(_) => T::Tid::sentinel(),
                     BaseOps::MultiThread(ops) => {
