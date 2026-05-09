@@ -151,7 +151,8 @@
 //! # impl Target for MyTarget {
 //! #     type Error = &'static str;
 //! #     type Arch = gdbstub_arch::arm::Armv4t; // as an example
-//! #     fn base_ops(&mut self) -> BaseOps<Self::Arch, Self::Error> { todo!() }
+//! #     type Tid = ();
+//! #     fn base_ops(&mut self) -> BaseOps<Self::Arch, Self::Error, Self::Tid> { todo!() }
 //! # }
 //! #
 //! # impl MyTarget {
@@ -182,16 +183,15 @@
 //! impl run_blocking::BlockingEventLoop for MyGdbBlockingEventLoop {
 //!     type Target = MyTarget;
 //!     type Connection = Box<dyn ConnectionExt<Error = std::io::Error>>;
-//!     type Tid = (); // Single threaded example
 //!
 //!     // Invoked immediately after the target's `resume` method has been
 //!     // called. The implementation should block until either the target
 //!     // reports a stop reason, or if new data was sent over the connection.
 //!     fn wait_for_stop_reason<'a>(
 //!         target: &mut MyTarget,
-//!         mut simple_stub: run_blocking::SimpleStub<'a, Self::Target, Self::Connection, Self::Tid>,
+//!         mut simple_stub: run_blocking::SimpleStub<'a, Self::Target, Self::Connection>,
 //!     ) -> Result<
-//!         run_blocking::Event<'a, Self::Target, Self::Connection, Self::Tid>,
+//!         run_blocking::Event<'a, Self::Target, Self::Connection>,
 //!         run_blocking::WaitForStopReasonError<
 //!             <Self::Target as Target>::Error,
 //!             <Self::Connection as Connection>::Error,
@@ -355,7 +355,7 @@ const SINGLE_THREAD_TID: common::Tid = unwrap!(common::Tid::new(1));
 const FAKE_PID: common::Pid = unwrap!(common::Pid::new(1));
 
 /// Data types that can be used as Thread IDs in the GBD protocol.
-pub trait IsValidTid: private::Sealed {
+pub trait IsValidTid: private::Sealed + PartialEq + Copy {
     #[doc(hidden)]
     fn into_fully_qualified_tid(self) -> common::Tid;
 }

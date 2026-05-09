@@ -17,8 +17,12 @@ where
 }
 
 /// See [`ReverseCont`]
-pub type ReverseContOps<'a, Tid, T> =
-    &'a mut dyn ReverseCont<Tid, Arch = <T as Target>::Arch, Error = <T as Target>::Error>;
+pub type ReverseContOps<'a, Tid, T> = &'a mut dyn ReverseCont<
+    Tid,
+    Arch = <T as Target>::Arch,
+    Error = <T as Target>::Error,
+    Tid = Tid,
+>;
 
 /// Target Extension - Reverse stepping for targets.
 pub trait ReverseStep<Tid>: Target
@@ -37,8 +41,12 @@ where
 }
 
 /// See [`ReverseStep`]
-pub type ReverseStepOps<'a, Tid, T> =
-    &'a mut dyn ReverseStep<Tid, Arch = <T as Target>::Arch, Error = <T as Target>::Error>;
+pub type ReverseStepOps<'a, Tid, T> = &'a mut dyn ReverseStep<
+    Tid,
+    Arch = <T as Target>::Arch,
+    Error = <T as Target>::Error,
+    Tid = Tid,
+>;
 
 /// Describes the point reached in a replay log (used in
 /// [`StopReasonReporter::replay_log`])

@@ -83,6 +83,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         ops: &mut dyn crate::target::ext::base::singlethread::SingleThreadResume<
             Arch = T::Arch,
             Error = T::Error,
+            Tid = (),
         >,
         actions: &Actions<'_>,
     ) -> Result<(), Error<T::Error, C::Error>> {
@@ -166,6 +167,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         ops: &mut dyn crate::target::ext::base::multithread::MultiThreadResume<
             Arch = T::Arch,
             Error = T::Error,
+            Tid = T::Tid,
         >,
         actions: &Actions<'_>,
     ) -> Result<(), Error<T::Error, C::Error>> {
@@ -269,7 +271,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
     fn do_vcont(
         &mut self,
-        ops: ResumeOps<'_, T::Arch, T::Error>,
+        ops: ResumeOps<'_, T::Arch, T::Error, T::Tid>,
         actions: Actions<'_>,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
         match ops {

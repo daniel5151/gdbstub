@@ -76,6 +76,7 @@ impl Target for Emu {
     // listing out all the registers out manually).
     type Arch = custom_arch::Armv4tCustom;
     type Error = &'static str;
+    type Tid = ();
 
     // --------------- IMPORTANT NOTE ---------------
     // Always remember to annotate IDET enable methods with `inline(always)`!
@@ -83,7 +84,7 @@ impl Target for Emu {
     // implementations, resulting in unnecessary binary bloat.
 
     #[inline(always)]
-    fn base_ops(&mut self) -> target::ext::base::BaseOps<'_, Self::Arch, Self::Error> {
+    fn base_ops(&mut self) -> target::ext::base::BaseOps<'_, Self::Arch, Self::Error, Self::Tid> {
         target::ext::base::BaseOps::SingleThread(self)
     }
 

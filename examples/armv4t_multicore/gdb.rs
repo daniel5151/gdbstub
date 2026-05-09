@@ -31,9 +31,10 @@ fn tid_to_cpuid(tid: Tid) -> Result<CpuId, &'static str> {
 impl Target for Emu {
     type Arch = gdbstub_arch::arm::Armv4t;
     type Error = &'static str;
+    type Tid = gdbstub::common::Tid;
 
     #[inline(always)]
-    fn base_ops(&mut self) -> target::ext::base::BaseOps<'_, Self::Arch, Self::Error> {
+    fn base_ops(&mut self) -> target::ext::base::BaseOps<'_, Self::Arch, Self::Error, Self::Tid> {
         target::ext::base::BaseOps::MultiThread(self)
     }
 

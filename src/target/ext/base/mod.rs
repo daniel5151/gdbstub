@@ -14,23 +14,23 @@ pub mod single_register_access;
 pub mod singlethread;
 
 /// Base required operations for single/multi threaded targets.
-pub enum BaseOps<'a, A, E> {
+pub enum BaseOps<'a, A, E, Tid> {
     /// Single-threaded target
-    SingleThread(&'a mut dyn singlethread::SingleThreadBase<Arch = A, Error = E>),
+    SingleThread(&'a mut dyn singlethread::SingleThreadBase<Arch = A, Error = E, Tid = ()>),
     /// Multi-threaded target
-    MultiThread(&'a mut dyn multithread::MultiThreadBase<Arch = A, Error = E>),
+    MultiThread(&'a mut dyn multithread::MultiThreadBase<Arch = A, Error = E, Tid = Tid>),
 }
 
-pub(crate) enum ResumeOps<'a, A, E> {
+pub(crate) enum ResumeOps<'a, A, E, Tid> {
     /// Single-threaded target
-    SingleThread(&'a mut dyn singlethread::SingleThreadResume<Arch = A, Error = E>),
+    SingleThread(&'a mut dyn singlethread::SingleThreadResume<Arch = A, Error = E, Tid = ()>),
     /// Multi-threaded target
-    MultiThread(&'a mut dyn multithread::MultiThreadResume<Arch = A, Error = E>),
+    MultiThread(&'a mut dyn multithread::MultiThreadResume<Arch = A, Error = E, Tid = Tid>),
 }
 
-impl<'a, A: Arch, E> BaseOps<'a, A, E> {
+impl<'a, A: Arch, E, Tid: crate::IsValidTid> BaseOps<'a, A, E, Tid> {
     #[inline(always)]
-    pub(crate) fn resume_ops(self) -> Option<ResumeOps<'a, A, E>> {
+    pub(crate) fn resume_ops(self) -> Option<ResumeOps<'a, A, E, Tid>> {
         let ret = match self {
             BaseOps::SingleThread(ops) => ResumeOps::SingleThread(ops.support_resume()?),
             BaseOps::MultiThread(ops) => ResumeOps::MultiThread(ops.support_resume()?),

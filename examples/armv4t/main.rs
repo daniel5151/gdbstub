@@ -59,14 +59,13 @@ enum EmuGdbEventLoop {}
 impl run_blocking::BlockingEventLoop for EmuGdbEventLoop {
     type Target = emu::Emu;
     type Connection = Box<dyn ConnectionExt<Error = std::io::Error>>;
-    type Tid = ();
 
     #[allow(clippy::type_complexity)]
     fn wait_for_stop_reason<'a>(
         target: &mut emu::Emu,
-        mut simple_stub: run_blocking::SimpleStub<'a, Self::Target, Self::Connection, ()>,
+        mut simple_stub: run_blocking::SimpleStub<'a, Self::Target, Self::Connection>,
     ) -> Result<
-        run_blocking::Event<'a, Self::Target, Self::Connection, Self::Tid>,
+        run_blocking::Event<'a, Self::Target, Self::Connection>,
         run_blocking::WaitForStopReasonError<
             <Self::Target as Target>::Error,
             <Self::Connection as Connection>::Error,

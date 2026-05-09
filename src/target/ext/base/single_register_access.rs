@@ -62,5 +62,9 @@ where
 }
 
 /// See [`SingleRegisterAccess`]
-pub type SingleRegisterAccessOps<'a, Tid, T> =
-    &'a mut dyn SingleRegisterAccess<Tid, Arch = <T as Target>::Arch, Error = <T as Target>::Error>;
+pub type SingleRegisterAccessOps<'a, Tid, T> = &'a mut dyn SingleRegisterAccess<
+    Tid,
+    Arch = <T as Target>::Arch,
+    Error = <T as Target>::Error,
+    Tid = Tid,
+>;

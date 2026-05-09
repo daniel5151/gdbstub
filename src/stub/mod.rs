@@ -16,7 +16,6 @@ use self::error::InternalError;
 use crate::conn::Connection;
 use crate::conn::ConnectionExt;
 use crate::target::Target;
-use crate::IsValidTid;
 use managed::ManagedSlice;
 
 /// Types and traits related to the [`GdbStub::run_blocking`] interface.
@@ -30,29 +29,28 @@ pub mod run_blocking {
     use crate::conn::ConnectionExt;
     use crate::stub::state_machine::GdbStubStateMachine;
     use crate::stub::state_machine::StopReasonReporter;
-    use crate::IsValidTid;
 
     /// Simple interface to a running [`GdbStubStateMachine`], used in
     /// [`BlockingEventLoop::wait_for_stop_reason`].
     ///
     /// [`GdbStubStateMachine`]: state_machine::GdbStubStateMachine
-    pub struct SimpleStub<'a, T: Target, C: Connection, Tid: IsValidTid> {
+    pub struct SimpleStub<'a, T: Target, C: Connection> {
         pub(crate) gdb:
-            state_machine::GdbStubStateMachineInner<'a, state_machine::state::Running, T, C, Tid>,
+            state_machine::GdbStubStateMachineInner<'a, state_machine::state::Running, T, C>,
     }
 
     /// Opaque type representing an event that was occurred in
     /// [`BlockingEventLoop::wait_for_stop_reason`].
     ///
     /// Created via [`SimpleStub`].
-    pub struct Event<'a, T: Target, C: Connection, Tid: IsValidTid> {
+    pub struct Event<'a, T: Target, C: Connection> {
         pub(crate) gdb: Result<
-            state_machine::GdbStubStateMachine<'a, T, C, Tid>,
+            state_machine::GdbStubStateMachine<'a, T, C>,
             GdbStubError<<T as Target>::Error, <C as Connection>::Error>,
         >,
     }
 
-    impl<'a, T: Target, C: Connection, Tid: IsValidTid> SimpleStub<'a, T, C, Tid> {
+    impl<'a, T: Target, C: Connection> SimpleStub<'a, T, C> {
         /// Return a mutable reference to the underlying connection.
         pub fn borrow_conn(&mut self) -> &mut C {
             self.gdb.borrow_conn()
@@ -63,19 +61,19 @@ pub mod run_blocking {
             self,
             target: &'t mut T,
             report: impl FnOnce(
-                StopReasonReporter<'a, 't, T, C, Tid, false, false>,
+                StopReasonReporter<'a, 't, T, C, false, false>,
             ) -> Result<
-                GdbStubStateMachine<'a, T, C, Tid>,
+                GdbStubStateMachine<'a, T, C>,
                 GdbStubError<<T as Target>::Error, <C as Connection>::Error>,
             >,
-        ) -> Event<'a, T, C, Tid> {
+        ) -> Event<'a, T, C> {
             Event {
                 gdb: report(self.gdb.report_stop(target)),
             }
         }
 
         /// Pass a byte to the GDB stub.
-        pub fn incoming_data(self, target: &mut T, byte: u8) -> Event<'a, T, C, Tid> {
+        pub fn incoming_data(self, target: &mut T, byte: u8) -> Event<'a, T, C> {
             Event {
                 gdb: self.gdb.incoming_data(target, byte),
             }
@@ -93,8 +91,6 @@ pub mod run_blocking {
         type Target: Target;
         /// Connection being used to drive the target.
         type Connection: ConnectionExt;
-        /// What kind of target this is (singlethread vs. multithread)
-        type Tid: IsValidTid;
 
         /// Invoked after the target's `resume` method has been called.
         ///
@@ -110,9 +106,9 @@ pub mod run_blocking {
         /// Events are reported via methods on the provided [`SimpleStub`].
         fn wait_for_stop_reason<'a>(
             target: &mut Self::Target,
-            simple_stub: SimpleStub<'a, Self::Target, Self::Connection, Self::Tid>,
+            simple_stub: SimpleStub<'a, Self::Target, Self::Connection>,
         ) -> Result<
-            Event<'a, Self::Target, Self::Connection, Self::Tid>,
+            Event<'a, Self::Target, Self::Connection>,
             WaitForStopReasonError<
                 <Self::Target as Target>::Error,
                 <Self::Connection as Connection>::Error,
@@ -267,10 +263,10 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
     /// `GdbStub` into a
     /// [`GdbStubStateMachine`](state_machine::GdbStubStateMachine) that is
     /// ready to receive data.
-    pub fn run_state_machine<Tid: IsValidTid>(
+    pub fn run_state_machine(
         mut self,
         target: &mut T,
-    ) -> Result<state_machine::GdbStubStateMachine<'a, T, C, Tid>, GdbStubError<T::Error, C::Error>>
+    ) -> Result<state_machine::GdbStubStateMachine<'a, T, C>, GdbStubError<T::Error, C::Error>>
     {
         // Check if the target hasn't explicitly opted into implicit sw breakpoints
         {

@@ -123,9 +123,10 @@
 //! impl Target for MyTarget {
 //!     type Error = ();
 //!     type Arch = gdbstub_arch::arm::Armv4t; // as an example
+//!     type Tid = ();
 //!
 //!     #[inline(always)]
-//!     fn base_ops(&mut self) -> BaseOps<Self::Arch, Self::Error> {
+//!     fn base_ops(&mut self) -> BaseOps<Self::Arch, Self::Error, Self::Tid> {
 //!         BaseOps::SingleThread(self)
 //!     }
 //!
@@ -252,6 +253,7 @@
 //! method implementation with a parameter passed as `(addr: <Self::Arch as
 //! Arch>::Usize)`, just write `(addr: u32)` directly.
 use crate::arch::Arch;
+use crate::IsValidTid;
 
 pub mod ext;
 
@@ -371,6 +373,9 @@ pub trait Target {
     /// A target-specific **fatal** error.
     type Error;
 
+    /// The type of thread identifier used by the target.
+    type Tid: IsValidTid;
+
     /// Base operations such as reading/writing from memory/registers,
     /// stopping/resuming the target, etc....
     ///
@@ -387,8 +392,9 @@ pub trait Target {
     ///     // ...
     ///     # type Arch = gdbstub_arch::arm::Armv4t;
     ///     # type Error = ();
+    ///     # type Tid = ();
     ///
-    ///     fn base_ops(&mut self) -> BaseOps<Self::Arch, Self::Error> {
+    ///     fn base_ops(&mut self) -> BaseOps<Self::Arch, Self::Error, Self::Tid> {
     ///         BaseOps::SingleThread(self)
     ///     }
     /// }
@@ -419,7 +425,7 @@ pub trait Target {
     /// #   ) -> TargetResult<(), Self> { todo!() }
     /// }
     /// ```
-    fn base_ops(&mut self) -> ext::base::BaseOps<'_, Self::Arch, Self::Error>;
+    fn base_ops(&mut self) -> ext::base::BaseOps<'_, Self::Arch, Self::Error, Self::Tid>;
 
     /// If the target supports resumption, but hasn't implemented explicit
     /// support for software breakpoints (via
@@ -833,14 +839,16 @@ macro_rules! __delegate_support {
 
 macro_rules! impl_dyn_target {
     ($type:ty) => {
-        impl<A, E> Target for $type
+        impl<A, E, Tid> Target for $type
         where
             A: Arch,
+            Tid: crate::IsValidTid,
         {
             type Arch = A;
             type Error = E;
+            type Tid = Tid;
 
-            __delegate!(fn base_ops(&mut self) -> ext::base::BaseOps<'_, Self::Arch, Self::Error>);
+            __delegate!(fn base_ops(&mut self) -> ext::base::BaseOps<'_, Self::Arch, Self::Error, Self::Tid>);
 
             __delegate!(fn guard_rail_implicit_sw_breakpoints(&self) -> bool);
 
@@ -879,6 +887,6 @@ macro_rules! impl_dyn_target {
     };
 }
 
-impl_dyn_target!(&mut dyn Target<Arch = A, Error = E>);
+impl_dyn_target!(&mut dyn Target<Arch = A, Error = E, Tid = Tid>);
 #[cfg(feature = "alloc")]
-impl_dyn_target!(alloc::boxed::Box<dyn Target<Arch = A, Error = E>>);
+impl_dyn_target!(alloc::boxed::Box<dyn Target<Arch = A, Error = E, Tid = Tid>>);
