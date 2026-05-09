@@ -1,7 +1,6 @@
 use super::prelude::*;
 use crate::arch::Arch;
 use crate::common::Signal;
-use crate::common::Tid;
 use crate::protocol::commands::_vCont::Actions;
 use crate::protocol::commands::ext::Resume;
 use crate::protocol::SpecificIdKind;
@@ -83,7 +82,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         ops: &mut dyn crate::target::ext::base::singlethread::SingleThreadResume<
             Arch = T::Arch,
             Error = T::Error,
-            Tid = (),
+            Tid = T::Tid,
         >,
         actions: &Actions<'_>,
     ) -> Result<(), Error<T::Error, C::Error>> {
@@ -200,7 +199,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         // An action with no thread-id matches all threads, which is passed to
                         // `set_resume_action_continue` as `None`.
                         None | Some(SpecificIdKind::All) => None,
-                        Some(SpecificIdKind::WithId(tid)) => Some(tid),
+                        Some(SpecificIdKind::WithId(tid)) => Some(
+                            T::Tid::from_fully_qualified_tid(tid)
+                                .ok_or(Error::UnexpectedThreadId)?,
+                        ),
                     };
 
                     ops.set_resume_action_continue(tid, signal)
@@ -223,7 +225,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                             return Err(Error::PacketUnexpected);
                         }
                         Some(SpecificIdKind::WithId(tid)) => {
-                            ops.set_resume_action_step(tid, signal)
+                            let thread_id = T::Tid::from_fully_qualified_tid(tid)
+                                .ok_or(Error::UnexpectedThreadId)?;
+
+                            ops.set_resume_action_step(thread_id, signal)
                                 .map_err(Error::TargetError)?;
                         }
                     };
@@ -242,7 +247,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                             let start = start.decode().map_err(|_| Error::UnexpectedIntegerSize)?;
                             let end = end.decode().map_err(|_| Error::UnexpectedIntegerSize)?;
 
-                            ops.set_resume_action_range_step(tid, start, end)
+                            let thread_id = T::Tid::from_fully_qualified_tid(tid)
+                                .ok_or(Error::UnexpectedThreadId)?;
+
+                            ops.set_resume_action_range_step(thread_id, start, end)
                                 .map_err(Error::TargetError)?;
                         }
                     };
@@ -286,7 +294,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         &mut self,
         res: &mut ResponseWriter<'_, C>,
         target: &mut T,
-        tid: Option<Tid>,
+        tid: Option<T::Tid>,
         signal: Signal,
     ) -> Result<(), Error<T::Error, C::Error>> {
         res.write_str("T")?;
@@ -294,7 +302,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
         if let Some(tid) = tid {
             self.current_mem_tid = tid;
-            self.current_resume_tid = SpecificIdKind::WithId(tid);
+            self.current_resume_tid = SpecificIdKind::WithId(tid.into_fully_qualified_tid());
 
             res.write_str("thread:")?;
             res.write_specific_thread_id(SpecificThreadId {
@@ -302,7 +310,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     .features
                     .multiprocess()
                     .then_some(SpecificIdKind::WithId(self.get_current_pid(target)?)),
-                tid: SpecificIdKind::WithId(tid),
+                tid: SpecificIdKind::WithId(tid.into_fully_qualified_tid()),
             })?;
             res.write_str(";")?;
         }
@@ -358,7 +366,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         &mut self,
         res: &mut ResponseWriter<'_, C>,
         target: &mut T,
-        tid: Tid,
+        tid: T::Tid,
         sig: Signal,
     ) -> Result<(), Error<T::Error, C::Error>> {
         self.write_stop_common(res, target, Some(tid), sig)?;
@@ -370,7 +378,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         &mut self,
         res: &mut ResponseWriter<'_, C>,
         target: &mut T,
-        tid: Tid,
+        tid: T::Tid,
     ) -> Result<(), Error<T::Error, C::Error>> {
         if target
             .support_breakpoints()
@@ -392,7 +400,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         &mut self,
         res: &mut ResponseWriter<'_, C>,
         target: &mut T,
-        tid: Tid,
+        tid: T::Tid,
     ) -> Result<(), Error<T::Error, C::Error>> {
         if target
             .support_breakpoints()
@@ -414,7 +422,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         &mut self,
         res: &mut ResponseWriter<'_, C>,
         target: &mut T,
-        tid: Tid,
+        tid: T::Tid,
         kind: WatchKind,
         addr: <<T as Target>::Arch as Arch>::Usize,
     ) -> Result<(), Error<T::Error, C::Error>> {
@@ -445,7 +453,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         &mut self,
         res: &mut ResponseWriter<'_, C>,
         target: &mut T,
-        tid: Option<Tid>,
+        tid: Option<T::Tid>,
         pos: ReplayLogPosition,
     ) -> Result<(), Error<T::Error, C::Error>> {
         let supported = if let Some(resume_ops) = target.base_ops().resume_ops() {
@@ -487,7 +495,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         &mut self,
         res: &mut ResponseWriter<'_, C>,
         target: &mut T,
-        tid: Option<Tid>,
+        tid: Option<T::Tid>,
         number: <<T as Target>::Arch as Arch>::Usize,
         position: CatchSyscallPosition,
     ) -> Result<(), Error<T::Error, C::Error>> {
@@ -513,7 +521,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         &mut self,
         res: &mut ResponseWriter<'_, C>,
         target: &mut T,
-        tid: Tid,
+        tid: T::Tid,
     ) -> Result<(), Error<T::Error, C::Error>> {
         self.write_stop_common(res, target, Some(tid), Signal::SIGTRAP)?;
         res.write_str("library:;")?;
@@ -525,8 +533,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         &mut self,
         res: &mut ResponseWriter<'_, C>,
         target: &mut T,
-        cur_tid: Tid,
-        new_tid: Tid,
+        cur_tid: T::Tid,
+        new_tid: T::Tid,
     ) -> Result<(), Error<T::Error, C::Error>> {
         if !target.use_fork_stop_reason() {
             return Err(Error::UnsupportedStopReason);
@@ -540,7 +548,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 .features
                 .multiprocess()
                 .then_some(SpecificIdKind::WithId(self.get_current_pid(target)?)),
-            tid: SpecificIdKind::WithId(new_tid),
+            tid: SpecificIdKind::WithId(new_tid.into_fully_qualified_tid()),
         })?;
         res.write_str(";")?;
         Ok(())
@@ -551,8 +559,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         &mut self,
         res: &mut ResponseWriter<'_, C>,
         target: &mut T,
-        cur_tid: Tid,
-        new_tid: Tid,
+        cur_tid: T::Tid,
+        new_tid: T::Tid,
     ) -> Result<(), Error<T::Error, C::Error>> {
         if !target.use_vfork_stop_reason() {
             return Err(Error::UnsupportedStopReason);
@@ -566,7 +574,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 .features
                 .multiprocess()
                 .then_some(SpecificIdKind::WithId(self.get_current_pid(target)?)),
-            tid: SpecificIdKind::WithId(new_tid),
+            tid: SpecificIdKind::WithId(new_tid.into_fully_qualified_tid()),
         })?;
         res.write_str(";")?;
         Ok(())
@@ -577,7 +585,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         &mut self,
         res: &mut ResponseWriter<'_, C>,
         target: &mut T,
-        tid: Tid,
+        tid: T::Tid,
     ) -> Result<(), Error<T::Error, C::Error>> {
         if !target.use_vforkdone_stop_reason() {
             return Err(Error::UnsupportedStopReason);

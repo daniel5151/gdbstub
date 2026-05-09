@@ -17,14 +17,14 @@ pub mod singlethread;
 /// Base required operations for single/multi threaded targets.
 pub enum BaseOps<'a, A, E, Tid> {
     /// Single-threaded target
-    SingleThread(&'a mut dyn singlethread::SingleThreadBase<Arch = A, Error = E, Tid = ()>),
+    SingleThread(&'a mut dyn singlethread::SingleThreadBase<Arch = A, Error = E, Tid = Tid>),
     /// Multi-threaded target
     MultiThread(&'a mut dyn multithread::MultiThreadBase<Arch = A, Error = E, Tid = Tid>),
 }
 
 pub(crate) enum ResumeOps<'a, A, E, Tid> {
     /// Single-threaded target
-    SingleThread(&'a mut dyn singlethread::SingleThreadResume<Arch = A, Error = E, Tid = ()>),
+    SingleThread(&'a mut dyn singlethread::SingleThreadResume<Arch = A, Error = E, Tid = Tid>),
     /// Multi-threaded target
     MultiThread(&'a mut dyn multithread::MultiThreadResume<Arch = A, Error = E, Tid = Tid>),
 }

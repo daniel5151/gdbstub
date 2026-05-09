@@ -15,7 +15,8 @@ pub trait ThreadExtraInfo: Target {
     /// `Thread 1.1 (value)`
     ///
     /// Return the number of bytes written into `buf`.
-    fn thread_extra_info(&self, tid: Self::Tid, buf: &mut [u8]) -> Result<usize, Self::Error>;
+    fn thread_extra_info(&self, thread_id: Self::Tid, buf: &mut [u8])
+        -> Result<usize, Self::Error>;
 }
 
 define_ext!(ThreadExtraInfoOps, ThreadExtraInfo);

@@ -232,8 +232,7 @@ impl SingleThreadBase for Emu {
     #[inline(always)]
     fn support_single_register_access(
         &mut self,
-    ) -> Option<target::ext::base::single_register_access::SingleRegisterAccessOps<'_, (), Self>>
-    {
+    ) -> Option<target::ext::base::single_register_access::SingleRegisterAccessOps<'_, Self>> {
         Some(self)
     }
 
@@ -299,14 +298,14 @@ impl SingleThreadResume for Emu {
     #[inline(always)]
     fn support_reverse_cont(
         &mut self,
-    ) -> Option<target::ext::base::reverse_exec::ReverseContOps<'_, (), Self>> {
+    ) -> Option<target::ext::base::reverse_exec::ReverseContOps<'_, Self>> {
         Some(self)
     }
 
     #[inline(always)]
     fn support_reverse_step(
         &mut self,
-    ) -> Option<target::ext::base::reverse_exec::ReverseStepOps<'_, (), Self>> {
+    ) -> Option<target::ext::base::reverse_exec::ReverseStepOps<'_, Self>> {
         Some(self)
     }
 

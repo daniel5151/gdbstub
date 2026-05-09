@@ -39,7 +39,7 @@ pub trait Wasm: Target {
     /// [Wasm address encoding]: `self#Address_Encoding`
     fn wasm_call_stack(
         &self,
-        tid: Self::Tid,
+        thread_id: Self::Tid,
         next_pc: &mut dyn FnMut(u64),
     ) -> Result<(), Self::Error>;
 
@@ -56,7 +56,7 @@ pub trait Wasm: Target {
     /// type).
     fn read_wasm_local(
         &self,
-        tid: Self::Tid,
+        thread_id: Self::Tid,
         frame: usize,
         local: usize,
         buf: &mut [u8],
@@ -77,7 +77,7 @@ pub trait Wasm: Target {
     /// type).
     fn read_wasm_stack(
         &self,
-        tid: Self::Tid,
+        thread_id: Self::Tid,
         frame: usize,
         index: usize,
         buf: &mut [u8],
@@ -98,7 +98,7 @@ pub trait Wasm: Target {
     /// type).
     fn read_wasm_global(
         &self,
-        tid: Self::Tid,
+        thread_id: Self::Tid,
         frame: usize,
         global: usize,
         buf: &mut [u8],

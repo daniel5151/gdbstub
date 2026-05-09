@@ -373,7 +373,12 @@ pub trait Target {
     /// A target-specific **fatal** error.
     type Error;
 
-    /// The type of thread identifier used by the target.
+    /// The type of `thread-id` the Target supports.
+    ///
+    /// - For single threaded targets, this should be `()`.
+    /// - For multi threaded targets, this should be [`Tid`](crate::common::Tid)
+    // DEVNOTE: and in the future, multi-threaded targets will use something along
+    // the lines of (Tid, Pid)
     type Tid: IsValidTid;
 
     /// Base operations such as reading/writing from memory/registers,

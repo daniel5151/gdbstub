@@ -1,5 +1,5 @@
+use crate::common::IsValidTid;
 use crate::common::Signal;
-use crate::common::Tid;
 use crate::conn::Connection;
 use crate::protocol::commands::Command;
 use crate::protocol::Packet;
@@ -105,7 +105,7 @@ pub(crate) struct GdbStubImpl<T: Target, C: Connection> {
     _target: PhantomData<T>,
     _connection: PhantomData<C>,
 
-    current_mem_tid: Tid,
+    current_mem_tid: T::Tid,
     current_resume_tid: SpecificIdKind,
     features: ProtocolFeatures,
 }
@@ -131,7 +131,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             //
             // Plus, even if the GDB client is acting strangely and doesn't overwrite these values,
             // the target will simply return a non-fatal error, which is totally fine.
-            current_mem_tid: SINGLE_THREAD_TID,
+            current_mem_tid: T::Tid::sentinel(),
+            // FUTURE: this should get switched over to T::Tid as well
             current_resume_tid: SpecificIdKind::WithId(SINGLE_THREAD_TID),
             features: ProtocolFeatures::empty(),
         }

@@ -3,7 +3,6 @@ use crate::protocol::commands::ext::ExtendedMode;
 use crate::protocol::SpecificIdKind;
 use crate::protocol::SpecificThreadId;
 use crate::target::ext::base::BaseOps;
-use crate::SINGLE_THREAD_TID;
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     pub(crate) fn handle_extended_mode(
@@ -42,29 +41,21 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 res.write_str("QC")?;
                 let pid = ops.current_active_pid().map_err(Error::TargetError)?;
                 let tid = match target.base_ops() {
-                    BaseOps::SingleThread(_) => SINGLE_THREAD_TID,
+                    BaseOps::SingleThread(_) => T::Tid::sentinel(),
                     BaseOps::MultiThread(ops) => {
-                        // HACK: gdbstub should avoid using a sentinel value here...
-                        if self.current_mem_tid == SINGLE_THREAD_TID {
-                            let mut err: Result<_, Error<T::Error, C::Error>> = Ok(());
+                        // HACK: gdbstub should prob avoid using a sentinel value here... but making
+                        // `self.current_mem_tid` an optional adds a _lot_ of noise to the rest of
+                        // the implementation
+                        if self.current_mem_tid == T::Tid::sentinel() {
                             let mut first_tid = None;
                             ops.list_active_threads(&mut |tid| {
-                                // TODO: replace this with a try block (once stabilized)
-                                let e = (|| {
-                                    if first_tid.is_some() {
-                                        return Ok(());
-                                    }
+                                if first_tid.is_none() {
                                     first_tid = Some(tid);
-                                    Ok(())
-                                })();
-
-                                if let Err(e) = e {
-                                    err = Err(e)
                                 }
                             })
                             .map_err(Error::TargetError)?;
-                            err?;
-                            first_tid.unwrap_or(SINGLE_THREAD_TID)
+
+                            first_tid.unwrap_or(T::Tid::sentinel())
                         } else {
                             self.current_mem_tid
                         }
@@ -76,7 +67,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         .features
                         .multiprocess()
                         .then_some(SpecificIdKind::WithId(pid)),
-                    tid: SpecificIdKind::WithId(tid),
+                    tid: SpecificIdKind::WithId(tid.into_fully_qualified_tid()),
                 })?;
 
                 HandlerStatus::Handled

@@ -37,7 +37,6 @@ use super::DisconnectReason;
 use super::GdbStub;
 use crate::arch::Arch;
 use crate::arch::RegId;
-use crate::common::IsValidTid;
 use crate::common::Signal;
 use crate::conn::Connection;
 use crate::protocol::recv_packet::RecvPacketStateMachine;
@@ -489,12 +488,9 @@ where
 
         let mut res = ResponseWriter::from_state(&mut gdb.i.conn, res);
 
-        gdb.i.inner.finish_signal_with_thread(
-            &mut res,
-            target,
-            tid.into_fully_qualified_tid(),
-            signal,
-        )?;
+        gdb.i
+            .inner
+            .finish_signal_with_thread(&mut res, target, tid, signal)?;
 
         Ok(StopReasonReporter {
             target,
@@ -527,9 +523,7 @@ where
 
         let mut res = ResponseWriter::from_state(&mut gdb.i.conn, res);
 
-        gdb.i
-            .inner
-            .finish_swbreak(&mut res, target, tid.into_fully_qualified_tid())?;
+        gdb.i.inner.finish_swbreak(&mut res, target, tid)?;
 
         Ok(StopReasonReporter {
             target,
@@ -559,9 +553,7 @@ where
 
         let mut res = ResponseWriter::from_state(&mut gdb.i.conn, res);
 
-        gdb.i
-            .inner
-            .finish_hwbreak(&mut res, target, tid.into_fully_qualified_tid())?;
+        gdb.i.inner.finish_hwbreak(&mut res, target, tid)?;
 
         Ok(StopReasonReporter {
             target,
@@ -595,7 +587,7 @@ where
 
         gdb.i
             .inner
-            .finish_watch(&mut res, target, tid.into_fully_qualified_tid(), kind, addr)?;
+            .finish_watch(&mut res, target, tid, kind, addr)?;
 
         Ok(StopReasonReporter {
             target,
@@ -629,12 +621,7 @@ where
 
         let mut res = ResponseWriter::from_state(&mut gdb.i.conn, res);
 
-        gdb.i.inner.finish_replay_log(
-            &mut res,
-            target,
-            tid.map(|tid| tid.into_fully_qualified_tid()),
-            pos,
-        )?;
+        gdb.i.inner.finish_replay_log(&mut res, target, tid, pos)?;
 
         Ok(StopReasonReporter {
             target,
@@ -666,13 +653,9 @@ where
 
         let mut res = ResponseWriter::from_state(&mut gdb.i.conn, res);
 
-        gdb.i.inner.finish_catch_syscall(
-            &mut res,
-            target,
-            tid.map(|tid| tid.into_fully_qualified_tid()),
-            number,
-            position,
-        )?;
+        gdb.i
+            .inner
+            .finish_catch_syscall(&mut res, target, tid, number, position)?;
 
         Ok(StopReasonReporter {
             target,
@@ -698,9 +681,7 @@ where
 
         let mut res = ResponseWriter::from_state(&mut gdb.i.conn, res);
 
-        gdb.i
-            .inner
-            .finish_library(&mut res, target, tid.into_fully_qualified_tid())?;
+        gdb.i.inner.finish_library(&mut res, target, tid)?;
 
         Ok(StopReasonReporter {
             target,
@@ -729,12 +710,9 @@ where
 
         let mut res = ResponseWriter::from_state(&mut gdb.i.conn, res);
 
-        gdb.i.inner.finish_fork(
-            &mut res,
-            target,
-            cur_tid.into_fully_qualified_tid(),
-            new_tid.into_fully_qualified_tid(),
-        )?;
+        gdb.i
+            .inner
+            .finish_fork(&mut res, target, cur_tid, new_tid)?;
 
         Ok(StopReasonReporter {
             target,
@@ -767,12 +745,9 @@ where
 
         let mut res = ResponseWriter::from_state(&mut gdb.i.conn, res);
 
-        gdb.i.inner.finish_vfork(
-            &mut res,
-            target,
-            cur_tid.into_fully_qualified_tid(),
-            new_tid.into_fully_qualified_tid(),
-        )?;
+        gdb.i
+            .inner
+            .finish_vfork(&mut res, target, cur_tid, new_tid)?;
 
         Ok(StopReasonReporter {
             target,
@@ -801,9 +776,7 @@ where
 
         let mut res = ResponseWriter::from_state(&mut gdb.i.conn, res);
 
-        gdb.i
-            .inner
-            .finish_vforkdone(&mut res, target, tid.into_fully_qualified_tid())?;
+        gdb.i.inner.finish_vforkdone(&mut res, target, tid)?;
 
         Ok(StopReasonReporter {
             target,

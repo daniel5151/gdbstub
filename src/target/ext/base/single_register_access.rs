@@ -21,8 +21,9 @@ use crate::target::TargetResult;
 pub trait SingleRegisterAccess: Target {
     /// Read to a single register on the target.
     ///
-    /// The `tid` field identifies which thread the value should be read from.
-    /// On single threaded targets, `tid` is set to `()` and can be ignored.
+    /// The `thread_id` field identifies which thread the value should be read
+    /// from. On single threaded targets, `thread_id` is set to `()` and can
+    /// be ignored.
     ///
     /// Implementations should write the value of the register using target's
     /// native byte order in the buffer `buf`.
@@ -34,15 +35,16 @@ pub trait SingleRegisterAccess: Target {
     /// non-fatal error should be returned.
     fn read_register(
         &mut self,
-        tid: Self::Tid,
+        thread_id: Self::Tid,
         reg_id: <Self::Arch as Arch>::RegId,
         buf: &mut [u8],
     ) -> TargetResult<usize, Self>;
 
     /// Write from a single register on the target.
     ///
-    /// The `tid` field identifies which thread the value should be written to.
-    /// On single threaded targets, `tid` is set to `()` and can be ignored.
+    /// The `thread_id` field identifies which thread the value should be
+    /// written to. On single threaded targets, `thread_id` is set to `()`
+    /// and can be ignored.
     ///
     /// The `val` buffer contains the new value of the register in the target's
     /// native byte order. It is guaranteed to be the exact length as the target
@@ -52,15 +54,15 @@ pub trait SingleRegisterAccess: Target {
     /// non-fatal error should be returned.
     fn write_register(
         &mut self,
-        tid: Self::Tid,
+        thread_id: Self::Tid,
         reg_id: <Self::Arch as Arch>::RegId,
         val: &[u8],
     ) -> TargetResult<(), Self>;
 }
 
 /// See [`SingleRegisterAccess`]
-pub type SingleRegisterAccessOps<'a, Tid, T> = &'a mut dyn SingleRegisterAccess<
+pub type SingleRegisterAccessOps<'a, T> = &'a mut dyn SingleRegisterAccess<
     Arch = <T as Target>::Arch,
     Error = <T as Target>::Error,
-    Tid = Tid,
+    Tid = <T as Target>::Tid,
 >;

@@ -5,16 +5,20 @@ use crate::protocol::commands::ext::SingleRegisterAccess;
 use crate::target::ext::base::BaseOps;
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
-    fn inner<Tid: IsValidTid>(
+    pub(crate) fn handle_single_register_access(
+        &mut self,
         res: &mut ResponseWriter<'_, C>,
-        ops: &mut dyn crate::target::ext::base::single_register_access::SingleRegisterAccess<
-            Arch = T::Arch,
-            Error = T::Error,
-            Tid = Tid,
-        >,
+        target: &mut T,
         command: SingleRegisterAccess<'_>,
-        id: Tid,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
+        let ops = match match target.base_ops() {
+            BaseOps::SingleThread(ops) => ops.support_single_register_access(),
+            BaseOps::MultiThread(ops) => ops.support_single_register_access(),
+        } {
+            Some(ops) => ops,
+            None => return Ok(HandlerStatus::Handled),
+        };
+
         let handler_status = match command {
             SingleRegisterAccess::p(p) => {
                 let reg = <T::Arch as Arch>::RegId::from_raw_id(p.reg_id);
@@ -32,7 +36,9 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         .ok_or(Error::PacketBufferOverflow)?;
                 }
 
-                let len = ops.read_register(id, reg_id, buf).handle_error()?;
+                let len = ops
+                    .read_register(self.current_mem_tid, reg_id, buf)
+                    .handle_error()?;
 
                 if len == 0 {
                     if let Some(size) = reg_size {
@@ -59,30 +65,14 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 match reg {
                     // empty packet indicates unrecognized query
                     None => return Ok(HandlerStatus::Handled),
-                    Some((reg_id, _)) => ops.write_register(id, reg_id, p.val).handle_error()?,
+                    Some((reg_id, _)) => ops
+                        .write_register(self.current_mem_tid, reg_id, p.val)
+                        .handle_error()?,
                 }
                 HandlerStatus::NeedsOk
             }
         };
 
         Ok(handler_status)
-    }
-
-    pub(crate) fn handle_single_register_access(
-        &mut self,
-        res: &mut ResponseWriter<'_, C>,
-        target: &mut T,
-        command: SingleRegisterAccess<'_>,
-    ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
-        match target.base_ops() {
-            BaseOps::SingleThread(ops) => match ops.support_single_register_access() {
-                None => Ok(HandlerStatus::Handled),
-                Some(ops) => Self::inner(res, ops, command, ()),
-            },
-            BaseOps::MultiThread(ops) => match ops.support_single_register_access() {
-                None => Ok(HandlerStatus::Handled),
-                Some(ops) => Self::inner(res, ops, command, self.current_mem_tid),
-            },
-        }
     }
 }

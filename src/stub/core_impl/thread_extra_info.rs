@@ -23,9 +23,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             ThreadExtraInfo::qThreadExtraInfo(info) => {
                 // TODO: plumb through PID when true multi-process support is added
                 let _pid = info.id.pid;
-                let Some(thread_id) = T::Tid::from_fully_qualified_tid(info.id.tid) else {
-                    return Err(Error::UnexpectedThreadId);
-                };
+                let thread_id = T::Tid::from_fully_qualified_tid(info.id.tid)
+                    .ok_or(Error::UnexpectedThreadId)?;
 
                 let size = ops
                     .thread_extra_info(thread_id, info.buf)

@@ -1,40 +1,8 @@
 use super::prelude::*;
-use crate::arch::Arch;
 use crate::protocol::commands::ext::ReverseCont;
 use crate::protocol::commands::ext::ReverseStep;
 use crate::protocol::SpecificIdKind;
-use crate::target::ext::base::reverse_exec::ReverseCont as ReverseContTrait;
-use crate::target::ext::base::reverse_exec::ReverseStep as ReverseStepTrait;
 use crate::target::ext::base::ResumeOps;
-
-macro_rules! defn_ops {
-    ($name:ident, $reverse_trait:ident, $f:ident) => {
-        enum $name<'a, A: Arch, E> {
-            SingleThread(&'a mut dyn $reverse_trait<Arch = A, Error = E, Tid = ()>),
-            MultiThread(&'a mut dyn $reverse_trait<Arch = A, Error = E, Tid = crate::common::Tid>),
-        }
-
-        impl<'a, A, E> $name<'a, A, E>
-        where
-            A: Arch,
-        {
-            #[inline(always)]
-            fn from_target<T>(target: &mut T) -> Option<$name<'_, T::Arch, T::Error>>
-            where
-                T: Target,
-            {
-                let ops = match target.base_ops().resume_ops()? {
-                    ResumeOps::SingleThread(ops) => $name::SingleThread(ops.$f()?),
-                    ResumeOps::MultiThread(ops) => $name::MultiThread(ops.$f()?),
-                };
-                Some(ops)
-            }
-        }
-    };
-}
-
-defn_ops!(ReverseContOps, ReverseContTrait, support_reverse_cont);
-defn_ops!(ReverseStepOps, ReverseStepTrait, support_reverse_step);
 
 impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     pub(crate) fn handle_reverse_cont(
@@ -43,7 +11,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         target: &mut T,
         command: ReverseCont,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
-        let ops = match ReverseContOps::<'_, T::Arch, T::Error>::from_target(target) {
+        let ops = match target.base_ops().resume_ops().and_then(|ops| match ops {
+            ResumeOps::SingleThread(ops) => ops.support_reverse_cont(),
+            ResumeOps::MultiThread(ops) => ops.support_reverse_cont(),
+        }) {
             Some(ops) => ops,
             None => return Ok(HandlerStatus::Handled),
         };
@@ -52,15 +23,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
         let handler_status = match command {
             ReverseCont::bc(_) => {
-                match ops {
-                    ReverseContOps::MultiThread(ops) => {
-                        ops.reverse_cont().map_err(Error::TargetError)?
-                    }
-                    ReverseContOps::SingleThread(ops) => {
-                        ops.reverse_cont().map_err(Error::TargetError)?
-                    }
-                }
-
+                ops.reverse_cont().map_err(Error::TargetError)?;
                 HandlerStatus::DoResume
             }
         };
@@ -68,14 +31,16 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         Ok(handler_status)
     }
 
-    // FIXME: De-duplicate with above code?
     pub(crate) fn handle_reverse_step(
         &mut self,
         _res: &mut ResponseWriter<'_, C>,
         target: &mut T,
         command: ReverseStep,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>> {
-        let ops = match ReverseStepOps::<'_, T::Arch, T::Error>::from_target(target) {
+        let ops = match target.base_ops().resume_ops().and_then(|ops| match ops {
+            ResumeOps::SingleThread(ops) => ops.support_reverse_step(),
+            ResumeOps::MultiThread(ops) => ops.support_reverse_step(),
+        }) {
             Some(ops) => ops,
             None => return Ok(HandlerStatus::Handled),
         };
@@ -90,14 +55,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     SpecificIdKind::WithId(tid) => tid,
                 };
 
-                match ops {
-                    ReverseStepOps::MultiThread(ops) => {
-                        ops.reverse_step(tid).map_err(Error::TargetError)?
-                    }
-                    ReverseStepOps::SingleThread(ops) => {
-                        ops.reverse_step(()).map_err(Error::TargetError)?
-                    }
-                }
+                let thread_id =
+                    T::Tid::from_fully_qualified_tid(tid).ok_or(Error::UnexpectedThreadId)?;
+
+                ops.reverse_step(thread_id).map_err(Error::TargetError)?;
 
                 HandlerStatus::DoResume
             }
