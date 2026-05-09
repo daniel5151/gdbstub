@@ -1,11 +1,12 @@
 //! Support for reverse debugging targets.
 
+use crate::common::IsValidTid;
 use crate::target::Target;
 
 /// Target Extension - Reverse continue for targets.
 pub trait ReverseCont<Tid>: Target
 where
-    Tid: crate::IsValidTid,
+    Tid: IsValidTid,
 {
     /// [Reverse continue] the target.
     ///
@@ -27,7 +28,7 @@ pub type ReverseContOps<'a, Tid, T> = &'a mut dyn ReverseCont<
 /// Target Extension - Reverse stepping for targets.
 pub trait ReverseStep<Tid>: Target
 where
-    Tid: crate::IsValidTid,
+    Tid: IsValidTid,
 {
     /// [Reverse step] the specified `Tid`.
     ///

@@ -37,6 +37,7 @@ use super::DisconnectReason;
 use super::GdbStub;
 use crate::arch::Arch;
 use crate::arch::RegId;
+use crate::common::IsValidTid;
 use crate::common::Signal;
 use crate::conn::Connection;
 use crate::protocol::recv_packet::RecvPacketStateMachine;
@@ -49,7 +50,6 @@ use crate::target::ext::base::reverse_exec::ReplayLogPosition;
 use crate::target::ext::breakpoints::WatchKind;
 use crate::target::ext::catch_syscalls::CatchSyscallPosition;
 use crate::target::Target;
-use crate::IsValidTid;
 use managed::ManagedSlice;
 
 /// State-machine interface to `GdbStub`.

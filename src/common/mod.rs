@@ -43,3 +43,28 @@ pub enum Endianness {
     /// Little-endian.
     Little,
 }
+
+/// Data types that can be used as Thread IDs in the GBD protocol.
+pub trait IsValidTid: private::Sealed + PartialEq + Copy {
+    #[doc(hidden)]
+    fn into_fully_qualified_tid(self) -> Tid;
+}
+
+impl IsValidTid for () {
+    fn into_fully_qualified_tid(self) -> Tid {
+        crate::SINGLE_THREAD_TID
+    }
+}
+
+impl IsValidTid for Tid {
+    fn into_fully_qualified_tid(self) -> Tid {
+        self
+    }
+}
+
+mod private {
+    pub trait Sealed {}
+
+    impl Sealed for () {}
+    impl Sealed for crate::common::Tid {}
+}

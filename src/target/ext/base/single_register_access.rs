@@ -1,6 +1,7 @@
 //! Support for single-register read/write access.
 
 use crate::arch::Arch;
+use crate::common::IsValidTid;
 use crate::target::Target;
 use crate::target::TargetResult;
 
@@ -20,7 +21,7 @@ use crate::target::TargetResult;
 /// Control and Status registers).
 pub trait SingleRegisterAccess<Tid>: Target
 where
-    Tid: crate::IsValidTid,
+    Tid: IsValidTid,
 {
     /// Read to a single register on the target.
     ///

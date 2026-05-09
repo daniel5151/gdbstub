@@ -253,7 +253,7 @@
 //! method implementation with a parameter passed as `(addr: <Self::Arch as
 //! Arch>::Usize)`, just write `(addr: u32)` directly.
 use crate::arch::Arch;
-use crate::IsValidTid;
+use crate::common::IsValidTid;
 
 pub mod ext;
 
@@ -842,7 +842,7 @@ macro_rules! impl_dyn_target {
         impl<A, E, Tid> Target for $type
         where
             A: Arch,
-            Tid: crate::IsValidTid,
+            Tid: crate::common::IsValidTid,
         {
             type Arch = A;
             type Error = E;

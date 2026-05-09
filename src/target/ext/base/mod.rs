@@ -7,6 +7,7 @@
 //! threaded mode.
 
 use crate::arch::Arch;
+use crate::common::IsValidTid;
 
 pub mod multithread;
 pub mod reverse_exec;
@@ -28,7 +29,7 @@ pub(crate) enum ResumeOps<'a, A, E, Tid> {
     MultiThread(&'a mut dyn multithread::MultiThreadResume<Arch = A, Error = E, Tid = Tid>),
 }
 
-impl<'a, A: Arch, E, Tid: crate::IsValidTid> BaseOps<'a, A, E, Tid> {
+impl<'a, A: Arch, E, Tid: IsValidTid> BaseOps<'a, A, E, Tid> {
     #[inline(always)]
     pub(crate) fn resume_ops(self) -> Option<ResumeOps<'a, A, E, Tid>> {
         let ret = match self {

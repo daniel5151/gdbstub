@@ -1,6 +1,7 @@
 use super::prelude::*;
 use crate::arch::Arch;
 use crate::arch::RegId;
+use crate::common::IsValidTid;
 use crate::protocol::commands::ext::SingleRegisterAccess;
 use crate::target::ext::base::BaseOps;
 
@@ -17,8 +18,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         id: Tid,
     ) -> Result<HandlerStatus, Error<T::Error, C::Error>>
     where
-        Tid: crate::IsValidTid,
-        TargetTid: crate::IsValidTid,
+        Tid: IsValidTid,
+        TargetTid: IsValidTid,
     {
         let handler_status = match command {
             SingleRegisterAccess::p(p) => {
