@@ -72,6 +72,15 @@ pub mod run_blocking {
             }
         }
 
+        /// Return a writer that can be used to write arbitrary text to the GDB
+        /// client console.
+        pub fn console_writer(
+            &mut self,
+            target: &mut T,
+        ) -> state_machine::GdbConsoleWriter<'_, 'a, T, C> {
+            self.gdb.console_writer(target)
+        }
+
         /// Pass a byte to the GDB stub.
         pub fn incoming_data(self, target: &mut T, byte: u8) -> Event<'a, T, C> {
             Event {

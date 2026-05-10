@@ -113,6 +113,14 @@ impl run_blocking::BlockingEventLoop for EmuGdbEventLoop {
                 Ok(simple_stub.incoming_data(target, byte))
             }
             emu::RunEvent::Event(event) => {
+                // example of using the console writer to print a message to the GDB console
+                // when the target finishes running.
+                if matches!(event, emu::Event::Halted) {
+                    let mut out = simple_stub.console_writer(target);
+                    let ret = target.cpu.reg_get(armv4t_emu::Mode::User, 0);
+                    gdbstub::outputln!(out, "Program completed. Return value: {}", ret);
+                }
+
                 // translate emulator stop reason into GDB stop reason
                 Ok(simple_stub.report_stop(target, |report_stop| {
                     use gdbstub::target::ext::breakpoints::WatchKind;

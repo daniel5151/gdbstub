@@ -812,6 +812,53 @@ where
     }
 }
 
+/// A helper struct which enables writing arbitrary text to the GDB client
+/// console (either via `write_raw`, or via the `core::fmt::Write`
+/// implementation + [`output!`](crate::output) macro).
+pub struct GdbConsoleWriter<'gdb, 'a, T, C>
+where
+    T: Target,
+    C: Connection,
+{
+    gdb: &'gdb mut GdbStubStateMachineInner<'a, state::Running, T, C>,
+    use_rle: bool,
+}
+
+impl<'gdb, 'a, T, C> GdbConsoleWriter<'gdb, 'a, T, C>
+where
+    T: Target,
+    C: Connection,
+{
+    /// Write raw data to the GDB client console.
+    ///
+    /// Unless you have a specific reason to use this method, you will likely be
+    /// better served by using the `core::fmt::Write` implementation +
+    /// [`output!`](crate::output) macros instead.
+    ///
+    /// The GDB RSP docs recommend that console output be ASCII, but in
+    /// practice, GDB seems to be fine with receiving arbitrary binary data here
+    /// (e.g: it's possible to write UTF-8 data just fine, and it renders
+    /// correctly in GDB's console).
+    pub fn write_raw(&mut self, data: &[u8]) -> Result<(), GdbStubError<T::Error, C::Error>> {
+        let mut res = ResponseWriter::new(self.gdb.borrow_conn(), self.use_rle);
+        res.write_str("O").map_err(InternalError::from)?;
+        res.write_hex_buf(data).map_err(InternalError::from)?;
+        res.flush().map_err(InternalError::from)?;
+        Ok(())
+    }
+}
+
+impl<'gdb, 'a, T, C> core::fmt::Write for GdbConsoleWriter<'gdb, 'a, T, C>
+where
+    T: Target,
+    C: Connection,
+{
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
+        self.write_raw(s.as_bytes())
+            .map_err(|_| core::fmt::Error {})
+    }
+}
+
 /// Methods which can only be called from the
 /// [`GdbStubStateMachine::Running`] state.
 impl<'a, T, C> GdbStubStateMachineInner<'a, state::Running, T, C>
@@ -828,6 +875,15 @@ where
             res: ResponseWriter::new(self.borrow_conn(), target.use_rle()).into_state(),
             target,
             gdb: self,
+        }
+    }
+
+    /// Return a struct that can be used to write arbitrary text to the GDB
+    /// client console.
+    pub fn console_writer(&mut self, target: &mut T) -> GdbConsoleWriter<'_, 'a, T, C> {
+        GdbConsoleWriter {
+            gdb: self,
+            use_rle: target.use_rle(),
         }
     }
 
