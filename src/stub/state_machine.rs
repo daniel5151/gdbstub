@@ -490,7 +490,7 @@ where
 
         gdb.i
             .inner
-            .finish_signal_with_thread(&mut res, target, tid, signal)?;
+            .finish_signal_with_thread(&mut res, tid, signal)?;
 
         Ok(StopReasonReporter {
             target,
@@ -681,7 +681,7 @@ where
 
         let mut res = ResponseWriter::from_state(&mut gdb.i.conn, res);
 
-        gdb.i.inner.finish_library(&mut res, target, tid)?;
+        gdb.i.inner.finish_library(&mut res, tid)?;
 
         Ok(StopReasonReporter {
             target,

@@ -39,11 +39,6 @@ pub(crate) enum InternalError<T, C> {
 
     // Errors indicative of a error in the user's `Target` implementation / `gdbstub` integration.
     ImplicitSwBreakpoints,
-    // DEVNOTE: this is a temporary workaround for something that can and should
-    // be caught at compile time via IDETs. That said, since i'm not sure when
-    // I'll find the time to cut a breaking release of gdbstub, I'd prefer to
-    // push out this feature as a non-breaking change now.
-    MissingCurrentActivePidImpl,
     MissingToRawId,
     TracepointUnsupportedSourceEnumeration,
     UnsupportedStopReason,
@@ -88,7 +83,6 @@ impl<T, C> InternalError<T, C> {
 
             TargetError(_)
             | ImplicitSwBreakpoints
-            | MissingCurrentActivePidImpl
             | MissingToRawId
             | TracepointUnsupportedSourceEnumeration
             | UnsupportedStopReason => "Target",
@@ -104,7 +98,6 @@ impl<T, C> InternalError<T, C> {
             ClientSentNack
             | Connection(_, _)
             | ImplicitSwBreakpoints
-            | MissingCurrentActivePidImpl
             | MissingToRawId
             | PacketBufferOverflow
             | PacketParse(_)
@@ -208,7 +201,6 @@ where
 
             // Errors indicating an error in the user's `Target` implementation / `gdbstub` integration.
             ImplicitSwBreakpoints => write!(f, "The target has not opted into using implicit software breakpoints. See `Target::guard_rail_implicit_sw_breakpoints` for more information"),
-            MissingCurrentActivePidImpl => write!(f, "GDB client attempted to attach to a new process, but the target has not implemented support for `ExtendedMode::support_current_active_pid`"),
             MissingToRawId => write!(f, "A RegId was used with an API that requires raw register IDs to be available (e.g. `StopReasonReporter::add_reg`) but returned `None` from `to_raw_id()`"),
             TracepointUnsupportedSourceEnumeration => write!(f, "The target doesn't support the gdbstub TracepointSource extension, but attempted to transition to enumerating tracepoint sources"),
             UnsupportedStopReason => write!(f, "{} {}", unsupported_stop_reason!(), SEE_DOCS_FOR_CONTEXT),

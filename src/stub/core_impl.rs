@@ -1,4 +1,5 @@
 use crate::common::IsValidTid;
+use crate::common::Pid;
 use crate::common::Signal;
 use crate::conn::Connection;
 use crate::protocol::commands::Command;
@@ -7,6 +8,7 @@ use crate::protocol::ResponseWriter;
 use crate::protocol::SpecificIdKind;
 use crate::stub::error::InternalError;
 use crate::target::Target;
+use crate::FAKE_PID;
 use crate::SINGLE_THREAD_TID;
 use core::marker::PhantomData;
 
@@ -105,6 +107,11 @@ pub(crate) struct GdbStubImpl<T: Target, C: Connection> {
     _target: PhantomData<T>,
     _connection: PhantomData<C>,
 
+    // The most recently attached PID
+    current_active_pid: Pid,
+
+    // The TID (and when multiprocess support added, PID) used for memory/register
+    // operations
     current_mem_tid: T::Tid,
     current_resume_tid: SpecificIdKind,
     features: ProtocolFeatures,
@@ -123,14 +130,16 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             _target: PhantomData,
             _connection: PhantomData,
 
-            // NOTE: `current_mem_tid` and `current_resume_tid` are never queried prior to being set
-            // by the GDB client (via the 'H' packet), so it's fine to use dummy values here.
+            // NOTE: `current_active_pid`, `current_mem_tid` and `current_resume_tid` are never
+            // queried prior to being set by the GDB client (via the 'H' packet), so
+            // it's fine to use dummy values here.
             //
             // The alternative would be to use `Option`, and while this would be more "correct", it
             // would introduce a _lot_ of noisy and heavy error handling logic all over the place.
             //
             // Plus, even if the GDB client is acting strangely and doesn't overwrite these values,
             // the target will simply return a non-fatal error, which is totally fine.
+            current_active_pid: FAKE_PID,
             current_mem_tid: T::Tid::sentinel(),
             // FUTURE: this should get switched over to T::Tid as well
             current_resume_tid: SpecificIdKind::WithId(SINGLE_THREAD_TID),

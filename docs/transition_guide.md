@@ -14,6 +14,10 @@ Previously, if a thread had no `resume_set_action_XXX` methods called on it, the
 
 This new behavior obsoletes the `MultiThreadSchedulerLocking` trait, which has been removed.  If a stub is unable to handle executing a single thread and keeping all others locked, it should return an error in the `resume` method.
 
+#### The `CurrentActivePid` trait no longer exists
+
+The current PID is now tracked in the stub itself, so targets no longer need to implement this.  No changes are needed for the `attach` method.
+
 ## `0.6` -> `0.7`
 
 `0.7` is a fairly minimal "cleanup" release, landing a collection of small breaking changes that collectively improve various ergonomic issues in `gdbstub`'s API.
