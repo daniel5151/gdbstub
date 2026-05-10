@@ -31,7 +31,7 @@
 //!   type encodes information about the target's architecture, such as its
 //!   pointer size, register layout, etc... `gdbstub` comes with several
 //!   built-in architecture definitions, which can be found under the
-//!   [`arch`](../arch/index.html) module.
+//!   [`arch`](crate::arch) module.
 //!
 //! - The [`Target::Error`](trait.Target.html#associatedtype.Error) associated
 //!   type allows implementors to plumb-through their own project-specific fatal
@@ -353,9 +353,9 @@ impl<E> From<std::io::Error> for TargetError<E> {
 pub type TargetResult<T, Tgt> = Result<T, TargetError<<Tgt as Target>::Error>>;
 
 /// Describes the architecture and capabilities of a target which can be
-/// debugged by [`GdbStub`](../struct.GdbStub.html).
+/// debugged by [`GdbStub`](crate::stub::GdbStub).
 ///
-/// The [`Target`](trait.Target.html) trait describes how to control and modify
+/// The [`Target`] trait describes how to control and modify
 /// a system's execution state during a GDB debugging session, and serves as the
 /// primary bridge between `gdbstub`'s generic protocol implementation and a
 /// target's project/platform-specific code.

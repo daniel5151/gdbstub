@@ -63,8 +63,8 @@ pub enum Offsets<U> {
 
 /// Target Extension - Get section/segment relocation offsets from the target.
 ///
-/// Corresponds to the `qOffset` command. See the [section_offset module
-/// documentation](index.html).
+/// Corresponds to the `qOffset` command. See the [module docs](self) for
+/// additional context.
 pub trait SectionOffsets: Target {
     /// Return the target's current section (or segment) offsets.
     fn get_section_offsets(&mut self) -> Result<Offsets<<Self::Arch as Arch>::Usize>, Self::Error>;

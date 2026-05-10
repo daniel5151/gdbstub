@@ -21,10 +21,10 @@ pub trait MonitorCmd: Target {
     ///
     /// Intermediate console output can be written back to the GDB client using
     /// the provided `ConsoleOutput` object + the
-    /// [`gdbstub::output!`](macro.output.html) macro.
+    /// [`gdbstub::output!`](output) macro.
     ///
     /// _Note:_ The maximum length of incoming commands is limited by the size
-    /// of the packet buffer provided to the [`GdbStub`](struct.GdbStub.html).
+    /// of the packet buffer provided to the [`GdbStub`](crate::stub::GdbStub).
     /// Specifically, commands can only be up to `(buf.len() - 10) / 2` bytes.
     fn handle_monitor_cmd(&mut self, cmd: &[u8], out: ConsoleOutput<'_>)
         -> Result<(), Self::Error>;
