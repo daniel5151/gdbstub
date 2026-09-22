@@ -40,6 +40,7 @@ mod monitor_cmd;
 mod no_ack_mode;
 mod resume;
 mod reverse_exec;
+mod sbpf;
 mod section_offsets;
 mod single_register_access;
 mod target_xml;
@@ -229,6 +230,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             Command::Tracepoints(cmd) => self.handle_tracepoints(res, target, cmd),
             Command::HostInfo(cmd) => self.handle_host_info(res, target, cmd),
             Command::ProcessInfo(cmd) => self.handle_process_info(res, target, cmd),
+            Command::Sbpf(cmd) => self.handle_sbpf(res, target, cmd),
             Command::Wasm(cmd) => self.handle_wasm(res, target, cmd),
             // in the worst case, the command could not be parsed...
             Command::Unknown(cmd) => {

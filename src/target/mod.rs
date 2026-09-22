@@ -784,6 +784,12 @@ pub trait Target {
         None
     }
 
+    /// (LLDB extension) Support for SBPF-specific commands.
+    #[inline(always)]
+    fn support_sbpf(&mut self) -> Option<ext::sbpf::SbpfOps<'_, Self>> {
+        None
+    }
+
     /// (LLDB extension) Support for WebAssembly (Wasm)-specific commands.
     #[inline(always)]
     fn support_wasm(&mut self) -> Option<ext::wasm::WasmOps<'_, Self>> {
@@ -857,6 +863,7 @@ macro_rules! impl_dyn_target {
             __delegate_support!(monitor_cmd);
             __delegate_support!(process_info);
             __delegate_support!(section_offsets);
+            __delegate_support!(sbpf);
             __delegate_support!(target_description_xml_override);
             __delegate_support!(tracepoints);
             __delegate_support!(wasm);

@@ -388,6 +388,10 @@ commands! {
         "qProcessInfo" => _qProcessInfo::qProcessInfo,
     }
 
+    sbpf {
+        "qSBPFCallStack" => _qSBPFCallStack::qSBPFCallStack,
+    }
+
     wasm use 'a {
         "qWasmCallStack" => _qWasmCallStack::qWasmCallStack,
         "qWasmLocal" => _qWasmLocal::qWasmLocal<'a>,
