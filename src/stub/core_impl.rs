@@ -146,6 +146,7 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
     ) -> Result<State, InternalError<T::Error, C::Error>> {
         match packet {
             Packet::Ack => Ok(State::Pump),
+            Packet::Nack if self.features.no_ack_mode() => Ok(State::Pump),
             Packet::Nack => Err(InternalError::ClientSentNack),
             Packet::Interrupt => {
                 debug!("<-- interrupt packet");
