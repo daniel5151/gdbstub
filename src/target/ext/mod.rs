@@ -251,7 +251,7 @@ macro_rules! doc_comment {
 macro_rules! define_ext {
     ($extname:ident, $exttrait:ident) => {
         doc_comment! {
-            concat!("See [`", stringify!($exttrait), "`](trait.", stringify!($exttrait), ".html)."),
+            concat!("See [`", stringify!($exttrait), "`]."),
             pub type $extname<'a, T> =
                 &'a mut dyn $exttrait<Arch = <T as Target>::Arch, Error = <T as Target>::Error>;
         }

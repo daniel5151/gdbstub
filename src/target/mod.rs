@@ -353,7 +353,7 @@ pub type TargetResult<T, Tgt> = Result<T, TargetError<<Tgt as Target>::Error>>;
 /// Describes the architecture and capabilities of a target which can be
 /// debugged by [`GdbStub`](../struct.GdbStub.html).
 ///
-/// The [`Target`](trait.Target.html) trait describes how to control and modify
+/// The [`Target`] trait describes how to control and modify
 /// a system's execution state during a GDB debugging session, and serves as the
 /// primary bridge between `gdbstub`'s generic protocol implementation and a
 /// target's project/platform-specific code.

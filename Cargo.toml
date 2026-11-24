@@ -7,7 +7,6 @@ license = "MIT OR Apache-2.0"
 edition = "2018"
 readme = "README.md"
 documentation = "https://docs.rs/gdbstub"
-homepage = "https://github.com/daniel5151/gdbstub"
 repository  = "https://github.com/daniel5151/gdbstub"
 keywords = ["gdb", "emulation", "no_std", "debugging"]
 categories = ["development-tools::debugging", "embedded", "emulators", "network-programming", "no-std"]

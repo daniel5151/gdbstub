@@ -79,8 +79,10 @@ impl Registers for X86_64CoreRegs {
         }
 
         let mut regs = bytes[0..0x80]
-            .chunks_exact(8)
-            .map(|x| u64::from_le_bytes(x.try_into().unwrap()));
+            .as_chunks()
+            .0
+            .iter()
+            .map(|x| u64::from_le_bytes(*x));
 
         for reg in self.regs.iter_mut() {
             *reg = regs.next().ok_or(())?;
@@ -91,17 +93,19 @@ impl Registers for X86_64CoreRegs {
 
         self.segments.gdb_deserialize(&bytes[0x8C..0xA4])?;
 
-        let mut regs = bytes[0xA4..0xF4].chunks_exact(10).map(TryInto::try_into);
+        let mut regs = bytes[0xA4..0xF4].as_chunks::<10>().0.iter().copied();
 
         for reg in self.st.iter_mut() {
-            *reg = regs.next().ok_or(())?.map_err(|_| ())?;
+            *reg = regs.next().ok_or(())?;
         }
 
         self.fpu.gdb_deserialize(&bytes[0xF4..0x114])?;
 
         let mut regs = bytes[0x114..0x214]
-            .chunks_exact(0x10)
-            .map(|x| u128::from_le_bytes(x.try_into().unwrap()));
+            .as_chunks()
+            .0
+            .iter()
+            .map(|x| u128::from_le_bytes(*x));
 
         for reg in self.xmm.iter_mut() {
             *reg = regs.next().ok_or(())?;

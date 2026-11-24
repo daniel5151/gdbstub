@@ -74,7 +74,7 @@ pub trait ExtendedMode: Target {
     ///
     /// _Note:_ This method's implementation should handle any additional
     /// configuration options set via the various `ConfigureXXX` extensions to
-    /// `ExtendedMode`. e.g: if the [`ConfigureEnv`](trait.ConfigureEnv.html)
+    /// `ExtendedMode`. e.g: if the [`ConfigureEnv`]
     /// extension is implemented and enabled, this method should set the spawned
     /// processes' environment variables accordingly.
     fn run(&mut self, filename: Option<&[u8]>, args: Args<'_, '_>) -> TargetResult<Pid, Self>;

@@ -5,8 +5,8 @@ mod impls;
 /// A trait to perform in-order, serial, byte-wise I/O.
 ///
 /// When the `std` feature is enabled, this trait is automatically implemented
-/// for [`TcpStream`](std::net::TcpStream) and
-/// [`UnixStream`](std::os::unix::net::UnixStream) (on unix systems).
+/// for [`TcpStream`](https://doc.rust-lang.org/std/net/struct.TcpStream.html) and
+/// [`UnixStream`](https://doc.rust-lang.org/std/os/unix/net/struct.UnixStream.html) (on unix systems).
 pub trait Connection {
     /// Transport-specific error type.
     type Error;
@@ -43,7 +43,7 @@ pub trait Connection {
     /// # Example
     ///
     /// The `on_session_start` implementation for `TcpStream` ensures that
-    /// [`set_nodelay(true)`](std::net::TcpStream::set_nodelay)
+    /// [`set_nodelay(true)`](https://doc.rust-lang.org/std/net/struct.TcpStream.html#method.set_nodelay)
     /// is called. The GDB remote serial protocol requires sending/receiving
     /// many small packets, so forgetting to enable `TCP_NODELAY` can result in
     /// a massively degraded debugging experience.
@@ -58,8 +58,8 @@ pub trait Connection {
 /// [`GdbStub::run_blocking`](crate::stub::GdbStub::run_blocking) API.
 ///
 /// When the `std` feature is enabled, this trait is automatically implemented
-/// for [`TcpStream`](std::net::TcpStream) and
-/// [`UnixStream`](std::os::unix::net::UnixStream) (on unix systems).
+/// for [`TcpStream`](https://doc.rust-lang.org/std/net/struct.TcpStream.html) and
+/// [`UnixStream`](https://doc.rust-lang.org/std/os/unix/net/struct.UnixStream.html) (on unix systems).
 pub trait ConnectionExt: Connection {
     /// Read a single byte.
     fn read(&mut self) -> Result<u8, Self::Error>;
