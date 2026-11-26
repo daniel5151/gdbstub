@@ -29,9 +29,10 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     }
                 })
                 .map_err(Error::TargetError)?;
-                // It is possible for this to be `None` in the case where the target has
-                // not yet called `register_thread()`. This can happen, for example, if
-                // there are no active threads in the current target process.
+                // It is possible for this to be `None` in the case where the
+                // target has not yet called `register_thread()`. This can
+                // happen, for example, if there are no active threads in the
+                // current target process.
                 first_tid
             }
         };
@@ -112,7 +113,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 res.write_str("PacketSize=")?;
                 res.write_num(cmd.packet_buffer_len)?;
 
-                // these are the few features that gdbstub unconditionally supports
+                // these are the few features that gdbstub unconditionally
+                // supports
                 res.write_str(concat!(";vContSupported+", ";multiprocess+",))?;
 
                 if target.use_no_ack_mode() {
@@ -192,19 +194,20 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     // There are a number of optional tracepoint extensions that
                     // gdbstub should eventually implement.
                     // * `StaticTracepoint` for static tracepoint support.
-                    // * `EnableDisableTracepoints` for enabling/disabling tracepoints during a
-                    //   trace experiment.
+                    // * `EnableDisableTracepoints` for enabling/disabling
+                    //   tracepoints during a trace experiment.
                     // * `tracenz` for the tracenz agent bytecode operation.
                     // * The `Qbtrace:*` family for branch tracing.
-                    // * `InstallInTrace` allows for gdbstub to deliver tracepoint configuration
-                    //   commands while the trace experiment is running instead of them only taking
+                    // * `InstallInTrace` allows for gdbstub to deliver
+                    //   tracepoint configuration commands while the trace
+                    //   experiment is running instead of them only taking
                     //   affect on the next `tstart` command.
                     //
-                    // For now, gdbstub doesn't provide trait extensions for these
-                    // options and so we don't report support. We do report support
-                    // for one extension however:
-                    // * `QTBuffer:size` for configuring the trace buffer size, since the target is
-                    //   allowed to implement it as a no-op.
+                    // For now, gdbstub doesn't provide trait extensions for
+                    // these options and so we don't report support. We do
+                    // report support for one extension however:
+                    // * `QTBuffer:size` for configuring the trace buffer size,
+                    //   since the target is allowed to implement it as a no-op.
                     res.write_str(";QTBuffer:size+")?;
                     if ops.support_tracepoint_source().is_some() {
                         res.write_str(";TracepointSource+")?;
@@ -248,15 +251,17 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             // -------------------- "Core" Functionality -------------------- //
             Base::QuestionMark(_) => {
                 // TODO: Improve the '?' response.
-                // this will be particularly relevant when working on non-stop mode.
+                // this will be particularly relevant when working on non-stop
+                // mode.
                 self.report_reasonable_stop_reason(res, target)?
             }
             Base::qAttached(cmd) => {
                 let is_attached = match target.support_extended_mode() {
-                    // when _not_ running in extended mode, just report that we're attaching to an
-                    // existing process.
+                    // when _not_ running in extended mode, just report that
+                    // we're attaching to an existing process.
                     None => true, // assume attached to an existing process
-                    // When running in extended mode, we must defer to the target
+                    // When running in extended mode, we must defer to the
+                    // target
                     Some(ops) => {
                         match cmd.pid {
                             Some(pid) => ops.query_if_attached(pid).handle_error()?.was_attached(),
@@ -330,11 +335,12 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             }
             Base::k(_) | Base::vKill(_) => {
                 match target.support_extended_mode() {
-                    // When not running in extended mode, stop the `GdbStub` and disconnect.
+                    // When not running in extended mode, stop the `GdbStub` and
+                    // disconnect.
                     None => HandlerStatus::Disconnect(DisconnectReason::Kill),
 
-                    // When running in extended mode, a kill command does not necessarily result in
-                    // a disconnect...
+                    // When running in extended mode, a kill command does not
+                    // necessarily result in a disconnect...
                     Some(ops) => {
                         let pid = match command {
                             Base::vKill(cmd) => Some(cmd.pid),
@@ -343,7 +349,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
 
                         let should_terminate = ops.kill(pid).handle_error()?;
                         if should_terminate.into_bool() {
-                            // manually write OK, since we need to return a DisconnectReason
+                            // manually write OK, since we need to return a
+                            // DisconnectReason
                             res.write_str("OK")?;
                             HandlerStatus::Disconnect(DisconnectReason::Kill)
                         } else {
@@ -353,9 +360,11 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 }
             }
             Base::D(cmd) => {
-                // TODO: plumb-through Pid when exposing full multiprocess + extended mode
+                // TODO: plumb-through Pid when exposing full multiprocess +
+                // extended mode
                 let _pid = cmd.pid;
-                res.write_str("OK")?; // manually write OK, since we need to return a DisconnectReason
+                res.write_str("OK")?; // manually write OK, since we need to
+                                      // return a DisconnectReason
                 HandlerStatus::Disconnect(DisconnectReason::Disconnect)
             }
 
@@ -374,7 +383,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         IdKind::All => return Err(Error::PacketUnexpected),
                         IdKind::WithId(tid) => self.current_mem_tid = tid,
                     },
-                    // technically, this variant is deprecated in favor of vCont...
+                    // technically, this variant is deprecated in favor of
+                    // vCont...
                     Op::StepContinue => match cmd.thread.tid {
                         IdKind::Any => match self.get_sane_any_tid(target)? {
                             Some(tid) => self.current_resume_tid = SpecificIdKind::WithId(tid),
@@ -406,7 +416,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         let mut err: Result<_, Error<T::Error, C::Error>> = Ok(());
                         let mut first = true;
                         ops.list_active_threads(&mut |tid| {
-                            // TODO: replace this with a try block (once stabilized)
+                            // TODO: replace this with a try block (once
+                            // stabilized)
                             let e = (|| {
                                 if !first {
                                     res.write_str(",")?

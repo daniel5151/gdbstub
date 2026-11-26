@@ -44,12 +44,14 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 let tid = match target.base_ops() {
                     BaseOps::SingleThread(_) => SINGLE_THREAD_TID,
                     BaseOps::MultiThread(ops) => {
-                        // HACK: gdbstub should avoid using a sentinel value here...
+                        // HACK: gdbstub should avoid using a sentinel value
+                        // here...
                         if self.current_mem_tid == SINGLE_THREAD_TID {
                             let mut err: Result<_, Error<T::Error, C::Error>> = Ok(());
                             let mut first_tid = None;
                             ops.list_active_threads(&mut |tid| {
-                                // TODO: replace this with a try block (once stabilized)
+                                // TODO: replace this with a try block (once
+                                // stabilized)
                                 let e = (|| {
                                     if first_tid.is_some() {
                                         return Ok(());

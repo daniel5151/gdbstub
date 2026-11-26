@@ -144,9 +144,10 @@ impl Emu {
                 .iter()
                 .filter(|(_tracepoint, (ctp, _source, _actions))| ctp.enabled && ctp.addr == pc)
                 .map(|(tracepoint, _definition)| {
-                    // our `tracepoint_define` restricts our loaded tracepoints to only contain
-                    // register collect actions. instead of only collecting the registers requested
-                    // in the register mask and recording a minimal trace frame, we just collect
+                    // our `tracepoint_define` restricts our loaded tracepoints
+                    // to only contain register collect actions. instead of only
+                    // collecting the registers requested in the register mask
+                    // and recording a minimal trace frame, we just collect
                     // all of them by cloning the cpu itself.
                     TraceFrame {
                         number: *tracepoint,

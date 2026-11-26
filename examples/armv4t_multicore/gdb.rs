@@ -142,19 +142,20 @@ impl MultiThreadBase for Emu {
 
 impl MultiThreadResume for Emu {
     fn resume(&mut self) -> Result<(), Self::Error> {
-        // Upon returning from the `resume` method, the target being debugged should be
-        // configured to run according to whatever resume actions the GDB client has
-        // specified (as specified by `set_resume_action`, `set_resume_range_step`,
-        // `set_reverse_{step, continue}`, etc...)
+        // Upon returning from the `resume` method, the target being debugged
+        // should be configured to run according to whatever resume actions the
+        // GDB client has specified (as specified by `set_resume_action`,
+        // `set_resume_range_step`, `set_reverse_{step, continue}`, etc...)
         //
-        // In this basic `armv4t_multicore` example, the `resume` method is actually a
-        // no-op, as the execution mode of the emulator's interpreter loop has already
-        // been modified via the various `set_X` methods.
+        // In this basic `armv4t_multicore` example, the `resume` method is
+        // actually a no-op, as the execution mode of the emulator's interpreter
+        // loop has already been modified via the various `set_X` methods.
         //
-        // In more complex implementations, it's likely that the target being debugged
-        // will be running in another thread / process, and will require some kind of
-        // external "orchestration" to set it's execution mode (e.g: modifying the
-        // target's process state via platform specific debugging syscalls).
+        // In more complex implementations, it's likely that the target being
+        // debugged will be running in another thread / process, and will
+        // require some kind of external "orchestration" to set it's execution
+        // mode (e.g: modifying the target's process state via platform specific
+        // debugging syscalls).
 
         Ok(())
     }

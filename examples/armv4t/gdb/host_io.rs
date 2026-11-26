@@ -69,10 +69,10 @@ impl target::ext::host_io::HostIoOpen for Emu {
             return Err(HostIoError::Errno(HostIoErrno::ENOENT));
         }
 
-        // In this example, the test binary is compiled into the binary itself as the
-        // `TEST_PROGRAM_ELF` array using `include_bytes!`. As such, we must "spoof" the
-        // existence of a real file, which will actually be backed by the in-binary
-        // `TEST_PROGRAM_ELF` array.
+        // In this example, the test binary is compiled into the binary itself
+        // as the `TEST_PROGRAM_ELF` array using `include_bytes!`. As such, we
+        // must "spoof" the existence of a real file, which will actually be
+        // backed by the in-binary `TEST_PROGRAM_ELF` array.
         if filename == b"/test.elf" {
             return Ok(0);
         }

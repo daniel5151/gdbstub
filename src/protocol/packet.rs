@@ -54,7 +54,8 @@ impl<'a> PacketBuf<'a> {
         // split buffer into body and checksum components
         let mut parts = pkt_buf[1..].split(|b| *b == b'#');
 
-        let body = parts.next().unwrap(); // spit iter always returns at least one element
+        let body = parts.next().unwrap(); // spit iter always returns at least
+                                          // one element
         let checksum = parts
             .next()
             .ok_or(PacketParseError::MissingChecksum)?
@@ -94,8 +95,9 @@ impl<'a> PacketBuf<'a> {
     /// there was a prefix match.
     pub fn strip_prefix(&mut self, prefix: &[u8]) -> bool {
         let body = {
-            // SAFETY: The public interface of `PacketBuf` ensures that `self.body_range`
-            // always stays within the bounds of the provided buffer.
+            // SAFETY: The public interface of `PacketBuf` ensures that
+            // `self.body_range` always stays within the bounds of the provided
+            // buffer.
             #[cfg(not(feature = "paranoid_unsafe"))]
             unsafe {
                 self.buf.get_unchecked_mut(self.body_range.clone())
@@ -106,8 +108,9 @@ impl<'a> PacketBuf<'a> {
         };
 
         if body.starts_with(prefix) {
-            // SAFETY: if the current buffer range `starts_with` the specified prefix, then
-            // it is safe to bump `body_range.start` by the prefix length.
+            // SAFETY: if the current buffer range `starts_with` the specified
+            // prefix, then it is safe to bump `body_range.start` by the prefix
+            // length.
             self.body_range = (self.body_range.start + prefix.len())..self.body_range.end;
             true
         } else {
@@ -118,8 +121,9 @@ impl<'a> PacketBuf<'a> {
     /// Return a mutable reference to slice of the packet buffer corresponding
     /// to the current body.
     pub fn into_body(self) -> &'a mut [u8] {
-        // SAFETY: The public interface of `PacketBuf` ensures that `self.body_range`
-        // always stays within the bounds of the provided buffer.
+        // SAFETY: The public interface of `PacketBuf` ensures that
+        // `self.body_range` always stays within the bounds of the provided
+        // buffer.
         #[cfg(not(feature = "paranoid_unsafe"))]
         unsafe {
             self.buf.get_unchecked_mut(self.body_range)

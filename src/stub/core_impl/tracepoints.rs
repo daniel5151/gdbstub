@@ -108,8 +108,9 @@ impl<'a, U: BeBytes> ExtendTracepoint<'a, U> {
             [rest @ .., b'-'] => (rest, true),
             x => (x, false),
         };
-        // TODO: There's no "packet unsupported", so for now we stub out unimplemented
-        // functionality by reporting the commands malformed instead.
+        // TODO: There's no "packet unsupported", so for now we stub out
+        // unimplemented functionality by reporting the commands malformed
+        // instead.
         use crate::protocol::PacketParseError::MalformedCommand;
         let mut unparsed: Option<&mut [u8]> = Some(actions);
         loop {
@@ -119,15 +120,15 @@ impl<'a, U: BeBytes> ExtendTracepoint<'a, U> {
                     // future packets should be interpreted, but as a trait we
                     // can't keep a flag around for that (unless we specifically
                     // have a `mark_while_stepping` callback for the target to
-                    // keep track future tracepoint_extends should be treated different).
-                    // If we go that route we also would need to return two vectors
-                    // here, "normal" actions and "while stepping" actions...but
-                    // "normals" actions may still be "while stepping" actions,
-                    // just continued from the previous packet, which we forgot
-                    // about!
+                    // keep track future tracepoint_extends should be treated
+                    // different). If we go that route we also would need to
+                    // return two vectors here, "normal" actions and "while
+                    // stepping" actions...but "normals" actions may still be
+                    // "while stepping" actions, just continued from the
+                    // previous packet, which we forgot about!
                     //
-                    // We use 'W' to indicate "while-stepping", since we're already
-                    // using 'S' elsewhere for static tracepoints.
+                    // We use 'W' to indicate "while-stepping", since we're
+                    // already using 'S' elsewhere for static tracepoints.
                     return Err(Error::TracepointFeatureUnimplemented(b'W'));
                 }
                 Some([b'R', mask @ ..]) => {
@@ -149,8 +150,9 @@ impl<'a, U: BeBytes> ExtendTracepoint<'a, U> {
                     });
                 }
                 Some([b'M', _mem_args @ ..]) => {
-                    // Unimplemented: even simple actions like `collect *(int*)0x0`
-                    // are actually assembled as `X` bytecode actions
+                    // Unimplemented: even simple actions like `collect
+                    // *(int*)0x0` are actually assembled as `X` bytecode
+                    // actions
                     return Err(Error::TracepointFeatureUnimplemented(b'M'));
                 }
                 Some([b'X', eval_args @ ..]) => {
@@ -214,10 +216,10 @@ impl<U: crate::internal::BeBytes + num_traits::Zero + PrimInt> SourceTracepoint<
         })?;
         res.write_str(":")?;
         // We use the start and slen from the SourceTracepoint instead of
-        // start=0 slen=bytes.len() because, although we can assume GDB to be able
-        // to handle arbitrary sized packets, the target implementation might still
-        // be giving us chunked source (such as if it's parroting the chunked source
-        // that GDB initially gave us).
+        // start=0 slen=bytes.len() because, although we can assume GDB to be
+        // able to handle arbitrary sized packets, the target implementation
+        // might still be giving us chunked source (such as if it's parroting
+        // the chunked source that GDB initially gave us).
         res.write_num(self.start)?;
         res.write_str(":")?;
         res.write_num(self.slen)?;
@@ -386,17 +388,17 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
         match command {
             Tracepoints::QTinit(_) => {
                 ops.tracepoints_init().handle_error()?;
-                // GDB documentation doesn't say it, but this requires "OK" in order
-                // to signify we support tracepoints.
+                // GDB documentation doesn't say it, but this requires "OK" in
+                // order to signify we support tracepoints.
                 return Ok(HandlerStatus::NeedsOk);
             }
             Tracepoints::qTStatus(_) => {
                 let mut err: Option<Error<T::Error, C::Error>> = None;
                 let mut has_status = false;
                 ops.trace_experiment_status(&mut |status: ExperimentStatus<'_>| {
-                    // If the target implementation calls us multiple times, then
-                    // we would erroneously serialize an invalid response. Guard
-                    // against it in the simplest way.
+                    // If the target implementation calls us multiple times,
+                    // then we would erroneously serialize an invalid response.
+                    // Guard against it in the simplest way.
                     if has_status {
                         return;
                     }
@@ -441,7 +443,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 match q {
                     QTDP::Create(ctdp) => {
                         if let Some(feat) = ctdp.unsupported_option {
-                            // We have some options we don't know how to process, so bail out.
+                            // We have some options we don't know how to
+                            // process, so bail out.
                             return Err(Error::TracepointFeatureUnimplemented(feat));
                         }
 
@@ -558,12 +561,13 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     res.write_str("F-1")?;
                 }
             }
-            // The GDB protocol for this is very weird: it sends this first packet
-            // to initialize a state machine on our stub, and then sends the subsequent
-            // packets N times in order to drive the state machine to the end in
-            // order to ask for all our tracepoints and their actions. gdbstub
-            // uses a target allocated state machine that it drives in response
-            // to these packets, so that it can provide a nice typed API.
+            // The GDB protocol for this is very weird: it sends this first
+            // packet to initialize a state machine on our stub, and then sends
+            // the subsequent packets N times in order to drive the state
+            // machine to the end in order to ask for all our tracepoints and
+            // their actions. gdbstub uses a target allocated state machine that
+            // it drives in response to these packets, so that it can provide a
+            // nice typed API.
             Tracepoints::qTfP(_) => {
                 // Reset our state machine
                 let state = ops.tracepoint_enumerate_state();
@@ -573,9 +577,9 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 let mut started = None;
                 let step = ops
                     .tracepoint_enumerate_start(None, &mut |ctp| {
-                        // We need to know what tracepoint to begin stepping, since the
-                        // target will just tell us there's TracepointEnumerateStep::More
-                        // otherwise.
+                        // We need to know what tracepoint to begin stepping,
+                        // since the target will just tell us there's
+                        // TracepointEnumerateStep::More otherwise.
                         started = Some((ctp.number, ctp.addr));
                         let e = ctp.write::<T, C>(res);
                         if let Err(e) = e {
@@ -605,7 +609,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     }
                     Some(TracepointEnumerateCursor::New { tp, .. }) => {
                         // If we don't have any progress, the last packet was
-                        // a Next(tp) and we need to start reporting a new tracepoint
+                        // a Next(tp) and we need to start reporting a new
+                        // tracepoint
                         Some(
                             ops.tracepoint_enumerate_start(Some(tp), &mut |ctp| {
                                 let e = ctp.write::<T, C>(res);
@@ -617,7 +622,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                         )
                     }
                     Some(TracepointEnumerateCursor::Action { tp, addr, step }) => {
-                        // Otherwise we should be continuing the advance the current tracepoint.
+                        // Otherwise we should be continuing the advance the
+                        // current tracepoint.
                         Some(
                             ops.tracepoint_enumerate_action(tp, step, &mut |action| {
                                 let e = action.write::<T, C>(tp, addr, res);
@@ -641,8 +647,9 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                                     .handle_error()?,
                             )
                         } else {
-                            // If the target doesn't support tracepoint sources but told
-                            // us to enumerate one anyways, then the target has an error.
+                            // If the target doesn't support tracepoint sources
+                            // but told us to enumerate one anyways, then the
+                            // target has an error.
                             return Err(Error::TracepointUnsupportedSourceEnumeration);
                         }
                     }

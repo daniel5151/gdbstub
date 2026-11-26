@@ -103,10 +103,12 @@ pub fn decode_hex_buf(base_buf: &mut [u8]) -> Result<&mut [u8], DecodeHexBufErro
 
     let decoded_len = buf.len() / 2;
     for i in 0..decoded_len {
-        // SAFETY: rustc isn't smart enough to automatically elide these bound checks.
+        // SAFETY: rustc isn't smart enough to automatically elide these bound
+        // checks.
         //
-        // If buf.len() == 0 or 1: trivially safe, since the for block is never taken
-        // If buf.len() >= 2: the range of values for `i` is 0..(buf.len() / 2 - 1)
+        // If buf.len() == 0 or 1: trivially safe, since the for block is never
+        // taken If buf.len() >= 2: the range of values for `i` is 0..(buf.len()
+        // / 2 - 1)
         let (hi, lo, b) = unsafe {
             (
                 //    (buf.len() / 2 - 1) * 2
@@ -117,7 +119,8 @@ pub fn decode_hex_buf(base_buf: &mut [u8]) -> Result<&mut [u8], DecodeHexBufErro
                 // == (buf.len() - 1)
                 // since buf.len() is >2, this is in-bounds
                 *buf.get_unchecked(i * 2 + 1),
-                // since buf.len() is >2, (buf.len() / 2 - 1) is always in-bounds
+                // since buf.len() is >2, (buf.len() / 2 - 1) is always
+                // in-bounds
                 buf.get_unchecked_mut(i),
             )
         };

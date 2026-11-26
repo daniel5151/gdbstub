@@ -230,14 +230,16 @@ impl<'a, T: Target, C: Connection> GdbStubStateMachineInner<'a, state::Idle<T>, 
             State::Disconnect(reason) => self.transition(state::Disconnected { reason }).into(),
             State::DeferredStopReason => {
                 match self.state.deferred_ctrlc_stop_reason {
-                    // if we were interrupted while idle, immediately report the deferred stop
-                    // reason after transitioning into the running state
+                    // if we were interrupted while idle, immediately report the
+                    // deferred stop reason after transitioning into the running
+                    // state
                     Some(reason) => {
                         return self
                             .transition(state::Running {})
                             .report_stop(target, reason)
                     }
-                    // otherwise, just transition into the running state as usual
+                    // otherwise, just transition into the running state as
+                    // usual
                     None => self.transition(state::Running {}).into(),
                 }
             }

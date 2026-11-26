@@ -39,8 +39,8 @@ pub struct X87FpuInternalRegs {
 impl Registers for X87FpuInternalRegs {
     type ProgramCounter = u32;
 
-    // HACK: this struct is never used as an architecture's main register file, so
-    // using a dummy value here is fine.
+    // HACK: this struct is never used as an architecture's main register file,
+    // so using a dummy value here is fine.
     fn pc(&self) -> Self::ProgramCounter {
         0
     }
@@ -54,8 +54,8 @@ impl Registers for X87FpuInternalRegs {
             };
         }
 
-        // Note: GDB section names don't make sense unless you read x87 FPU section 8.1:
-        // https://web.archive.org/web/20150123212110/http://www.intel.com/content/dam/www/public/us/en/documents/manuals/64-ia-32-architectures-software-developer-vol-1-manual.pdf
+        // Note: GDB section names don't make sense unless you read x87 FPU
+        // section 8.1: https://web.archive.org/web/20150123212110/http://www.intel.com/content/dam/www/public/us/en/documents/manuals/64-ia-32-architectures-software-developer-vol-1-manual.pdf
         write_bytes!(&self.fctrl.to_le_bytes());
         write_bytes!(&self.fstat.to_le_bytes());
         write_bytes!(&self.ftag.to_le_bytes());
@@ -110,8 +110,8 @@ pub struct X86SegmentRegs {
 impl Registers for X86SegmentRegs {
     type ProgramCounter = u32;
 
-    // HACK: this struct is never used as an architecture's main register file, so
-    // using a dummy value here is fine.
+    // HACK: this struct is never used as an architecture's main register file,
+    // so using a dummy value here is fine.
     fn pc(&self) -> Self::ProgramCounter {
         0
     }

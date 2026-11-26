@@ -56,8 +56,9 @@ pub struct Emu {
     pub(crate) watchpoint_kind: HashMap<u32, (bool, bool)>,
     pub(crate) breakpoints: Vec<u32>,
 
-    // GDB seems to get gets very confused if two threads are executing the exact same code at the
-    // exact same time. Maybe this is a bug with `gdbstub`?
+    // GDB seems to get gets very confused if two threads are executing the
+    // exact same code at the exact same time. Maybe this is a bug with
+    // `gdbstub`?
     stall_cop_cycles: usize,
 }
 
@@ -147,9 +148,9 @@ impl Emu {
         }
 
         if let Some(access) = hit_watchpoint {
-            // NOTE: this isn't a particularly elegant way to do watchpoints! This works
-            // fine for some example code, but don't use this as inspiration in your own
-            // emulator!
+            // NOTE: this isn't a particularly elegant way to do watchpoints!
+            // This works fine for some example code, but don't use this as
+            // inspiration in your own emulator!
             match access.kind {
                 AccessKind::Read => {
                     if *self
@@ -204,7 +205,8 @@ impl Emu {
     }
 
     pub fn run(&mut self, mut poll_incoming_data: impl FnMut() -> bool) -> RunEvent {
-        // The underlying armv4t_multicore emulator cycles all cores in lock-step.
+        // The underlying armv4t_multicore emulator cycles all cores in
+        // lock-step.
         //
         // Inside `self.step()`, we iterate through all cores and only invoke
         // `step_core` if that core's `ExecMode` is not `Stop`.
