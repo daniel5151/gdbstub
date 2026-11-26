@@ -19,9 +19,10 @@
 //!         - (Monitor Command) Use a heap-allocated output buffer in
 //!           `ConsoleOutput`.
 //! - `std` (implies `alloc`)
-//!     - Implement `Connection` for [`TcpStream`](std::net::TcpStream) and
-//!       [`UnixStream`](std::os::unix::net::UnixStream).
-//!     - Implement [`std::error::Error`] for `gdbstub::Error`.
+//!     - Implement `Connection` for [`TcpStream`](https://doc.rust-lang.org/std/net/struct.TcpStream.html)
+//!       and [`UnixStream`](https://doc.rust-lang.org/std/os/unix/net/struct.UnixStream.html).
+//!     - Implement [`std::error::Error`](https://doc.rust-lang.org/std/error/trait.Error.html)
+//!       for `gdbstub::Error`.
 //!     - Add a `TargetError::Io` variant to simplify `std::io::Error` handling
 //!       from Target methods.
 //! - `paranoid_unsafe`
@@ -58,8 +59,8 @@
 //! [`Connection`](conn::Connection) trait.
 //!
 //! `Connection` is automatically implemented for common `std` types such as
-//! [`TcpStream`](std::net::TcpStream) and
-//! [`UnixStream`](std::os::unix::net::UnixStream).
+//! [`TcpStream`](https://doc.rust-lang.org/std/net/struct.TcpStream.html) and
+//! [`UnixStream`](https://doc.rust-lang.org/std/os/unix/net/struct.UnixStream.html).
 //!
 //! If you're using `gdbstub` in a `#![no_std]` environment, `Connection` will
 //! most likely need to be manually implemented on top of whatever in-order,

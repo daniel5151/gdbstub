@@ -1,2 +1,4 @@
 # fmt everything using imports_granularity = "Item"
 e2329b80c2d51ee0ab4678365a35b27b51f32235
+# fmt everything using wrap_comments = true
+a3f8576a6eba1c4adc7a8b67fa9bc13ff4fe6b8e

@@ -94,8 +94,10 @@ impl Registers for X86CoreRegs {
         macro_rules! parse_regs {
             ($($reg:ident),*) => {
                 let mut regs = bytes[0..0x28]
-                    .chunks_exact(4)
-                    .map(|x| u32::from_le_bytes(x.try_into().unwrap()));
+                    .as_chunks()
+                    .0
+                    .iter()
+                    .map(|x| u32::from_le_bytes(*x));
                 $(
                     self.$reg = regs.next().ok_or(())?;
                 )*
@@ -106,17 +108,19 @@ impl Registers for X86CoreRegs {
 
         self.segments.gdb_deserialize(&bytes[0x28..0x40])?;
 
-        let mut regs = bytes[0x40..0x90].chunks_exact(10).map(TryInto::try_into);
+        let mut regs = bytes[0x40..0x90].as_chunks::<10>().0.iter().copied();
 
         for reg in self.st.iter_mut() {
-            *reg = regs.next().ok_or(())?.map_err(|_| ())?;
+            *reg = regs.next().ok_or(())?;
         }
 
         self.fpu.gdb_deserialize(&bytes[0x90..0xb0])?;
 
         let mut regs = bytes[0xb0..0x130]
-            .chunks_exact(0x10)
-            .map(|x| u128::from_le_bytes(x.try_into().unwrap()));
+            .as_chunks()
+            .0
+            .iter()
+            .map(|x| u128::from_le_bytes(*x));
 
         for reg in self.xmm.iter_mut() {
             *reg = regs.next().ok_or(())?;

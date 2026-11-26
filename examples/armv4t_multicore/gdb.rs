@@ -58,8 +58,8 @@ impl MultiThreadBase for Emu {
 
         let mode = cpu.mode();
 
-        for i in 0..13 {
-            regs.r[i] = cpu.reg_get(mode, i as u8);
+        for (i, reg) in regs.r.iter_mut().enumerate() {
+            *reg = cpu.reg_get(mode, i as u8);
         }
         regs.sp = cpu.reg_get(mode, reg::SP);
         regs.lr = cpu.reg_get(mode, reg::LR);

@@ -1,5 +1,4 @@
 use super::PpcVector;
-use core::convert::TryInto;
 use gdbstub::arch::Registers;
 
 /// 32-bit PowerPC core registers, FPU registers, and AltiVec SIMD registers.
@@ -85,16 +84,20 @@ impl Registers for PowerPcCommonRegs {
         }
 
         let mut regs = bytes[0..0x80]
-            .chunks_exact(4)
-            .map(|x| u32::from_be_bytes(x.try_into().unwrap()));
+            .as_chunks()
+            .0
+            .iter()
+            .map(|x| u32::from_be_bytes(*x));
 
         for reg in &mut self.r {
             *reg = regs.next().ok_or(())?;
         }
 
         let mut regs = bytes[0x80..0x180]
-            .chunks_exact(8)
-            .map(|x| f64::from_be_bytes(x.try_into().unwrap()));
+            .as_chunks()
+            .0
+            .iter()
+            .map(|x| f64::from_be_bytes(*x));
 
         for reg in &mut self.f {
             *reg = regs.next().ok_or(())?;
@@ -103,8 +106,10 @@ impl Registers for PowerPcCommonRegs {
         macro_rules! parse_regs {
             ($start:literal..$end:literal, $($reg:ident),*) => {
                 let mut regs = bytes[$start..$end]
-                    .chunks_exact(4)
-                    .map(|x| u32::from_be_bytes(x.try_into().unwrap()));
+                    .as_chunks()
+                    .0
+                    .iter()
+                    .map(|x| u32::from_be_bytes(*x));
                 $(
                     self.$reg = regs.next().ok_or(())?;
                 )*
@@ -114,8 +119,10 @@ impl Registers for PowerPcCommonRegs {
         parse_regs!(0x180..0x19c, pc, msr, cr, lr, ctr, xer, fpscr);
 
         let mut regs = bytes[0x19c..0x39c]
-            .chunks_exact(0x10)
-            .map(|x| u128::from_be_bytes(x.try_into().unwrap()));
+            .as_chunks()
+            .0
+            .iter()
+            .map(|x| u128::from_be_bytes(*x));
 
         for reg in &mut self.vr {
             *reg = regs.next().ok_or(())?;

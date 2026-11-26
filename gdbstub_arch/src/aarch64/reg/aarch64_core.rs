@@ -1,4 +1,3 @@
-use core::convert::TryInto;
 use gdbstub::arch::Registers;
 
 /// AArch64 core registers.
@@ -63,8 +62,10 @@ impl Registers for AArch64CoreRegs {
         }
 
         let mut regs = bytes[0..CPSR_OFF]
-            .chunks_exact(core::mem::size_of::<u64>())
-            .map(|c| u64::from_le_bytes(c.try_into().unwrap()));
+            .as_chunks()
+            .0
+            .iter()
+            .map(|c| u64::from_le_bytes(*c));
 
         for reg in self.x.iter_mut() {
             *reg = regs.next().ok_or(())?
@@ -73,22 +74,28 @@ impl Registers for AArch64CoreRegs {
         self.pc = regs.next().ok_or(())?;
 
         let mut regs = bytes[CPSR_OFF..FPSIMD_OFF]
-            .chunks_exact(core::mem::size_of::<u32>())
-            .map(|c| u32::from_le_bytes(c.try_into().unwrap()));
+            .as_chunks()
+            .0
+            .iter()
+            .map(|c| u32::from_le_bytes(*c));
 
         self.cpsr = regs.next().ok_or(())?;
 
         let mut regs = bytes[FPSIMD_OFF..FPCR_OFF]
-            .chunks_exact(core::mem::size_of::<u128>())
-            .map(|c| u128::from_le_bytes(c.try_into().unwrap()));
+            .as_chunks()
+            .0
+            .iter()
+            .map(|c| u128::from_le_bytes(*c));
 
         for reg in self.v.iter_mut() {
             *reg = regs.next().ok_or(())?
         }
 
         let mut regs = bytes[FPCR_OFF..]
-            .chunks_exact(core::mem::size_of::<u32>())
-            .map(|c| u32::from_le_bytes(c.try_into().unwrap()));
+            .as_chunks()
+            .0
+            .iter()
+            .map(|c| u32::from_le_bytes(*c));
 
         self.fpcr = regs.next().ok_or(())?;
         self.fpsr = regs.next().ok_or(())?;

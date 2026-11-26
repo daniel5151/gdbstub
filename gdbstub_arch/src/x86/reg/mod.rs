@@ -1,6 +1,5 @@
 //! `Register` structs for x86 architectures.
 
-use core::convert::TryInto;
 use gdbstub::arch::Registers;
 
 /// `RegId` definitions for x86 architectures.
@@ -71,9 +70,7 @@ impl Registers for X87FpuInternalRegs {
             return Err(());
         }
 
-        let mut regs = bytes
-            .chunks_exact(4)
-            .map(|x| u32::from_le_bytes(x.try_into().unwrap()));
+        let mut regs = bytes.as_chunks().0.iter().map(|x| u32::from_le_bytes(*x));
 
         self.fctrl = regs.next().ok_or(())?;
         self.fstat = regs.next().ok_or(())?;
@@ -138,9 +135,7 @@ impl Registers for X86SegmentRegs {
             return Err(());
         }
 
-        let mut regs = bytes
-            .chunks_exact(4)
-            .map(|x| u32::from_le_bytes(x.try_into().unwrap()));
+        let mut regs = bytes.as_chunks().0.iter().map(|x| u32::from_le_bytes(*x));
 
         self.cs = regs.next().ok_or(())?;
         self.ss = regs.next().ok_or(())?;

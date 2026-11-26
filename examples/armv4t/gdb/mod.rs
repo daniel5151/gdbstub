@@ -196,8 +196,8 @@ impl SingleThreadBase for Emu {
             .unwrap_or_else(|| self.cpu);
         let mode = cpu.mode();
 
-        for i in 0..13 {
-            regs.core.r[i] = cpu.reg_get(mode, i as u8);
+        for (i, reg) in regs.core.r.iter_mut().enumerate() {
+            *reg = cpu.reg_get(mode, i as u8);
         }
         regs.core.sp = cpu.reg_get(mode, reg::SP);
         regs.core.lr = cpu.reg_get(mode, reg::LR);
@@ -479,15 +479,12 @@ mod custom_arch {
         }
 
         fn gdb_deserialize(&mut self, bytes: &[u8]) -> Result<(), ()> {
-            // ensure bytes.chunks_exact(4) won't panic
+            // reject a partial register at the end
             if !bytes.len().is_multiple_of(4) {
                 return Err(());
             }
 
-            use core::convert::TryInto;
-            let mut regs = bytes
-                .chunks_exact(4)
-                .map(|c| u32::from_le_bytes(c.try_into().unwrap()));
+            let mut regs = bytes.as_chunks().0.iter().map(|c| u32::from_le_bytes(*c));
 
             // copied from ArmCoreRegs
             {
