@@ -56,11 +56,12 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             }
             // TODO?: support custom resume addr in 'c' and 's'
             //
-            // vCont doesn't have a notion of "resume addr", and since the implementation of these
-            // packets reuse vCont infrastructure, supporting this obscure feature will be a bit
-            // annoying...
+            // vCont doesn't have a notion of "resume addr", and since the
+            // implementation of these packets reuse vCont infrastructure,
+            // supporting this obscure feature will be a bit annoying...
             //
-            // TODO: add `support_legacy_s_c_packets` flag (similar to `use_X_packet`)
+            // TODO: add `support_legacy_s_c_packets` flag (similar to
+            // `use_X_packet`)
             Resume::c(cmd) => {
                 let _addr = cmd.addr;
                 Actions::new_continue(SpecificThreadId {
@@ -149,7 +150,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             // TODO: update this case when non-stop mode is implemented
             VContKind::Stop => Err(Error::PacketUnexpected),
 
-            // Instead of using `_ =>`, explicitly list out any remaining unguarded cases.
+            // Instead of using `_ =>`, explicitly list out any remaining
+            // unguarded cases.
             VContKind::RangeStep(..) | VContKind::Step | VContKind::StepWithSig(..) => {
                 error!("GDB client sent resume action not reported by `vCont?`");
                 Err(Error::PacketUnexpected)
@@ -243,15 +245,17 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 // TODO: update this case when non-stop mode is implemented
                 VContKind::Stop => return Err(Error::PacketUnexpected),
 
-                // GDB doesn't always respect `vCont?` responses that omit `;s;S`, and will try to
-                // send step packets regardless. Inform the user of this bug by issuing a
-                // `UnexpectedStepPacket` error, which is more useful than a generic
-                // `PacketUnexpected` error.
+                // GDB doesn't always respect `vCont?` responses that omit
+                // `;s;S`, and will try to send step packets regardless. Inform
+                // the user of this bug by issuing a `UnexpectedStepPacket`
+                // error, which is more useful than a generic `PacketUnexpected`
+                // error.
                 VContKind::Step | VContKind::StepWithSig(..) => {
                     return Err(Error::UnexpectedStepPacket)
                 }
 
-                // Instead of using `_ =>`, explicitly list out any remaining unguarded cases.
+                // Instead of using `_ =>`, explicitly list out any remaining
+                // unguarded cases.
                 VContKind::RangeStep(..) => {
                     error!("GDB client sent resume action not reported by `vCont?`");
                     return Err(Error::PacketUnexpected);
@@ -491,8 +495,9 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                 res.write_str("vforkdone:;")?;
                 FinishExecStatus::Handled
             }
-            // Explicitly avoid using `_ =>` to handle the "unguarded" variants, as doing so would
-            // squelch the useful compiler error that crops up whenever stop reasons are added.
+            // Explicitly avoid using `_ =>` to handle the "unguarded" variants,
+            // as doing so would squelch the useful compiler error that crops up
+            // whenever stop reasons are added.
             MultiThreadStopReason::SwBreak(_)
             | MultiThreadStopReason::HwBreak(_)
             | MultiThreadStopReason::Watch { .. }

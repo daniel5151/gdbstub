@@ -69,18 +69,18 @@ impl Target for Emu {
     // `gdbstub_arch::arm::Armv4t`. The implementation is in the `custom_arch`
     // module at the bottom of this file.
     //
-    // unless you're working with a particularly funky architecture that uses custom
-    // registers, you should probably stick to using the simple `target.xml`
-    // implementations from the `gdbstub_arch` repo (i.e: `target.xml` files that
-    // only specify the <architecture> and <feature>s of the arch, instead of
-    // listing out all the registers out manually).
+    // unless you're working with a particularly funky architecture that uses
+    // custom registers, you should probably stick to using the simple
+    // `target.xml` implementations from the `gdbstub_arch` repo (i.e:
+    // `target.xml` files that only specify the <architecture> and <feature>s of
+    // the arch, instead of listing out all the registers out manually).
     type Arch = custom_arch::Armv4tCustom;
     type Error = &'static str;
 
     // --------------- IMPORTANT NOTE ---------------
     // Always remember to annotate IDET enable methods with `inline(always)`!
-    // Without this annotation, LLVM might fail to dead-code-eliminate nested IDET
-    // implementations, resulting in unnecessary binary bloat.
+    // Without this annotation, LLVM might fail to dead-code-eliminate nested
+    // IDET implementations, resulting in unnecessary binary bloat.
 
     #[inline(always)]
     fn base_ops(&mut self) -> target::ext::base::BaseOps<'_, Self::Arch, Self::Error> {
@@ -187,7 +187,8 @@ impl SingleThreadBase for Emu {
         &mut self,
         regs: &mut custom_arch::ArmCoreRegsCustom,
     ) -> TargetResult<(), Self> {
-        // if we selected a frame from a tracepoint, return registers from that snapshot
+        // if we selected a frame from a tracepoint, return registers from that
+        // snapshot
         let cpu = self
             .selected_frame
             .and_then(|selected| self.traceframes.get(selected))
@@ -238,12 +239,13 @@ impl SingleThreadBase for Emu {
 
     fn read_addrs(&mut self, start_addr: u32, data: &mut [u8]) -> TargetResult<usize, Self> {
         if self.selected_frame.is_some() {
-            // we only support register collection actions for our tracepoint frames.
-            // if we have a selected frame, then we don't have any memory we can
-            // return from the frame snapshot.
+            // we only support register collection actions for our tracepoint
+            // frames. if we have a selected frame, then we don't have any
+            // memory we can return from the frame snapshot.
             return Ok(0);
         }
-        // this is a simple emulator, with RAM covering the entire 32 bit address space
+        // this is a simple emulator, with RAM covering the entire 32 bit
+        // address space
         for (addr, val) in (start_addr..).zip(data.iter_mut()) {
             *val = self.mem.r8(addr)
         }
@@ -256,7 +258,8 @@ impl SingleThreadBase for Emu {
             return Err(TargetError::NonFatal);
         }
 
-        // this is a simple emulator, with RAM covering the entire 32 bit address space
+        // this is a simple emulator, with RAM covering the entire 32 bit
+        // address space
         for (addr, val) in (start_addr..).zip(data.iter().copied()) {
             self.mem.w8(addr, val)
         }
@@ -273,18 +276,19 @@ impl SingleThreadBase for Emu {
 
 impl SingleThreadResume for Emu {
     fn resume(&mut self, signal: Option<Signal>) -> Result<(), Self::Error> {
-        // Upon returning from the `resume` method, the target being debugged should be
-        // configured to run according to whatever resume actions the GDB client has
-        // specified (as specified by `set_resume_action`, `resume_range_step`,
-        // `reverse_{step, continue}`, etc...)
+        // Upon returning from the `resume` method, the target being debugged
+        // should be configured to run according to whatever resume actions the
+        // GDB client has specified (as specified by `set_resume_action`,
+        // `resume_range_step`, `reverse_{step, continue}`, etc...)
         //
-        // In this basic `armv4t` example, the `resume` method simply sets the exec mode
-        // of the emulator's interpreter loop and returns.
+        // In this basic `armv4t` example, the `resume` method simply sets the
+        // exec mode of the emulator's interpreter loop and returns.
         //
-        // In more complex implementations, it's likely that the target being debugged
-        // will be running in another thread / process, and will require some kind of
-        // external "orchestration" to set it's execution mode (e.g: modifying the
-        // target's process state via platform specific debugging syscalls).
+        // In more complex implementations, it's likely that the target being
+        // debugged will be running in another thread / process, and will
+        // require some kind of external "orchestration" to set it's execution
+        // mode (e.g: modifying the target's process state via platform specific
+        // debugging syscalls).
 
         if signal.is_some() {
             return Err("no support for continuing with signal");
@@ -516,8 +520,8 @@ mod custom_arch {
     pub enum ArmCoreRegIdCustom {
         Core(ArmCoreRegId),
         Custom,
-        // not sent as part of `struct ArmCoreRegsCustom`, and only accessible via the single
-        // register read/write functions
+        // not sent as part of `struct ArmCoreRegsCustom`, and only accessible
+        // via the single register read/write functions
         Time,
         /// This pseudo-register is valid but never available
         Unavailable,
@@ -549,15 +553,16 @@ mod custom_arch {
         //
         // See `examples/armv4t/gdb/target_description_xml_override.rs`
         //
-        // in an actual implementation, you'll want to return an actual string here!
+        // in an actual implementation, you'll want to return an actual string
+        // here!
         fn target_description_xml() -> Option<&'static str> {
             Some("never gets returned")
         }
 
         // (LLDB extension)
         //
-        // for _purely demonstrative purposes_, even though this provides a working
-        // example, it will get overwritten by RegisterInfoOverride.
+        // for _purely demonstrative purposes_, even though this provides a
+        // working example, it will get overwritten by RegisterInfoOverride.
         //
         // See `examples/armv4t/gdb/register_info_override.rs`
         fn lldb_register_info(reg_id: usize) -> Option<RegisterInfo<'static>> {
@@ -565,9 +570,11 @@ mod custom_arch {
                 Some((_, None)) | None => Some(RegisterInfo::Done),
                 Some((r, Some(size))) => {
                     let name = match r {
-                        // For the purpose of demonstration, we end the qRegisterInfo packet
-                        // exchange when reaching the Time register id, so that this register can
-                        // only be explicitly queried via the single-register read packet.
+                        // For the purpose of demonstration, we end the
+                        // qRegisterInfo packet exchange when reaching the Time
+                        // register id, so that this register can
+                        // only be explicitly queried via the single-register
+                        // read packet.
                         ArmCoreRegIdCustom::Time => return Some(RegisterInfo::Done),
                         ArmCoreRegIdCustom::Core(ArmCoreRegId::Gpr(i)) => match i {
                             0 => "r0",

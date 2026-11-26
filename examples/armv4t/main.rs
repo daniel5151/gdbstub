@@ -73,20 +73,21 @@ impl run_blocking::BlockingEventLoop for EmuGdbEventLoop {
             <Self::Connection as Connection>::Error,
         >,
     > {
-        // The `armv4t` example runs the emulator in the same thread as the GDB state
-        // machine loop. As such, it uses a simple poll-based model to check for
-        // interrupt events, whereby the emulator will check if there is any incoming
-        // data over the connection, and pause execution with a synthetic
-        // `RunEvent::IncomingData` event.
+        // The `armv4t` example runs the emulator in the same thread as the GDB
+        // state machine loop. As such, it uses a simple poll-based model to
+        // check for interrupt events, whereby the emulator will check if there
+        // is any incoming data over the connection, and pause execution with a
+        // synthetic `RunEvent::IncomingData` event.
         //
-        // In more complex integrations, the target will probably be running in a
-        // separate thread, and instead of using a poll-based model to check for
-        // incoming data, you'll want to use some kind of "select" based model to
-        // simultaneously wait for incoming GDB data coming over the connection, along
-        // with any target-reported stop events.
+        // In more complex integrations, the target will probably be running in
+        // a separate thread, and instead of using a poll-based model to check
+        // for incoming data, you'll want to use some kind of "select" based
+        // model to simultaneously wait for incoming GDB data coming over the
+        // connection, along with any target-reported stop events.
         //
-        // The specifics of how this "select" mechanism work + how the target reports
-        // stop events will entirely depend on your project's architecture.
+        // The specifics of how this "select" mechanism work + how the target
+        // reports stop events will entirely depend on your project's
+        // architecture.
         //
         // Some ideas on how to implement this `select` mechanism:
         //
@@ -96,9 +97,9 @@ impl run_blocking::BlockingEventLoop for EmuGdbEventLoop {
         // - Driving `GdbStub` from various interrupt handlers
 
         let poll_incoming_data = || {
-            // gdbstub takes ownership of the underlying connection, so the `borrow_conn`
-            // method is used to borrow the underlying connection back from the stub to
-            // check for incoming data.
+            // gdbstub takes ownership of the underlying connection, so the
+            // `borrow_conn` method is used to borrow the underlying connection
+            // back from the stub to check for incoming data.
             conn.peek().map(|b| b.is_some()).unwrap_or(true)
         };
 
@@ -137,9 +138,9 @@ impl run_blocking::BlockingEventLoop for EmuGdbEventLoop {
     fn on_interrupt(
         _target: &mut emu::Emu,
     ) -> Result<Option<SingleThreadStopReason<u32>>, <emu::Emu as Target>::Error> {
-        // Because this emulator runs as part of the GDB stub loop, there isn't any
-        // special action that needs to be taken to interrupt the underlying target. It
-        // is implicitly paused whenever the stub isn't within the
+        // Because this emulator runs as part of the GDB stub loop, there isn't
+        // any special action that needs to be taken to interrupt the underlying
+        // target. It is implicitly paused whenever the stub isn't within the
         // `wait_for_stop_reason` callback.
         Ok(Some(SingleThreadStopReason::Signal(Signal::SIGINT)))
     }

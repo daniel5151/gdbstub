@@ -103,11 +103,12 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                             }
                             res.write_str(";")
                         })(),
-                        // In fact, this doesn't has to be E45! It could equally well be any
-                        // other error code or even an eOk, eAck or eNack! It turns out that
-                        // 0x45 == 69, so presumably the LLDB people were just having some fun
-                        // here. For a little discussion on this and LLDB source code pointers,
-                        // see https://github.com/daniel5151/gdbstub/pull/103#discussion_r888590197
+                        // In fact, this doesn't has to be E45! It could equally
+                        // well be any other error code or even an eOk, eAck or
+                        // eNack! It turns out that 0x45 == 69, so presumably
+                        // the LLDB people were just having some fun here. For a
+                        // little discussion on this and LLDB source code
+                        // pointers, see https://github.com/daniel5151/gdbstub/pull/103#discussion_r888590197
                         _ => res.write_str("E45"),
                     };
                     if let Err(e) = res {

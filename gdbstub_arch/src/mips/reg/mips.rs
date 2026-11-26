@@ -228,8 +228,8 @@ where
         // Deserialize the core registers first
         self.core.gdb_deserialize(bytes)?;
 
-        // Ensure bytes contains enough data for all 79 registers of target-width
-        // and the dspctl register which is always 4 bytes
+        // Ensure bytes contains enough data for all 79 registers of
+        // target-width and the dspctl register which is always 4 bytes
         let ptrsize = core::mem::size_of::<U>();
         if bytes.len() < (ptrsize * 79) + 4 {
             return Err(());

@@ -54,8 +54,9 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
         // don't include the '#' in checksum calculation
         let checksum = if self.rle_enabled {
             self.write(b'#')?;
-            // (note: even though `self.write` was called, the the '#' char hasn't been
-            // added to the checksum, and is just sitting in the RLE buffer)
+            // (note: even though `self.write` was called, the the '#' char
+            // hasn't been added to the checksum, and is just sitting in the RLE
+            // buffer)
             self.checksum
         } else {
             let checksum = self.checksum;
@@ -170,19 +171,23 @@ impl<'a, C: Connection + 'a> ResponseWriter<'a, C> {
             let c = match digit {
                 0..=9 => b'0' + digit,
                 10..=15 => b'a' + digit - 10,
-                // This match arm is unreachable, but the compiler isn't smart enough to optimize
-                // out the branch. As such, using `unreachable!` here would introduce panicking
+                // This match arm is unreachable, but the compiler isn't smart
+                // enough to optimize out the branch. As such, using
+                // `unreachable!` here would introduce panicking
                 // code to `gdbstub`.
                 //
                 // In this case, it'd be totally reasonable to use
-                // `unsafe { core::hint::unreachable_unchecked() }`, but i'll be honest, using some
-                // spooky unsafe compiler hints just to eek out a smidge more performance here just
-                // isn't worth the cognitive overhead.
+                // `unsafe { core::hint::unreachable_unchecked() }`, but i'll be
+                // honest, using some spooky unsafe compiler hints just to eek
+                // out a smidge more performance here just isn't worth the
+                // cognitive overhead.
                 //
-                // Moreover, I've played around with this code in godbolt.org, and it turns out that
-                // leaving this match arm as `=> digit` ends up generating the _exact same code_ as
-                // using `unreachable_unchecked` (at least on x86_64 targets compiled using the
-                // latest Rust compiler). YMMV on other platforms.
+                // Moreover, I've played around with this code in godbolt.org,
+                // and it turns out that leaving this match arm as `=> digit`
+                // ends up generating the _exact same code_ as
+                // using `unreachable_unchecked` (at least on x86_64 targets
+                // compiled using the latest Rust compiler). YMMV on other
+                // platforms.
                 _ => digit,
             };
             self.write(c)?;

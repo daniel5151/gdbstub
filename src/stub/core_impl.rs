@@ -124,14 +124,17 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
             _target: PhantomData,
             _connection: PhantomData,
 
-            // NOTE: `current_mem_tid` and `current_resume_tid` are never queried prior to being set
-            // by the GDB client (via the 'H' packet), so it's fine to use dummy values here.
+            // NOTE: `current_mem_tid` and `current_resume_tid` are never
+            // queried prior to being set by the GDB client (via the 'H'
+            // packet), so it's fine to use dummy values here.
             //
-            // The alternative would be to use `Option`, and while this would be more "correct", it
-            // would introduce a _lot_ of noisy and heavy error handling logic all over the place.
+            // The alternative would be to use `Option`, and while this would be
+            // more "correct", it would introduce a _lot_ of noisy and heavy
+            // error handling logic all over the place.
             //
-            // Plus, even if the GDB client is acting strangely and doesn't overwrite these values,
-            // the target will simply return a non-fatal error, which is totally fine.
+            // Plus, even if the GDB client is acting strangely and doesn't
+            // overwrite these values, the target will simply return a non-fatal
+            // error, which is totally fine.
             current_mem_tid: SINGLE_THREAD_TID,
             current_resume_tid: SpecificIdKind::WithId(SINGLE_THREAD_TID),
             features: ProtocolFeatures::empty(),
@@ -167,8 +170,8 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     }
                     Ok(HandlerStatus::DeferredStopReason) => return Ok(State::DeferredStopReason),
                     Ok(HandlerStatus::Disconnect(reason)) => Some(reason),
-                    // HACK: handling this "dummy" error is required as part of the
-                    // `TargetResultExt::handle_error()` machinery.
+                    // HACK: handling this "dummy" error is required as part of
+                    // the `TargetResultExt::handle_error()` machinery.
                     Err(InternalError::NonFatalError(code)) => {
                         res.write_str("E")?;
                         res.write_num(code)?;
@@ -177,8 +180,9 @@ impl<T: Target, C: Connection> GdbStubImpl<T, C> {
                     Err(e) => return Err(e),
                 };
 
-                // every response needs to be flushed, _except_ for the response to a kill
-                // packet, but ONLY when extended mode is NOT implemented.
+                // every response needs to be flushed, _except_ for the response
+                // to a kill packet, but ONLY when extended mode is NOT
+                // implemented.
                 let is_kill = matches!(disconnect_reason, Some(DisconnectReason::Kill));
                 if !(target.support_extended_mode().is_none() && is_kill) {
                     res.flush()?;

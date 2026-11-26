@@ -169,7 +169,8 @@ impl target::ext::tracepoints::Tracepoints for Emu {
         &self,
         report: &mut dyn FnMut(ExperimentStatus<'_>),
     ) -> TargetResult<(), Self> {
-        // For a bare-bones example, we don't provide in-depth status explanations.
+        // For a bare-bones example, we don't provide in-depth status
+        // explanations.
         (report)(if self.tracing {
             ExperimentStatus::Running
         } else {

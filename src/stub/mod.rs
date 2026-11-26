@@ -166,19 +166,21 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
         loop {
             gdb = match gdb {
                 state_machine::GdbStubStateMachine::Idle(mut gdb) => {
-                    // needs more data, so perform a blocking read on the connection
+                    // needs more data, so perform a blocking read on the
+                    // connection
                     let byte = gdb.borrow_conn().read().map_err(InternalError::conn_read)?;
                     gdb.incoming_data(target, byte)?
                 }
 
                 state_machine::GdbStubStateMachine::Disconnected(gdb) => {
-                    // run_blocking keeps things simple, and doesn't expose a way to re-use the
-                    // state machine
+                    // run_blocking keeps things simple, and doesn't expose a
+                    // way to re-use the state machine
                     break Ok(gdb.get_reason());
                 }
 
                 state_machine::GdbStubStateMachine::CtrlCInterrupt(gdb) => {
-                    // defer to the implementation on how it wants to handle the interrupt
+                    // defer to the implementation on how it wants to handle the
+                    // interrupt
                     let stop_reason =
                         E::on_interrupt(target).map_err(InternalError::TargetError)?;
                     gdb.interrupt_handled(target, stop_reason)?
@@ -220,7 +222,8 @@ impl<'a, T: Target, C: Connection> GdbStub<'a, T, C> {
         target: &mut T,
     ) -> Result<state_machine::GdbStubStateMachine<'a, T, C>, GdbStubError<T::Error, C::Error>>
     {
-        // Check if the target hasn't explicitly opted into implicit sw breakpoints
+        // Check if the target hasn't explicitly opted into implicit sw
+        // breakpoints
         {
             let support_software_breakpoints = target
                 .support_breakpoints()

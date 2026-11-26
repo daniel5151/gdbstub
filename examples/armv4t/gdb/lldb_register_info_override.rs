@@ -25,9 +25,10 @@ impl target::ext::lldb_register_info_override::LldbRegisterInfoOverride for Emu 
             Some((_, None)) | None => Ok(reg_info.done()),
             Some((r, Some(size))) => {
                 let name: String = match r {
-                    // For the purpose of demonstration, we end the qRegisterInfo packet exchange
-                    // when reaching the Time register id, so that this register can only be
-                    // explicitly queried via the single-register read packet.
+                    // For the purpose of demonstration, we end the
+                    // qRegisterInfo packet exchange when reaching the Time
+                    // register id, so that this register can only be explicitly
+                    // queried via the single-register read packet.
                     ArmCoreRegIdCustom::Time => return Ok(reg_info.done()),
                     ArmCoreRegIdCustom::Core(ArmCoreRegId::Gpr(i)) => match i {
                         0 => "r0",

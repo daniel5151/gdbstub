@@ -22,8 +22,8 @@ impl<'a, T: ParseAnnex<'a>> ParseCommand<'a> for QXferReadBase<'a, T> {
     fn from_packet(buf: PacketBuf<'a>) -> Option<Self> {
         let (buf, body_range) = buf.into_raw_buf();
 
-        // this looks a bit wacky, but the compiler is dumb and won't elide bounds
-        // checks without it.
+        // this looks a bit wacky, but the compiler is dumb and won't elide
+        // bounds checks without it.
         let (body, buf) = {
             let buf = buf.get_mut(body_range.start..)?;
             if body_range.end - body_range.start > buf.len() {

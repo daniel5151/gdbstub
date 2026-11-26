@@ -42,9 +42,9 @@ impl target::ext::extended_mode::ExtendedMode for Emu {
     fn run(&mut self, filename: Option<&[u8]>, args: Args<'_, '_>) -> TargetResult<Pid, Self> {
         // simplified example: assume UTF-8 filenames / args
         //
-        // To be 100% pedantically correct, consider converting to an `OsStr` in the
-        // least lossy way possible (e.g: using the `from_bytes` extension from
-        // `std::os::unix::ffi::OsStrExt`).
+        // To be 100% pedantically correct, consider converting to an `OsStr` in
+        // the least lossy way possible (e.g: using the `from_bytes` extension
+        // from `std::os::unix::ffi::OsStrExt`).
 
         let filename = match filename {
             None => None,
